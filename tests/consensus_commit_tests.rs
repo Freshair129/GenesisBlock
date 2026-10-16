@@ -277,12 +277,14 @@ fn stale_consensus_revision_is_rejected_before_wal_append() {
         .unwrap();
     assert!(approve(&s, &first));
     let before_stale_commit = wal_lines(&path);
-    let peer = s.local_peer_id.clone();
-    let signature = s.sign_vote(stale.clone(), true).unwrap();
-    let error = s
-        .submit_vote(stale, peer, true, signature)
-        .unwrap_err()
-        .to_string();
+    let vote_lock_path = Path::new(&path).join("consensus-votes.jsonl");
+    let before_stale_vote = fs::read(&vote_lock_path).unwrap_or_default();
+    let error = s.sign_vote(stale, true).unwrap_err().to_string();
     assert!(error.contains("REVISION_CONFLICT"), "{error}");
     assert_eq!(wal_lines(&path), before_stale_commit);
+    assert_eq!(
+        fs::read(&vote_lock_path).unwrap_or_default(),
+        before_stale_vote,
+        "a stale proposal must be rejected before its vote lock is persisted"
+    );
 }

@@ -2,8 +2,13 @@ use genesis_block_native::{
     AccessContext, BackupExportRequest, BackupRestoreRequest, BatchInput, GenesisTransaction,
     NodeInput, OpenOptions, Storage, TemporalRead,
 };
+use sha2::{Digest, Sha256};
 use std::{fs, path::Path, time::Duration};
 use tempfile::TempDir;
+
+fn bundle_sha256(path: &Path) -> String {
+    hex::encode(Sha256::digest(fs::read(path).unwrap()))
+}
 
 fn read_u32(bytes: &[u8], offset: &mut usize) -> u32 {
     let value = u32::from_le_bytes(bytes[*offset..*offset + 4].try_into().unwrap());
@@ -127,7 +132,7 @@ fn restore_publishes_a_generation_before_exposing_the_target() {
     let source_frontier = source.stable_frontier();
     let source_txn_frontier = source.txn_frontier();
     assert!(source_txn_frontier > 0);
-    source
+    let exported = source
         .export_backup(BackupExportRequest {
             destination: bundle_path.clone(),
         })
@@ -136,6 +141,7 @@ fn restore_publishes_a_generation_before_exposing_the_target() {
     let restored_info = Storage::restore_backup(BackupRestoreRequest {
         bundle_path,
         target_root: restore_root.clone(),
+        expected_sha256: exported.sha256,
     })
     .unwrap();
     assert_eq!(restored_info.stable_frontier, source_frontier);
@@ -169,7 +175,7 @@ fn restore_accepts_a_bundle_whose_last_frame_is_the_generation_receipt() {
     let generation = source.publish_generation().unwrap();
     assert_eq!(generation.publication_seq, source.stable_frontier());
     assert_eq!(generation.txn_frontier, transaction_frontier);
-    source
+    let exported = source
         .export_backup(BackupExportRequest {
             destination: bundle_path.clone(),
         })
@@ -178,6 +184,7 @@ fn restore_accepts_a_bundle_whose_last_frame_is_the_generation_receipt() {
     let restored_info = Storage::restore_backup(BackupRestoreRequest {
         bundle_path,
         target_root: restore_root.clone(),
+        expected_sha256: exported.sha256,
     })
     .unwrap();
     assert_eq!(restored_info.stable_frontier, generation.publication_seq);
@@ -212,10 +219,12 @@ fn restore_rejects_a_manifest_frontier_not_present_in_recovered_wal() {
         })
         .unwrap();
     rewrite_manifest_frontier(&bundle_path, exported.stable_frontier + 1);
+    let expected_sha256 = bundle_sha256(&bundle_path);
 
     let error = Storage::restore_backup(BackupRestoreRequest {
         bundle_path,
         target_root: restore_root.clone(),
+        expected_sha256,
     })
     .unwrap_err();
     assert!(format!("{error:?}").contains("recovered WAL frontier mismatch"));

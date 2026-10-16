@@ -73,13 +73,15 @@ fn compacted_quantizers_and_empty_definitions_survive_journal_only() {
         let backup_dir = tempfile::tempdir().unwrap();
         let bundle = backup_dir.path().join("backup.gbak");
         let restored_path = backup_dir.path().join("restored");
-        s.export_backup(BackupExportRequest {
-            destination: bundle.clone(),
-        })
-        .unwrap();
+        let exported = s
+            .export_backup(BackupExportRequest {
+                destination: bundle.clone(),
+            })
+            .unwrap();
         Storage::restore_backup(BackupRestoreRequest {
             bundle_path: bundle,
             target_root: restored_path.clone(),
+            expected_sha256: exported.sha256,
         })
         .unwrap();
         let restored = Storage::open(options(&restored_path)).unwrap();

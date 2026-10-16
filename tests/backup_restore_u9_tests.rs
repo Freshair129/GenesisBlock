@@ -4,10 +4,15 @@ use genesis_block_native::{
     RelationalRowMutation, RelationalSchemaPackage, RelationalTable, Storage, ENGINE_VERSION,
     SCHEMA_VERSION,
 };
-use serde_json::json;
+use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::Path;
 use uuid::Uuid;
+
+fn bundle_sha256(path: &Path) -> String {
+    hex::encode(Sha256::digest(fs::read(path).unwrap()))
+}
 
 fn fresh(name: &str) -> String {
     let path = format!(
@@ -116,6 +121,46 @@ fn replace_archive_path(bytes: &mut [u8], from: &str, to: &str) {
     panic!("archive path was not found: {from}");
 }
 
+fn tamper_artifact_and_rehash_manifest(bytes: &mut [u8], artifact_path: &str) {
+    let manifest_range = manifest_json_range(bytes);
+    let manifest: Value = serde_json::from_slice(&bytes[manifest_range.clone()]).unwrap();
+    let artifact_hash = manifest["artifacts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|artifact| artifact["path"].as_str() == Some(artifact_path))
+        .unwrap()["sha256"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let mut cursor = manifest_range.end;
+    while cursor < bytes.len() {
+        let path_len = u32::from_le_bytes(bytes[cursor..cursor + 4].try_into().unwrap()) as usize;
+        cursor += 4;
+        let path = &bytes[cursor..cursor + path_len];
+        cursor += path_len;
+        let byte_count = u64::from_le_bytes(bytes[cursor..cursor + 8].try_into().unwrap()) as usize;
+        cursor += 8;
+        if path == artifact_path.as_bytes() {
+            assert!(byte_count > 0, "test artifact must contain bytes");
+            let payload = cursor..cursor + byte_count;
+            bytes[payload.start] ^= 0x01;
+            let replacement = hex::encode(Sha256::digest(&bytes[payload]));
+            let manifest_bytes = &bytes[manifest_range.clone()];
+            let hash_offset = manifest_bytes
+                .windows(artifact_hash.len())
+                .position(|window| window == artifact_hash.as_bytes())
+                .unwrap();
+            let start = manifest_range.start + hash_offset;
+            bytes[start..start + replacement.len()].copy_from_slice(replacement.as_bytes());
+            return;
+        }
+        cursor += byte_count;
+    }
+    panic!("archive artifact was not found: {artifact_path}");
+}
+
 #[test]
 fn export_then_clean_restore_preserves_graph_vector_and_manifest_identity() {
     let source_root = fresh("u9_source");
@@ -179,6 +224,7 @@ fn export_then_clean_restore_preserves_graph_vector_and_manifest_identity() {
     let restored_bundle = Storage::restore_backup(BackupRestoreRequest {
         bundle_path: bundle_path.into(),
         target_root: restore_root.clone().into(),
+        expected_sha256: bundle.sha256.clone(),
     })
     .unwrap();
     assert_eq!(restored_bundle.sha256, bundle.sha256);
@@ -222,6 +268,61 @@ fn export_then_clean_restore_preserves_graph_vector_and_manifest_identity() {
 }
 
 #[test]
+fn restore_authenticates_truncated_bundle_before_extracting_artifacts() {
+    let source_root = fresh("u9_pre_auth_source");
+    let bundle_path = format!("{}/u9-pre-auth.genesis", fresh("u9_pre_auth_bundle"));
+    let restore_root = fresh("u9_pre_auth_restore");
+    let source = open(&source_root);
+    let mut large_node = node("large-note", [1.0, 0.0, 0.0, 0.0], None);
+    large_node.props = Some(json!({"padding": "x".repeat(256 * 1024)}));
+    source.add_node(large_node).unwrap();
+    let exported = source
+        .export_backup(BackupExportRequest {
+            destination: bundle_path.clone().into(),
+        })
+        .unwrap();
+
+    let mut bytes = fs::read(&bundle_path).unwrap();
+    let mut cursor = manifest_json_range(&bytes).end;
+    let mut truncated_nodes = false;
+    while cursor < bytes.len() {
+        let path_len = u32::from_le_bytes(bytes[cursor..cursor + 4].try_into().unwrap()) as usize;
+        cursor += 4;
+        let path = &bytes[cursor..cursor + path_len];
+        cursor += path_len;
+        let byte_count = u64::from_le_bytes(bytes[cursor..cursor + 8].try_into().unwrap()) as usize;
+        cursor += 8;
+        if path == b"projection.sqlite" {
+            let retained_payload = 64 * 1024;
+            assert!(
+                byte_count > retained_payload,
+                "test projection artifact must exceed one restore copy buffer"
+            );
+            bytes.truncate(cursor + retained_payload);
+            truncated_nodes = true;
+            break;
+        }
+        cursor += byte_count;
+    }
+    assert!(
+        truncated_nodes,
+        "projection.sqlite must be present in the bundle"
+    );
+    fs::write(&bundle_path, bytes).unwrap();
+
+    let error = Storage::restore_backup(BackupRestoreRequest {
+        bundle_path: bundle_path.into(),
+        target_root: restore_root.clone().into(),
+        expected_sha256: exported.sha256,
+    })
+    .unwrap_err();
+    assert!(error
+        .to_string()
+        .contains("does not match the trusted expected SHA-256"));
+    assert!(!Path::new(&restore_root).exists());
+}
+
+#[test]
 fn restore_rejects_tampered_bundle_without_creating_target() {
     let source_root = fresh("u9_tamper_source");
     let bundle_path = format!("{}/u9-tamper.genesis", fresh("u9_tamper_bundle"));
@@ -230,22 +331,25 @@ fn restore_rejects_tampered_bundle_without_creating_target() {
     source
         .add_node(node("note-a", [1.0, 0.0, 0.0, 0.0], None))
         .unwrap();
-    source
+    let exported = source
         .export_backup(BackupExportRequest {
             destination: bundle_path.clone().into(),
         })
         .unwrap();
 
     let mut bytes = fs::read(&bundle_path).unwrap();
-    let middle = bytes.len() / 2;
-    bytes[middle] ^= 0x01;
+    tamper_artifact_and_rehash_manifest(&mut bytes, "nodes.bin");
     fs::write(&bundle_path, bytes).unwrap();
 
-    assert!(Storage::restore_backup(BackupRestoreRequest {
+    let error = Storage::restore_backup(BackupRestoreRequest {
         bundle_path: bundle_path.into(),
         target_root: restore_root.clone().into(),
+        expected_sha256: exported.sha256,
     })
-    .is_err());
+    .unwrap_err();
+    assert!(error
+        .to_string()
+        .contains("does not match the trusted expected SHA-256"));
     assert!(!Path::new(&restore_root).exists());
 }
 
@@ -269,10 +373,12 @@ fn restore_rejects_incompatible_manifest_without_creating_target() {
     assert_eq!(incompatible.len(), range.len());
     bytes[range].copy_from_slice(incompatible.as_bytes());
     fs::write(&bundle_path, bytes).unwrap();
+    let expected_sha256 = bundle_sha256(Path::new(&bundle_path));
 
     let error = Storage::restore_backup(BackupRestoreRequest {
         bundle_path: bundle_path.into(),
         target_root: restore_root.clone().into(),
+        expected_sha256,
     })
     .unwrap_err();
     assert!(error
@@ -325,11 +431,13 @@ fn restore_rejects_duplicate_traversal_and_trailing_entries() {
             replace_archive_path(&mut bytes, "nodes.bin", replacement);
         }
         fs::write(&bundle_path, bytes).unwrap();
+        let expected_sha256 = bundle_sha256(Path::new(&bundle_path));
 
         assert!(
             Storage::restore_backup(BackupRestoreRequest {
                 bundle_path: bundle_path.into(),
                 target_root: restore_root.clone().into(),
+                expected_sha256,
             })
             .is_err(),
             "{name} bundle should be rejected"
@@ -370,11 +478,13 @@ fn restore_rejects_incompatible_engine_and_schema_without_creating_target() {
              means the fixture drifted from the real manifest shape"
         );
         fs::write(&bundle_path, bytes).unwrap();
+        let expected_sha256 = bundle_sha256(Path::new(&bundle_path));
 
         assert!(
             Storage::restore_backup(BackupRestoreRequest {
                 bundle_path: bundle_path.into(),
                 target_root: restore_root.clone().into(),
+                expected_sha256,
             })
             .is_err(),
             "{name} bundle should be rejected"
@@ -426,10 +536,12 @@ fn restore_accepts_older_engine_version_with_same_schema() {
         "engine_version rewrite must match the manifest"
     );
     fs::write(&bundle_path, bytes).unwrap();
+    let expected_sha256 = bundle_sha256(Path::new(&bundle_path));
 
     Storage::restore_backup(BackupRestoreRequest {
         bundle_path: bundle_path.into(),
         target_root: restore_root.clone().into(),
+        expected_sha256,
     })
     .expect("a same-schema bundle from an older engine version must restore");
 
@@ -465,16 +577,18 @@ fn export_and_restore_reject_live_or_existing_destinations() {
         })
         .is_err());
     fs::remove_file(&bundle_path).unwrap();
-    source
+    let exported = source
         .export_backup(BackupExportRequest {
             destination: bundle_path.clone().into(),
         })
         .unwrap();
+    let expected_sha256 = exported.sha256;
     let existing_target = fresh("u9_existing_restore_target");
     fs::create_dir_all(&existing_target).unwrap();
     assert!(Storage::restore_backup(BackupRestoreRequest {
         bundle_path: bundle_path.into(),
         target_root: existing_target.into(),
+        expected_sha256,
     })
     .is_err());
 }

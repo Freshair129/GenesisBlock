@@ -986,6 +986,76 @@ fn exported_proposal_can_be_imported_and_voted_on_by_an_authorized_member() {
 }
 
 #[test]
+fn schema6_consensus_rejects_raw_graph_events_before_voting() {
+    let (_master_dir, master) = open_current_schema("raw-schema6-consensus-master");
+    let (voter_dir, voter) = open_current_schema("raw-schema6-consensus-voter");
+    configure(&master, vec![peer(&voter, 31482, false)], 31481, true);
+    configure(&voter, vec![peer(&master, 31481, true)], 31482, false);
+
+    let proposal_id = "raw-schema6-node-proposal".to_string();
+    let proposal = ConsensusProposal {
+        proposal_id: proposal_id.clone(),
+        signed_event: master.sign_event(&Event::Node(node(
+            "raw-schema6-consensus-node",
+            &["MASTER"],
+        ))),
+        votes: Default::default(),
+        quorum_signatures: Default::default(),
+        committed: false,
+    };
+    let before = voter.stable_frontier();
+    let error = voter
+        .import_consensus_proposal(proposal.clone())
+        .unwrap_err();
+    assert!(error.to_string().contains("revision-bearing graph events"));
+    assert_eq!(voter.stable_frontier(), before);
+    assert!(!voter.proposals.contains_key(&proposal_id));
+    assert!(voter.node_view("raw-schema6-consensus-node").is_none());
+
+    // Defense in depth: even if an invalid proposal is injected into the
+    // in-memory map by a stale or corrupted caller, the voting path rejects it
+    // before creating a durable vote lock.
+    voter.proposals.insert(proposal_id.clone(), proposal);
+    let error = voter.sign_vote(proposal_id.clone(), true).unwrap_err();
+    assert!(error.to_string().contains("revision-bearing graph events"));
+    assert!(!voter_dir.path().join("consensus-votes.jsonl").exists());
+    assert_eq!(voter.stable_frontier(), before);
+}
+
+#[test]
+fn schema6_consensus_rejects_malformed_revision_envelope_before_admission() {
+    let (_master_dir, master) = open_current_schema("malformed-consensus-master");
+    let (voter_dir, voter) = open_current_schema("malformed-consensus-voter");
+    configure(&master, vec![peer(&voter, 31484, false)], 31483, true);
+    configure(&voter, vec![peer(&master, 31483, true)], 31484, false);
+
+    let proposal_id = master
+        .propose_consensus(
+            Event::Node(node("malformed-consensus-node", &["USER"])),
+            Vec::new(),
+        )
+        .unwrap();
+    let mut proposal = master.export_consensus_proposal(&proposal_id).unwrap();
+    let Event::Transaction(transaction) = &mut proposal.signed_event.event else {
+        panic!("schema-6 graph proposal should use a revision transaction");
+    };
+    transaction
+        .record_revision_transaction
+        .as_mut()
+        .expect("graph proposal must carry a revision envelope")
+        .mutations[0]
+        .revision_id = "not-a-uuid".to_string();
+    proposal.signed_event = master.sign_event(&proposal.signed_event.event);
+
+    let before = voter.stable_frontier();
+    voter.import_consensus_proposal(proposal).unwrap_err();
+    assert_eq!(voter.stable_frontier(), before);
+    assert!(!voter.proposals.contains_key(&proposal_id));
+    assert!(voter.node_view("malformed-consensus-node").is_none());
+    assert!(!voter_dir.path().join("consensus-votes.jsonl").exists());
+}
+
+#[test]
 fn consensus_quorum_uses_the_fixed_roster_not_discovered_peers() {
     let (_local_dir, local) = open("quorum-local");
     let (_peer_a_dir, peer_a) = open("quorum-peer-a");
@@ -1063,7 +1133,7 @@ fn consensus_quorum_uses_the_fixed_roster_not_discovered_peers() {
 fn current_schema_accepts_authenticated_compacted_graph_materializations() {
     let (_master_dir, master) = open_current_schema("schema6-compaction-master");
     let (_relay_dir, relay) = open_current_schema("schema6-compaction-relay");
-    let (_receiver_dir, receiver) = open_current_schema("schema6-compaction-receiver");
+    let (receiver_dir, receiver) = open_current_schema("schema6-compaction-receiver");
     configure(
         &master,
         vec![peer(&relay, 31512, false), peer(&receiver, 31513, false)],
@@ -1132,6 +1202,36 @@ fn current_schema_accepts_authenticated_compacted_graph_materializations() {
     relay.compact().unwrap();
 
     let compacted = relay.events_since_seq(0);
+    let revision_checkpoint = compacted
+        .iter()
+        .find(|signed| {
+            matches!(
+                &signed.event,
+                Event::Transaction(transaction)
+                    if transaction.record_revision_transaction.is_some()
+                        && transaction.local_frame_seq.is_some()
+            )
+        })
+        .expect("compaction should emit a revision checkpoint");
+    let before_rejected_checkpoints = receiver.stable_frontier();
+
+    let mut tampered_checkpoint = revision_checkpoint.clone();
+    let Event::Transaction(transaction) = &mut tampered_checkpoint.event else {
+        unreachable!();
+    };
+    transaction.local_frame_seq = transaction.local_frame_seq.map(|seq| seq + 1);
+    assert!(receiver
+        .reconcile_state(vec![tampered_checkpoint])
+        .unwrap_err()
+        .to_string()
+        .contains("SYNC_AUTH_REQUIRED"));
+
+    // A valid relay signature over a checkpoint shape is not enough: schema 6
+    // requires a source event whose revision envelope binds the checkpoint.
+    let raw_checkpoint = relay.sign_event(&revision_checkpoint.event);
+    assert!(receiver.reconcile_state(vec![raw_checkpoint]).is_err());
+    assert_eq!(receiver.stable_frontier(), before_rejected_checkpoints);
+
     let large_materialization = compacted
         .iter()
         .find(
@@ -1183,6 +1283,24 @@ fn current_schema_accepts_authenticated_compacted_graph_materializations() {
     assert!(receiver.node_view("schema6-user-vector").is_some());
     assert!(receiver.node_view("schema6-relay-user").is_some());
     assert!(receiver.node_view("schema6-master-retracted").is_none());
+
+    // Force projection recovery from the compacted WAL to exercise the same
+    // source-proof check used during sync, then confirm revisions survived.
+    drop(receiver);
+    fs::remove_file(receiver_dir.path().join("projection.sqlite")).unwrap();
+    let reopened = reopen("schema6-compaction-receiver-replay", receiver_dir.path());
+    assert!(reopened.node_view("schema6-master-live").is_some());
+    let projection =
+        rusqlite::Connection::open(receiver_dir.path().join("projection.sqlite")).unwrap();
+    let revision_count: i64 = projection
+        .query_row("SELECT COUNT(*) FROM hql2_record_revisions", [], |row| {
+            row.get(0)
+        })
+        .unwrap();
+    assert!(
+        revision_count > 0,
+        "revision history should replay from checkpoint proofs"
+    );
 }
 
 #[test]

@@ -3,6 +3,7 @@ set -euo pipefail
 
 IMAGE="${GENESIS_SMOKE_IMAGE:-genesisblockdb:smoke}"
 PORT="${GENESIS_SMOKE_PORT:-31080}"
+API_KEY="${GENESIS_SMOKE_API_KEY:-docker-smoke-test-only}"
 VOLUME="genesisblockdb-smoke-${RANDOM}-${RANDOM}"
 CONTAINER="genesisblockdb-smoke-${RANDOM}-${RANDOM}"
 
@@ -15,7 +16,8 @@ trap cleanup EXIT
 wait_ready() {
   local attempts=60
   for _ in $(seq 1 "$attempts"); do
-    if curl -fsS "http://127.0.0.1:${PORT}/v1/status" >/dev/null 2>&1; then
+    if curl -fsS -H "Authorization: Bearer ${API_KEY}" \
+      "http://127.0.0.1:${PORT}/v1/status" >/dev/null 2>&1; then
       return 0
     fi
     sleep 1
@@ -26,7 +28,8 @@ wait_ready() {
 }
 
 node_count() {
-  curl -fsS "http://127.0.0.1:${PORT}/v1/status" \
+  curl -fsS -H "Authorization: Bearer ${API_KEY}" \
+    "http://127.0.0.1:${PORT}/v1/status" \
     | python3 -c 'import json,sys; print(json.load(sys.stdin)["node_count"])'
 }
 
@@ -40,6 +43,7 @@ docker volume create "$VOLUME" >/dev/null
 
 echo "==> First start"
 docker run -d --name "$CONTAINER" \
+  -e "GENESIS_API_KEY=${API_KEY}" \
   -p "${PORT}:3000" \
   -v "${VOLUME}:/data" \
   "$IMAGE" >/dev/null
@@ -49,6 +53,7 @@ before="$(node_count)"
 echo "node_count before write: ${before}"
 
 curl -fsS \
+  -H "Authorization: Bearer ${API_KEY}" \
   -H 'content-type: application/json' \
   -d '{"id":"docker-persistence-smoke","labels":["Smoke"]}' \
   "http://127.0.0.1:${PORT}/v1/node/add" >/dev/null
@@ -64,6 +69,7 @@ docker stop "$CONTAINER" >/dev/null
 docker rm "$CONTAINER" >/dev/null
 
 docker run -d --name "$CONTAINER" \
+  -e "GENESIS_API_KEY=${API_KEY}" \
   -p "${PORT}:3000" \
   -v "${VOLUME}:/data" \
   "$IMAGE" >/dev/null

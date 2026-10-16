@@ -95,7 +95,7 @@ On first open at bumped `SCHEMA_VERSION`: (1) verify/produce a durable snapshot 
 | Frontier surfaces (frame/txn split) | `cargo test --test unified_transaction_u3_tests --test backup_restore_u9_tests --test studio_contract_tests --test rest_api_tests --test napi_rest_parity_tests` |
 | Everything else unbroken | `cargo test` + `npm test` |
 | Mobile targets build with zstd in tree (**merge-blocking**, ADR D1) | `mobile-build.yml` green on all targets |
-| Compression ratio measured vs JSONL baseline (ADR D3 estimate → number) | `cargo run --release --features bins --bin industrial-audit` + journal size report in PR |
+| Compression ratio measured for the authenticated compacted body; original JSONL size reported separately | `cargo run --release --features bins --bin industrial-audit` + journal size report in PR |
 
 ## 8. Implementation deviations (WP-1.2, recorded per the same-PR rule)
 
@@ -105,10 +105,14 @@ Implementation revealed four places where draft-1 was over- or under-specified; 
 2. **No `segments[]` list in the manifest.** Segments are self-describing (header carries kind/min/max) and are discovered by directory scan — a manifest list could only diverge from the directory. `state.json.journal` holds `{frontier_seq, txn_frontier, tx_epoch_start, format_version}` only.
 3. **Checkpoint = fold-to-base (interim `frontier_only` profile).** WP-1.2 ships the fold machinery with the degenerate profile as default: every checkpoint folds the whole journal into one base segment (`B<seq>.gseg`, kind=base, frames stamped at the fold frontier). This keeps the journal a complete standalone recovery source at every instant (I8) and preserves today's bounded-disk behavior; budget profiles (partial folds, retention floors) land in WP-1.3 and flip the default. Fold order (I7/I9): base segment durable → drop old journal files → reset active → snapshot files → `state.json` renamed last.
 4. **Migration needs no prior snapshot.** The snapshot-first rule in §6 guards *folds* (which discard); sealing the legacy WAL as segment 0 is lossless (exact bytes, streamed sha256 + zstd, bounded memory), so migration runs unconditionally at first open. Read-only opens skip migration and read the legacy file in place. Also: no `WalMsg::Seal` message — threshold seals run inline on the writer thread after a batch fsync.
+5. **Authenticated compacted events carry source proofs.** Schema-6 graph materializations and revision checkpoints retain signed source transactions so recovery and sync can verify their revision bindings. Those proofs add bytes that were not present in the original JSONL input, so the journal benchmark reports the original input size separately and measures compression against the complete authenticated compacted body.
+6. **Authorization follows the fold boundary.** Pre-base history and detached revision-checkpoint sources are evaluated in their original frame order, then base materializations establish the graph state at the fold frontier, then post-base HISTORY and active frames are evaluated in frame order. A sealed segment's `HISTORY` kind alone does not mean it predates the latest base.
 
 ## CHANGELOG
 
 | Version | Date | Summary |
 |---|---|---|
+| draft-3 | 2026-10-16 | PR #239 security-proof compaction benchmark separates required proof overhead from segment compression ratio |
+| draft-4 | 2026-10-16 | PR #239 preflight orders post-base HISTORY and active events after folded base materializations |
 | draft-2 | 2026-08-17 | §8 implementation deviations: seq-cursor supersedes prefix-hash; directory-scanned segments (no manifest list); interim fold-to-base checkpoint; lossless migration without prior snapshot |
 | draft-1 | 2026-08-17 | Initial format spec elaborating accepted ADR--GENESISDB-JOURNAL-HISTORY |

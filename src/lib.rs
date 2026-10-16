@@ -10,7 +10,7 @@ use rand::Rng;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::{self, File, OpenOptions as FileOpenOptions};
-use std::io::{Read, Write};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::net::SocketAddr;
 // Positioned (offset) reads for the on-disk rerank sidecar. Both are gated by
 // `#[cfg]` so the crate builds on either platform; NEVER mmap (Windows rename /
@@ -111,8 +111,9 @@ type Hql2CatalogSnapshotV2 = (
 // v6: durable HQL2 record revisions, row identities and annotation projections.
 pub const SCHEMA_VERSION: u32 = 6;
 const LEGACY_SCHEMA_VERSION: u32 = 5;
-/// Gossip v7 adds detached MASTER proofs to compacted SignedEvent signatures.
-/// It is independent of the on-disk schema so older peers fail before sync.
+/// Gossip v8 adds authenticated closed peer membership on top of v7's detached
+/// MASTER proofs for compacted SignedEvent signatures. It is independent of the
+/// on-disk schema so older peers fail before sync.
 pub const GOSSIP_PROTOCOL_VERSION: u32 = 8;
 // v3: WP-2.1 node_versions chain (additive CREATE IF NOT EXISTS migration).
 // v4: edges + edges_current view (SPEC--GENESISDB-EDGE-PROJECTION), same
@@ -1216,6 +1217,9 @@ pub struct BackupExportRequest {
 pub struct BackupRestoreRequest {
     pub bundle_path: PathBuf,
     pub target_root: PathBuf,
+    /// SHA-256 of the complete bundle, pinned through a trusted channel by the
+    /// caller. Manifest artifact hashes alone do not authenticate bundle origin.
+    pub expected_sha256: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -1249,6 +1253,35 @@ struct BackupManifest {
     logical_clock: u32,
     created_at: String,
     artifacts: Vec<BackupArtifact>,
+}
+
+struct HashingReader<R> {
+    inner: R,
+    hasher: Sha256,
+    byte_count: u64,
+}
+
+impl<R> HashingReader<R> {
+    fn new(inner: R) -> Self {
+        Self {
+            inner,
+            hasher: Sha256::new(),
+            byte_count: 0,
+        }
+    }
+
+    fn finish(self) -> (u64, String) {
+        (self.byte_count, hex::encode(self.hasher.finalize()))
+    }
+}
+
+impl<R: Read> Read for HashingReader<R> {
+    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        let read = self.inner.read(buffer)?;
+        self.hasher.update(&buffer[..read]);
+        self.byte_count += read as u64;
+        Ok(read)
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -1474,6 +1507,9 @@ const COMPACTED_MASTER_PROOF_MAX_BYTES: usize = 1024 * 1024;
 const COMPACTED_BASE_EVENT_MAGIC: &[u8] = b"GB-COMPACTED-BASE-EVENT-V1\0";
 const COMPACTED_BASE_EVENT_V2_MAGIC: &[u8] = b"GB-COMPACTED-BASE-EVENT-V2\0";
 const COMPACTED_BASE_EVENT_MAX_BYTES: usize = 1024 * 1024;
+const COMPACTED_REVISION_CHECKPOINT_MAGIC: &[u8] = b"GB-COMPACTED-REVISION-CHECKPOINT-V1\0";
+const COMPACTED_REVISION_CHECKPOINT_V2_MAGIC: &[u8] = b"GB-COMPACTED-REVISION-CHECKPOINT-V2\0";
+const COMPACTED_REVISION_CHECKPOINT_MAX_BYTES: usize = 1024 * 1024;
 const MAX_GOSSIP_EVENT_JSON_BYTES: usize = 54_000;
 const MAX_GOSSIP_DELTA_JSON_BYTES: usize = 55_000;
 
@@ -1482,6 +1518,8 @@ fn is_compacted_signature(bytes: &[u8]) -> bool {
         || bytes.starts_with(COMPACTED_MASTER_PROOF_V2_MAGIC)
         || bytes.starts_with(COMPACTED_BASE_EVENT_MAGIC)
         || bytes.starts_with(COMPACTED_BASE_EVENT_V2_MAGIC)
+        || bytes.starts_with(COMPACTED_REVISION_CHECKPOINT_MAGIC)
+        || bytes.starts_with(COMPACTED_REVISION_CHECKPOINT_V2_MAGIC)
 }
 
 fn encode_base64(bytes: &[u8]) -> String {
@@ -1519,12 +1557,13 @@ fn decode_base64(encoded: &str) -> Option<Vec<u8>> {
         }
     }
     let input = encoded.as_bytes();
-    if input.len() % 4 != 0 {
+    let (chunks, remainder) = input.as_chunks::<4>();
+    if !remainder.is_empty() {
         return None;
     }
-    let mut decoded = Vec::with_capacity(input.len() / 4 * 3);
-    for (index, chunk) in input.chunks_exact(4).enumerate() {
-        let final_chunk = index + 1 == input.len() / 4;
+    let mut decoded = Vec::with_capacity(chunks.len() * 3);
+    for (index, chunk) in chunks.iter().enumerate() {
+        let final_chunk = index + 1 == chunks.len();
         let a = value(chunk[0])?;
         let b = value(chunk[1])?;
         decoded.push((a << 2) | (b >> 4));
@@ -1642,7 +1681,8 @@ fn decode_compacted_envelope<T: serde::de::DeserializeOwned>(
             return None;
         }
         (1, payload.to_vec())
-    } else if let Some(compressed) = signature.strip_prefix(v2_magic) {
+    } else {
+        let compressed = signature.strip_prefix(v2_magic)?;
         if compressed.len() < 4 || compressed.len() > max_uncompressed_bytes.saturating_add(4) {
             return None;
         }
@@ -1655,8 +1695,6 @@ fn decode_compacted_envelope<T: serde::de::DeserializeOwned>(
             return None;
         }
         (2, payload)
-    } else {
-        return None;
     };
     Some((version, serde_json::from_slice(&payload).ok()?))
 }
@@ -1677,6 +1715,36 @@ struct CompactedBaseEventEnvelope {
     relay_signature: Vec<u8>,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct CompactedRevisionCheckpointEnvelope {
+    version: u32,
+    proof: SignedEvent,
+    relay_signature: Vec<u8>,
+}
+
+#[derive(Clone)]
+struct CompactedRowRevisionState {
+    row_id: String,
+    revision_id: String,
+    valid_from: DateTime<Utc>,
+    after_image: serde_json::Map<String, Value>,
+}
+
+type CompactedRowRevisionKey = (String, String, Vec<u8>);
+type CompactedRelationalRowRevisionState =
+    HashMap<CompactedRowRevisionKey, CompactedRowRevisionState>;
+
+struct CompactedRowRevisionExpectation<'a> {
+    schema: &'a RelationalSchemaPackage,
+    table: &'a str,
+    key_bytes: &'a [u8],
+    operation: uee_v2::RevisionOperationV1,
+    row_id: Option<&'a str>,
+    expected_revision_id: Option<&'a str>,
+    predecessor_revision_id: Option<&'a str>,
+    payload: &'a Value,
+}
+
 #[derive(Default)]
 struct CompactedBaseMaterializationProofs {
     nodes: HashMap<String, SignedEvent>,
@@ -1692,7 +1760,7 @@ struct CompactedMasterAuthorityProofs {
 }
 
 enum CompactedMasterIdentityAction {
-    Node(NodeOutput, SignedEvent),
+    Node(Box<NodeOutput>, Box<SignedEvent>),
     Retraction(NodeRetractionEvent),
 }
 
@@ -2271,6 +2339,48 @@ fn compacted_base_event_payload(
     Ok(payload)
 }
 
+fn compacted_revision_checkpoint_payload(
+    relay_peer_id: &str,
+    event: &Event,
+    proof: &SignedEvent,
+    envelope_version: u32,
+) -> serde_json::Result<Vec<u8>> {
+    let Event::Transaction(transaction) = event else {
+        return Err(<serde_json::Error as serde::ser::Error>::custom(
+            "revision checkpoint must be a transaction",
+        ));
+    };
+    let frame_seq = transaction.local_frame_seq.ok_or_else(|| {
+        <serde_json::Error as serde::ser::Error>::custom(
+            "revision checkpoint must include its local frame sequence",
+        )
+    })?;
+    let event_bytes = canonical_event_bytes(event)?;
+    let proof_bytes = serde_json::to_vec(proof)?;
+    let version_bytes = envelope_version.to_le_bytes();
+    let frame_seq_bytes = frame_seq.to_le_bytes();
+    let mut payload = match envelope_version {
+        1 => b"genesis-block/compacted-revision-checkpoint/v1\0".to_vec(),
+        2 => b"genesis-block/compacted-revision-checkpoint/v2\0".to_vec(),
+        _ => {
+            return Err(<serde_json::Error as serde::ser::Error>::custom(
+                "unsupported compacted revision checkpoint version",
+            ))
+        }
+    };
+    for part in [
+        relay_peer_id.as_bytes(),
+        event_bytes.as_slice(),
+        proof_bytes.as_slice(),
+        frame_seq_bytes.as_slice(),
+        &version_bytes,
+    ] {
+        payload.extend_from_slice(&(part.len() as u64).to_le_bytes());
+        payload.extend_from_slice(part);
+    }
+    Ok(payload)
+}
+
 fn node_projection_matches_proof(target: &NodeOutput, source: &NodeOutput) -> bool {
     if target.id != source.id
         || Storage::labels_are_master(&target.labels) != Storage::labels_are_master(&source.labels)
@@ -2310,7 +2420,7 @@ fn find_base_proof_node(event: &Event, target: &NodeOutput) -> Option<NodeOutput
         Some(ProofIdentityState::Node(node))
             if node_base_projection_matches_proof(target, &node) =>
         {
-            Some(node)
+            Some(*node)
         }
         _ => None,
     }
@@ -2318,7 +2428,7 @@ fn find_base_proof_node(event: &Event, target: &NodeOutput) -> Option<NodeOutput
 
 #[derive(Clone)]
 enum ProofIdentityState {
-    Node(NodeOutput),
+    Node(Box<NodeOutput>),
     Retraction(NodeRetractionEvent),
 }
 
@@ -2334,7 +2444,7 @@ fn apply_proof_event_for_identity(event: &Event, id: &str, state: &mut Option<Pr
                 _ => true,
             };
             if wins_over_node && wins_over_tombstone {
-                *state = Some(ProofIdentityState::Node(node.clone()));
+                *state = Some(ProofIdentityState::Node(Box::new(node.clone())));
             }
         }
         Event::NodeRetract {
@@ -2366,7 +2476,7 @@ fn apply_proof_event_for_identity(event: &Event, id: &str, state: &mut Option<Pr
             // even when their logical clock is lower than the node's clock.
             for node in &transaction.nodes {
                 if node.id == id {
-                    *state = Some(ProofIdentityState::Node(node.clone()));
+                    *state = Some(ProofIdentityState::Node(Box::new(node.clone())));
                 }
             }
             for retraction in &transaction.node_retractions {
@@ -2388,7 +2498,7 @@ fn effective_proof_identity(event: &Event, id: &str) -> Option<ProofIdentityStat
 fn find_proof_node(event: &Event, target: &NodeOutput) -> Option<NodeOutput> {
     match effective_proof_identity(event, &target.id) {
         Some(ProofIdentityState::Node(node)) if node_projection_matches_proof(target, &node) => {
-            Some(node)
+            Some(*node)
         }
         _ => None,
     }
@@ -4478,6 +4588,14 @@ const MAX_JOURNAL_SEGMENT_FILE_BYTES: u64 =
 const SEG_KIND_HISTORY: u8 = 1;
 const SEG_KIND_BASE: u8 = 2;
 const SEG_KIND_LEGACY_JSONL: u8 = 3;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum JournalEventOrigin {
+    Legacy,
+    History,
+    Base,
+    Active,
+}
 
 const CODEC_NONE: u8 = 0;
 // 1 was zstd — dropped in this same PR (SPEC §8): zstd-sys's vendored C
@@ -12499,9 +12617,7 @@ impl Storage {
                 tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
             }
             Event::Transaction(transaction) => {
-                let revision_checkpoint =
-                    allow_revision_checkpoint || Self::is_revision_checkpoint(transaction);
-                if self.storage_schema_version == SCHEMA_VERSION && !revision_checkpoint {
+                if self.storage_schema_version == SCHEMA_VERSION && !allow_revision_checkpoint {
                     self.validate_graph_revision_binding(transaction)?;
                 }
                 // Identity = (transaction_id, payload_hash). The origin sequence
@@ -12587,13 +12703,7 @@ impl Storage {
                         "UPGRADE_REQUIRED: schema 6 requires revision-bound relational transactions",
                     ));
                 }
-                let revision_checkpoint = transaction.local_frame_seq.is_some()
-                    && transaction.relational.is_empty()
-                    && transaction.nodes.is_empty()
-                    && transaction.edges.is_empty()
-                    && transaction.vectors.is_empty()
-                    && transaction.node_retractions.is_empty();
-                if !revision_checkpoint {
+                if !allow_revision_checkpoint {
                     Self::validate_row_revision_binding(
                         &tx,
                         &expected_row_revisions,
@@ -13029,11 +13139,32 @@ impl Storage {
             if first_err.is_some() {
                 return;
             }
+            let revision_checkpoint = match &signed_event.event {
+                Event::Transaction(transaction) if Self::is_revision_checkpoint(transaction) => {
+                    self.storage_schema_version != SCHEMA_VERSION
+                        || self.verify_compacted_revision_checkpoint(&signed_event)
+                        || (!self.peer_membership_configured.load(Ordering::SeqCst)
+                            && self.compacted_revision_checkpoint_well_formed(&signed_event))
+                        || (signed_event.signer_peer_id == self.local_peer_id
+                            && self.verify_raw_event_signature(&signed_event))
+                }
+                _ => false,
+            };
+            if self.storage_schema_version == SCHEMA_VERSION
+                && matches!(
+                    &signed_event.event,
+                    Event::Transaction(transaction)
+                        if Self::is_revision_checkpoint(transaction)
+                            && transaction.record_revision_transaction.is_some()
+                )
+                && !revision_checkpoint
+            {
+                first_err = Some(Error::from_reason(
+                    "REVISION_CHECKPOINT_PROOF_REQUIRED: journal checkpoint has no verified source event",
+                ));
+                return;
+            }
             let mut apply = |event: Event| {
-                let revision_checkpoint = match &event {
-                    Event::Transaction(transaction) => Self::is_revision_checkpoint(transaction),
-                    _ => false,
-                };
                 if let Err(e) = self.projection_apply_event(&event, seq, revision_checkpoint) {
                     first_err = Some(e);
                 }
@@ -14194,7 +14325,7 @@ impl Storage {
         Ok(events)
     }
 
-    fn transaction_checkpoint_events(&self) -> Result<Vec<Event>> {
+    fn transaction_checkpoint_events(&self) -> Result<Vec<SignedEvent>> {
         let conn = self.projection_db.lock();
         let query = if self.storage_schema_version == SCHEMA_VERSION {
             "SELECT a.transaction_id, a.commit_sequence, a.payload_hash, a.frame_seq, a.advances_txn_frontier, r.revision_json
@@ -14222,6 +14353,9 @@ impl Storage {
             .map_err(|e| Error::from_reason(e.to_string()))?
             .collect::<std::result::Result<Vec<_>, _>>()
             .map_err(|e| Error::from_reason(e.to_string()))?;
+        drop(statement);
+        drop(conn);
+
         let events = rows
             .into_iter()
             .map(
@@ -14255,7 +14389,82 @@ impl Storage {
                 },
             )
             .collect::<Result<Vec<_>>>()?;
-        Ok(events)
+
+        let mut source_events: HashMap<(String, String), Vec<SignedEvent>> = HashMap::new();
+        self.scan_journal(None, true, &mut |_, signed_event| {
+            let source = if let Some(proof) =
+                self.compacted_revision_checkpoint_source_proof(&signed_event)
+            {
+                Some(proof)
+            } else if !is_compacted_signature(&signed_event.signature)
+                && self.verify_raw_event_signature(&signed_event)
+            {
+                Some(signed_event.clone())
+            } else {
+                None
+            };
+            let Some(source) = source else {
+                return;
+            };
+            let identity = match &source.event {
+                Event::Transaction(transaction)
+                    if transaction.local_frame_seq.is_none()
+                        && transaction.record_revision_transaction.is_some() =>
+                {
+                    Some((
+                        transaction.transaction_id.clone(),
+                        transaction.payload_hash.clone(),
+                    ))
+                }
+                Event::RelationalRows {
+                    mutation_id,
+                    payload_hash,
+                    record_revision_transaction: Some(_),
+                    ..
+                } if !mutation_id.is_empty() => {
+                    Some((format!("relational:{mutation_id}"), payload_hash.clone()))
+                }
+                _ => None,
+            };
+            if let Some(identity) = identity {
+                source_events.entry(identity).or_default().push(source);
+            }
+        });
+
+        events
+            .into_iter()
+            .map(|event| {
+                let Event::Transaction(checkpoint) = &event else {
+                    unreachable!("transaction checkpoint query only emits transactions")
+                };
+                if self.storage_schema_version == SCHEMA_VERSION
+                    && checkpoint.record_revision_transaction.is_some()
+                {
+                    let identity = (
+                        checkpoint.transaction_id.clone(),
+                        checkpoint.payload_hash.clone(),
+                    );
+                    let proof = source_events
+                        .get(&identity)
+                        .and_then(|candidates| {
+                            candidates.iter().find(|candidate| {
+                                Self::revision_checkpoint_matches_source(
+                                    checkpoint,
+                                    &candidate.event,
+                                )
+                            })
+                        })
+                        .ok_or_else(|| {
+                            Error::from_reason(
+                                "COMPACTION_REVISION_CHECKPOINT_PROOF_MISSING: no signed source event binds the stored revision history",
+                            )
+                        })?;
+                    self.sign_compacted_revision_checkpoint(&event, proof)
+                } else {
+                    Ok(self.sign_event(&event))
+                }
+            })
+            .collect()
     }
 
     fn hydrated_props(&self, node_u32: u32, node: &NodeOutput) -> Value {
@@ -14305,7 +14514,17 @@ impl Storage {
     }
 
     pub fn open(opts: OpenOptions) -> Result<Self> {
-        Self::open_internal(opts, None)
+        Self::open_internal(opts, None, None, false)
+    }
+
+    /// Open a database with the operator-pinned membership roster available
+    /// during journal recovery. This is required when recovering events from
+    /// other cluster members.
+    pub fn open_with_membership(
+        opts: OpenOptions,
+        membership: PeerMembershipOptions,
+    ) -> Result<Self> {
+        Self::open_internal(opts, None, Some(membership), false)
     }
 
     fn open_schema6_migration(
@@ -14313,10 +14532,15 @@ impl Storage {
         migration_id: String,
         manifest_sha256: String,
     ) -> Result<Self> {
-        Self::open_internal(opts, Some((migration_id, manifest_sha256)))
+        Self::open_internal(opts, Some((migration_id, manifest_sha256)), None, false)
     }
 
-    fn open_internal(opts: OpenOptions, migration_token: Option<(String, String)>) -> Result<Self> {
+    fn open_internal(
+        opts: OpenOptions,
+        migration_token: Option<(String, String)>,
+        membership: Option<PeerMembershipOptions>,
+        authenticate_journal_before_replay: bool,
+    ) -> Result<Self> {
         let root = PathBuf::from(opts.path.clone());
         let root_was_missing = !root.exists();
         let fresh_database = root_was_missing
@@ -14853,6 +15077,23 @@ impl Storage {
             verifying_key,
         };
 
+        if let Some(membership) = membership {
+            let local_master_authority = match membership.local_master_authority {
+                Some(role) => role,
+                None if membership.peers.is_empty() => true,
+                None => {
+                    return Err(Error::from_reason(
+                        "PEER_MEMBERSHIP_INVALID: localMasterAuthority must be set when peers are configured",
+                    ));
+                }
+            };
+            storage.configure_peer_membership(
+                membership.peers,
+                &membership.local_gossip_addr,
+                local_master_authority,
+            )?;
+        }
+
         // --- Recovery (ADR--GENESISDB-JOURNAL-HISTORY D5): snapshot@frontier +
         // replay journal frames > frontier. The frame stamps make the cursor
         // position-independent, which retires PR #100's byte-positional
@@ -14956,6 +15197,9 @@ impl Storage {
             }
             for d in &recovery_definitions {
                 storage.apply_collection_definition(d)?;
+            }
+            if authenticate_journal_before_replay {
+                storage.preflight_backup_journal_authorization()?;
             }
             match (snapshot_loaded, journal_frontier) {
                 // Framed snapshot: replay only frames past the seq frontier.
@@ -15145,6 +15389,32 @@ impl Storage {
             && transaction.node_retractions.is_empty()
     }
 
+    fn validate_consensus_schema_event(&self, event: &Event) -> Result<()> {
+        if self.storage_schema_version != SCHEMA_VERSION {
+            return Ok(());
+        }
+        match event {
+            Event::Node(_)
+            | Event::Edge(_)
+            | Event::Vector(_)
+            | Event::VectorMaterialized(_)
+            | Event::NodeRetract { .. }
+            | Event::Batch(_) => Err(Error::from_reason(
+                "UPGRADE_REQUIRED: schema 6 consensus requires revision-bearing graph events",
+            )),
+            Event::Transaction(transaction) => {
+                if Self::is_revision_checkpoint(transaction) {
+                    return Err(Error::from_reason(
+                        "CONSENSUS_REVISION_CHECKPOINT_UNSUPPORTED",
+                    ));
+                }
+                self.preflight_relational_event(event)
+            }
+            Event::RelationalRows { .. } => self.preflight_relational_event(event),
+            _ => Ok(()),
+        }
+    }
+
     fn validate_graph_revision_binding(&self, transaction: &GenesisTransactionEvent) -> Result<()> {
         let graph_mutation_count =
             transaction.nodes.len() + transaction.edges.len() + transaction.node_retractions.len();
@@ -15291,14 +15561,29 @@ impl Storage {
     }
 
     fn preflight_relational_event(&self, event: &Event) -> Result<()> {
-        self.preflight_relational_event_with_verified_compaction(event, false)
+        self.preflight_relational_event_with_verified_compaction(event, false, false)
     }
 
     fn preflight_signed_relational_event(&self, signed_event: &SignedEvent) -> Result<()> {
         let verified_compaction = self.is_compacted_graph_materialization(signed_event);
+        let verified_revision_checkpoint = self.verify_compacted_revision_checkpoint(signed_event);
+        if self.storage_schema_version == SCHEMA_VERSION
+            && matches!(
+                &signed_event.event,
+                Event::Transaction(transaction)
+                    if Self::is_revision_checkpoint(transaction)
+                        && transaction.record_revision_transaction.is_some()
+            )
+            && !verified_revision_checkpoint
+        {
+            return Err(Error::from_reason(
+                "REVISION_CHECKPOINT_PROOF_REQUIRED: schema 6 checkpoint requires a verified source event",
+            ));
+        }
         self.preflight_relational_event_with_verified_compaction(
             &signed_event.event,
             verified_compaction,
+            verified_revision_checkpoint,
         )
     }
 
@@ -15306,7 +15591,21 @@ impl Storage {
         &self,
         event: &Event,
         verified_compaction: bool,
+        verified_revision_checkpoint: bool,
     ) -> Result<()> {
+        if self.storage_schema_version == SCHEMA_VERSION
+            && matches!(
+                event,
+                Event::Transaction(transaction)
+                    if Self::is_revision_checkpoint(transaction)
+                        && transaction.record_revision_transaction.is_some()
+            )
+            && !verified_revision_checkpoint
+        {
+            return Err(Error::from_reason(
+                "REVISION_CHECKPOINT_PROOF_REQUIRED: schema 6 checkpoint requires a verified source event",
+            ));
+        }
         if self.storage_schema_version == SCHEMA_VERSION
             && !verified_compaction
             && Self::graph_event_requires_revision_envelope(event)
@@ -15381,26 +15680,47 @@ impl Storage {
         let Event::Transaction(transaction) = event else {
             return Ok(());
         };
-        if self.storage_schema_version == SCHEMA_VERSION
-            && !Self::is_revision_checkpoint(transaction)
-        {
+        if self.storage_schema_version == SCHEMA_VERSION && !verified_revision_checkpoint {
             self.validate_graph_revision_binding(transaction)?;
         }
         let mut conn = self.projection_db.lock();
-        let existing: Option<String> = conn
-            .query_row(
-                "SELECT payload_hash FROM applied_transactions WHERE transaction_id = ?1",
-                [&transaction.transaction_id],
-                |row| row.get(0),
-            )
+        if self.storage_schema_version == SCHEMA_VERSION {
+            if let Some(revisions) = transaction.record_revision_transaction.as_ref() {
+                revisions
+                    .validate()
+                    .map_err(|error| Error::from_reason(error.to_string()))?;
+            }
+        }
+        let existing_query = if self.storage_schema_version == SCHEMA_VERSION {
+            "SELECT a.payload_hash, r.revision_json
+             FROM applied_transactions a
+             LEFT JOIN hql2_transaction_revisions r ON r.transaction_id=a.transaction_id
+             WHERE a.transaction_id = ?1"
+        } else {
+            "SELECT payload_hash, NULL FROM applied_transactions WHERE transaction_id = ?1"
+        };
+        let existing: Option<(String, Option<String>)> = conn
+            .query_row(existing_query, [&transaction.transaction_id], |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })
             .optional()
             .map_err(|e| Error::from_reason(e.to_string()))?;
-        if let Some(hash) = existing {
-            return if hash == transaction.payload_hash {
-                Ok(())
-            } else {
-                Err(Error::from_reason("transaction identity conflict"))
-            };
+        if let Some((hash, revision_json)) = existing {
+            if hash != transaction.payload_hash {
+                return Err(Error::from_reason("transaction identity conflict"));
+            }
+            if self.storage_schema_version == SCHEMA_VERSION {
+                let incoming_revision_json = transaction
+                    .record_revision_transaction
+                    .as_ref()
+                    .map(serde_json::to_string)
+                    .transpose()
+                    .map_err(|error| Error::from_reason(error.to_string()))?;
+                if incoming_revision_json != revision_json {
+                    return Err(Error::from_reason("transaction identity conflict"));
+                }
+            }
+            return Ok(());
         }
         match (
             self.storage_schema_version == SCHEMA_VERSION,
@@ -15446,12 +15766,14 @@ impl Storage {
                 "UPGRADE_REQUIRED: schema 6 requires revision-bound relational transactions",
             ));
         }
-        Self::validate_row_revision_binding(
-            &tx,
-            &expected_row_revisions,
-            transaction.record_revision_transaction.as_ref(),
-            &self.database_id(),
-        )?;
+        if !verified_revision_checkpoint {
+            Self::validate_row_revision_binding(
+                &tx,
+                &expected_row_revisions,
+                transaction.record_revision_transaction.as_ref(),
+                &self.database_id(),
+            )?;
+        }
         tx.rollback()
             .map_err(|e| Error::from_reason(e.to_string()))?;
         Ok(())
@@ -15533,20 +15855,14 @@ impl Storage {
             COMPACTED_MASTER_PROOF_MAX_BYTES,
         )
         .map_err(|_| Error::from_reason("COMPACTION_MASTER_AUTHORITY_PROOF_TOO_LARGE"))?;
+        // A compacted proof is stored in the local journal, not sent as one
+        // gossip datagram. Its envelope has its own hard bound above; transport
+        // size limits are enforced when a peer requests events_since().
         let signed = SignedEvent {
             event: event.clone(),
             signature,
             signer_peer_id: self.local_peer_id.clone(),
         };
-        if serde_json::to_vec(&signed)
-            .map_err(|error| Error::from_reason(error.to_string()))?
-            .len()
-            > MAX_GOSSIP_EVENT_JSON_BYTES
-        {
-            return Err(Error::from_reason(
-                "COMPACTION_MASTER_AUTHORITY_PROOF_TOO_LARGE",
-            ));
-        }
         Ok(signed)
     }
 
@@ -15620,13 +15936,45 @@ impl Storage {
             signature,
             signer_peer_id: self.local_peer_id.clone(),
         };
-        if serde_json::to_vec(&signed)
-            .map_err(|error| Error::from_reason(error.to_string()))?
-            .len()
-            > MAX_GOSSIP_EVENT_JSON_BYTES
+        Ok(signed)
+    }
+
+    fn sign_compacted_revision_checkpoint(
+        &self,
+        event: &Event,
+        proof: &SignedEvent,
+    ) -> Result<SignedEvent> {
+        let Event::Transaction(checkpoint) = event else {
+            return Err(Error::from_reason(
+                "COMPACTION_REVISION_CHECKPOINT_INVALID: expected a transaction",
+            ));
+        };
+        if !self.verify_raw_event_signature(proof)
+            || is_compacted_signature(&proof.signature)
+            || !Self::revision_checkpoint_matches_source(checkpoint, &proof.event)
         {
-            return Err(Error::from_reason("COMPACTION_BASE_EVENT_PROOF_TOO_LARGE"));
+            return Err(Error::from_reason(
+                "COMPACTION_REVISION_CHECKPOINT_PROOF_INVALID: source event does not bind checkpoint",
+            ));
         }
+        let payload = compacted_revision_checkpoint_payload(&self.local_peer_id, event, proof, 2)
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let relay_signature = self.signing_key.sign(&payload).to_bytes().to_vec();
+        let envelope = CompactedRevisionCheckpointEnvelope {
+            version: 2,
+            proof: proof.clone(),
+            relay_signature,
+        };
+        let signature = encode_compacted_envelope(
+            COMPACTED_REVISION_CHECKPOINT_V2_MAGIC,
+            &envelope,
+            COMPACTED_REVISION_CHECKPOINT_MAX_BYTES,
+        )?;
+        let signed = SignedEvent {
+            event: event.clone(),
+            signature,
+            signer_peer_id: self.local_peer_id.clone(),
+        };
         Ok(signed)
     }
 
@@ -16502,6 +16850,7 @@ impl Storage {
         // signing so the persisted payload is exactly the one voters approved.
         Self::promote_consensus_nodes_to_master(&mut event);
         let event = self.revisionize_consensus_event(event)?;
+        self.validate_consensus_schema_event(&event)?;
         if self.event_requires_master_authority(&event)
             && !self.local_master_authority.load(Ordering::SeqCst)
         {
@@ -17495,6 +17844,14 @@ impl Storage {
     /// the single source of truth for event-level signature checks — the WAL sync
     /// (`reconcile_state`), the consensus propose/commit paths all route here.
     fn verify_event_signature(&self, se: &SignedEvent) -> bool {
+        self.verify_event_signature_with_collection_definitions(se, None)
+    }
+
+    fn verify_event_signature_with_collection_definitions(
+        &self,
+        se: &SignedEvent,
+        collection_definitions: Option<&HashMap<String, CollectionDefinition>>,
+    ) -> bool {
         if se.signature.starts_with(COMPACTED_MASTER_PROOF_MAGIC)
             || se.signature.starts_with(COMPACTED_MASTER_PROOF_V2_MAGIC)
         {
@@ -17503,7 +17860,29 @@ impl Storage {
         if se.signature.starts_with(COMPACTED_BASE_EVENT_MAGIC)
             || se.signature.starts_with(COMPACTED_BASE_EVENT_V2_MAGIC)
         {
-            return self.verify_compacted_base_materialization(se);
+            return self.verify_compacted_base_materialization_with_collection_definitions(
+                se,
+                collection_definitions,
+            );
+        }
+        if se
+            .signature
+            .starts_with(COMPACTED_REVISION_CHECKPOINT_MAGIC)
+            || se
+                .signature
+                .starts_with(COMPACTED_REVISION_CHECKPOINT_V2_MAGIC)
+        {
+            return self.verify_compacted_revision_checkpoint(se);
+        }
+        if self.storage_schema_version == SCHEMA_VERSION
+            && matches!(
+                &se.event,
+                Event::Transaction(transaction)
+                    if Self::is_revision_checkpoint(transaction)
+                        && transaction.record_revision_transaction.is_some()
+            )
+        {
+            return false;
         }
         self.verify_raw_event_signature(se)
     }
@@ -17525,6 +17904,14 @@ impl Storage {
     }
 
     fn verify_compacted_base_materialization(&self, se: &SignedEvent) -> bool {
+        self.verify_compacted_base_materialization_with_collection_definitions(se, None)
+    }
+
+    fn verify_compacted_base_materialization_with_collection_definitions(
+        &self,
+        se: &SignedEvent,
+        collection_definitions: Option<&HashMap<String, CollectionDefinition>>,
+    ) -> bool {
         if !matches!(
             &se.event,
             Event::Node(_) | Event::Edge(_) | Event::VectorMaterialized(_)
@@ -17543,7 +17930,11 @@ impl Storage {
             || is_compacted_signature(&envelope.proof.signature)
             || !self.verify_raw_event_signature(&envelope.proof)
             || !Self::revision_transaction_binds_graph(&envelope.proof.event)
-            || !self.compacted_base_proof_matches_event(&se.event, &envelope.proof.event)
+            || !self.compacted_base_proof_matches_event_with_collection_definitions(
+                &se.event,
+                &envelope.proof.event,
+                collection_definitions,
+            )
         {
             return false;
         }
@@ -17559,6 +17950,877 @@ impl Storage {
             return false;
         };
         key.verify(&payload, &signature).is_ok()
+    }
+
+    fn compacted_row_revision_schemas(
+        &self,
+        signed_events: &[SignedEvent],
+    ) -> Result<HashMap<(String, u32), RelationalSchemaPackage>> {
+        let mut schemas = HashMap::new();
+        {
+            let conn = self.projection_db.lock();
+            let mut statement = conn
+                .prepare("SELECT package_json FROM relational_schema_registry")
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let packages = statement
+                .query_map([], |row| row.get::<_, String>(0))
+                .map_err(|error| Error::from_reason(error.to_string()))?
+                .collect::<std::result::Result<Vec<_>, _>>()
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            for json in packages {
+                let package: RelationalSchemaPackage = serde_json::from_str(&json)
+                    .map_err(|error| Error::from_reason(error.to_string()))?;
+                Self::validate_relational_schema(&package)?;
+                schemas.insert((package.namespace.clone(), package.schema_version), package);
+            }
+        }
+
+        for signed_event in signed_events {
+            let Event::RelationalSchema(package) = &signed_event.event else {
+                continue;
+            };
+            Self::validate_relational_schema(package)?;
+            let identity = (package.namespace.clone(), package.schema_version);
+            if schemas
+                .get(&identity)
+                .is_some_and(|existing| existing != package)
+            {
+                return Err(Error::from_reason(
+                    "REVISION_CHECKPOINT_SCHEMA_CONFLICT: multiple schema packages use the same version",
+                ));
+            }
+            schemas.insert(identity, package.clone());
+        }
+        Ok(schemas)
+    }
+
+    fn compacted_row_revision_state(&self) -> Result<CompactedRelationalRowRevisionState> {
+        let database_id = self.database_id();
+        let conn = self.projection_db.lock();
+        let mut statement = conn
+            .prepare(
+                "SELECT r.namespace, r.schema_ref, r.record_id, r.revision_id,
+                        r.operation, r.valid_from, r.payload_json, i.key_bytes
+                 FROM hql2_record_revisions r
+                 JOIN hql2_row_identity_registry i
+                   ON i.database_id=r.database_id AND i.namespace=r.namespace
+                  AND i.table_name=r.schema_ref AND i.row_id=r.record_id
+                 WHERE r.database_id=?1 AND r.kind='row' AND r.tx_to IS NULL",
+            )
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let mut rows = statement
+            .query(params![database_id])
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let mut state = HashMap::new();
+        while let Some(row) = rows
+            .next()
+            .map_err(|error| Error::from_reason(error.to_string()))?
+        {
+            let namespace: String = row
+                .get(0)
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let table: String = row
+                .get(1)
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let row_id: String = row
+                .get(2)
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let revision_id: String = row
+                .get(3)
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let operation: String = row
+                .get(4)
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            if operation.eq_ignore_ascii_case("retract") {
+                continue;
+            }
+            if !operation.eq_ignore_ascii_case("upsert") {
+                return Err(Error::from_reason(
+                    "REVISION_CHECKPOINT_STATE_INVALID: unknown active row operation",
+                ));
+            }
+            let valid_from: String = row
+                .get(5)
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let payload_json: String = row
+                .get(6)
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let key_bytes: Vec<u8> = row
+                .get(7)
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let payload: Value = serde_json::from_str(&payload_json)
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let key_has_null = payload
+                .get("key")
+                .and_then(Value::as_object)
+                .is_some_and(|key| key.values().any(Value::is_null));
+            if key_has_null {
+                // Nullable primary-key rows are intentionally not addressable
+                // by later Update/Delete operations and can share the same
+                // encoded null key. Their insert checkpoints are checked
+                // directly against the source event instead of this key map.
+                continue;
+            }
+            let after_image = payload
+                .get("after_image")
+                .and_then(Value::as_object)
+                .cloned()
+                .ok_or_else(|| {
+                    Error::from_reason(
+                        "REVISION_CHECKPOINT_STATE_INVALID: active row has no after-image",
+                    )
+                })?;
+            let valid_from = DateTime::parse_from_rfc3339(&valid_from)
+                .map_err(|error| Error::from_reason(error.to_string()))?
+                .with_timezone(&Utc);
+            let identity = (namespace, table, key_bytes);
+            if state
+                .insert(
+                    identity,
+                    CompactedRowRevisionState {
+                        row_id,
+                        revision_id,
+                        valid_from,
+                        after_image,
+                    },
+                )
+                .is_some()
+            {
+                return Err(Error::from_reason(
+                    "REVISION_CHECKPOINT_STATE_INVALID: multiple active rows share one key",
+                ));
+            }
+        }
+        Ok(state)
+    }
+
+    fn compacted_relational_value(column: &RelationalColumn, value: &Value) -> Result<Value> {
+        match (&column.column_type, Self::json_to_sql_typed(column, value)?) {
+            (_, SqlValue::Null) => Ok(Value::Null),
+            (RelationalColumnType::Boolean, SqlValue::Integer(value)) => {
+                Ok(Value::Bool(value != 0))
+            }
+            (RelationalColumnType::Json, SqlValue::Text(value)) => {
+                serde_json::from_str(&value).map_err(|error| Error::from_reason(error.to_string()))
+            }
+            (RelationalColumnType::Blob, SqlValue::Blob(value)) => {
+                Ok(Value::Array(value.into_iter().map(Value::from).collect()))
+            }
+            (RelationalColumnType::Integer, SqlValue::Integer(value)) => Ok(Value::from(value)),
+            (RelationalColumnType::Real, SqlValue::Real(value)) => Ok(Value::Number(
+                serde_json::Number::from_f64(value)
+                    .ok_or_else(|| Error::from_reason("REL_STORAGE_TYPE_MISMATCH"))?,
+            )),
+            (RelationalColumnType::Real, SqlValue::Integer(value)) => Ok(Value::Number(
+                serde_json::Number::from_f64(value as f64)
+                    .ok_or_else(|| Error::from_reason("REL_STORAGE_TYPE_MISMATCH"))?,
+            )),
+            (
+                RelationalColumnType::Text
+                | RelationalColumnType::Timestamp
+                | RelationalColumnType::EntityId,
+                SqlValue::Text(value),
+            ) => Ok(Value::String(value)),
+            (_, _) => Err(Error::from_reason("REL_STORAGE_TYPE_MISMATCH")),
+        }
+    }
+
+    fn compacted_complete_relational_insert_image(
+        table: &RelationalTable,
+        mutation: &RelationalRowMutation,
+    ) -> Result<serde_json::Map<String, Value>> {
+        let values = mutation
+            .values
+            .as_object()
+            .ok_or_else(|| Error::from_reason("relational mutation requires an object payload"))?;
+        let mut image = serde_json::Map::new();
+        for column in &table.columns {
+            let value = values
+                .get(&column.name)
+                .or(column.default.as_ref())
+                .cloned()
+                .unwrap_or(Value::Null);
+            image.insert(
+                column.name.clone(),
+                Self::compacted_relational_value(column, &value)?,
+            );
+        }
+        Ok(image)
+    }
+
+    fn take_compacted_row_revision(
+        actual: &mut Vec<uee_v2::RecordRevisionMutationV1>,
+        expected: CompactedRowRevisionExpectation<'_>,
+    ) -> Result<uee_v2::RecordRevisionMutationV1> {
+        let position = actual.iter().position(|candidate| {
+            candidate.namespace == expected.schema.namespace
+                && candidate.kind == uee_v2::RecordKindV2::Row
+                && candidate.schema_ref.as_deref() == Some(expected.table)
+                && candidate.schema_version == Some(expected.schema.schema_version as u64)
+                && candidate.key_codec_version == Some(1)
+                && candidate.key_bytes.as_deref() == Some(expected.key_bytes)
+                && candidate.operation == expected.operation
+                && candidate.expected_revision_id.as_deref() == expected.expected_revision_id
+                && candidate.predecessor_revision_id.as_deref() == expected.predecessor_revision_id
+                && candidate.payload == *expected.payload
+                && expected.row_id.is_none_or(|row_id| candidate.id == row_id)
+        });
+        position
+            .map(|position| actual.remove(position))
+            .ok_or_else(|| {
+                Error::from_reason(
+                "REVISION_CHECKPOINT_SOURCE_MISMATCH: row revision does not match source mutations",
+            )
+            })
+    }
+
+    fn compacted_source_revision_already_applied(&self, source: &Event) -> Result<bool> {
+        let (transaction_id, payload_hash, revisions) = match source {
+            Event::Transaction(transaction) => (
+                transaction.transaction_id.clone(),
+                transaction.payload_hash.clone(),
+                transaction.record_revision_transaction.as_ref(),
+            ),
+            Event::RelationalRows {
+                mutation_id,
+                payload_hash,
+                record_revision_transaction,
+                ..
+            } if !mutation_id.is_empty() => (
+                format!("relational:{mutation_id}"),
+                payload_hash.clone(),
+                record_revision_transaction.as_ref(),
+            ),
+            _ => return Ok(false),
+        };
+        let Some(revisions) = revisions else {
+            return Ok(false);
+        };
+        let expected_revision_json = serde_json::to_string(revisions)
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let conn = self.projection_db.lock();
+        let stored: Option<(String, Option<String>)> = conn
+            .query_row(
+                "SELECT a.payload_hash, r.revision_json
+                 FROM applied_transactions a
+                 LEFT JOIN hql2_transaction_revisions r ON r.transaction_id=a.transaction_id
+                 WHERE a.transaction_id=?1",
+                [&transaction_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let Some((stored_hash, stored_revision_json)) = stored else {
+            return Ok(false);
+        };
+        if stored_hash != payload_hash
+            || stored_revision_json.as_deref() != Some(&expected_revision_json)
+        {
+            return Err(Error::from_reason(
+                "REVISION_CHECKPOINT_IDENTITY_CONFLICT: applied row event has different revision history",
+            ));
+        }
+        Ok(true)
+    }
+
+    fn validate_compacted_row_source_event(
+        &self,
+        source: &Event,
+        schemas: &HashMap<(String, u32), RelationalSchemaPackage>,
+        state: &mut CompactedRelationalRowRevisionState,
+    ) -> Result<()> {
+        let (groups, revisions, relational_affected_rows) = match source {
+            Event::RelationalRows {
+                namespace,
+                schema_version,
+                affected_rows,
+                mutations,
+                record_revision_transaction: Some(revisions),
+                ..
+            } => (
+                vec![(
+                    namespace.as_str(),
+                    Some(*schema_version),
+                    mutations.as_slice(),
+                )],
+                revisions,
+                Some(*affected_rows),
+            ),
+            Event::Transaction(transaction) => (
+                transaction
+                    .relational
+                    .iter()
+                    .map(|group| (group.namespace.as_str(), None, group.mutations.as_slice()))
+                    .collect::<Vec<_>>(),
+                transaction
+                    .record_revision_transaction
+                    .as_ref()
+                    .ok_or_else(|| {
+                        Error::from_reason(
+                            "REVISION_CHECKPOINT_SOURCE_MISMATCH: relational source has no revision transaction",
+                        )
+                    })?,
+                None,
+            ),
+            _ => return Ok(()),
+        };
+        revisions
+            .validate()
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let mut actual = revisions
+            .mutations
+            .iter()
+            .filter(|mutation| mutation.kind == uee_v2::RecordKindV2::Row)
+            .cloned()
+            .collect::<Vec<_>>();
+
+        if let Event::RelationalRows { .. } = source {
+            if actual.len() != revisions.mutations.len() {
+                return Err(Error::from_reason(
+                    "REVISION_CHECKPOINT_SOURCE_MISMATCH: relational row source contains non-row revisions",
+                ));
+            }
+        }
+
+        let mut relational_affected = 0u32;
+        for (namespace, declared_version, mutations) in groups {
+            if mutations.is_empty() {
+                continue;
+            }
+            let namespace_versions = actual
+                .iter()
+                .filter(|revision| revision.namespace == namespace)
+                .filter_map(|revision| revision.schema_version)
+                .collect::<std::collections::HashSet<_>>();
+            if namespace_versions.len() > 1 {
+                return Err(Error::from_reason(
+                    "REVISION_CHECKPOINT_SCHEMA_UNAVAILABLE: source transaction spans multiple schema versions in one namespace",
+                ));
+            }
+            let latest_version = schemas
+                .keys()
+                .filter_map(|(candidate_namespace, version)| {
+                    (candidate_namespace == namespace).then_some(*version)
+                })
+                .max();
+            let schema_version = declared_version
+                .filter(|version| *version != 0)
+                .or_else(|| namespace_versions.iter().next().map(|version| *version as u32))
+                .or(latest_version)
+                .ok_or_else(|| {
+                    Error::from_reason(
+                        "REVISION_CHECKPOINT_SCHEMA_UNAVAILABLE: exact relational schema is unavailable",
+                    )
+                })?;
+            let schema = schemas
+                .get(&(namespace.to_string(), schema_version))
+                .ok_or_else(|| {
+                    Error::from_reason(
+                        "REVISION_CHECKPOINT_SCHEMA_UNAVAILABLE: exact historical relational schema is unavailable",
+                    )
+                })?;
+
+            struct RowPlan {
+                table: RelationalTable,
+                key: serde_json::Map<String, Value>,
+                key_bytes: Vec<u8>,
+                before: Option<CompactedRowRevisionState>,
+                after: Option<serde_json::Map<String, Value>>,
+                saw_delete: bool,
+                reinserted: bool,
+            }
+            let mut plans = HashMap::<(String, Vec<u8>), RowPlan>::new();
+            let mut nullable_inserts = Vec::new();
+
+            for mutation in mutations {
+                Self::validate_row_mutation(schema, mutation)?;
+                let table = schema
+                    .tables
+                    .iter()
+                    .find(|table| table.name == mutation.table)
+                    .expect("validated relational mutation table");
+                let key = Self::relational_primary_key_values(table, mutation)?;
+                let key_bytes = Self::encode_relational_primary_key_v1(schema, mutation)?;
+                let has_null = table
+                    .primary_key
+                    .iter()
+                    .any(|name| key.get(name).is_none_or(Value::is_null));
+                if has_null {
+                    if matches!(
+                        mutation.kind,
+                        RelationalMutationKind::Insert | RelationalMutationKind::Upsert
+                    ) {
+                        nullable_inserts.push((table.clone(), key, key_bytes, mutation.clone()));
+                        relational_affected = relational_affected.saturating_add(1);
+                    }
+                    continue;
+                }
+
+                let identity = (table.name.clone(), key_bytes.clone());
+                if !plans.contains_key(&identity) {
+                    let state_key = (namespace.to_string(), table.name.clone(), key_bytes.clone());
+                    let before = state.get(&state_key).cloned();
+                    plans.insert(
+                        identity.clone(),
+                        RowPlan {
+                            table: table.clone(),
+                            key,
+                            key_bytes,
+                            after: before.as_ref().map(|state| state.after_image.clone()),
+                            before,
+                            saw_delete: false,
+                            reinserted: false,
+                        },
+                    );
+                }
+                let plan = plans
+                    .get_mut(&identity)
+                    .expect("row plan inserted for its identity");
+                match mutation.kind {
+                    RelationalMutationKind::Insert => {
+                        if plan.after.is_some() {
+                            return Err(Error::from_reason(
+                                "REVISION_CHECKPOINT_SOURCE_MISMATCH: insert targets an existing row",
+                            ));
+                        }
+                        plan.after = Some(Self::compacted_complete_relational_insert_image(
+                            &plan.table,
+                            mutation,
+                        )?);
+                        relational_affected = relational_affected.saturating_add(1);
+                    }
+                    RelationalMutationKind::Upsert => {
+                        if let Some(after) = plan.after.as_mut() {
+                            let values = mutation.values.as_object().expect("validated values");
+                            let mut updates = 0u32;
+                            for (name, value) in values {
+                                if plan.table.primary_key.contains(name) {
+                                    continue;
+                                }
+                                let column = plan
+                                    .table
+                                    .columns
+                                    .iter()
+                                    .find(|column| column.name == *name)
+                                    .expect("validated mutation column");
+                                after.insert(
+                                    name.clone(),
+                                    Self::compacted_relational_value(column, value)?,
+                                );
+                                updates += 1;
+                            }
+                            if updates > 0 {
+                                relational_affected = relational_affected.saturating_add(1);
+                            }
+                        } else {
+                            plan.after = Some(Self::compacted_complete_relational_insert_image(
+                                &plan.table,
+                                mutation,
+                            )?);
+                            relational_affected = relational_affected.saturating_add(1);
+                        }
+                    }
+                    RelationalMutationKind::Update => {
+                        if let Some(after) = plan.after.as_mut() {
+                            let values = mutation.values.as_object().expect("validated values");
+                            for (name, value) in values {
+                                let column = plan
+                                    .table
+                                    .columns
+                                    .iter()
+                                    .find(|column| column.name == *name)
+                                    .expect("validated mutation column");
+                                after.insert(
+                                    name.clone(),
+                                    Self::compacted_relational_value(column, value)?,
+                                );
+                            }
+                            relational_affected = relational_affected.saturating_add(1);
+                        }
+                    }
+                    RelationalMutationKind::Delete => {
+                        if plan.after.take().is_some() {
+                            relational_affected = relational_affected.saturating_add(1);
+                        }
+                    }
+                }
+                match mutation.kind {
+                    RelationalMutationKind::Delete => plan.saw_delete = true,
+                    RelationalMutationKind::Insert | RelationalMutationKind::Upsert
+                        if plan.saw_delete =>
+                    {
+                        plan.reinserted = true;
+                        plan.saw_delete = false;
+                    }
+                    _ => {}
+                }
+            }
+
+            for (table, key, key_bytes, mutation) in nullable_inserts {
+                let after_image = Self::complete_relational_insert_image(&table, &mutation)?;
+                let payload = serde_json::json!({
+                    "table": table.name,
+                    "key": key,
+                    "key_codec_version": 1,
+                    "key_bytes": hex::encode(&key_bytes),
+                    "after_image": after_image,
+                });
+                let candidate = Self::take_compacted_row_revision(
+                    &mut actual,
+                    CompactedRowRevisionExpectation {
+                        schema,
+                        table: &table.name,
+                        key_bytes: &key_bytes,
+                        operation: uee_v2::RevisionOperationV1::Upsert,
+                        row_id: None,
+                        expected_revision_id: None,
+                        predecessor_revision_id: None,
+                        payload: &payload,
+                    },
+                )?;
+                if candidate.valid_to.is_some() {
+                    return Err(Error::from_reason(
+                        "REVISION_CHECKPOINT_SOURCE_MISMATCH: upsert row revision is closed",
+                    ));
+                }
+            }
+
+            let mut identities = plans.keys().cloned().collect::<Vec<_>>();
+            identities.sort();
+            for identity in identities {
+                let plan = plans
+                    .get(&identity)
+                    .expect("row plan identity was collected from the map");
+                let state_key = (
+                    namespace.to_string(),
+                    plan.table.name.clone(),
+                    plan.key_bytes.clone(),
+                );
+                let mut final_state = None;
+                match (&plan.before, &plan.after) {
+                    (Some(before), None) => {
+                        let payload = serde_json::json!({
+                            "table": plan.table.name,
+                            "key": plan.key,
+                            "key_codec_version": 1,
+                            "key_bytes": hex::encode(&plan.key_bytes),
+                            "tombstone": true,
+                        });
+                        let candidate = Self::take_compacted_row_revision(
+                            &mut actual,
+                            CompactedRowRevisionExpectation {
+                                schema,
+                                table: &plan.table.name,
+                                key_bytes: &plan.key_bytes,
+                                operation: uee_v2::RevisionOperationV1::Retract,
+                                row_id: Some(&before.row_id),
+                                expected_revision_id: Some(&before.revision_id),
+                                predecessor_revision_id: Some(&before.revision_id),
+                                payload: &payload,
+                            },
+                        )?;
+                        if candidate.valid_from != before.valid_from
+                            || candidate
+                                .valid_to
+                                .is_none_or(|valid_to| valid_to <= candidate.valid_from)
+                        {
+                            return Err(Error::from_reason(
+                                "REVISION_CHECKPOINT_SOURCE_MISMATCH: row retraction time does not match its predecessor",
+                            ));
+                        }
+                    }
+                    (Some(before), Some(after_image)) if plan.reinserted => {
+                        let retract_payload = serde_json::json!({
+                            "table": plan.table.name,
+                            "key": plan.key,
+                            "key_codec_version": 1,
+                            "key_bytes": hex::encode(&plan.key_bytes),
+                            "tombstone": true,
+                        });
+                        let retraction = Self::take_compacted_row_revision(
+                            &mut actual,
+                            CompactedRowRevisionExpectation {
+                                schema,
+                                table: &plan.table.name,
+                                key_bytes: &plan.key_bytes,
+                                operation: uee_v2::RevisionOperationV1::Retract,
+                                row_id: Some(&before.row_id),
+                                expected_revision_id: Some(&before.revision_id),
+                                predecessor_revision_id: Some(&before.revision_id),
+                                payload: &retract_payload,
+                            },
+                        )?;
+                        if retraction.valid_from != before.valid_from
+                            || retraction
+                                .valid_to
+                                .is_none_or(|valid_to| valid_to <= retraction.valid_from)
+                        {
+                            return Err(Error::from_reason(
+                                "REVISION_CHECKPOINT_SOURCE_MISMATCH: row retraction time does not match its predecessor",
+                            ));
+                        }
+                        let payload = serde_json::json!({
+                            "table": plan.table.name,
+                            "key": plan.key,
+                            "key_codec_version": 1,
+                            "key_bytes": hex::encode(&plan.key_bytes),
+                            "after_image": after_image,
+                        });
+                        let candidate = Self::take_compacted_row_revision(
+                            &mut actual,
+                            CompactedRowRevisionExpectation {
+                                schema,
+                                table: &plan.table.name,
+                                key_bytes: &plan.key_bytes,
+                                operation: uee_v2::RevisionOperationV1::Upsert,
+                                row_id: None,
+                                expected_revision_id: None,
+                                predecessor_revision_id: None,
+                                payload: &payload,
+                            },
+                        )?;
+                        if candidate.id == before.row_id
+                            || candidate.valid_to.is_some()
+                            || candidate.valid_from != retraction.valid_to.unwrap()
+                        {
+                            return Err(Error::from_reason(
+                                "REVISION_CHECKPOINT_SOURCE_MISMATCH: reinsert must create a fresh row revision",
+                            ));
+                        }
+                        final_state = Some(CompactedRowRevisionState {
+                            row_id: candidate.id,
+                            revision_id: candidate.revision_id,
+                            valid_from: candidate.valid_from,
+                            after_image: after_image.clone(),
+                        });
+                    }
+                    (Some(before), Some(after_image)) => {
+                        let payload = serde_json::json!({
+                            "table": plan.table.name,
+                            "key": plan.key,
+                            "key_codec_version": 1,
+                            "key_bytes": hex::encode(&plan.key_bytes),
+                            "after_image": after_image,
+                        });
+                        let candidate = Self::take_compacted_row_revision(
+                            &mut actual,
+                            CompactedRowRevisionExpectation {
+                                schema,
+                                table: &plan.table.name,
+                                key_bytes: &plan.key_bytes,
+                                operation: uee_v2::RevisionOperationV1::Upsert,
+                                row_id: Some(&before.row_id),
+                                expected_revision_id: Some(&before.revision_id),
+                                predecessor_revision_id: Some(&before.revision_id),
+                                payload: &payload,
+                            },
+                        )?;
+                        if candidate.valid_from <= before.valid_from || candidate.valid_to.is_some()
+                        {
+                            return Err(Error::from_reason(
+                                "REVISION_CHECKPOINT_SOURCE_MISMATCH: row upsert time does not advance its predecessor",
+                            ));
+                        }
+                        final_state = Some(CompactedRowRevisionState {
+                            row_id: candidate.id,
+                            revision_id: candidate.revision_id,
+                            valid_from: candidate.valid_from,
+                            after_image: after_image.clone(),
+                        });
+                    }
+                    (None, Some(after_image)) => {
+                        let payload = serde_json::json!({
+                            "table": plan.table.name,
+                            "key": plan.key,
+                            "key_codec_version": 1,
+                            "key_bytes": hex::encode(&plan.key_bytes),
+                            "after_image": after_image,
+                        });
+                        let candidate = Self::take_compacted_row_revision(
+                            &mut actual,
+                            CompactedRowRevisionExpectation {
+                                schema,
+                                table: &plan.table.name,
+                                key_bytes: &plan.key_bytes,
+                                operation: uee_v2::RevisionOperationV1::Upsert,
+                                row_id: None,
+                                expected_revision_id: None,
+                                predecessor_revision_id: None,
+                                payload: &payload,
+                            },
+                        )?;
+                        if candidate.valid_to.is_some() {
+                            return Err(Error::from_reason(
+                                "REVISION_CHECKPOINT_SOURCE_MISMATCH: new row revision is closed",
+                            ));
+                        }
+                        final_state = Some(CompactedRowRevisionState {
+                            row_id: candidate.id,
+                            revision_id: candidate.revision_id,
+                            valid_from: candidate.valid_from,
+                            after_image: after_image.clone(),
+                        });
+                    }
+                    (None, None) => {}
+                }
+                if let Some(final_state) = final_state {
+                    state.insert(state_key, final_state);
+                } else {
+                    state.remove(&state_key);
+                }
+            }
+        }
+
+        if !actual.is_empty() {
+            return Err(Error::from_reason(
+                "REVISION_CHECKPOINT_SOURCE_MISMATCH: checkpoint includes row revisions with no source mutation",
+            ));
+        }
+        if relational_affected_rows.is_some_and(|affected| affected != relational_affected) {
+            return Err(Error::from_reason(
+                "REVISION_CHECKPOINT_SOURCE_MISMATCH: affected row count does not match source mutations",
+            ));
+        }
+        Ok(())
+    }
+
+    fn revision_checkpoint_matches_source(
+        checkpoint: &GenesisTransactionEvent,
+        source: &Event,
+    ) -> bool {
+        if !Self::is_revision_checkpoint(checkpoint) {
+            return false;
+        }
+        let Some(checkpoint_revisions) = checkpoint.record_revision_transaction.as_ref() else {
+            return false;
+        };
+        if checkpoint_revisions.mutations.is_empty() || checkpoint_revisions.validate().is_err() {
+            return false;
+        }
+        let checkpoint_revisions = serde_json::to_value(checkpoint_revisions).ok();
+        match source {
+            Event::Transaction(transaction) => {
+                if transaction.local_frame_seq.is_some()
+                    || transaction.transaction_id != checkpoint.transaction_id
+                    || transaction.origin_commit_seq != checkpoint.origin_commit_seq
+                    || transaction.payload_hash != checkpoint.payload_hash
+                    || transaction.advances_txn_frontier != checkpoint.advances_txn_frontier
+                    || serde_json::to_value(&transaction.record_revision_transaction).ok()
+                        != checkpoint_revisions
+                {
+                    return false;
+                }
+                Self::revision_transaction_binds_graph(source)
+            }
+            Event::RelationalRows {
+                namespace,
+                mutation_id,
+                payload_hash,
+                record_revision_transaction: Some(revisions),
+                ..
+            } => {
+                format!("relational:{mutation_id}") == checkpoint.transaction_id
+                    && !mutation_id.is_empty()
+                    && payload_hash == &checkpoint.payload_hash
+                    && !checkpoint.advances_txn_frontier
+                    && revisions.validate().is_ok()
+                    && revisions.mutations.iter().all(|mutation| {
+                        mutation.kind == uee_v2::RecordKindV2::Row
+                            && mutation.namespace == *namespace
+                    })
+                    && serde_json::to_value(revisions).ok() == checkpoint_revisions
+            }
+            _ => false,
+        }
+    }
+
+    fn verify_compacted_revision_checkpoint(&self, se: &SignedEvent) -> bool {
+        let Event::Transaction(checkpoint) = &se.event else {
+            return false;
+        };
+        if checkpoint.record_revision_transaction.is_none() {
+            return false;
+        }
+        let Some((version, envelope)) =
+            decode_compacted_envelope::<CompactedRevisionCheckpointEnvelope>(
+                &se.signature,
+                COMPACTED_REVISION_CHECKPOINT_MAGIC,
+                COMPACTED_REVISION_CHECKPOINT_V2_MAGIC,
+                COMPACTED_REVISION_CHECKPOINT_MAX_BYTES,
+            )
+        else {
+            return false;
+        };
+        if envelope.version != version
+            || is_compacted_signature(&envelope.proof.signature)
+            || !self.verify_raw_event_signature(&envelope.proof)
+            || !Self::revision_checkpoint_matches_source(checkpoint, &envelope.proof.event)
+        {
+            return false;
+        }
+        let Some(key) = self.peer_verifying_key(&se.signer_peer_id) else {
+            return false;
+        };
+        let Ok(payload) = compacted_revision_checkpoint_payload(
+            &se.signer_peer_id,
+            &se.event,
+            &envelope.proof,
+            version,
+        ) else {
+            return false;
+        };
+        let Ok(signature) = Signature::from_slice(&envelope.relay_signature) else {
+            return false;
+        };
+        key.verify(&payload, &signature).is_ok()
+    }
+
+    /// Projection replay runs before an operator can restore the in-memory
+    /// membership roster. At that point the local WAL is the durable record of
+    /// events that passed authenticated sync admission. Retain a structural
+    /// check for the signed source binding and envelope shape so a legitimate
+    /// compacted revision checkpoint can rebuild the projection after restart.
+    /// Network ingress always uses `verify_compacted_revision_checkpoint`,
+    /// which verifies both ed25519 signatures against the configured roster.
+    fn compacted_revision_checkpoint_well_formed(&self, se: &SignedEvent) -> bool {
+        let Event::Transaction(checkpoint) = &se.event else {
+            return false;
+        };
+        let Some((version, envelope)) =
+            decode_compacted_envelope::<CompactedRevisionCheckpointEnvelope>(
+                &se.signature,
+                COMPACTED_REVISION_CHECKPOINT_MAGIC,
+                COMPACTED_REVISION_CHECKPOINT_V2_MAGIC,
+                COMPACTED_REVISION_CHECKPOINT_MAX_BYTES,
+            )
+        else {
+            return false;
+        };
+        envelope.version == version
+            && !se.signer_peer_id.is_empty()
+            && !envelope.proof.signer_peer_id.is_empty()
+            && envelope.relay_signature.len() == 64
+            && envelope.proof.signature.len() == 64
+            && !is_compacted_signature(&envelope.proof.signature)
+            && Self::revision_checkpoint_matches_source(checkpoint, &envelope.proof.event)
+            && compacted_revision_checkpoint_payload(
+                &se.signer_peer_id,
+                &se.event,
+                &envelope.proof,
+                version,
+            )
+            .is_ok()
+    }
+
+    fn compacted_revision_checkpoint_source_proof(&self, se: &SignedEvent) -> Option<SignedEvent> {
+        let (version, envelope) = decode_compacted_envelope::<CompactedRevisionCheckpointEnvelope>(
+            &se.signature,
+            COMPACTED_REVISION_CHECKPOINT_MAGIC,
+            COMPACTED_REVISION_CHECKPOINT_V2_MAGIC,
+            COMPACTED_REVISION_CHECKPOINT_MAX_BYTES,
+        )?;
+        (envelope.version == version && self.verify_compacted_revision_checkpoint(se))
+            .then_some(envelope.proof)
     }
 
     fn is_compacted_graph_materialization(&self, se: &SignedEvent) -> bool {
@@ -17781,7 +19043,48 @@ impl Storage {
         vector_ids.len() == expected_vector_count
     }
 
+    fn compacted_vector_source_clock(
+        proof_event: &Event,
+        owner_id: &str,
+        collection: &str,
+    ) -> Option<LogicalClock> {
+        let Event::Transaction(transaction) = proof_event else {
+            return None;
+        };
+        transaction
+            .vectors
+            .iter()
+            .find(|vector| {
+                vector.node_id == owner_id && vector.collection.as_deref() == Some(collection)
+            })
+            .map(|vector| vector.clock.clone())
+            .or_else(|| {
+                transaction
+                    .nodes
+                    .iter()
+                    .find(|node| {
+                        node.id == owner_id
+                            && node.collection.as_deref() == Some(collection)
+                            && node.embedding.is_some()
+                    })
+                    .map(|node| node.clock.clone())
+            })
+    }
+
     fn compacted_base_proof_matches_event(&self, event: &Event, proof_event: &Event) -> bool {
+        self.compacted_base_proof_matches_event_with_collection_definitions(
+            event,
+            proof_event,
+            None,
+        )
+    }
+
+    fn compacted_base_proof_matches_event_with_collection_definitions(
+        &self,
+        event: &Event,
+        proof_event: &Event,
+        collection_definitions: Option<&HashMap<String, CollectionDefinition>>,
+    ) -> bool {
         let Event::Transaction(transaction) = proof_event else {
             return false;
         };
@@ -17803,6 +19106,16 @@ impl Storage {
             Event::VectorMaterialized(target) => {
                 let Some(revisions) = transaction.record_revision_transaction.as_ref() else {
                     return false;
+                };
+                let collection_definition = |name: &str| {
+                    collection_definitions
+                        .and_then(|definitions| definitions.get(name))
+                        .cloned()
+                        .or_else(|| {
+                            self.collection_definitions
+                                .get(name)
+                                .map(|definition| definition.clone())
+                        })
                 };
                 let matches_source =
                     |owner_id: &str,
@@ -17828,13 +19141,88 @@ impl Storage {
                         let Some(collection) = mutation.payload["collection"].as_str() else {
                             return false;
                         };
-                        let materialized_embedding: Vec<f64> = source_embedding
-                            .iter()
-                            .map(|value| (*value as f32) as f64)
-                            .collect();
+                        let source_f32: Vec<f32> =
+                            source_embedding.iter().map(|value| *value as f32).collect();
+                        // The source proof binds the exact pre-quantized input.
+                        // Check the deterministic projection that compaction
+                        // actually reads from this collection's arena. A rerank
+                        // sidecar retains the original f32 values; otherwise the
+                        // arena's quantization and persisted calibration state
+                        // determine the materialized vector.
+                        let live_collection = self.collections.get(collection);
+                        let definition = collection_definition(collection);
+                        let quant = definition
+                            .as_ref()
+                            .map(|definition| definition.quant)
+                            .or_else(|| live_collection.as_ref().map(|entry| entry.quant));
+                        let metric = definition
+                            .as_ref()
+                            .map(|definition| definition.metric)
+                            .or_else(|| live_collection.as_ref().map(|entry| entry.metric));
+                        let rerank = definition
+                            .as_ref()
+                            .map(|definition| definition.rerank)
+                            .or_else(|| {
+                                live_collection
+                                    .as_ref()
+                                    .map(|entry| entry.f32_sidecar.is_some())
+                            });
+                        let mut prepared_f32 = source_f32;
+                        if metric == Some(Metric::Cosine) {
+                            let norm = prepared_f32
+                                .iter()
+                                .map(|value| value * value)
+                                .sum::<f32>()
+                                .sqrt();
+                            if norm > 0.0 {
+                                for value in &mut prepared_f32 {
+                                    *value /= norm;
+                                }
+                            }
+                        }
+                        let projected = match (quant, metric, rerank) {
+                            (Some(_), Some(_), Some(true)) => Some(prepared_f32.clone()),
+                            (Some(Quant::ScalarU8), Some(_), Some(false)) => {
+                                let (scale, bias) = live_collection
+                                    .as_ref()
+                                    .map(|entry| entry.sq8_snapshot())
+                                    .unwrap_or(SQ8_FIXED);
+                                Some(
+                                    prepared_f32
+                                        .iter()
+                                        .map(|value| {
+                                            sq8_dq(sq8_q(*value, scale, bias), scale, bias)
+                                        })
+                                        .collect(),
+                                )
+                            }
+                            (Some(Quant::Binary), Some(_), Some(false)) => {
+                                let center = live_collection
+                                    .as_ref()
+                                    .and_then(|entry| entry.center_snapshot());
+                                Some(bq_unpack(
+                                    &bq_pack_centered(&prepared_f32, center.as_deref()),
+                                    prepared_f32.len(),
+                                ))
+                            }
+                            (Some(Quant::F16), Some(_), Some(false)) => Some(
+                                prepared_f32
+                                    .iter()
+                                    .map(|value| f16::from_f32(*value).to_f32())
+                                    .collect(),
+                            ),
+                            (Some(Quant::None), Some(_), Some(false)) => Some(prepared_f32.clone()),
+                            // An unknown quantization/rerank contract cannot
+                            // authorize a materialized vector.
+                            _ => None,
+                        };
+                        let materialized_matches = projected.is_some_and(|embedding| {
+                            target.embedding
+                                == embedding.into_iter().map(f64::from).collect::<Vec<_>>()
+                        });
                         target.node_id == owner_id
                             && target.collection.as_deref() == Some(collection)
-                            && target.embedding == materialized_embedding
+                            && materialized_matches
                             && target.lang.as_deref()
                                 == Some(mutation.payload["lang"].as_str().unwrap_or("en"))
                             && &target.clock == source_clock
@@ -17914,9 +19302,7 @@ impl Storage {
     }
 
     fn compacted_master_revision_proof(&self, se: &SignedEvent) -> Option<SignedEvent> {
-        if self.compacted_master_authority_proof(se).is_none() {
-            return None;
-        }
+        self.compacted_master_authority_proof(se)?;
         let (_, envelope) = decode_compacted_envelope::<CompactedMasterProofEnvelope>(
             &se.signature,
             COMPACTED_MASTER_PROOF_MAGIC,
@@ -17946,15 +19332,22 @@ impl Storage {
         &self,
         node_id: &str,
         states: &'a mut HashMap<String, BatchMasterAuthState>,
+        seed_from_live_state: bool,
     ) -> &'a mut BatchMasterAuthState {
         if !states.contains_key(node_id) {
-            let current = self
-                .get_u32_unlocked(node_id)
-                .and_then(|id| self.nodes.get(&id).map(|node| node.value().clone()));
-            let tombstone = self
-                .tombstones
-                .get(node_id)
-                .map(|tombstone| tombstone.clock.clone());
+            let current = seed_from_live_state
+                .then(|| {
+                    self.get_u32_unlocked(node_id)
+                        .and_then(|id| self.nodes.get(&id).map(|node| node.value().clone()))
+                })
+                .flatten();
+            let tombstone = seed_from_live_state
+                .then(|| {
+                    self.tombstones
+                        .get(node_id)
+                        .map(|tombstone| tombstone.clock.clone())
+                })
+                .flatten();
             states.insert(
                 node_id.to_string(),
                 BatchMasterAuthState {
@@ -18016,11 +19409,12 @@ impl Storage {
         signer_peer_id: &str,
         forwarded_master_proof: Option<&SignedEvent>,
         states: &mut HashMap<String, BatchMasterAuthState>,
+        seed_from_live_state: bool,
     ) -> Result<()> {
         let direct_master_authority = self.authorized_master(signer_peer_id);
         match event {
             Event::Node(node) => {
-                let state = self.batch_master_auth_state(&node.id, states);
+                let state = self.batch_master_auth_state(&node.id, states, seed_from_live_state);
                 let forwarded_authority = forwarded_master_proof.is_some_and(|proof| {
                     self.compacted_proof_authorizes_protected_node(node, proof, state)
                 });
@@ -18055,7 +19449,7 @@ impl Storage {
                 if !direct_master_authority && !forwarded_authority {
                     return self.require_master_event_authority(signer_peer_id);
                 }
-                let state = self.batch_master_auth_state(id, states);
+                let state = self.batch_master_auth_state(id, states, seed_from_live_state);
                 let wins_over_node = state
                     .node_clock
                     .as_ref()
@@ -18074,7 +19468,13 @@ impl Storage {
             }
             Event::Batch(events) => {
                 for nested in events {
-                    self.preflight_reconcile_event_authority(nested, signer_peer_id, None, states)?;
+                    self.preflight_reconcile_event_authority(
+                        nested,
+                        signer_peer_id,
+                        None,
+                        states,
+                        seed_from_live_state,
+                    )?;
                 }
             }
             Event::Transaction(transaction) => {
@@ -18082,7 +19482,8 @@ impl Storage {
                 // order, then applies retractions. Mirror that order here so
                 // nested changes cannot evade the same authorization rule.
                 for node in &transaction.nodes {
-                    let state = self.batch_master_auth_state(&node.id, states);
+                    let state =
+                        self.batch_master_auth_state(&node.id, states, seed_from_live_state);
                     if (Self::labels_are_master(&node.labels) || state.node_is_master)
                         && !direct_master_authority
                     {
@@ -18096,7 +19497,8 @@ impl Storage {
                     if !direct_master_authority {
                         return self.require_master_event_authority(signer_peer_id);
                     }
-                    let state = self.batch_master_auth_state(&retraction.id, states);
+                    let state =
+                        self.batch_master_auth_state(&retraction.id, states, seed_from_live_state);
                     state.node_clock = None;
                     state.node_is_master = true;
                     state.tombstone_clock = Some(retraction.clock.clone());
@@ -18108,19 +19510,148 @@ impl Storage {
     }
 
     fn preflight_reconcile_authorization(&self, signed_events: &[SignedEvent]) -> Result<()> {
-        let mut states = HashMap::new();
+        self.preflight_reconcile_authorization_with_graph_baseline(signed_events, true)
+    }
+
+    fn preflight_reconcile_authorization_with_graph_baseline(
+        &self,
+        signed_events: &[SignedEvent],
+        seed_from_live_state: bool,
+    ) -> Result<()> {
+        self.preflight_reconcile_authorization_with_graph_events(
+            signed_events,
+            signed_events,
+            seed_from_live_state,
+        )
+    }
+
+    fn preflight_reconcile_authorization_with_graph_events(
+        &self,
+        signed_events: &[SignedEvent],
+        graph_auth_events: &[SignedEvent],
+        seed_from_live_state: bool,
+    ) -> Result<()> {
+        let mut collection_definitions = self
+            .collections
+            .iter()
+            .map(|collection| {
+                (
+                    collection.key().clone(),
+                    self.definition_for(collection.value()),
+                )
+            })
+            .collect::<HashMap<_, _>>();
+        let row_schemas = if self.storage_schema_version == SCHEMA_VERSION {
+            self.compacted_row_revision_schemas(signed_events)?
+        } else {
+            HashMap::new()
+        };
+        let mut row_revision_state = if self.storage_schema_version == SCHEMA_VERSION {
+            self.compacted_row_revision_state()?
+        } else {
+            HashMap::new()
+        };
+        let mut checked_row_sources = std::collections::HashSet::new();
         for signed_event in signed_events {
-            if !self.verify_event_signature(signed_event) {
+            if !self.verify_event_signature_with_collection_definitions(
+                signed_event,
+                Some(&collection_definitions),
+            ) {
                 return Err(Error::from_reason(format!(
                     "SYNC_AUTH_REQUIRED: invalid signature or unauthorized event signer {}",
                     signed_event.signer_peer_id
                 )));
+            }
+            Self::validate_collection_event(&signed_event.event, &mut collection_definitions)?;
+            let source_proof = self.compacted_revision_checkpoint_source_proof(signed_event);
+            if let Some(source_proof) = source_proof.as_ref() {
+                if Self::contains_p6_control_event(&source_proof.event) {
+                    return Err(Error::from_reason("P6_LOCAL_ONLY"));
+                }
+            }
+            if self.storage_schema_version == SCHEMA_VERSION {
+                let row_source = source_proof
+                    .as_ref()
+                    .map(|proof| &proof.event)
+                    .unwrap_or(&signed_event.event);
+                let has_revision_envelope = match row_source {
+                    Event::Transaction(transaction) => transaction
+                        .record_revision_transaction
+                        .as_ref()
+                        .is_some_and(|revisions| {
+                            revisions
+                                .mutations
+                                .iter()
+                                .any(|mutation| mutation.kind == uee_v2::RecordKindV2::Row)
+                                || !transaction.relational.is_empty()
+                        }),
+                    Event::RelationalRows {
+                        record_revision_transaction: Some(_),
+                        ..
+                    } => true,
+                    _ => false,
+                };
+                if has_revision_envelope
+                    && !self.compacted_source_revision_already_applied(row_source)?
+                {
+                    let identity = match row_source {
+                        Event::Transaction(transaction) => (
+                            transaction.transaction_id.clone(),
+                            transaction.payload_hash.clone(),
+                            serde_json::to_string(&transaction.record_revision_transaction)
+                                .map_err(|error| Error::from_reason(error.to_string()))?,
+                        ),
+                        Event::RelationalRows {
+                            mutation_id,
+                            payload_hash,
+                            record_revision_transaction,
+                            ..
+                        } => (
+                            format!("relational:{mutation_id}"),
+                            payload_hash.clone(),
+                            serde_json::to_string(record_revision_transaction)
+                                .map_err(|error| Error::from_reason(error.to_string()))?,
+                        ),
+                        _ => unreachable!("row revision source event was checked above"),
+                    };
+                    if checked_row_sources.insert(identity) {
+                        self.validate_compacted_row_source_event(
+                            row_source,
+                            &row_schemas,
+                            &mut row_revision_state,
+                        )?;
+                    }
+                }
+            }
+        }
+
+        // Graph authorization follows the source event order. Compacted base
+        // materializations describe the final state at the fold frontier, so
+        // they are checked after historical checkpoint proofs have rebuilt the
+        // authorization overlay.
+        let mut states = HashMap::new();
+        for signed_event in graph_auth_events {
+            if let Some(source_proof) =
+                self.compacted_revision_checkpoint_source_proof(signed_event)
+            {
+                // The checkpoint is a compact representation of its source
+                // event. Carry that event's authorized graph transitions into
+                // the batch overlay so later proofs cannot bypass MASTER state
+                // established by an earlier checkpoint.
+                self.preflight_reconcile_event_authority(
+                    &source_proof.event,
+                    &source_proof.signer_peer_id,
+                    None,
+                    &mut states,
+                    seed_from_live_state,
+                )?;
             }
             self.preflight_reconcile_event_authority(
                 &signed_event.event,
                 &signed_event.signer_peer_id,
                 self.compacted_master_authority_proof(signed_event).as_ref(),
                 &mut states,
+                seed_from_live_state,
             )?;
         }
         Ok(())
@@ -18185,6 +19716,7 @@ impl Storage {
         let _commit_guard = self.commit_lock.lock();
         self.ensure_writable()?;
         self.validate_signed_event_authorization(&proposal.signed_event)?;
+        self.validate_consensus_schema_event(&proposal.signed_event.event)?;
         Self::validate_consensus_proposal_event(&proposal.signed_event.event)?;
         self.prune_expired_consensus_proposals();
         proposal.votes.clear();
@@ -18338,7 +19870,6 @@ impl Storage {
             .proposals
             .get(&proposal_id)
             .ok_or_else(|| Error::from_reason(format!("unknown proposal '{}'", proposal_id)))?;
-        self.touch_consensus_proposal(&proposal_id);
         if proposal.proposal_id != proposal_id {
             return Err(Error::from_reason(
                 "CONSENSUS_PROPOSAL_ID_CONFLICT: proposal key does not match its envelope",
@@ -18348,6 +19879,8 @@ impl Storage {
             return Err(Error::from_reason("P6_LOCAL_ONLY"));
         }
         self.validate_signed_event_authorization(&proposal.signed_event)?;
+        self.validate_consensus_schema_event(&proposal.signed_event.event)?;
+        self.touch_consensus_proposal(&proposal_id);
         let event_digest = Self::consensus_proposal_digest(&proposal.signed_event)?;
         let proposal_digest = hex::encode(event_digest);
         let roster_digest = self.membership_digest.read().clone();
@@ -18454,6 +19987,7 @@ impl Storage {
             ));
         }
         self.validate_signed_event_authorization(&signed_event)?;
+        self.validate_consensus_schema_event(&signed_event.event)?;
         let event_digest = Self::consensus_proposal_digest(&signed_event)?;
         let proposal_digest = hex::encode(event_digest);
         let roster_digest = self.membership_digest.read().clone();
@@ -18567,6 +20101,7 @@ impl Storage {
                 return Err(Error::from_reason("P6_LOCAL_ONLY"));
             }
             self.validate_signed_event_authorization(&signed_event)?;
+            self.validate_consensus_schema_event(&signed_event.event)?;
             if !self.semantic_verify(&signed_event.event)? {
                 return Err(Error::from_reason(
                     "proposal rejected by semantic_verify at commit",
@@ -22223,7 +23758,7 @@ impl Storage {
                     self.persist_signed(signed_event.clone())?;
                 }
                 Event::Transaction(transaction) => {
-                    self.preflight_relational_event(event)?;
+                    self.preflight_signed_relational_event(&signed_event)?;
                     // ADR D2.2: no fetch_max of the peer's origin sequence —
                     // see the consensus-commit arm for the rationale.
                     let seq = self.persist_signed(signed_event.clone())?;
@@ -22336,8 +23871,12 @@ impl Storage {
         self.preflight_signed_relational_event(&signed_event)?;
         let (ack_tx, ack_rx) = unbounded();
         let event = signed_event.event.clone();
-        let revision_checkpoint = match &event {
-            Event::Transaction(transaction) => Self::is_revision_checkpoint(transaction),
+        let revision_checkpoint = match &signed_event.event {
+            Event::Transaction(transaction) if Self::is_revision_checkpoint(transaction) => {
+                self.storage_schema_version != SCHEMA_VERSION
+                    || transaction.record_revision_transaction.is_none()
+                    || self.verify_compacted_revision_checkpoint(&signed_event)
+            }
             _ => false,
         };
         // A folded receipt may carry the source replica's local frame for
@@ -24092,7 +25631,7 @@ impl Storage {
             .map_err(|e| Error::from_reason(e.to_string()))
     }
 
-    fn read_u32(reader: &mut File) -> Result<u32> {
+    fn read_u32<R: Read>(reader: &mut R) -> Result<u32> {
         let mut bytes = [0u8; 4];
         reader
             .read_exact(&mut bytes)
@@ -24100,7 +25639,7 @@ impl Storage {
         Ok(u32::from_le_bytes(bytes))
     }
 
-    fn read_u64(reader: &mut File) -> Result<u64> {
+    fn read_u64<R: Read>(reader: &mut R) -> Result<u64> {
         let mut bytes = [0u8; 8];
         reader
             .read_exact(&mut bytes)
@@ -24110,7 +25649,21 @@ impl Storage {
 
     fn backup_info(manifest: &BackupManifest, bundle_path: PathBuf) -> Result<BackupBundleInfo> {
         let (byte_count, sha256) = Self::sha256_file(&bundle_path)?;
-        Ok(BackupBundleInfo {
+        Ok(Self::backup_info_with_digest(
+            manifest,
+            bundle_path,
+            byte_count,
+            sha256,
+        ))
+    }
+
+    fn backup_info_with_digest(
+        manifest: &BackupManifest,
+        bundle_path: PathBuf,
+        byte_count: u64,
+        sha256: String,
+    ) -> BackupBundleInfo {
+        BackupBundleInfo {
             format_version: manifest.format_version,
             engine_name: manifest.engine_name.clone(),
             engine_version: manifest.engine_version.clone(),
@@ -24121,7 +25674,7 @@ impl Storage {
             bundle_path,
             byte_count,
             sha256,
-        })
+        }
     }
 
     fn validate_backup_manifest(manifest: &BackupManifest) -> Result<()> {
@@ -24867,6 +26420,23 @@ impl Storage {
 
     /// Verifies one opaque bundle before publishing it as a non-existing root.
     pub fn restore_backup(request: BackupRestoreRequest) -> Result<BackupBundleInfo> {
+        Self::restore_backup_internal(request, None)
+    }
+
+    /// Restore a backup that contains events from other cluster members. The
+    /// supplied operator-pinned roster is installed before journal recovery so
+    /// every stored event and compacted checkpoint can be authenticated.
+    pub fn restore_backup_with_membership(
+        request: BackupRestoreRequest,
+        membership: PeerMembershipOptions,
+    ) -> Result<BackupBundleInfo> {
+        Self::restore_backup_internal(request, Some(membership))
+    }
+
+    fn restore_backup_internal(
+        request: BackupRestoreRequest,
+        membership: Option<PeerMembershipOptions>,
+    ) -> Result<BackupBundleInfo> {
         if request.target_root.exists() {
             return Err(Error::from_reason("restore target must not already exist"));
         }
@@ -24885,10 +26455,35 @@ impl Storage {
         let staging = parent.join(format!(".genesis-restore-{}", Uuid::new_v4()));
         let bundle_path = fs::canonicalize(&request.bundle_path)
             .map_err(|e| Error::from_reason(e.to_string()))?;
+        if !Self::is_lower_sha256(&request.expected_sha256) {
+            return Err(Error::from_reason(
+                "BACKUP_AUTH_REQUIRED: restore requires a trusted lowercase bundle SHA-256",
+            ));
+        }
+
+        // Authenticate the complete bundle before parsing attacker-controlled
+        // manifest lengths or creating any staging files. Keep the same open
+        // handle for extraction so a path replacement cannot swap the input
+        // between the verification and extraction passes.
+        let mut bundle_file =
+            File::open(&bundle_path).map_err(|e| Error::from_reason(e.to_string()))?;
+        let (preflight_byte_count, preflight_sha256) = {
+            let mut preflight = HashingReader::new(&mut bundle_file);
+            std::io::copy(&mut preflight, &mut std::io::sink())
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            preflight.finish()
+        };
+        if preflight_sha256 != request.expected_sha256 {
+            return Err(Error::from_reason(
+                "BACKUP_AUTH_REQUIRED: bundle does not match the trusted expected SHA-256",
+            ));
+        }
+        bundle_file
+            .seek(SeekFrom::Start(0))
+            .map_err(|e| Error::from_reason(e.to_string()))?;
 
         let result = (|| -> Result<BackupBundleInfo> {
-            let mut input =
-                File::open(&bundle_path).map_err(|e| Error::from_reason(e.to_string()))?;
+            let mut input = HashingReader::new(bundle_file);
             let mut magic = vec![0u8; BACKUP_MAGIC.len()];
             input
                 .read_exact(&mut magic)
@@ -24984,17 +26579,31 @@ impl Storage {
                     "Genesis backup bundle has trailing data",
                 ));
             }
+            let (bundle_byte_count, bundle_sha256) = input.finish();
+            if bundle_byte_count != preflight_byte_count
+                || bundle_sha256 != preflight_sha256
+                || bundle_sha256 != request.expected_sha256
+            {
+                return Err(Error::from_reason(
+                    "BACKUP_AUTH_REQUIRED: bundle does not match the trusted expected SHA-256",
+                ));
+            }
 
             // A fresh open validates the engine's own snapshot/WAL compatibility
             // before staging becomes caller-visible. Full retention prevents its
             // shutdown checkpoint from folding the only restored journal copy.
-            let staging_storage = Storage::open(OpenOptions {
-                path: staging.display().to_string(),
-                page_cache_mb: Some(16),
-                read_only: Some(false),
-                vector_dim: None,
-                retention: Some("full".into()),
-            })?;
+            let staging_storage = Storage::open_internal(
+                OpenOptions {
+                    path: staging.display().to_string(),
+                    page_cache_mb: Some(16),
+                    read_only: Some(false),
+                    vector_dim: None,
+                    retention: Some("full".into()),
+                },
+                None,
+                membership.clone(),
+                true,
+            )?;
             if staging_storage.stable_frontier() != manifest.stable_frontier {
                 return Err(Error::from_reason(
                     "GENERATION_STALE: recovered WAL frontier mismatch",
@@ -25012,13 +26621,18 @@ impl Storage {
 
             // Verify the newly published generation through a separate
             // read-only recovery before the restore target becomes visible.
-            let read_only_validation = Storage::open(OpenOptions {
-                path: staging.display().to_string(),
-                page_cache_mb: Some(16),
-                read_only: Some(true),
-                vector_dim: None,
-                retention: Some("full".into()),
-            })?;
+            let read_only_validation = Storage::open_internal(
+                OpenOptions {
+                    path: staging.display().to_string(),
+                    page_cache_mb: Some(16),
+                    read_only: Some(true),
+                    vector_dim: None,
+                    retention: Some("full".into()),
+                },
+                None,
+                membership.clone(),
+                true,
+            )?;
             let lease = read_only_validation.pin_generation(
                 AccessContext {
                     principal: "backup-restore-verifier".into(),
@@ -25035,7 +26649,12 @@ impl Storage {
             drop(read_only_validation);
             // Prepare every fallible return value before the rename publishes
             // the target. A bundle I/O error must not leave a visible restore.
-            Self::backup_info(&manifest, bundle_path.clone())
+            Ok(Self::backup_info_with_digest(
+                &manifest,
+                bundle_path.clone(),
+                bundle_byte_count,
+                bundle_sha256,
+            ))
         })();
         match result {
             Ok(bundle_info) => match fs::rename(&staging, &target_root) {
@@ -26318,13 +27937,31 @@ impl Storage {
 
             match event {
                 Event::Node(node) => {
-                    record_lww_action(
-                        event,
-                        &node.id,
-                        CompactedMasterIdentityAction::Node(node.clone(), proof.clone()),
-                        order,
-                        latest,
-                    );
+                    let prior_state_is_protected =
+                        action_state(latest, &node.id).is_some_and(|state| match state {
+                            ProofIdentityState::Node(prior) => {
+                                Storage::labels_are_master(&prior.labels)
+                            }
+                            ProofIdentityState::Retraction(_) => true,
+                        });
+                    // A MASTER-authorized writer may also create ordinary USER
+                    // nodes. Preserve a USER action only when it transitions an
+                    // identity that was already MASTER-protected (or retracted),
+                    // so the compacted journal does not turn unrelated USER data
+                    // into state that every receiving member must authorize as
+                    // MASTER.
+                    if Storage::labels_are_master(&node.labels) || prior_state_is_protected {
+                        record_lww_action(
+                            event,
+                            &node.id,
+                            CompactedMasterIdentityAction::Node(
+                                Box::new(node.clone()),
+                                Box::new(proof.clone()),
+                            ),
+                            order,
+                            latest,
+                        );
+                    }
                 }
                 Event::NodeRetract {
                     id,
@@ -26351,14 +27988,26 @@ impl Storage {
                 }
                 Event::Transaction(transaction) => {
                     for node in &transaction.nodes {
-                        *order = order.saturating_add(1);
-                        latest.insert(
-                            node.id.clone(),
-                            (
-                                *order,
-                                CompactedMasterIdentityAction::Node(node.clone(), proof.clone()),
-                            ),
-                        );
+                        let prior_state_is_protected =
+                            action_state(latest, &node.id).is_some_and(|state| match state {
+                                ProofIdentityState::Node(prior) => {
+                                    Storage::labels_are_master(&prior.labels)
+                                }
+                                ProofIdentityState::Retraction(_) => true,
+                            });
+                        if Storage::labels_are_master(&node.labels) || prior_state_is_protected {
+                            *order = order.saturating_add(1);
+                            latest.insert(
+                                node.id.clone(),
+                                (
+                                    *order,
+                                    CompactedMasterIdentityAction::Node(
+                                        Box::new(node.clone()),
+                                        Box::new(proof.clone()),
+                                    ),
+                                ),
+                            );
+                        }
                     }
                     for retraction in &transaction.node_retractions {
                         *order = order.saturating_add(1);
@@ -26469,7 +28118,7 @@ impl Storage {
                 {
                     proofs
                         .user_nodes
-                        .insert(node.id.clone(), (proof_node.clone(), proof.clone()));
+                        .insert(node.id.clone(), ((**proof_node).clone(), (**proof).clone()));
                 }
                 Some(_) => missing.push(format!(
                     "MASTER-authorized USER transition for node {}",
@@ -26591,6 +28240,11 @@ impl Storage {
     /// live state cannot move between the build and the fold).
     fn build_compacted_wal(&self) -> Result<(Vec<u8>, usize)> {
         self.ensure_writable()?;
+        // The current projection is final state, so validate source proofs by
+        // their retained journal order before creating checkpoints. Checking
+        // each historical source against the live MASTER state would reject
+        // USER events that predate a later authorized MASTER promotion.
+        self.preflight_journal_authorization_in_source_order(false)?;
         // Build the live-state snapshot in memory, then hand it to the WAL thread
         // to atomically replace the file (serialized with appends; see WalMsg).
         let mut buf: Vec<u8> = Vec::new();
@@ -26605,7 +28259,15 @@ impl Storage {
         {
             self.validate_schema6_migration_authority()?;
         }
-        let base_proofs = self.compacted_base_materialization_proofs()?;
+        // Detached base-event proofs are the schema-6 revision contract. Legacy
+        // schema-5 graph events have no revision envelope, so they must remain
+        // locally signed materializations instead of being misclassified as a
+        // schema-6 source proof and rejected during folding.
+        let base_proofs = if self.storage_schema_version == SCHEMA_VERSION {
+            self.compacted_base_materialization_proofs()?
+        } else {
+            CompactedBaseMaterializationProofs::default()
+        };
         let authority_proofs = self.compacted_master_authority_proofs(&now)?;
 
         // Sign only the current protected projection and carry the original
@@ -26698,7 +28360,34 @@ impl Storage {
                 // an explicit already-prepared representation.
                 node.embedding = None;
                 let mut materializations = Vec::with_capacity(2);
-                if let Some((declassified_node, master_proof)) =
+                if self.storage_schema_version != SCHEMA_VERSION {
+                    if let Some((declassified_node, master_proof)) =
+                        authority_proofs.user_nodes.get(&node.id)
+                    {
+                        // Legacy graph frames have no revision-bound base proof.
+                        // Preserve the privileged transition itself, then let
+                        // the relay sign a later ordinary USER update locally.
+                        let mut transition = declassified_node.clone();
+                        transition.embedding = None;
+                        let transition_event = Event::Node(transition.clone());
+                        materializations.push(self.sign_compacted_master_materialization(
+                            &transition_event,
+                            master_proof,
+                            None,
+                        )?);
+                        if !node_base_projection_matches_proof(&node, &transition) {
+                            if node.clock <= transition.clock {
+                                return Err(Error::from_reason(format!(
+                                    "COMPACTION_MASTER_AUTHORITY_PROOF_MISSING: USER update for node {} does not follow its MASTER transition",
+                                    node.id
+                                )));
+                            }
+                            materializations.push(self.sign_event(&Event::Node(node.clone())));
+                        }
+                    } else {
+                        materializations.push(self.sign_event(&Event::Node(node.clone())));
+                    }
+                } else if let Some((declassified_node, master_proof)) =
                     authority_proofs.user_nodes.get(&node.id)
                 {
                     // Preserve the exact MASTER-authorized USER transition.
@@ -26832,15 +28521,19 @@ impl Storage {
                     }
                     arena.f32_at(m.embedding_offset as usize, m.vector_dim as usize)
                 };
+                let vector_id = Self::vector_revision_record_id(&node.id, &c.name)?;
+                let proof = base_proofs.vectors.get(&vector_id);
                 let event = Event::VectorMaterialized(VectorEvent {
                     node_id: node.id.clone(),
                     collection: Some(c.name.clone()),
                     embedding: values.into_iter().map(|v| v as f64).collect(),
                     lang: Some(m.lang.clone()),
-                    clock: node.clock.clone(),
+                    clock: proof
+                        .and_then(|proof| {
+                            Self::compacted_vector_source_clock(&proof.event, &node.id, &c.name)
+                        })
+                        .unwrap_or_else(|| node.clock.clone()),
                 });
-                let vector_id = Self::vector_revision_record_id(&node.id, &c.name)?;
-                let proof = base_proofs.vectors.get(&vector_id);
                 let json =
                     serde_json::to_vec(&self.sign_compacted_base_materialization(&event, proof)?)
                         .map_err(|e| Error::from_reason(e.to_string()))?;
@@ -26862,8 +28555,8 @@ impl Storage {
 
         // 5. Preserve transaction identities and stable frontier across WAL
         // compaction without replaying their logical mutations a second time.
-        for event in self.transaction_checkpoint_events()? {
-            let json = serde_json::to_string(&self.sign_event(&event))
+        for signed_event in self.transaction_checkpoint_events()? {
+            let json = serde_json::to_string(&signed_event)
                 .map_err(|e| Error::from_reason(e.to_string()))?;
             buf.extend_from_slice(json.as_bytes());
             buf.push(b'\n');
@@ -27393,6 +29086,17 @@ impl Storage {
         include_legacy: bool,
         f: &mut dyn FnMut(u64, SignedEvent),
     ) {
+        self.scan_journal_with_origin(from_seq, include_legacy, &mut |seq, _, signed_event| {
+            f(seq, signed_event);
+        });
+    }
+
+    fn scan_journal_with_origin(
+        &self,
+        from_seq: Option<u64>,
+        include_legacy: bool,
+        f: &mut dyn FnMut(u64, JournalEventOrigin, SignedEvent),
+    ) {
         use std::io::BufRead;
         let base_frontier = Self::journal_list_segments(&self.path)
             .into_iter()
@@ -27400,22 +29104,23 @@ impl Storage {
             .map(|segment| segment.max_seq)
             .max()
             .unwrap_or(0);
-        let emit_lines = |bytes: &[u8], f: &mut dyn FnMut(u64, SignedEvent)| {
-            for line in bytes.split(|b| *b == b'\n') {
-                if line.is_empty() {
-                    continue;
+        let emit_lines =
+            |bytes: &[u8], origin, f: &mut dyn FnMut(u64, JournalEventOrigin, SignedEvent)| {
+                for line in bytes.split(|b| *b == b'\n') {
+                    if line.is_empty() {
+                        continue;
+                    }
+                    if let Ok(se) = serde_json::from_slice::<SignedEvent>(line) {
+                        f(0, origin, se);
+                    }
                 }
-                if let Ok(se) = serde_json::from_slice::<SignedEvent>(line) {
-                    f(0, se);
-                }
-            }
-        };
+            };
         // Pre-migration / read-only legacy file, in place.
         if include_legacy && self.legacy_log_path.exists() {
             if let Ok(file) = File::open(&self.legacy_log_path) {
                 for line in std::io::BufReader::new(file).lines().map_while(|r| r.ok()) {
                     if let Ok(se) = serde_json::from_str::<SignedEvent>(&line) {
-                        f(0, se);
+                        f(0, JournalEventOrigin::Legacy, se);
                     }
                 }
             }
@@ -27424,7 +29129,7 @@ impl Storage {
             if seg.kind == SEG_KIND_LEGACY_JSONL {
                 if include_legacy {
                     if let Some((_, body)) = read_segment_body(&seg.path) {
-                        emit_lines(&body, f);
+                        emit_lines(&body, JournalEventOrigin::Legacy, f);
                     }
                 }
                 continue;
@@ -27436,7 +29141,12 @@ impl Storage {
                 walk_frames(&body, 0, |seq, payload| {
                     if from_seq.is_none_or(|cursor| seq > cursor) {
                         if let Ok(se) = serde_json::from_slice::<SignedEvent>(payload) {
-                            f(seq, se);
+                            let origin = if seg.kind == SEG_KIND_BASE {
+                                JournalEventOrigin::Base
+                            } else {
+                                JournalEventOrigin::History
+                            };
+                            f(seq, origin, se);
                         }
                     }
                 });
@@ -27447,7 +29157,7 @@ impl Storage {
                 walk_frames(&bytes, ACTIVE_HEADER_LEN, |seq, payload| {
                     if seq > base_frontier && from_seq.is_none_or(|cursor| seq > cursor) {
                         if let Ok(se) = serde_json::from_slice::<SignedEvent>(payload) {
-                            f(seq, se);
+                            f(seq, JournalEventOrigin::Active, se);
                         }
                     }
                 });
@@ -27483,6 +29193,77 @@ impl Storage {
             }
             self.apply_replay_event(seq, self.normalize_replayed_event(signed_event));
         });
+    }
+
+    fn preflight_backup_journal_authorization(&self) -> Result<()> {
+        self.preflight_journal_authorization_in_source_order(false)
+            .map_err(|error| Error::from_reason(format!("BACKUP_AUTH_REQUIRED: {error}")))
+    }
+
+    fn preflight_journal_authorization_in_source_order(
+        &self,
+        seed_from_live_state: bool,
+    ) -> Result<()> {
+        let mut journal_events = Vec::new();
+        self.scan_journal_with_origin(None, true, &mut |seq, origin, signed_event| {
+            journal_events.push((seq, origin, signed_event));
+        });
+        let signed_events = journal_events
+            .iter()
+            .map(|(_, _, signed_event)| signed_event.clone())
+            .collect::<Vec<_>>();
+        let graph_auth_events = Self::graph_authorization_event_order(&journal_events);
+        // A loaded snapshot is the final materialized state. Replaying auth
+        // from journal start must not use it as the initial state, because a
+        // later MASTER promotion would retroactively protect earlier USER
+        // transactions. Base checkpoints carry their source transactions at
+        // original frame sequence; base materializations then establish the
+        // authorization state used by the post-base journal tail.
+        self.preflight_reconcile_authorization_with_graph_events(
+            &signed_events,
+            &graph_auth_events,
+            seed_from_live_state,
+        )
+    }
+
+    fn graph_authorization_event_order(
+        journal_events: &[(u64, JournalEventOrigin, SignedEvent)],
+    ) -> Vec<SignedEvent> {
+        let base_frontier = journal_events
+            .iter()
+            .filter(|(_, origin, _)| *origin == JournalEventOrigin::Base)
+            .map(|(seq, _, _)| *seq)
+            .max()
+            .unwrap_or(0);
+        let mut ordered = journal_events
+            .iter()
+            .enumerate()
+            .map(|(order, (seq, origin, signed_event))| {
+                let (phase, source_seq) = match origin {
+                    JournalEventOrigin::Legacy => (0, *seq),
+                    JournalEventOrigin::History if *seq <= base_frontier => (0, *seq),
+                    JournalEventOrigin::History => (2, *seq),
+                    JournalEventOrigin::Base => {
+                        let source_seq = match &signed_event.event {
+                            Event::Transaction(transaction)
+                                if Self::is_revision_checkpoint(transaction) =>
+                            {
+                                transaction.local_frame_seq.unwrap_or(*seq)
+                            }
+                            _ => return (1, *seq, order, signed_event.clone()),
+                        };
+                        (0, source_seq)
+                    }
+                    JournalEventOrigin::Active => (2, *seq),
+                };
+                (phase, source_seq, order, signed_event.clone())
+            })
+            .collect::<Vec<_>>();
+        ordered.sort_by_key(|(phase, seq, order, _)| (*phase, *seq, *order));
+        ordered
+            .into_iter()
+            .map(|(_, _, _, signed_event)| signed_event)
+            .collect()
     }
 
     fn apply_replay_event(&self, seq: u64, event: Event) {
@@ -29986,21 +31767,7 @@ impl GenesisDatabase {
         opts: OpenOptions,
         membership: PeerMembershipOptions,
     ) -> Result<Self> {
-        let local_master_authority = match membership.local_master_authority {
-            Some(role) => role,
-            None if membership.peers.is_empty() => true,
-            None => {
-                return Err(Error::from_reason(
-                    "PEER_MEMBERSHIP_INVALID: localMasterAuthority must be set when peers are configured",
-                ));
-            }
-        };
-        let storage = Arc::new(Storage::open(opts)?);
-        storage.configure_peer_membership(
-            membership.peers,
-            &membership.local_gossip_addr,
-            local_master_authority,
-        )?;
+        let storage = Arc::new(Storage::open_with_membership(opts, membership)?);
         Storage::start_autonomic_loop(Arc::clone(&storage));
         Storage::start_gossip_manager(Arc::clone(&storage));
         Ok(Self { inner: storage })
@@ -30812,5 +32579,977 @@ mod api_error_contract_tests {
         assert_eq!(error.category, api_error::ApiErrorCategory::Validation);
         assert_eq!(error.code, "GENESIS_VALIDATION_ERROR");
         assert!(error.message.contains("REL_TYPE_MISMATCH"));
+    }
+}
+
+#[cfg(test)]
+mod compacted_row_revision_binding_tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn schema() -> RelationalSchemaPackage {
+        RelationalSchemaPackage {
+            namespace: "checkpoint_rows".into(),
+            schema_version: 1,
+            previous_version: None,
+            package_id: Uuid::new_v4().to_string(),
+            schema_hash: String::new(),
+            tables: vec![RelationalTable {
+                name: "records".into(),
+                columns: vec![
+                    RelationalColumn::required("id", RelationalColumnType::Text),
+                    RelationalColumn::required("title", RelationalColumnType::Text),
+                ],
+                primary_key: vec!["id".into()],
+                foreign_keys: Vec::new(),
+                indexes: Vec::new(),
+            }],
+            named_queries: Vec::new(),
+        }
+    }
+
+    fn row_revision(
+        schema: &RelationalSchemaPackage,
+        mutation: &RelationalRowMutation,
+        row_id: &str,
+        revision_id: &str,
+        expected_revision_id: Option<&str>,
+        after_image: Value,
+        valid_from: DateTime<Utc>,
+    ) -> uee_v2::RecordRevisionMutationV1 {
+        let table = &schema.tables[0];
+        let key = Storage::relational_primary_key_values(table, mutation).unwrap();
+        let key_bytes = Storage::encode_relational_primary_key_v1(schema, mutation).unwrap();
+        uee_v2::RecordRevisionMutationV1 {
+            namespace: schema.namespace.clone(),
+            kind: uee_v2::RecordKindV2::Row,
+            id: row_id.into(),
+            revision_id: revision_id.into(),
+            expected_revision_id: expected_revision_id.map(str::to_string),
+            predecessor_revision_id: expected_revision_id.map(str::to_string),
+            operation: uee_v2::RevisionOperationV1::Upsert,
+            valid_from,
+            valid_to: None,
+            schema_ref: Some(table.name.clone()),
+            schema_version: Some(schema.schema_version as u64),
+            key_codec_version: Some(1),
+            key_bytes: Some(key_bytes.clone()),
+            payload: serde_json::json!({
+                "table": table.name,
+                "key": key,
+                "key_codec_version": 1,
+                "key_bytes": hex::encode(key_bytes),
+                "after_image": after_image,
+            }),
+        }
+    }
+
+    fn source_event(
+        mutation_id: &str,
+        mutation: RelationalRowMutation,
+        revision: uee_v2::RecordRevisionMutationV1,
+    ) -> Event {
+        Event::RelationalRows {
+            namespace: "checkpoint_rows".into(),
+            schema_version: 1,
+            mutation_id: mutation_id.into(),
+            payload_hash: "1".repeat(64),
+            affected_rows: 1,
+            mutations: vec![mutation],
+            record_revision_transaction: Some(uee_v2::RecordRevisionTransactionV1 {
+                transaction_id: Uuid::new_v4(),
+                origin_database_id: "0".repeat(64),
+                mutations: vec![revision],
+            }),
+        }
+    }
+
+    fn open_storage() -> (TempDir, Storage) {
+        open_storage_with_retention(None)
+    }
+
+    fn open_storage_with_retention(retention: Option<&str>) -> (TempDir, Storage) {
+        let directory = TempDir::new().unwrap();
+        let storage = Storage::open(OpenOptions {
+            path: directory.path().to_string_lossy().into_owned(),
+            page_cache_mb: Some(16),
+            read_only: Some(false),
+            vector_dim: Some(2),
+            retention: retention.map(str::to_string),
+        })
+        .unwrap();
+        (directory, storage)
+    }
+
+    fn authorized_peer(
+        storage: &Storage,
+        port: u16,
+        master_authority: bool,
+    ) -> AuthorizedPeerConfig {
+        let identity = storage.local_identity();
+        AuthorizedPeerConfig {
+            peer_id: identity.peer_id,
+            public_key_hex: identity.public_key_hex,
+            gossip_addr: format!("127.0.0.1:{port}"),
+            master_authority,
+        }
+    }
+
+    fn compacted_checkpoint(relay: &Storage, source_event: Event) -> Result<SignedEvent> {
+        let source = relay.sign_event(&source_event);
+        let Event::RelationalRows {
+            mutation_id,
+            payload_hash,
+            record_revision_transaction: Some(revisions),
+            ..
+        } = &source_event
+        else {
+            panic!("expected a revision-bearing relational source event");
+        };
+        let checkpoint = Event::Transaction(GenesisTransactionEvent {
+            transaction_id: format!("relational:{mutation_id}"),
+            origin_commit_seq: 1,
+            local_frame_seq: Some(1),
+            payload_hash: payload_hash.clone(),
+            relational: Vec::new(),
+            nodes: Vec::new(),
+            edges: Vec::new(),
+            vectors: Vec::new(),
+            node_retractions: Vec::new(),
+            advances_txn_frontier: false,
+            record_revision_transaction: Some(revisions.clone()),
+        });
+        relay.sign_compacted_revision_checkpoint(&checkpoint, &source)
+    }
+
+    fn compacted_graph_checkpoint(relay: &Storage, source: &SignedEvent) -> Result<SignedEvent> {
+        let Event::Transaction(source_transaction) = &source.event else {
+            return Err(Error::from_reason(
+                "expected a revision-bearing graph transaction",
+            ));
+        };
+        let mut checkpoint = source_transaction.clone();
+        checkpoint.local_frame_seq = Some(1);
+        checkpoint.relational.clear();
+        checkpoint.nodes.clear();
+        checkpoint.edges.clear();
+        checkpoint.vectors.clear();
+        checkpoint.node_retractions.clear();
+        relay.sign_compacted_revision_checkpoint(&Event::Transaction(checkpoint), source)
+    }
+
+    fn append_signed_event(storage: &Storage, signed_event: SignedEvent) {
+        let (ack_tx, ack_rx) = unbounded();
+        storage
+            .wal_sender
+            .send(WalMsg::Append(Box::new(signed_event), ack_tx))
+            .unwrap();
+        let seq = ack_rx.recv().unwrap().unwrap();
+        storage.commit_sequence.fetch_max(seq, Ordering::SeqCst);
+    }
+
+    #[test]
+    fn backup_restore_requires_roster_for_remote_revision_checkpoint() {
+        let (_relay_dir, relay) = open_storage();
+        let (_untrusted_dir, untrusted_restore) = open_storage();
+        let (_trusted_dir, trusted_restore) = open_storage();
+        let schema = schema();
+        let mutation = RelationalRowMutation {
+            table: "records".into(),
+            kind: RelationalMutationKind::Insert,
+            values: serde_json::json!({"id": "backup-row", "title": "trusted source"}),
+            key: None,
+        };
+        let source = source_event(
+            "backup-row-insert",
+            mutation.clone(),
+            row_revision(
+                &schema,
+                &mutation,
+                &Uuid::new_v4().to_string(),
+                &Uuid::new_v4().to_string(),
+                None,
+                serde_json::json!({"id": "backup-row", "title": "trusted source"}),
+                Utc::now(),
+            ),
+        );
+        let checkpoint = compacted_checkpoint(&relay, source).unwrap();
+        assert!(untrusted_restore.compacted_revision_checkpoint_well_formed(&checkpoint));
+        assert!(!untrusted_restore.verify_compacted_revision_checkpoint(&checkpoint));
+
+        untrusted_restore
+            .register_relational_schema(schema.clone())
+            .unwrap();
+        append_signed_event(&untrusted_restore, checkpoint.clone());
+        let error = untrusted_restore
+            .preflight_backup_journal_authorization()
+            .unwrap_err();
+        assert!(error.to_string().contains("BACKUP_AUTH_REQUIRED"));
+
+        trusted_restore
+            .configure_peer_membership(
+                vec![authorized_peer(&relay, 31841, true)],
+                "127.0.0.1:31842",
+                false,
+            )
+            .unwrap();
+        trusted_restore.register_relational_schema(schema).unwrap();
+        append_signed_event(&trusted_restore, checkpoint);
+        trusted_restore
+            .preflight_backup_journal_authorization()
+            .unwrap();
+    }
+
+    #[test]
+    fn backup_restore_with_membership_authenticates_remote_journal_before_publish() {
+        for retention in [Some("full"), None] {
+            let (_source_dir, source) = open_storage_with_retention(retention);
+            let (_remote_dir, remote) = open_storage();
+            let source_gossip_addr = "127.0.0.1:31852";
+            let membership = PeerMembershipOptions {
+                local_gossip_addr: "127.0.0.1:31853".into(),
+                local_master_authority: Some(true),
+                peers: vec![authorized_peer(&remote, 31851, false)],
+            };
+            source
+                .configure_peer_membership(membership.peers.clone(), source_gossip_addr, true)
+                .unwrap();
+            remote
+                .add_node(NodeInput {
+                    id: Some("backup-remote-member".into()),
+                    labels: vec!["USER".into()],
+                    props: Some(serde_json::json!({"origin": "authorized-member"})),
+                    embedding: None,
+                    lang: None,
+                    valid_from: None,
+                    caused_by: None,
+                    ttl: None,
+                    collection: None,
+                })
+                .unwrap();
+            source
+                .reconcile_state(vec![remote.events_since_seq(0).pop().unwrap()])
+                .unwrap();
+            // This later, authorized promotion must not retroactively make the
+            // preceding USER event unauthorized in either retained or folded history.
+            source
+                .add_node(NodeInput {
+                    id: Some("backup-remote-member".into()),
+                    labels: vec!["MASTER".into()],
+                    props: Some(serde_json::json!({"origin": "authorized-master-promotion"})),
+                    embedding: None,
+                    lang: None,
+                    valid_from: None,
+                    caused_by: None,
+                    ttl: None,
+                    collection: None,
+                })
+                .unwrap();
+
+            let backup_dir = TempDir::new().unwrap();
+            let bundle_path = backup_dir.path().join("remote-member.genesis");
+            let export = source
+                .export_backup(BackupExportRequest {
+                    destination: bundle_path.clone(),
+                })
+                .unwrap();
+            if retention.is_none() {
+                assert_eq!(source.history_horizon(), source.stable_frontier());
+            } else {
+                assert_eq!(source.history_horizon(), 0);
+            }
+            let untrusted_target = backup_dir.path().join("without-roster");
+            let untrusted_error = Storage::restore_backup(BackupRestoreRequest {
+                bundle_path: bundle_path.clone(),
+                target_root: untrusted_target.clone(),
+                expected_sha256: export.sha256.clone(),
+            })
+            .unwrap_err();
+            assert!(untrusted_error.to_string().contains("BACKUP_AUTH_REQUIRED"));
+            assert!(!untrusted_target.exists());
+
+            let trusted_target = backup_dir.path().join("with-roster");
+            Storage::restore_backup_with_membership(
+                BackupRestoreRequest {
+                    bundle_path,
+                    target_root: trusted_target.clone(),
+                    expected_sha256: export.sha256,
+                },
+                membership.clone(),
+            )
+            .unwrap();
+            assert!(trusted_target.exists());
+            let restored = Storage::open_with_membership(
+                OpenOptions {
+                    path: trusted_target.to_string_lossy().into_owned(),
+                    page_cache_mb: Some(16),
+                    read_only: Some(true),
+                    vector_dim: Some(2),
+                    retention: None,
+                },
+                membership,
+            )
+            .unwrap();
+            assert!(restored
+                .node_view("backup-remote-member")
+                .is_some_and(|node| Storage::labels_are_master(&node.labels)));
+        }
+    }
+
+    #[test]
+    fn frontier_only_backup_rejects_user_update_after_master_promotion() {
+        let (_source_dir, source) = open_storage();
+        let (_remote_dir, remote) = open_storage();
+        let membership = PeerMembershipOptions {
+            local_gossip_addr: "127.0.0.1:31863".into(),
+            local_master_authority: Some(true),
+            peers: vec![authorized_peer(&remote, 31861, false)],
+        };
+        source
+            .configure_peer_membership(membership.peers.clone(), "127.0.0.1:31862", true)
+            .unwrap();
+        remote
+            .add_node(NodeInput {
+                id: Some("backup-unauthorized-member".into()),
+                labels: vec!["USER".into()],
+                props: Some(serde_json::json!({"revision": "before-promotion"})),
+                embedding: None,
+                lang: None,
+                valid_from: None,
+                caused_by: None,
+                ttl: None,
+                collection: None,
+            })
+            .unwrap();
+        source
+            .reconcile_state(vec![remote.events_since_seq(0).pop().unwrap()])
+            .unwrap();
+        source
+            .add_node(NodeInput {
+                id: Some("backup-unauthorized-member".into()),
+                labels: vec!["MASTER".into()],
+                props: Some(serde_json::json!({"revision": "master-promotion"})),
+                embedding: None,
+                lang: None,
+                valid_from: None,
+                caused_by: None,
+                ttl: None,
+                collection: None,
+            })
+            .unwrap();
+        remote
+            .add_node(NodeInput {
+                id: Some("backup-unauthorized-member".into()),
+                labels: vec!["USER".into()],
+                props: Some(serde_json::json!({"revision": "unauthorized-after-promotion"})),
+                embedding: None,
+                lang: None,
+                valid_from: None,
+                caused_by: None,
+                ttl: None,
+                collection: None,
+            })
+            .unwrap();
+
+        // Simulate a signed event that bypassed sync admission. Compaction must
+        // still validate the complete journal before it signs folded proofs.
+        append_signed_event(&source, remote.events_since_seq(0).last().unwrap().clone());
+
+        let backup_dir = TempDir::new().unwrap();
+        let bundle_path = backup_dir.path().join("unauthorized.genesis");
+        let error = source
+            .export_backup(BackupExportRequest {
+                destination: bundle_path.clone(),
+            })
+            .unwrap_err();
+        assert!(error.to_string().contains("GOVERNANCE_AUTH_REQUIRED"));
+        assert!(!bundle_path.exists());
+    }
+
+    #[test]
+    fn frontier_only_backup_rejects_user_update_in_post_base_history() {
+        let (_source_dir, mut source) = open_storage_with_retention(Some("budget:1"));
+        let (_remote_dir, remote) = open_storage();
+        let membership = PeerMembershipOptions {
+            local_gossip_addr: "127.0.0.1:31866".into(),
+            local_master_authority: Some(true),
+            peers: vec![authorized_peer(&remote, 31864, false)],
+        };
+        source
+            .configure_peer_membership(membership.peers.clone(), "127.0.0.1:31865", true)
+            .unwrap();
+        remote
+            .add_node(NodeInput {
+                id: Some("legacy-base-protected-member".into()),
+                labels: vec!["USER".into()],
+                props: Some(serde_json::json!({"revision": "before-promotion"})),
+                embedding: None,
+                lang: None,
+                valid_from: None,
+                caused_by: None,
+                ttl: None,
+                collection: None,
+            })
+            .unwrap();
+        source
+            .reconcile_state(vec![remote.events_since_seq(0).pop().unwrap()])
+            .unwrap();
+        source
+            .add_node(NodeInput {
+                id: Some("legacy-base-protected-member".into()),
+                labels: vec!["MASTER".into()],
+                props: Some(serde_json::json!({"revision": "master-promotion"})),
+                embedding: None,
+                lang: None,
+                valid_from: None,
+                caused_by: None,
+                ttl: None,
+                collection: None,
+            })
+            .unwrap();
+
+        // Schema-5 folds retain locally signed graph materializations without
+        // schema-6 revision envelopes. This exercises that compatibility path.
+        source.storage_schema_version = LEGACY_SCHEMA_VERSION;
+        source.compact().unwrap();
+        let base_frontier = source.history_horizon();
+        assert!(base_frontier > 0);
+
+        // The roster member can sign a USER event, but it cannot update a
+        // MASTER-protected identity. Make the frame large enough to cross the
+        // test budget's 64 KiB seal threshold and become a HISTORY segment.
+        let oversized_padding = "x".repeat(72 * 1024);
+        remote
+            .add_node(NodeInput {
+                id: Some("legacy-base-protected-member".into()),
+                labels: vec!["USER".into()],
+                props: Some(serde_json::json!({
+                    "revision": "unauthorized-after-fold",
+                    "padding": oversized_padding,
+                })),
+                embedding: None,
+                lang: None,
+                valid_from: None,
+                caused_by: None,
+                ttl: None,
+                collection: None,
+            })
+            .unwrap();
+        append_signed_event(&source, remote.events_since_seq(0).last().unwrap().clone());
+
+        let mut sealed_after_base = false;
+        for _ in 0..100 {
+            sealed_after_base =
+                Storage::journal_list_segments(&source.path)
+                    .iter()
+                    .any(|segment| {
+                        segment.kind == SEG_KIND_HISTORY
+                            && segment.min_seq > base_frontier
+                            && segment.max_seq > base_frontier
+                    });
+            if sealed_after_base {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(
+            sealed_after_base,
+            "post-base event was not sealed to HISTORY"
+        );
+
+        let error = source.preflight_backup_journal_authorization().unwrap_err();
+        assert!(error.to_string().contains("GOVERNANCE_AUTH_REQUIRED"));
+
+        let backup_dir = TempDir::new().unwrap();
+        let bundle_path = backup_dir.path().join("unauthorized-post-base.genesis");
+        let export_error = source
+            .export_backup(BackupExportRequest {
+                destination: bundle_path.clone(),
+            })
+            .unwrap_err();
+        assert!(export_error
+            .to_string()
+            .contains("GOVERNANCE_AUTH_REQUIRED"));
+        assert!(!bundle_path.exists());
+    }
+
+    #[test]
+    fn compacted_row_checkpoint_binds_after_image_to_insert_and_update() {
+        let (_directory, storage) = open_storage();
+        let schema = schema();
+        Storage::validate_relational_schema(&schema).unwrap();
+        let schemas = HashMap::from([((schema.namespace.clone(), 1), schema.clone())]);
+        let mut state = HashMap::new();
+
+        let row_id = Uuid::new_v4().to_string();
+        let insert_revision_id = Uuid::new_v4().to_string();
+        let insert = RelationalRowMutation {
+            table: "records".into(),
+            kind: RelationalMutationKind::Insert,
+            values: serde_json::json!({"id": "row-1", "title": "submitted"}),
+            key: None,
+        };
+        let valid_insert = source_event(
+            "row-insert",
+            insert.clone(),
+            row_revision(
+                &schema,
+                &insert,
+                &row_id,
+                &insert_revision_id,
+                None,
+                serde_json::json!({"id": "row-1", "title": "submitted"}),
+                Utc::now(),
+            ),
+        );
+        storage
+            .validate_compacted_row_source_event(&valid_insert, &schemas, &mut state)
+            .unwrap();
+
+        let forged_insert = source_event(
+            "forged-row-insert",
+            insert,
+            row_revision(
+                &schema,
+                &RelationalRowMutation {
+                    table: "records".into(),
+                    kind: RelationalMutationKind::Insert,
+                    values: serde_json::json!({"id": "row-1", "title": "submitted"}),
+                    key: None,
+                },
+                &Uuid::new_v4().to_string(),
+                &Uuid::new_v4().to_string(),
+                None,
+                serde_json::json!({"id": "row-1", "title": "forged"}),
+                Utc::now(),
+            ),
+        );
+        let mut empty_state = HashMap::new();
+        assert!(storage
+            .validate_compacted_row_source_event(&forged_insert, &schemas, &mut empty_state)
+            .unwrap_err()
+            .to_string()
+            .contains("REVISION_CHECKPOINT_SOURCE_MISMATCH"));
+
+        let predecessor_time = state
+            .get(&(
+                schema.namespace.clone(),
+                "records".to_string(),
+                Storage::encode_relational_primary_key_v1(
+                    &schema,
+                    &RelationalRowMutation {
+                        table: "records".into(),
+                        kind: RelationalMutationKind::Upsert,
+                        values: serde_json::json!({"id": "row-1", "title": "ignored"}),
+                        key: None,
+                    },
+                )
+                .unwrap(),
+            ))
+            .unwrap()
+            .valid_from;
+        let pre_update_state = state.clone();
+        let update = RelationalRowMutation {
+            table: "records".into(),
+            kind: RelationalMutationKind::Update,
+            values: serde_json::json!({"title": "updated"}),
+            key: Some(serde_json::json!({"id": "row-1"})),
+        };
+        let valid_update = source_event(
+            "row-update",
+            update.clone(),
+            row_revision(
+                &schema,
+                &update,
+                &row_id,
+                &Uuid::new_v4().to_string(),
+                Some(&insert_revision_id),
+                serde_json::json!({"id": "row-1", "title": "updated"}),
+                predecessor_time + chrono::Duration::nanoseconds(1),
+            ),
+        );
+        storage
+            .validate_compacted_row_source_event(&valid_update, &schemas, &mut state)
+            .unwrap();
+
+        let active = state
+            .get(&(
+                schema.namespace.clone(),
+                "records".to_string(),
+                Storage::encode_relational_primary_key_v1(
+                    &schema,
+                    &RelationalRowMutation {
+                        table: "records".into(),
+                        kind: RelationalMutationKind::Upsert,
+                        values: serde_json::json!({"id": "row-1", "title": "ignored"}),
+                        key: None,
+                    },
+                )
+                .unwrap(),
+            ))
+            .unwrap()
+            .clone();
+        let delete = RelationalRowMutation {
+            table: "records".into(),
+            kind: RelationalMutationKind::Delete,
+            values: serde_json::json!({}),
+            key: Some(serde_json::json!({"id": "row-1"})),
+        };
+        let reinsert = RelationalRowMutation {
+            table: "records".into(),
+            kind: RelationalMutationKind::Insert,
+            values: serde_json::json!({"id": "row-1", "title": "reinserted"}),
+            key: None,
+        };
+        let key = Storage::relational_primary_key_values(&schema.tables[0], &delete).unwrap();
+        let key_bytes = Storage::encode_relational_primary_key_v1(&schema, &delete).unwrap();
+        let reinserted_at = Utc::now().max(active.valid_from + chrono::Duration::nanoseconds(1));
+        let retracted_revision = uee_v2::RecordRevisionMutationV1 {
+            namespace: schema.namespace.clone(),
+            kind: uee_v2::RecordKindV2::Row,
+            id: active.row_id.clone(),
+            revision_id: Uuid::new_v4().to_string(),
+            expected_revision_id: Some(active.revision_id.clone()),
+            predecessor_revision_id: Some(active.revision_id.clone()),
+            operation: uee_v2::RevisionOperationV1::Retract,
+            valid_from: active.valid_from,
+            valid_to: Some(reinserted_at),
+            schema_ref: Some("records".into()),
+            schema_version: Some(schema.schema_version as u64),
+            key_codec_version: Some(1),
+            key_bytes: Some(key_bytes),
+            payload: serde_json::json!({
+                "table": "records",
+                "key": key,
+                "key_codec_version": 1,
+                "key_bytes": hex::encode(
+                    Storage::encode_relational_primary_key_v1(&schema, &delete).unwrap()
+                ),
+                "tombstone": true,
+            }),
+        };
+        let reinserted_row_id = Uuid::new_v4().to_string();
+        let reinserted_revision_id = Uuid::new_v4().to_string();
+        let reinserted_revision = row_revision(
+            &schema,
+            &reinsert,
+            &reinserted_row_id,
+            &reinserted_revision_id,
+            None,
+            serde_json::json!({"id": "row-1", "title": "reinserted"}),
+            reinserted_at,
+        );
+        let valid_delete_reinsert = Event::RelationalRows {
+            namespace: schema.namespace.clone(),
+            schema_version: schema.schema_version,
+            mutation_id: "row-delete-reinsert".into(),
+            payload_hash: "2".repeat(64),
+            affected_rows: 2,
+            mutations: vec![delete, reinsert],
+            record_revision_transaction: Some(uee_v2::RecordRevisionTransactionV1 {
+                transaction_id: Uuid::new_v4(),
+                origin_database_id: "0".repeat(64),
+                mutations: vec![retracted_revision, reinserted_revision],
+            }),
+        };
+        storage
+            .validate_compacted_row_source_event(&valid_delete_reinsert, &schemas, &mut state)
+            .unwrap();
+        assert_eq!(
+            state
+                .get(&(
+                    schema.namespace.clone(),
+                    "records".to_string(),
+                    Storage::encode_relational_primary_key_v1(
+                        &schema,
+                        &RelationalRowMutation {
+                            table: "records".into(),
+                            kind: RelationalMutationKind::Upsert,
+                            values: serde_json::json!({"id": "row-1", "title": "ignored"}),
+                            key: None,
+                        },
+                    )
+                    .unwrap(),
+                ))
+                .unwrap()
+                .row_id,
+            reinserted_row_id
+        );
+
+        let forged_update = source_event(
+            "forged-row-update",
+            update.clone(),
+            row_revision(
+                &schema,
+                &update,
+                &row_id,
+                &Uuid::new_v4().to_string(),
+                Some(&insert_revision_id),
+                serde_json::json!({"id": "row-1", "title": "forged"}),
+                predecessor_time + chrono::Duration::nanoseconds(1),
+            ),
+        );
+        let mut forged_state = pre_update_state;
+        assert!(storage
+            .validate_compacted_row_source_event(&forged_update, &schemas, &mut forged_state)
+            .unwrap_err()
+            .to_string()
+            .contains("REVISION_CHECKPOINT_SOURCE_MISMATCH"));
+    }
+
+    #[test]
+    fn reconcile_rejects_forged_compacted_row_after_image_before_wal_write() {
+        let (_relay_dir, relay) = open_storage();
+        let (_receiver_dir, receiver) = open_storage();
+        let schema = schema();
+        receiver.register_relational_schema(schema.clone()).unwrap();
+        let relay_peer = authorized_peer(&relay, 31841, true);
+        let receiver_peer = authorized_peer(&receiver, 31842, false);
+        relay
+            .configure_peer_membership(vec![receiver_peer.clone()], "127.0.0.1:31841", true)
+            .unwrap();
+        receiver
+            .configure_peer_membership(vec![relay_peer], "127.0.0.1:31842", false)
+            .unwrap();
+
+        let mutation = RelationalRowMutation {
+            table: "records".into(),
+            kind: RelationalMutationKind::Insert,
+            values: serde_json::json!({"id": "row-1", "title": "submitted"}),
+            key: None,
+        };
+        let forged_source = source_event(
+            "forged-checkpoint-row",
+            mutation.clone(),
+            row_revision(
+                &schema,
+                &mutation,
+                &Uuid::new_v4().to_string(),
+                &Uuid::new_v4().to_string(),
+                None,
+                serde_json::json!({"id": "row-1", "title": "forged"}),
+                Utc::now(),
+            ),
+        );
+        let forged_checkpoint = compacted_checkpoint(&relay, forged_source).unwrap();
+        let frontier_before = receiver.stable_frontier();
+        let wal_count_before = receiver.events_since_seq(0).len();
+        let error = receiver
+            .reconcile_state(vec![forged_checkpoint])
+            .unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("REVISION_CHECKPOINT_SOURCE_MISMATCH"));
+        assert_eq!(receiver.stable_frontier(), frontier_before);
+        assert_eq!(receiver.events_since_seq(0).len(), wal_count_before);
+
+        let valid_source = source_event(
+            "valid-checkpoint-row",
+            mutation.clone(),
+            row_revision(
+                &schema,
+                &mutation,
+                &Uuid::new_v4().to_string(),
+                &Uuid::new_v4().to_string(),
+                None,
+                serde_json::json!({"id": "row-1", "title": "submitted"}),
+                Utc::now(),
+            ),
+        );
+        let valid_checkpoint = compacted_checkpoint(&relay, valid_source).unwrap();
+        receiver.reconcile_state(vec![valid_checkpoint]).unwrap();
+    }
+
+    #[test]
+    fn compacted_revision_source_proof_uses_prior_batch_master_state() {
+        let (_master_dir, master) = open_storage();
+        let (_user_dir, user) = open_storage();
+        let (_receiver_dir, receiver) = open_storage();
+        let protected_id = "batch-master-checkpoint";
+
+        master
+            .add_node(NodeInput {
+                id: Some(protected_id.into()),
+                labels: vec!["MASTER".into()],
+                props: Some(serde_json::json!({"owner": "master"})),
+                embedding: None,
+                lang: None,
+                valid_from: None,
+                caused_by: None,
+                ttl: None,
+                collection: None,
+            })
+            .unwrap();
+
+        user.configure_peer_membership(
+            vec![
+                authorized_peer(&master, 31861, true),
+                authorized_peer(&receiver, 31862, false),
+            ],
+            "127.0.0.1:31863",
+            false,
+        )
+        .unwrap();
+        receiver
+            .configure_peer_membership(
+                vec![
+                    authorized_peer(&master, 31861, true),
+                    authorized_peer(&user, 31863, false),
+                ],
+                "127.0.0.1:31862",
+                false,
+            )
+            .unwrap();
+        user.add_node(NodeInput {
+            id: Some(protected_id.into()),
+            labels: vec!["USER".into()],
+            props: Some(serde_json::json!({"owner": "user"})),
+            embedding: None,
+            lang: None,
+            valid_from: None,
+            caused_by: None,
+            ttl: None,
+            collection: None,
+        })
+        .unwrap();
+
+        let source = user
+            .events_since_seq(0)
+            .into_iter()
+            .find(|signed| {
+                matches!(&signed.event, Event::Transaction(transaction)
+                    if transaction.nodes.iter().any(|node| node.id == protected_id))
+            })
+            .expect("user source transaction should be present in its WAL");
+        let Event::Transaction(source_transaction) = &source.event else {
+            unreachable!();
+        };
+        let mut checkpoint_transaction = source_transaction.clone();
+        checkpoint_transaction.local_frame_seq = Some(1);
+        checkpoint_transaction.relational.clear();
+        checkpoint_transaction.nodes.clear();
+        checkpoint_transaction.edges.clear();
+        checkpoint_transaction.vectors.clear();
+        checkpoint_transaction.node_retractions.clear();
+        let checkpoint = user
+            .sign_compacted_revision_checkpoint(
+                &Event::Transaction(checkpoint_transaction),
+                &source,
+            )
+            .unwrap();
+        let master_event = master.events_since_seq(0).pop().unwrap();
+
+        let frontier_before = receiver.stable_frontier();
+        let wal_count_before = receiver.events_since_seq(0).len();
+        let error = receiver
+            .reconcile_state(vec![master_event, checkpoint])
+            .unwrap_err();
+        assert!(error.to_string().contains("GOVERNANCE_AUTH_REQUIRED"));
+        assert_eq!(receiver.stable_frontier(), frontier_before);
+        assert_eq!(receiver.events_since_seq(0).len(), wal_count_before);
+        assert!(receiver.node_view(protected_id).is_none());
+    }
+
+    #[test]
+    fn compacted_revision_checkpoint_proof_advances_batch_master_state() {
+        let (_master_dir, master) = open_storage();
+        let (_user_dir, user) = open_storage();
+        let (_receiver_dir, receiver) = open_storage();
+        let protected_id = "checkpoint-master-chain";
+
+        master
+            .add_node(NodeInput {
+                id: Some(protected_id.into()),
+                labels: vec!["MASTER".into()],
+                props: Some(serde_json::json!({"owner": "master"})),
+                embedding: None,
+                lang: None,
+                valid_from: None,
+                caused_by: None,
+                ttl: None,
+                collection: None,
+            })
+            .unwrap();
+
+        user.configure_peer_membership(
+            vec![
+                authorized_peer(&master, 31871, true),
+                authorized_peer(&receiver, 31872, false),
+            ],
+            "127.0.0.1:31873",
+            false,
+        )
+        .unwrap();
+        receiver
+            .configure_peer_membership(
+                vec![
+                    authorized_peer(&master, 31871, true),
+                    authorized_peer(&user, 31873, false),
+                ],
+                "127.0.0.1:31872",
+                false,
+            )
+            .unwrap();
+
+        user.add_node(NodeInput {
+            id: Some(protected_id.into()),
+            labels: vec!["USER".into()],
+            props: Some(serde_json::json!({"owner": "user"})),
+            embedding: None,
+            lang: None,
+            valid_from: None,
+            caused_by: None,
+            ttl: None,
+            collection: None,
+        })
+        .unwrap();
+
+        let master_source = master.events_since_seq(0).pop().unwrap();
+        let master_revision_id = match &master_source.event {
+            Event::Transaction(transaction) => transaction
+                .record_revision_transaction
+                .as_ref()
+                .unwrap()
+                .mutations
+                .iter()
+                .find(|mutation| {
+                    mutation.kind == uee_v2::RecordKindV2::Node && mutation.id == protected_id
+                })
+                .unwrap()
+                .revision_id
+                .clone(),
+            _ => panic!("expected a master graph transaction"),
+        };
+
+        let user_source = user.events_since_seq(0).pop().unwrap();
+        let Event::Transaction(mut user_transaction) = user_source.event else {
+            panic!("expected a user graph transaction");
+        };
+        let user_revision = user_transaction
+            .record_revision_transaction
+            .as_mut()
+            .unwrap()
+            .mutations
+            .iter_mut()
+            .find(|mutation| {
+                mutation.kind == uee_v2::RecordKindV2::Node && mutation.id == protected_id
+            })
+            .unwrap();
+        user_revision.expected_revision_id = Some(master_revision_id.clone());
+        user_revision.predecessor_revision_id = Some(master_revision_id);
+        let user_source = user.sign_event(&Event::Transaction(user_transaction));
+
+        let master_checkpoint = compacted_graph_checkpoint(&master, &master_source).unwrap();
+        let user_checkpoint = compacted_graph_checkpoint(&user, &user_source).unwrap();
+        let frontier_before = receiver.stable_frontier();
+        let wal_count_before = receiver.events_since_seq(0).len();
+        let error = receiver
+            .reconcile_state(vec![master_checkpoint, user_checkpoint])
+            .unwrap_err();
+
+        assert!(error.to_string().contains("GOVERNANCE_AUTH_REQUIRED"));
+        assert_eq!(receiver.stable_frontier(), frontier_before);
+        assert_eq!(receiver.events_since_seq(0).len(), wal_count_before);
+        assert!(receiver.node_view(protected_id).is_none());
     }
 }

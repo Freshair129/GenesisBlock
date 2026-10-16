@@ -11,6 +11,13 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+/*
+ Gossip v8 adds authenticated closed peer membership on top of v7's detached
+ MASTER proofs for compacted SignedEvent signatures. It is independent of the
+ on-disk schema so older peers fail before sync.
+ */
+#define GOSSIP_PROTOCOL_VERSION 8
+
 #define STUDIO_SCENE_NODE_CEILING 1000
 
 #define STUDIO_SCENE_EDGE_CEILING 3000

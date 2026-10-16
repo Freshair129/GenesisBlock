@@ -121,6 +121,10 @@ src/lib.rs:19196-19246.
 - Event authorization is enforced in shared engine ingress paths before
   durable or in-memory side effects, including public reconciliation and nested
   batch or transaction forms.
+- A compacted revision checkpoint's source proof is authorized against the
+  sequential batch state accumulated before that checkpoint. Proof validation
+  reads a copy of the overlay so the proof cannot itself advance authorization
+  state for later events.
 - Consensus voter eligibility and quorum membership come from the pinned
   roster, not from a discovery cache.
 - P6 cursor-receipt trust remains a separate boundary. A trusted cursor receipt
@@ -157,6 +161,11 @@ src/lib.rs:19196-19246.
   cannot recover and verify the origin event, the fold fails closed with
   `COMPACTION_MASTER_AUTHORITY_PROOF_MISSING` or
   `COMPACTION_BASE_EVENT_PROOF_MISSING`.
+  Backup and compaction preflight preserve the same fold boundary: retained
+  pre-base sources establish the authorization history, base materializations
+  establish the state at the frontier, and post-base HISTORY or active events
+  follow in frame order. Segment kind alone does not classify HISTORY as
+  pre-base.
 - Compacted proof envelopes use a compressed V2 representation and a `b64:`
   JSON signature encoding, while readers continue to accept legacy byte-array
   signatures. A validated schema-5-to-6 migration may receive a local
@@ -221,3 +230,4 @@ public-facing record.
 | Version | Date | Status | Summary |
 |---|---|---|---|
 | 1.0.0 | 2026-10-16 | accepted | Adopt a closed static roster, signed gossip envelopes, MASTER-role enforcement, and fixed-roster quorum for security fixes #236 and #237. |
+| 1.0.1 | 2026-10-16 | accepted | Require compacted revision source proofs to use the accumulated batch authorization overlay. |
