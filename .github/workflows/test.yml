@@ -87,7 +87,14 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       # --no-default-features drops the napi bindings so the integration tests
       # link as plain native binaries (no napi_* symbols) — works on Linux too.
+      # Keep the stress test cases serial on the hosted Ubuntu runner. Each
+      # concurrency test still creates its own worker threads; this avoids
+      # several independent high-write cases saturating the runner together.
+      - name: cargo test (core, no napi; serial on Ubuntu)
+        if: matrix.host == 'ubuntu-latest'
+        run: cargo test --no-default-features -- --test-threads=1
       - name: cargo test (core, no napi)
+        if: matrix.host != 'ubuntu-latest'
         run: cargo test --no-default-features
 
   node-tests:
