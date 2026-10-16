@@ -474,7 +474,9 @@ jobs:
   host-mobile-check:
     name: host build + test (mobile SDK features)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # This runs the complete integration suite as well as the mobile features;
+    # leave enough time for the current stress and recovery tests to finish.
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
 
