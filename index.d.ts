@@ -496,16 +496,26 @@ export interface SyncPeer {
   lastSeen: number
   verifyingKey: Array<number>
 }
+/**
+ * Operator-pinned identity and endpoint for one remote cluster member.
+ * `public_key_hex` is the 32-byte Ed25519 verifying key; `peer_id` must be its
+ * first 16 lowercase hex characters after SHA-256. Discovery never creates
+ * membership entries.
+ */
 export interface AuthorizedPeerConfig {
   peerId: string
   publicKeyHex: string
   gossipAddr: string
   masterAuthority: boolean
 }
+/**
+ * Configuration for the closed gossip membership roster. Every member in a
+ * cluster must configure the same peer IDs, keys, and roles.
+ */
 export interface PeerMembershipOptions {
   /** Local UDP bind address, for example `0.0.0.0:30001`. */
   localGossipAddr: string
-  /** Omit only for single-node mode; multi-node mode must set this explicitly. */
+  /** Omit only for single-node mode. Multi-node mode must set this explicitly. */
   localMasterAuthority?: boolean
   peers: Array<AuthorizedPeerConfig>
 }
@@ -546,7 +556,10 @@ export declare function schemaVersionSync(): number
 export declare function versionSync(): string
 export declare class GenesisDatabase {
   static open(opts: OpenOptions): GenesisDatabase
-  /** Opens gossip with a fixed operator-configured membership roster. */
+  /**
+   * Open a multi-node instance with an operator-pinned peer roster. Plain
+   * `open()` remains self-only and does not accept discovered members.
+   */
   static openWithMembership(opts: OpenOptions, membership: PeerMembershipOptions): GenesisDatabase
   localIdentity(): PeerIdentity
   bulkAddNodes(inputs: Array<NodeInput>): Promise<void>
@@ -650,7 +663,9 @@ export declare class GenesisDatabase {
   eventsSince(fromClock: number): Promise<string>
   semanticVerify(eventJson: string): Promise<boolean>
   proposeConsensus(eventJson: string, signature: Array<number>): Promise<string>
+  /** Export the signed proposal envelope as JSON for relay to other members. */
   exportConsensusProposal(proposalId: string): Promise<string>
+  /** Import a relayed signed proposal before signing a vote for it. */
   importConsensusProposal(proposalJson: string): Promise<void>
   submitVote(proposalId: string, peerId: string, approve: boolean, signature: Array<number>): Promise<boolean>
   signVote(proposalId: string, approve: boolean): Array<number>

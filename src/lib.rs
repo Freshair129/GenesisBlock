@@ -1757,6 +1757,7 @@ struct CompactedMasterAuthorityProofs {
     master_nodes: HashMap<String, SignedEvent>,
     user_nodes: HashMap<String, (NodeOutput, SignedEvent)>,
     retractions: HashMap<String, SignedEvent>,
+    master_vectors: HashMap<(String, String), SignedEvent>,
 }
 
 enum CompactedMasterIdentityAction {
@@ -9237,6 +9238,7 @@ impl Storage {
         if !exists {
             return Err(Error::from_reason(format!("node '{}' not found", node_id)));
         }
+        self.validate_local_node_mutation(Some(&node_id), &[])?;
         let lang = "en".to_string();
         let coll = Some(collection);
         // Validate the dim BEFORE the WAL write so a bad vector never persists;
@@ -17855,7 +17857,12 @@ impl Storage {
         if se.signature.starts_with(COMPACTED_MASTER_PROOF_MAGIC)
             || se.signature.starts_with(COMPACTED_MASTER_PROOF_V2_MAGIC)
         {
-            return self.compacted_master_authority_proof(se).is_some();
+            return self
+                .compacted_master_authority_proof_with_collection_definitions(
+                    se,
+                    collection_definitions,
+                )
+                .is_some();
         }
         if se.signature.starts_with(COMPACTED_BASE_EVENT_MAGIC)
             || se.signature.starts_with(COMPACTED_BASE_EVENT_V2_MAGIC)
@@ -17901,10 +17908,6 @@ impl Storage {
             Err(_) => return false,
         };
         vkey.verify(&data, &sig).is_ok()
-    }
-
-    fn verify_compacted_base_materialization(&self, se: &SignedEvent) -> bool {
-        self.verify_compacted_base_materialization_with_collection_definitions(se, None)
     }
 
     fn verify_compacted_base_materialization_with_collection_definitions(
@@ -18824,22 +18827,60 @@ impl Storage {
     }
 
     fn is_compacted_graph_materialization(&self, se: &SignedEvent) -> bool {
-        self.verify_compacted_base_materialization(se)
-            || (self.compacted_master_authority_proof(se).is_some()
-                && self
-                    .compacted_master_revision_proof(se)
-                    .is_some_and(|proof| {
-                        Self::revision_transaction_binds_graph(&proof.event)
-                            && self.compacted_base_proof_matches_event(&se.event, &proof.event)
-                    }))
+        self.is_compacted_graph_materialization_with_collection_definitions(se, None)
     }
 
-    fn signed_event_requires_revision_envelope(&self, se: &SignedEvent) -> bool {
+    fn is_compacted_graph_materialization_with_collection_definitions(
+        &self,
+        se: &SignedEvent,
+        collection_definitions: Option<&HashMap<String, CollectionDefinition>>,
+    ) -> bool {
+        self.verify_compacted_base_materialization_with_collection_definitions(
+            se,
+            collection_definitions,
+        ) || (self
+            .compacted_master_authority_proof_with_collection_definitions(
+                se,
+                collection_definitions,
+            )
+            .is_some()
+            && self
+                .compacted_master_revision_proof_with_collection_definitions(
+                    se,
+                    collection_definitions,
+                )
+                .is_some_and(|proof| {
+                    Self::revision_transaction_binds_graph(&proof.event)
+                        && self.compacted_base_proof_matches_event_with_collection_definitions(
+                            &se.event,
+                            &proof.event,
+                            collection_definitions,
+                        )
+                }))
+    }
+
+    fn signed_event_requires_revision_envelope_with_collection_definitions(
+        &self,
+        se: &SignedEvent,
+        collection_definitions: Option<&HashMap<String, CollectionDefinition>>,
+    ) -> bool {
         Self::graph_event_requires_revision_envelope(&se.event)
-            && !self.is_compacted_graph_materialization(se)
+            && !self.is_compacted_graph_materialization_with_collection_definitions(
+                se,
+                collection_definitions,
+            )
     }
 
     fn compacted_proof_matches_event(&self, event: &Event, proof_event: &Event) -> bool {
+        self.compacted_proof_matches_event_with_collection_definitions(event, proof_event, None)
+    }
+
+    fn compacted_proof_matches_event_with_collection_definitions(
+        &self,
+        event: &Event,
+        proof_event: &Event,
+        collection_definitions: Option<&HashMap<String, CollectionDefinition>>,
+    ) -> bool {
         match event {
             Event::Node(node) => find_proof_node(proof_event, node).is_some(),
             Event::NodeRetract {
@@ -18847,6 +18888,12 @@ impl Storage {
                 clock,
                 retracted_at,
             } => find_proof_retraction(proof_event, id, clock, retracted_at),
+            Event::VectorMaterialized(_) => self
+                .compacted_master_vector_source_matches_event_with_collection_definitions(
+                    event,
+                    proof_event,
+                    collection_definitions,
+                ),
             _ => false,
         }
     }
@@ -19044,31 +19091,50 @@ impl Storage {
     }
 
     fn compacted_vector_source_clock(
+        &self,
         proof_event: &Event,
         owner_id: &str,
         collection: &str,
     ) -> Option<LogicalClock> {
-        let Event::Transaction(transaction) = proof_event else {
-            return None;
+        let is_collection = |candidate: &Option<String>| {
+            candidate.as_deref().unwrap_or(&self.default_collection) == collection
         };
-        transaction
-            .vectors
-            .iter()
-            .find(|vector| {
-                vector.node_id == owner_id && vector.collection.as_deref() == Some(collection)
-            })
-            .map(|vector| vector.clock.clone())
-            .or_else(|| {
-                transaction
-                    .nodes
-                    .iter()
-                    .find(|node| {
-                        node.id == owner_id
-                            && node.collection.as_deref() == Some(collection)
-                            && node.embedding.is_some()
-                    })
-                    .map(|node| node.clock.clone())
-            })
+        match proof_event {
+            Event::Vector(vector) | Event::VectorMaterialized(vector)
+                if vector.node_id == owner_id && is_collection(&vector.collection) =>
+            {
+                Some(vector.clock.clone())
+            }
+            Event::Node(node)
+                if node.id == owner_id
+                    && node.embedding.is_some()
+                    && is_collection(&node.collection) =>
+            {
+                Some(node.clock.clone())
+            }
+            Event::Batch(events) => events.iter().rev().find_map(|nested| {
+                self.compacted_vector_source_clock(nested, owner_id, collection)
+            }),
+            Event::Transaction(transaction) => transaction
+                .vectors
+                .iter()
+                .rev()
+                .find(|vector| vector.node_id == owner_id && is_collection(&vector.collection))
+                .map(|vector| vector.clock.clone())
+                .or_else(|| {
+                    transaction
+                        .nodes
+                        .iter()
+                        .rev()
+                        .find(|node| {
+                            node.id == owner_id
+                                && node.embedding.is_some()
+                                && is_collection(&node.collection)
+                        })
+                        .map(|node| node.clock.clone())
+                }),
+            _ => None,
+        }
     }
 
     fn compacted_base_proof_matches_event(&self, event: &Event, proof_event: &Event) -> bool {
@@ -19076,6 +19142,210 @@ impl Storage {
             event,
             proof_event,
             None,
+        )
+    }
+
+    fn compacted_vector_materialization_matches_source(
+        &self,
+        target: &VectorEvent,
+        owner_id: &str,
+        collection: &str,
+        source_embedding: &[f64],
+        source_lang: Option<&str>,
+        source_clock: &LogicalClock,
+        collection_definitions: Option<&HashMap<String, CollectionDefinition>>,
+    ) -> bool {
+        let source_f32: Vec<f32> = source_embedding.iter().map(|value| *value as f32).collect();
+        // Check the deterministic projection that compaction reads from the
+        // collection arena. Rerank sidecars preserve f32 values; other arena
+        // formats apply the collection's quantization and calibration.
+        let live_collection = self.collections.get(collection);
+        let definition = collection_definitions
+            .and_then(|definitions| definitions.get(collection))
+            .cloned()
+            .or_else(|| {
+                self.collection_definitions
+                    .get(collection)
+                    .map(|definition| definition.clone())
+            });
+        let quant = definition
+            .as_ref()
+            .map(|definition| definition.quant)
+            .or_else(|| live_collection.as_ref().map(|entry| entry.quant));
+        let metric = definition
+            .as_ref()
+            .map(|definition| definition.metric)
+            .or_else(|| live_collection.as_ref().map(|entry| entry.metric));
+        let rerank = definition
+            .as_ref()
+            .map(|definition| definition.rerank)
+            .or_else(|| {
+                live_collection
+                    .as_ref()
+                    .map(|entry| entry.f32_sidecar.is_some())
+            });
+        let mut prepared_f32 = source_f32;
+        if metric == Some(Metric::Cosine) {
+            let norm = prepared_f32
+                .iter()
+                .map(|value| value * value)
+                .sum::<f32>()
+                .sqrt();
+            if norm > 0.0 {
+                for value in &mut prepared_f32 {
+                    *value /= norm;
+                }
+            }
+        }
+        let projected = match (quant, metric, rerank) {
+            (Some(_), Some(_), Some(true)) => Some(prepared_f32.clone()),
+            (Some(Quant::ScalarU8), Some(_), Some(false)) => {
+                let (scale, bias) = live_collection
+                    .as_ref()
+                    .map(|entry| entry.sq8_snapshot())
+                    .unwrap_or(SQ8_FIXED);
+                Some(
+                    prepared_f32
+                        .iter()
+                        .map(|value| sq8_dq(sq8_q(*value, scale, bias), scale, bias))
+                        .collect(),
+                )
+            }
+            (Some(Quant::Binary), Some(_), Some(false)) => {
+                let center = live_collection
+                    .as_ref()
+                    .and_then(|entry| entry.center_snapshot());
+                Some(bq_unpack(
+                    &bq_pack_centered(&prepared_f32, center.as_deref()),
+                    prepared_f32.len(),
+                ))
+            }
+            (Some(Quant::F16), Some(_), Some(false)) => Some(
+                prepared_f32
+                    .iter()
+                    .map(|value| f16::from_f32(*value).to_f32())
+                    .collect(),
+            ),
+            (Some(Quant::None), Some(_), Some(false)) => Some(prepared_f32.clone()),
+            // Unknown quantization or rerank contracts cannot authorize a
+            // materialized vector.
+            _ => None,
+        };
+        let materialized_matches = projected.is_some_and(|embedding| {
+            target.embedding == embedding.into_iter().map(f64::from).collect::<Vec<_>>()
+        });
+        target.node_id == owner_id
+            && target.collection.as_deref() == Some(collection)
+            && materialized_matches
+            && target.lang.as_deref() == Some(source_lang.unwrap_or("en"))
+            && &target.clock == source_clock
+    }
+
+    fn compacted_master_vector_source_matches_event_with_collection_definitions(
+        &self,
+        event: &Event,
+        proof_event: &Event,
+        collection_definitions: Option<&HashMap<String, CollectionDefinition>>,
+    ) -> bool {
+        let Event::VectorMaterialized(target) = event else {
+            return false;
+        };
+        if matches!(
+            proof_event,
+            Event::Transaction(transaction)
+                if transaction.record_revision_transaction.is_some()
+        ) {
+            return self.compacted_base_proof_matches_event_with_collection_definitions(
+                event,
+                proof_event,
+                collection_definitions,
+            );
+        }
+        fn latest_vector_source<'a>(
+            event: &'a Event,
+            owner_id: &str,
+            collection: &str,
+            default_collection: &str,
+        ) -> Option<(&'a [f64], Option<&'a str>, &'a LogicalClock)> {
+            let matches_collection =
+                |candidate: Option<&str>| candidate.unwrap_or(default_collection) == collection;
+            match event {
+                Event::Vector(vector) | Event::VectorMaterialized(vector)
+                    if vector.node_id == owner_id
+                        && matches_collection(vector.collection.as_deref()) =>
+                {
+                    Some((&vector.embedding, vector.lang.as_deref(), &vector.clock))
+                }
+                Event::Node(node)
+                    if node.id == owner_id
+                        && node.embedding.is_some()
+                        && matches_collection(node.collection.as_deref()) =>
+                {
+                    Some((
+                        node.embedding.as_deref()?,
+                        node.lang.as_deref(),
+                        &node.clock,
+                    ))
+                }
+                Event::Batch(events) => events.iter().rev().find_map(|nested| {
+                    latest_vector_source(nested, owner_id, collection, default_collection)
+                }),
+                Event::Transaction(transaction) => transaction
+                    .vectors
+                    .iter()
+                    .rev()
+                    .find(|vector| {
+                        vector.node_id == owner_id
+                            && matches_collection(vector.collection.as_deref())
+                    })
+                    .map(|vector| {
+                        (
+                            vector.embedding.as_slice(),
+                            vector.lang.as_deref(),
+                            &vector.clock,
+                        )
+                    })
+                    .or_else(|| {
+                        transaction
+                            .nodes
+                            .iter()
+                            .rev()
+                            .find(|node| {
+                                node.id == owner_id
+                                    && node.embedding.is_some()
+                                    && matches_collection(node.collection.as_deref())
+                            })
+                            .map(|node| {
+                                (
+                                    node.embedding.as_deref().unwrap_or_default(),
+                                    node.lang.as_deref(),
+                                    &node.clock,
+                                )
+                            })
+                    }),
+                _ => None,
+            }
+        }
+        let collection = target
+            .collection
+            .as_deref()
+            .unwrap_or(&self.default_collection);
+        let Some((embedding, lang, clock)) = latest_vector_source(
+            proof_event,
+            &target.node_id,
+            collection,
+            &self.default_collection,
+        ) else {
+            return false;
+        };
+        self.compacted_vector_materialization_matches_source(
+            target,
+            &target.node_id,
+            collection,
+            embedding,
+            lang,
+            clock,
+            collection_definitions,
         )
     }
 
@@ -19107,16 +19377,6 @@ impl Storage {
                 let Some(revisions) = transaction.record_revision_transaction.as_ref() else {
                     return false;
                 };
-                let collection_definition = |name: &str| {
-                    collection_definitions
-                        .and_then(|definitions| definitions.get(name))
-                        .cloned()
-                        .or_else(|| {
-                            self.collection_definitions
-                                .get(name)
-                                .map(|definition| definition.clone())
-                        })
-                };
                 let matches_source =
                     |owner_id: &str,
                      source_collection: &Option<String>,
@@ -19128,6 +19388,8 @@ impl Storage {
                         };
                         let Some(mutation) = revisions.mutations.iter().find(|mutation| {
                             mutation.kind == uee_v2::RecordKindV2::Vector
+                                && mutation.namespace == "default"
+                                && mutation.operation == uee_v2::RevisionOperationV1::Upsert
                                 && mutation.payload["owner_id"].as_str() == Some(owner_id)
                                 && mutation.payload["embedding"] == embedding_payload
                                 && mutation.payload["lang"].as_str()
@@ -19141,91 +19403,15 @@ impl Storage {
                         let Some(collection) = mutation.payload["collection"].as_str() else {
                             return false;
                         };
-                        let source_f32: Vec<f32> =
-                            source_embedding.iter().map(|value| *value as f32).collect();
-                        // The source proof binds the exact pre-quantized input.
-                        // Check the deterministic projection that compaction
-                        // actually reads from this collection's arena. A rerank
-                        // sidecar retains the original f32 values; otherwise the
-                        // arena's quantization and persisted calibration state
-                        // determine the materialized vector.
-                        let live_collection = self.collections.get(collection);
-                        let definition = collection_definition(collection);
-                        let quant = definition
-                            .as_ref()
-                            .map(|definition| definition.quant)
-                            .or_else(|| live_collection.as_ref().map(|entry| entry.quant));
-                        let metric = definition
-                            .as_ref()
-                            .map(|definition| definition.metric)
-                            .or_else(|| live_collection.as_ref().map(|entry| entry.metric));
-                        let rerank = definition
-                            .as_ref()
-                            .map(|definition| definition.rerank)
-                            .or_else(|| {
-                                live_collection
-                                    .as_ref()
-                                    .map(|entry| entry.f32_sidecar.is_some())
-                            });
-                        let mut prepared_f32 = source_f32;
-                        if metric == Some(Metric::Cosine) {
-                            let norm = prepared_f32
-                                .iter()
-                                .map(|value| value * value)
-                                .sum::<f32>()
-                                .sqrt();
-                            if norm > 0.0 {
-                                for value in &mut prepared_f32 {
-                                    *value /= norm;
-                                }
-                            }
-                        }
-                        let projected = match (quant, metric, rerank) {
-                            (Some(_), Some(_), Some(true)) => Some(prepared_f32.clone()),
-                            (Some(Quant::ScalarU8), Some(_), Some(false)) => {
-                                let (scale, bias) = live_collection
-                                    .as_ref()
-                                    .map(|entry| entry.sq8_snapshot())
-                                    .unwrap_or(SQ8_FIXED);
-                                Some(
-                                    prepared_f32
-                                        .iter()
-                                        .map(|value| {
-                                            sq8_dq(sq8_q(*value, scale, bias), scale, bias)
-                                        })
-                                        .collect(),
-                                )
-                            }
-                            (Some(Quant::Binary), Some(_), Some(false)) => {
-                                let center = live_collection
-                                    .as_ref()
-                                    .and_then(|entry| entry.center_snapshot());
-                                Some(bq_unpack(
-                                    &bq_pack_centered(&prepared_f32, center.as_deref()),
-                                    prepared_f32.len(),
-                                ))
-                            }
-                            (Some(Quant::F16), Some(_), Some(false)) => Some(
-                                prepared_f32
-                                    .iter()
-                                    .map(|value| f16::from_f32(*value).to_f32())
-                                    .collect(),
-                            ),
-                            (Some(Quant::None), Some(_), Some(false)) => Some(prepared_f32.clone()),
-                            // An unknown quantization/rerank contract cannot
-                            // authorize a materialized vector.
-                            _ => None,
-                        };
-                        let materialized_matches = projected.is_some_and(|embedding| {
-                            target.embedding
-                                == embedding.into_iter().map(f64::from).collect::<Vec<_>>()
-                        });
-                        target.node_id == owner_id
-                            && target.collection.as_deref() == Some(collection)
-                            && materialized_matches
-                            && target.lang.as_deref()
-                                == Some(mutation.payload["lang"].as_str().unwrap_or("en"))
-                            && &target.clock == source_clock
+                        self.compacted_vector_materialization_matches_source(
+                            target,
+                            owner_id,
+                            collection,
+                            source_embedding,
+                            source_lang,
+                            source_clock,
+                            collection_definitions,
+                        )
                     };
                 transaction.nodes.iter().any(|node| {
                     node.embedding.as_ref().is_some_and(|embedding| {
@@ -19252,6 +19438,14 @@ impl Storage {
     }
 
     fn compacted_base_source_proof(&self, se: &SignedEvent) -> Option<SignedEvent> {
+        self.compacted_base_source_proof_with_collection_definitions(se, None)
+    }
+
+    fn compacted_base_source_proof_with_collection_definitions(
+        &self,
+        se: &SignedEvent,
+        collection_definitions: Option<&HashMap<String, CollectionDefinition>>,
+    ) -> Option<SignedEvent> {
         let (version, envelope) = decode_compacted_envelope::<CompactedBaseEventEnvelope>(
             &se.signature,
             COMPACTED_BASE_EVENT_MAGIC,
@@ -19259,12 +19453,23 @@ impl Storage {
             COMPACTED_BASE_EVENT_MAX_BYTES,
         )?;
         (envelope.version == version
-            && self.verify_compacted_base_materialization(se)
+            && self.verify_compacted_base_materialization_with_collection_definitions(
+                se,
+                collection_definitions,
+            )
             && !is_compacted_signature(&envelope.proof.signature))
         .then_some(envelope.proof)
     }
 
     fn compacted_master_authority_proof(&self, se: &SignedEvent) -> Option<SignedEvent> {
+        self.compacted_master_authority_proof_with_collection_definitions(se, None)
+    }
+
+    fn compacted_master_authority_proof_with_collection_definitions(
+        &self,
+        se: &SignedEvent,
+        collection_definitions: Option<&HashMap<String, CollectionDefinition>>,
+    ) -> Option<SignedEvent> {
         let (version, envelope) = decode_compacted_envelope::<CompactedMasterProofEnvelope>(
             &se.signature,
             COMPACTED_MASTER_PROOF_MAGIC,
@@ -19275,7 +19480,11 @@ impl Storage {
             || is_compacted_signature(&envelope.proof.signature)
             || !self.verify_raw_event_signature(&envelope.proof)
             || !self.authorized_master(&envelope.proof.signer_peer_id)
-            || !self.compacted_proof_matches_event(&se.event, &envelope.proof.event)
+            || !self.compacted_proof_matches_event_with_collection_definitions(
+                &se.event,
+                &envelope.proof.event,
+                collection_definitions,
+            )
         {
             return None;
         }
@@ -19283,7 +19492,11 @@ impl Storage {
         if (self.storage_schema_version == SCHEMA_VERSION || envelope.revision_proof.is_some())
             && (!self.verify_raw_event_signature(revision_proof)
                 || !Self::revision_transaction_binds_graph(&revision_proof.event)
-                || !self.compacted_base_proof_matches_event(&se.event, &revision_proof.event))
+                || !self.compacted_base_proof_matches_event_with_collection_definitions(
+                    &se.event,
+                    &revision_proof.event,
+                    collection_definitions,
+                ))
         {
             return None;
         }
@@ -19302,7 +19515,18 @@ impl Storage {
     }
 
     fn compacted_master_revision_proof(&self, se: &SignedEvent) -> Option<SignedEvent> {
-        self.compacted_master_authority_proof(se)?;
+        self.compacted_master_revision_proof_with_collection_definitions(se, None)
+    }
+
+    fn compacted_master_revision_proof_with_collection_definitions(
+        &self,
+        se: &SignedEvent,
+        collection_definitions: Option<&HashMap<String, CollectionDefinition>>,
+    ) -> Option<SignedEvent> {
+        self.compacted_master_authority_proof_with_collection_definitions(
+            se,
+            collection_definitions,
+        )?;
         let (_, envelope) = decode_compacted_envelope::<CompactedMasterProofEnvelope>(
             &se.signature,
             COMPACTED_MASTER_PROOF_MAGIC,
@@ -19408,6 +19632,8 @@ impl Storage {
         event: &Event,
         signer_peer_id: &str,
         forwarded_master_proof: Option<&SignedEvent>,
+        collection_definitions: Option<&HashMap<String, CollectionDefinition>>,
+        protected_vector_owners: &HashSet<String>,
         states: &mut HashMap<String, BatchMasterAuthState>,
         seed_from_live_state: bool,
     ) -> Result<()> {
@@ -19466,12 +19692,42 @@ impl Storage {
                     state.tombstone_clock = Some(clock.clone());
                 }
             }
+            Event::Vector(vector) => {
+                let state =
+                    self.batch_master_auth_state(&vector.node_id, states, seed_from_live_state);
+                if (state.node_is_master || protected_vector_owners.contains(&vector.node_id))
+                    && !direct_master_authority
+                {
+                    return self.require_master_event_authority(signer_peer_id);
+                }
+            }
+            Event::VectorMaterialized(vector) => {
+                let state =
+                    self.batch_master_auth_state(&vector.node_id, states, seed_from_live_state);
+                let forwarded_authority = forwarded_master_proof.is_some_and(|proof| {
+                    self.authorized_master(&proof.signer_peer_id)
+                        && self
+                            .compacted_master_vector_source_matches_event_with_collection_definitions(
+                            &Event::VectorMaterialized(vector.clone()),
+                            &proof.event,
+                            collection_definitions,
+                        )
+                });
+                if (state.node_is_master || protected_vector_owners.contains(&vector.node_id))
+                    && !direct_master_authority
+                    && !forwarded_authority
+                {
+                    return self.require_master_event_authority(signer_peer_id);
+                }
+            }
             Event::Batch(events) => {
                 for nested in events {
                     self.preflight_reconcile_event_authority(
                         nested,
                         signer_peer_id,
                         None,
+                        collection_definitions,
+                        protected_vector_owners,
                         states,
                         seed_from_live_state,
                     )?;
@@ -19502,6 +19758,15 @@ impl Storage {
                     state.node_clock = None;
                     state.node_is_master = true;
                     state.tombstone_clock = Some(retraction.clock.clone());
+                }
+                for vector in &transaction.vectors {
+                    let state =
+                        self.batch_master_auth_state(&vector.node_id, states, seed_from_live_state);
+                    if (state.node_is_master || protected_vector_owners.contains(&vector.node_id))
+                        && !direct_master_authority
+                    {
+                        return self.require_master_event_authority(signer_peer_id);
+                    }
                 }
             }
             _ => {}
@@ -19629,6 +19894,46 @@ impl Storage {
         // materializations describe the final state at the fold frontier, so
         // they are checked after historical checkpoint proofs have rebuilt the
         // authorization overlay.
+        fn collect_master_node_ids(event: &Event, ids: &mut HashSet<String>) {
+            match event {
+                Event::Node(node) if Storage::labels_are_master(&node.labels) => {
+                    ids.insert(node.id.clone());
+                }
+                Event::Batch(events) => {
+                    for nested in events {
+                        collect_master_node_ids(nested, ids);
+                    }
+                }
+                Event::Transaction(transaction) => {
+                    for node in &transaction.nodes {
+                        if Storage::labels_are_master(&node.labels) {
+                            ids.insert(node.id.clone());
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        let mut protected_vector_owners = HashSet::new();
+        for signed_event in graph_auth_events {
+            collect_master_node_ids(&signed_event.event, &mut protected_vector_owners);
+            for proof in [
+                self.compacted_revision_checkpoint_source_proof(signed_event),
+                self.compacted_master_authority_proof_with_collection_definitions(
+                    signed_event,
+                    Some(&collection_definitions),
+                ),
+                self.compacted_base_source_proof_with_collection_definitions(
+                    signed_event,
+                    Some(&collection_definitions),
+                ),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                collect_master_node_ids(&proof.event, &mut protected_vector_owners);
+            }
+        }
         let mut states = HashMap::new();
         for signed_event in graph_auth_events {
             if let Some(source_proof) =
@@ -19642,6 +19947,8 @@ impl Storage {
                     &source_proof.event,
                     &source_proof.signer_peer_id,
                     None,
+                    Some(&collection_definitions),
+                    &protected_vector_owners,
                     &mut states,
                     seed_from_live_state,
                 )?;
@@ -19649,7 +19956,20 @@ impl Storage {
             self.preflight_reconcile_event_authority(
                 &signed_event.event,
                 &signed_event.signer_peer_id,
-                self.compacted_master_authority_proof(signed_event).as_ref(),
+                self.compacted_master_authority_proof_with_collection_definitions(
+                    signed_event,
+                    Some(&collection_definitions),
+                )
+                .or_else(|| {
+                    self.compacted_base_source_proof_with_collection_definitions(
+                        signed_event,
+                        Some(&collection_definitions),
+                    )
+                    .filter(|proof| self.authorized_master(&proof.signer_peer_id))
+                })
+                .as_ref(),
+                Some(&collection_definitions),
+                &protected_vector_owners,
                 &mut states,
                 seed_from_live_state,
             )?;
@@ -19695,6 +20015,13 @@ impl Storage {
                         .any(|label| label.eq_ignore_ascii_case("MASTER"))
                         || self.node_identity_requires_master(&node.id)
                 }) || !transaction.node_retractions.is_empty()
+                    || transaction
+                        .vectors
+                        .iter()
+                        .any(|vector| self.node_identity_requires_master(&vector.node_id))
+            }
+            Event::Vector(vector) | Event::VectorMaterialized(vector) => {
+                self.node_identity_requires_master(&vector.node_id)
             }
             _ => false,
         }
@@ -23589,10 +23916,32 @@ impl Storage {
         {
             return Err(Error::from_reason("P6_LOCAL_ONLY"));
         }
+        let mut incoming_collection_definitions = self
+            .collections
+            .iter()
+            .map(|collection| {
+                (
+                    collection.key().clone(),
+                    self.definition_for(collection.value()),
+                )
+            })
+            .collect::<HashMap<_, _>>();
+        for signed_event in &signed_events {
+            // This temporary map supports same-batch compacted proofs for
+            // custom collections. Full signature and definition validation
+            // still happens in the preflight pass below.
+            let _ = Self::validate_collection_event(
+                &signed_event.event,
+                &mut incoming_collection_definitions,
+            );
+        }
         if self.storage_schema_version == SCHEMA_VERSION
-            && signed_events
-                .iter()
-                .any(|signed| self.signed_event_requires_revision_envelope(signed))
+            && signed_events.iter().any(|signed| {
+                self.signed_event_requires_revision_envelope_with_collection_definitions(
+                    signed,
+                    Some(&incoming_collection_definitions),
+                )
+            })
         {
             return Err(Error::from_reason(
                 "UPGRADE_REQUIRED: schema 6 requires revision-bearing graph events",
@@ -27885,6 +28234,85 @@ impl Storage {
             }
         }
 
+        fn record_vector_source(
+            owner_id: &str,
+            collection: Option<&str>,
+            proof: &SignedEvent,
+            default_collection: &str,
+            order: &mut u64,
+            latest: &mut HashMap<(String, String), (u64, SignedEvent)>,
+        ) {
+            *order = order.saturating_add(1);
+            latest.insert(
+                (
+                    owner_id.to_string(),
+                    collection.unwrap_or(default_collection).to_string(),
+                ),
+                (*order, proof.clone()),
+            );
+        }
+
+        fn record_vector_sources(
+            event: &Event,
+            proof: &SignedEvent,
+            default_collection: &str,
+            order: &mut u64,
+            latest: &mut HashMap<(String, String), (u64, SignedEvent)>,
+        ) {
+            match event {
+                Event::Vector(vector) | Event::VectorMaterialized(vector) => {
+                    record_vector_source(
+                        &vector.node_id,
+                        vector.collection.as_deref(),
+                        proof,
+                        default_collection,
+                        order,
+                        latest,
+                    );
+                }
+                Event::Node(node) if node.embedding.is_some() => {
+                    record_vector_source(
+                        &node.id,
+                        node.collection.as_deref(),
+                        proof,
+                        default_collection,
+                        order,
+                        latest,
+                    );
+                }
+                Event::Batch(events) => {
+                    for nested in events {
+                        record_vector_sources(nested, proof, default_collection, order, latest);
+                    }
+                }
+                Event::Transaction(transaction) => {
+                    for node in &transaction.nodes {
+                        if node.embedding.is_some() {
+                            record_vector_source(
+                                &node.id,
+                                node.collection.as_deref(),
+                                proof,
+                                default_collection,
+                                order,
+                                latest,
+                            );
+                        }
+                    }
+                    for vector in &transaction.vectors {
+                        record_vector_source(
+                            &vector.node_id,
+                            vector.collection.as_deref(),
+                            proof,
+                            default_collection,
+                            order,
+                            latest,
+                        );
+                    }
+                }
+                _ => {}
+            }
+        }
+
         fn record_actions(
             event: &Event,
             proof: &SignedEvent,
@@ -28025,6 +28453,9 @@ impl Storage {
         }
 
         let mut latest_proofs: HashMap<String, (u64, SignedEvent)> = HashMap::new();
+        let mut latest_master_vectors: HashMap<(String, String), (u64, SignedEvent)> =
+            HashMap::new();
+        let mut vector_source_order = 0u64;
         let mut latest_actions: HashMap<String, (u64, CompactedMasterIdentityAction)> =
             HashMap::new();
         let mut journal_order = 0u64;
@@ -28049,6 +28480,13 @@ impl Storage {
             let Some(proof) = proof else {
                 return;
             };
+            record_vector_sources(
+                &proof.event,
+                &proof,
+                &self.default_collection,
+                &mut vector_source_order,
+                &mut latest_master_vectors,
+            );
             let mut matches = Vec::new();
             collect_matches(
                 &proof.event,
@@ -28098,6 +28536,11 @@ impl Storage {
                     proofs.retractions.insert(id.clone(), proof.clone());
                 }
                 _ => missing.push(format!("MASTER retraction {id}")),
+            }
+        }
+        for (key, (_, proof)) in latest_master_vectors {
+            if self.current_node_is_master(&key.0) {
+                proofs.master_vectors.insert(key, proof);
             }
         }
         for entry in self.nodes.iter() {
@@ -28523,20 +28966,52 @@ impl Storage {
                 };
                 let vector_id = Self::vector_revision_record_id(&node.id, &c.name)?;
                 let proof = base_proofs.vectors.get(&vector_id);
+                let master_proof = if Self::labels_are_master(&node.labels) {
+                    Some(
+                        authority_proofs
+                            .master_vectors
+                            .get(&(node.id.clone(), c.name.clone()))
+                            .ok_or_else(|| {
+                                Error::from_reason(format!(
+                                    "COMPACTION_MASTER_AUTHORITY_PROOF_MISSING: vector mapping {}/{}",
+                                    node.id, c.name
+                                ))
+                            })?,
+                    )
+                } else {
+                    None
+                };
+                let source_proof = master_proof.or(proof);
                 let event = Event::VectorMaterialized(VectorEvent {
                     node_id: node.id.clone(),
                     collection: Some(c.name.clone()),
                     embedding: values.into_iter().map(|v| v as f64).collect(),
                     lang: Some(m.lang.clone()),
-                    clock: proof
+                    clock: source_proof
                         .and_then(|proof| {
-                            Self::compacted_vector_source_clock(&proof.event, &node.id, &c.name)
+                            self.compacted_vector_source_clock(&proof.event, &node.id, &c.name)
                         })
                         .unwrap_or_else(|| node.clock.clone()),
                 });
+                let signed = if let Some(master_proof) = master_proof {
+                    if !self
+                        .compacted_master_vector_source_matches_event_with_collection_definitions(
+                            &event,
+                            &master_proof.event,
+                            None,
+                        )
+                    {
+                        return Err(Error::from_reason(format!(
+                            "COMPACTION_MASTER_AUTHORITY_PROOF_MISSING: vector mapping {}/{} no longer matches current state",
+                            node.id, c.name
+                        )));
+                    }
+                    self.sign_compacted_master_materialization(&event, master_proof, proof)?
+                } else {
+                    self.sign_compacted_base_materialization(&event, proof)?
+                };
                 let json =
-                    serde_json::to_vec(&self.sign_compacted_base_materialization(&event, proof)?)
-                        .map_err(|e| Error::from_reason(e.to_string()))?;
+                    serde_json::to_vec(&signed).map_err(|e| Error::from_reason(e.to_string()))?;
                 buf.extend_from_slice(&json);
                 buf.push(b'\n');
                 count += 1;

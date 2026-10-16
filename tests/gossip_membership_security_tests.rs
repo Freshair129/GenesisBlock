@@ -1,7 +1,7 @@
 use genesis_block_native::{
     AuthorizedPeerConfig, BatchInput, ConsensusProposal, EdgeInput, Event, GenesisTransaction,
-    GenesisTransactionEvent, GossipMessage, LogicalClock, NodeInput, NodeOutput, OpenOptions,
-    Storage,
+    GenesisTransactionEvent, GossipMessage, HybridSearchInput, LogicalClock, NodeInput, NodeOutput,
+    OpenOptions, Storage, VectorEvent,
 };
 use std::fs;
 use std::path::Path;
@@ -339,6 +339,10 @@ fn local_direct_writes_respect_master_authority_for_live_and_retracted_ids() {
         .unwrap_err();
     assert!(error.to_string().contains("GOVERNANCE_AUTH_REQUIRED"));
     let error = storage
+        .add_vector("local-protected".into(), "default".into(), vec![0.0, 1.0])
+        .unwrap_err();
+    assert!(error.to_string().contains("GOVERNANCE_AUTH_REQUIRED"));
+    let error = storage
         .persist(&Event::Node(node("local-protected", &["USER"])))
         .unwrap_err();
     assert!(error.to_string().contains("GOVERNANCE_AUTH_REQUIRED"));
@@ -346,6 +350,233 @@ fn local_direct_writes_respect_master_authority_for_live_and_retracted_ids() {
     assert_eq!(storage.stable_frontier(), before);
     assert!(storage.node_view("local-protected").is_some());
     assert!(storage.node_view("local-retracted").is_none());
+}
+
+fn nonmaster_cannot_replace_a_master_nodes_vector(schema6: bool) {
+    let open = |name| {
+        if schema6 {
+            open_current_schema(name)
+        } else {
+            open(name)
+        }
+    };
+    let (_master_dir, master) = open("vector-master-source");
+    let (_attacker_dir, attacker) = open("vector-nonmaster-attacker");
+    let (_destination_dir, destination) = open("vector-master-destination");
+    configure(
+        &destination,
+        vec![peer(&master, 31981, true), peer(&attacker, 31982, false)],
+        31980,
+        false,
+    );
+    configure(&attacker, Vec::new(), 31983, false);
+
+    // Ordinary vector replication remains available to non-master members in
+    // both storage schemas.
+    attacker
+        .add_node(node_input("ordinary-vector-owner", &["USER"]))
+        .unwrap();
+    attacker
+        .add_vector(
+            "ordinary-vector-owner".into(),
+            "default".into(),
+            vec![0.5, 0.5],
+        )
+        .unwrap();
+    destination
+        .reconcile_state(attacker.events_since_seq(0))
+        .unwrap();
+    assert!(destination.node_view("ordinary-vector-owner").is_some());
+
+    master
+        .add_node(node_input("protected-vector-owner", &["MASTER"]))
+        .unwrap();
+    master
+        .add_vector(
+            "protected-vector-owner".into(),
+            "default".into(),
+            vec![1.0, 0.0],
+        )
+        .unwrap();
+    destination
+        .reconcile_state(master.events_since_seq(0))
+        .unwrap();
+
+    let source_frontier = master.stable_frontier();
+    master
+        .add_vector(
+            "protected-vector-owner".into(),
+            "default".into(),
+            vec![0.0, 1.0],
+        )
+        .unwrap();
+    let master_vector_update = master
+        .events_since_seq(source_frontier)
+        .into_iter()
+        .last()
+        .expect("master vector update should be journaled");
+    let forged_authority = attacker.sign_event(&master_vector_update.event);
+    let before = destination.stable_frontier();
+
+    let error = destination
+        .reconcile_state(vec![forged_authority])
+        .unwrap_err();
+    assert!(error.to_string().contains("GOVERNANCE_AUTH_REQUIRED"));
+    assert_eq!(destination.stable_frontier(), before);
+
+    let error = destination
+        .add_vector(
+            "protected-vector-owner".into(),
+            "default".into(),
+            vec![0.0, 1.0],
+        )
+        .unwrap_err();
+    assert!(error.to_string().contains("GOVERNANCE_AUTH_REQUIRED"));
+    assert_eq!(destination.stable_frontier(), before);
+
+    // The same valid update is accepted when its signer has configured MASTER
+    // authority, preserving normal replication for protected vectors.
+    destination
+        .reconcile_state(vec![master_vector_update])
+        .unwrap();
+    assert!(destination.stable_frontier() > before);
+}
+
+#[test]
+fn master_vector_mutations_require_authority_for_schema5_and_schema6() {
+    nonmaster_cannot_replace_a_master_nodes_vector(false);
+    nonmaster_cannot_replace_a_master_nodes_vector(true);
+}
+
+#[test]
+fn vector_before_master_creation_in_same_batch_requires_master_authority() {
+    let (_master_dir, master) = open("batch-vector-master");
+    let (_attacker_dir, attacker) = open("batch-vector-attacker");
+    let (_destination_dir, destination) = open("batch-vector-destination");
+    configure(
+        &destination,
+        vec![peer(&master, 31991, true), peer(&attacker, 31992, false)],
+        31990,
+        false,
+    );
+
+    let node_id = "batch-vector-protected";
+    let vector = attacker.sign_event(&Event::Vector(VectorEvent {
+        node_id: node_id.into(),
+        collection: Some("default".into()),
+        embedding: vec![1.0, 0.0],
+        lang: Some("en".into()),
+        clock: LogicalClock {
+            time: 1,
+            peer_id: attacker.local_peer_id.clone(),
+        },
+    }));
+    let master_creation = master.sign_event(&Event::Node(node(node_id, &["MASTER"])));
+    let before = destination.stable_frontier();
+
+    let error = destination
+        .reconcile_state(vec![vector, master_creation])
+        .unwrap_err();
+    assert!(error.to_string().contains("GOVERNANCE_AUTH_REQUIRED"));
+    assert_eq!(destination.stable_frontier(), before);
+    assert!(destination.node_view(node_id).is_none());
+}
+
+fn compacted_master_vectors_survive_nonmaster_relay(schema6: bool) {
+    let open = |name| {
+        if schema6 {
+            open_current_schema(name)
+        } else {
+            open(name)
+        }
+    };
+    let (_master_dir, master) = open("compacted-vector-master");
+    let (_relay_dir, relay) = open("compacted-vector-relay");
+    let (_receiver_dir, receiver) = open("compacted-vector-receiver");
+    configure(
+        &master,
+        vec![peer(&relay, 31995, false), peer(&receiver, 31996, false)],
+        31994,
+        true,
+    );
+    configure(
+        &relay,
+        vec![peer(&master, 31994, true), peer(&receiver, 31996, false)],
+        31995,
+        false,
+    );
+    configure(
+        &receiver,
+        vec![peer(&master, 31994, true), peer(&relay, 31995, false)],
+        31996,
+        false,
+    );
+
+    master
+        .create_collection(
+            "code".into(),
+            "security-test".into(),
+            2,
+            Some("L2".into()),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+    let mut protected = node_input("compacted-master-vector", &["MASTER"]);
+    protected.embedding = Some(vec![1.0, 0.0]);
+    master.add_node(protected).unwrap();
+    master
+        .add_vector(
+            "compacted-master-vector".into(),
+            "code".into(),
+            vec![0.25, 0.75],
+        )
+        .unwrap();
+    relay.reconcile_state(master.events_since_seq(0)).unwrap();
+
+    relay
+        .add_node(node_input("compacted-relay-user-vector", &["USER"]))
+        .unwrap();
+    relay
+        .add_vector(
+            "compacted-relay-user-vector".into(),
+            "code".into(),
+            vec![0.0, 1.0],
+        )
+        .unwrap();
+    relay.compact().unwrap();
+    relay.compact().unwrap();
+
+    receiver.reconcile_state(relay.events_since_seq(0)).unwrap();
+    receiver.flush_index();
+    let search = |storage: &Storage, collection: Option<&str>| {
+        storage
+            .hybrid_search(HybridSearchInput {
+                query_vector: vec![0.25, 0.75],
+                k: 10,
+                alpha: Some(0.0),
+                lang: None,
+                as_of: None,
+                collection: collection.map(str::to_string),
+                ef_search: None,
+                oversample: None,
+            })
+            .unwrap()
+            .into_iter()
+            .map(|hit| hit.node.id)
+            .collect::<Vec<_>>()
+    };
+    assert!(search(&receiver, None).contains(&"compacted-master-vector".into()));
+    let custom_collection_hits = search(&receiver, Some("code"));
+    assert!(custom_collection_hits.contains(&"compacted-master-vector".into()));
+    assert!(custom_collection_hits.contains(&"compacted-relay-user-vector".into()));
+}
+
+#[test]
+fn compacted_master_vectors_keep_authority_and_schema5_schema6_relay() {
+    compacted_master_vectors_survive_nonmaster_relay(false);
+    compacted_master_vectors_survive_nonmaster_relay(true);
 }
 
 #[test]

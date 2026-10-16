@@ -44,7 +44,7 @@ docker volume create "$VOLUME" >/dev/null
 echo "==> First start"
 docker run -d --name "$CONTAINER" \
   -e "GENESIS_API_KEY=${API_KEY}" \
-  -p "${PORT}:3000" \
+  -p "127.0.0.1:${PORT}:3000" \
   -v "${VOLUME}:/data" \
   "$IMAGE" >/dev/null
 wait_ready
@@ -70,7 +70,7 @@ docker rm "$CONTAINER" >/dev/null
 
 docker run -d --name "$CONTAINER" \
   -e "GENESIS_API_KEY=${API_KEY}" \
-  -p "${PORT}:3000" \
+  -p "127.0.0.1:${PORT}:3000" \
   -v "${VOLUME}:/data" \
   "$IMAGE" >/dev/null
 wait_ready

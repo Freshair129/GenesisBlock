@@ -1156,6 +1156,11 @@ mod tests {
                     Err(error) => panic!("HTTPS proxy did not receive the request: {error}"),
                 }
             };
+            // Some Windows socket implementations inherit the listener's
+            // nonblocking mode on accepted sockets. Restore blocking mode so
+            // `read` waits for the CONNECT request instead of treating
+            // WouldBlock as an empty request below.
+            stream.set_nonblocking(false).unwrap();
             stream
                 .set_read_timeout(Some(Duration::from_secs(2)))
                 .unwrap();
