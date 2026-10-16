@@ -1899,6 +1899,24 @@ struct BatchMasterAuthState {
     tombstone_clock: Option<LogicalClock>,
 }
 
+#[derive(Clone, Copy)]
+struct CompactedVectorSource<'a> {
+    owner_id: &'a str,
+    collection: &'a str,
+    embedding: &'a [f64],
+    lang: Option<&'a str>,
+    clock: &'a LogicalClock,
+}
+
+struct ReconcileAuthorityContext<'a> {
+    signer_peer_id: &'a str,
+    forwarded_master_proof: Option<&'a SignedEvent>,
+    collection_definitions: Option<&'a HashMap<String, CollectionDefinition>>,
+    protected_vector_owners: &'a HashSet<String>,
+    states: &'a mut HashMap<String, BatchMasterAuthState>,
+    seed_from_live_state: bool,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum SyncEvent {
     ProposeMutation(Box<Event>),
@@ -19148,13 +19166,16 @@ impl Storage {
     fn compacted_vector_materialization_matches_source(
         &self,
         target: &VectorEvent,
-        owner_id: &str,
-        collection: &str,
-        source_embedding: &[f64],
-        source_lang: Option<&str>,
-        source_clock: &LogicalClock,
+        source: CompactedVectorSource<'_>,
         collection_definitions: Option<&HashMap<String, CollectionDefinition>>,
     ) -> bool {
+        let CompactedVectorSource {
+            owner_id,
+            collection,
+            embedding: source_embedding,
+            lang: source_lang,
+            clock: source_clock,
+        } = source;
         let source_f32: Vec<f32> = source_embedding.iter().map(|value| *value as f32).collect();
         // Check the deterministic projection that compaction reads from the
         // collection arena. Rerank sidecars preserve f32 values; other arena
@@ -19340,11 +19361,13 @@ impl Storage {
         };
         self.compacted_vector_materialization_matches_source(
             target,
-            &target.node_id,
-            collection,
-            embedding,
-            lang,
-            clock,
+            CompactedVectorSource {
+                owner_id: &target.node_id,
+                collection,
+                embedding,
+                lang,
+                clock,
+            },
             collection_definitions,
         )
     }
@@ -19405,11 +19428,13 @@ impl Storage {
                         };
                         self.compacted_vector_materialization_matches_source(
                             target,
-                            owner_id,
-                            collection,
-                            source_embedding,
-                            source_lang,
-                            source_clock,
+                            CompactedVectorSource {
+                                owner_id,
+                                collection,
+                                embedding: source_embedding,
+                                lang: source_lang,
+                                clock: source_clock,
+                            },
                             collection_definitions,
                         )
                     };
@@ -19630,13 +19655,14 @@ impl Storage {
     fn preflight_reconcile_event_authority(
         &self,
         event: &Event,
-        signer_peer_id: &str,
-        forwarded_master_proof: Option<&SignedEvent>,
-        collection_definitions: Option<&HashMap<String, CollectionDefinition>>,
-        protected_vector_owners: &HashSet<String>,
-        states: &mut HashMap<String, BatchMasterAuthState>,
-        seed_from_live_state: bool,
+        context: &mut ReconcileAuthorityContext<'_>,
     ) -> Result<()> {
+        let signer_peer_id = context.signer_peer_id;
+        let forwarded_master_proof = context.forwarded_master_proof;
+        let collection_definitions = context.collection_definitions;
+        let protected_vector_owners = context.protected_vector_owners;
+        let seed_from_live_state = context.seed_from_live_state;
+        let states = &mut *context.states;
         let direct_master_authority = self.authorized_master(signer_peer_id);
         match event {
             Event::Node(node) => {
@@ -19722,15 +19748,15 @@ impl Storage {
             }
             Event::Batch(events) => {
                 for nested in events {
-                    self.preflight_reconcile_event_authority(
-                        nested,
+                    let mut nested_context = ReconcileAuthorityContext {
                         signer_peer_id,
-                        None,
+                        forwarded_master_proof: None,
                         collection_definitions,
                         protected_vector_owners,
-                        states,
+                        states: &mut *states,
                         seed_from_live_state,
-                    )?;
+                    };
+                    self.preflight_reconcile_event_authority(nested, &mut nested_context)?;
                 }
             }
             Event::Transaction(transaction) => {
@@ -19943,20 +19969,18 @@ impl Storage {
                 // event. Carry that event's authorized graph transitions into
                 // the batch overlay so later proofs cannot bypass MASTER state
                 // established by an earlier checkpoint.
-                self.preflight_reconcile_event_authority(
-                    &source_proof.event,
-                    &source_proof.signer_peer_id,
-                    None,
-                    Some(&collection_definitions),
-                    &protected_vector_owners,
-                    &mut states,
+                let mut context = ReconcileAuthorityContext {
+                    signer_peer_id: &source_proof.signer_peer_id,
+                    forwarded_master_proof: None,
+                    collection_definitions: Some(&collection_definitions),
+                    protected_vector_owners: &protected_vector_owners,
+                    states: &mut states,
                     seed_from_live_state,
-                )?;
+                };
+                self.preflight_reconcile_event_authority(&source_proof.event, &mut context)?;
             }
-            self.preflight_reconcile_event_authority(
-                &signed_event.event,
-                &signed_event.signer_peer_id,
-                self.compacted_master_authority_proof_with_collection_definitions(
+            let forwarded_master_proof = self
+                .compacted_master_authority_proof_with_collection_definitions(
                     signed_event,
                     Some(&collection_definitions),
                 )
@@ -19966,13 +19990,16 @@ impl Storage {
                         Some(&collection_definitions),
                     )
                     .filter(|proof| self.authorized_master(&proof.signer_peer_id))
-                })
-                .as_ref(),
-                Some(&collection_definitions),
-                &protected_vector_owners,
-                &mut states,
+                });
+            let mut context = ReconcileAuthorityContext {
+                signer_peer_id: &signed_event.signer_peer_id,
+                forwarded_master_proof: forwarded_master_proof.as_ref(),
+                collection_definitions: Some(&collection_definitions),
+                protected_vector_owners: &protected_vector_owners,
+                states: &mut states,
                 seed_from_live_state,
-            )?;
+            };
+            self.preflight_reconcile_event_authority(&signed_event.event, &mut context)?;
         }
         Ok(())
     }
