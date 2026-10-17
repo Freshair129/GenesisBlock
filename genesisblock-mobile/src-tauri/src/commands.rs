@@ -69,7 +69,11 @@ pub async fn retrieve_context(
 
 /// Graph neighbors of `seed` up to `depth` (current view, not inferred).
 #[tauri::command]
-pub async fn neighbors(db: Db<'_>, seed: String, depth: u32) -> Result<Vec<NeighborOutput>, String> {
+pub async fn neighbors(
+    db: Db<'_>,
+    seed: String,
+    depth: u32,
+) -> Result<Vec<NeighborOutput>, String> {
     let storage = db.inner().clone();
     let args = NeighborInput {
         depth: Some(depth),

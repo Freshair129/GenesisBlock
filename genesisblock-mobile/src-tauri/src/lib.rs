@@ -27,6 +27,7 @@ pub fn run() {
                 page_cache_mb: None,
                 read_only: None,
                 vector_dim: None,
+                retention: None,
             })
             .map_err(|e| e.to_string())?;
 
