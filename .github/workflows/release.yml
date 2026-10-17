@@ -1,21 +1,20 @@
 # Build the NAPI native addon for every published target and publish to npm.
 # Also publishes the two other mobile-SDK package-manager surfaces on the same
 # tag (issue #125): genesisdb-android to GitHub Packages, react-native-genesisdb
-# to npm. GenesisBlockDB.xcframework is NOT published here — it ships as a raw
-# GitHub Release asset via a manual step (see ios/README.md "Prebuilt
-# xcframework"), not through a package-manager job, since CocoaPods needs no
-# Trunk publish for it (react-native-genesisdb's podspec fetches it directly —
-# see that podspec's comment) and a real SPM-registry path is deferred.
+# to npm, and the GenesisBlockDB.xcframework.zip GitHub Release asset. The
+# release workflow builds the iOS slices from the exact release tag, creates a
+# BSD-zip archive, attaches it with a SHA-256 sidecar, and runs the blank iOS
+# consumer against that published asset. The mobile-build workflow's 14-day
+# artifact remains a test output, not the release source.
 #
 # The genesisdb-android `.aar` IS attached here, by the same `android-publish`
 # job that builds it with `--release` (see that job's "Attach .aar" step). It
 # used to be uploaded by hand, which is how a DEBUG .aar — 281 MB of native
 # libs, 78% DWARF — ended up on the v0.2.0 release. A guard step now fails the
 # job if any `.so` still carries `.debug_*` sections. The xcframework has the
-# same manual-upload exposure and the same history (a Windows-zipped asset
-# broke SwiftPM extraction); `mobile-build.yml`'s `ios-xcframework` job now
-# produces a correctly-attributed zip artifact for it, but attaching it is
-# still manual — worth closing the same way.
+# same history (a Windows-zipped asset broke SwiftPM extraction); the release
+# job uses BSD zip on macOS and verifies the downloaded release asset against
+# the generated SHA-256 sidecar before running the simulator consumer test.
 #
 # Triggered by pushing a version tag (e.g. v0.1.0-beta.1) or manually. A manual
 # run accepts a `repair_tag` input to rebuild and replace an EXISTING release's
@@ -63,6 +62,7 @@ on:
       - 'scripts/version-doc-check.mjs'
       - 'android/**'
       - 'react-native-genesisdb/**'
+      - 'mobile-acceptance/ios/**'
   workflow_dispatch:
     inputs:
       repair_tag:
@@ -118,6 +118,226 @@ jobs:
             exit 1
           fi
           echo "release tag matches engine version $EXPECTED"
+
+  ios-xcframework-build:
+    name: build iOS xcframework release asset
+    needs: release-version-check
+    runs-on: macos-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.repair_tag || github.ref }}
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios, aarch64-apple-ios-sim
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ios-xcframework-release
+
+      - name: Build release SDK core for iOS device and simulator
+        run: |
+          cargo build --locked --release --no-default-features --features "mobile ffi" --target aarch64-apple-ios
+          cargo build --locked --release --no-default-features --features "mobile ffi" --target aarch64-apple-ios-sim
+
+      - name: Verify release static libraries
+        run: |
+          test -s target/aarch64-apple-ios/release/libgenesis_block_native.a
+          test -s target/aarch64-apple-ios-sim/release/libgenesis_block_native.a
+
+      - name: Assemble GenesisBlockDB.xcframework
+        run: >
+          xcodebuild -create-xcframework
+          -library target/aarch64-apple-ios/release/libgenesis_block_native.a
+          -headers include/
+          -library target/aarch64-apple-ios-sim/release/libgenesis_block_native.a
+          -headers include/
+          -output GenesisBlockDB.xcframework
+
+      - name: Zip and verify release asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          ASSET="GenesisBlockDB.xcframework.zip"
+          zip -r -X --symlinks "$ASSET" GenesisBlockDB.xcframework
+          unzip -t "$ASSET"
+          SHA256=$(shasum -a 256 "$ASSET" | awk '{print $1}')
+          SWIFTPM_CHECKSUM=$(swift package compute-checksum "$ASSET")
+          if [[ "$SHA256" != "$SWIFTPM_CHECKSUM" ]]; then
+            echo "::error::SwiftPM checksum does not match SHA-256 for $ASSET"
+            exit 1
+          fi
+          printf '%s  %s\n' "$SHA256" "$ASSET" > "$ASSET.sha256"
+          echo "SHA-256 / SwiftPM checksum: $SHA256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-xcframework-release
+          path: |
+            GenesisBlockDB.xcframework.zip
+            GenesisBlockDB.xcframework.zip.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  ios-xcframework-release-asset:
+    name: attach iOS xcframework to GitHub Release
+    # Keep the write-scoped token out of PR and ordinary dry-run workflows.
+    if: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && inputs.repair_tag != '') }}
+    needs: [release-version-check, ios-xcframework-build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.publish.outputs.tag }}
+      url: ${{ steps.publish.outputs.url }}
+      checksum: ${{ steps.publish.outputs.checksum }}
+      published: ${{ steps.publish.outputs.published }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ios-xcframework-release
+          path: release-dist
+
+      - name: Verify staged asset and checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          ASSET="GenesisBlockDB.xcframework.zip"
+          (cd release-dist && sha256sum --check "$ASSET.sha256")
+          unzip -t "release-dist/$ASSET"
+
+      - name: Attach and verify release asset
+        id: publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPAIR_TAG: ${{ inputs.repair_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ASSET="GenesisBlockDB.xcframework.zip"
+          TAG="$REPAIR_TAG"
+          if [[ -z "$TAG" ]]; then TAG="$GITHUB_REF_NAME"; fi
+          CHECKSUM=$(awk '{print $1}' "release-dist/$ASSET.sha256")
+          ASSET_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${ASSET}"
+          PUBLISHED=false
+          if [[ "$IS_RELEASE" == "true" || -n "$REPAIR_TAG" ]]; then
+            PUBLISHED=true
+          fi
+
+          if [[ "$PUBLISHED" == "true" ]]; then
+            if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              if ! gh release create "$TAG" \
+                  --repo "$GITHUB_REPOSITORY" \
+                  --title "$TAG" \
+                  --verify-tag \
+                  --generate-notes; then
+                # The Android publisher may create the same release in
+                # parallel. Continue only if that release now exists.
+                gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
+              fi
+            fi
+
+            gh release upload "$TAG" \
+              "release-dist/$ASSET" \
+              "release-dist/$ASSET.sha256" \
+              --clobber \
+              --repo "$GITHUB_REPOSITORY"
+
+            VERIFY_DIR=$(mktemp -d)
+            trap 'rm -rf "$VERIFY_DIR"' EXIT
+            gh release download "$TAG" \
+              --pattern "$ASSET" \
+              --pattern "$ASSET.sha256" \
+              --dir "$VERIFY_DIR" \
+              --repo "$GITHUB_REPOSITORY"
+            (cd "$VERIFY_DIR" && sha256sum --check "$ASSET.sha256")
+            cmp "release-dist/$ASSET.sha256" "$VERIFY_DIR/$ASSET.sha256"
+            echo "Verified public release asset $ASSET for $TAG ($CHECKSUM)"
+          else
+            echo "DRY RUN: would attach $ASSET and its SHA-256 sidecar to $TAG"
+          fi
+
+          {
+            echo "tag=$TAG"
+            echo "url=$ASSET_URL"
+            echo "checksum=$CHECKSUM"
+            echo "published=$PUBLISHED"
+          } >> "$GITHUB_OUTPUT"
+
+  ios-xcframework-consumer-smoke:
+    name: iOS consumer smoke (release xcframework via SPM)
+    needs: [ios-xcframework-build, ios-xcframework-release-asset]
+    # Tag/repair runs must consume the verified public asset. PRs and an
+    # ordinary manual dry run consume the exact release-mode artifact locally.
+    if: >-
+      ${{
+        always() &&
+        needs.ios-xcframework-build.result == 'success' &&
+        (
+          needs.ios-xcframework-release-asset.result == 'success' ||
+          (
+            needs.ios-xcframework-release-asset.result == 'skipped' &&
+            (
+              github.event_name == 'pull_request' ||
+              (github.event_name == 'workflow_dispatch' && inputs.repair_tag == '')
+            )
+          )
+        )
+      }}
+    runs-on: macos-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.repair_tag || github.ref }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ios-xcframework-release
+          path: release-dist
+
+      - name: Select the exact release asset for the blank consumer
+        env:
+          ASSET_PUBLISHED: ${{ needs.ios-xcframework-release-asset.outputs.published }}
+          RELEASE_URL: ${{ needs.ios-xcframework-release-asset.outputs.url }}
+          RELEASE_CHECKSUM: ${{ needs.ios-xcframework-release-asset.outputs.checksum }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$ASSET_PUBLISHED" == "true" ]]; then
+            echo "GENESISDB_XCFRAMEWORK_URL=$RELEASE_URL" >> "$GITHUB_ENV"
+            echo "GENESISDB_XCFRAMEWORK_CHECKSUM=$RELEASE_CHECKSUM" >> "$GITHUB_ENV"
+          else
+            unzip -q release-dist/GenesisBlockDB.xcframework.zip -d mobile-acceptance/ios
+            test -d mobile-acceptance/ios/GenesisBlockDB.xcframework
+            echo "GENESISDB_XCFRAMEWORK_PATH=GenesisBlockDB.xcframework" >> "$GITHUB_ENV"
+            echo "DRY RUN: simulator consumer uses the release-mode xcframework built in this run"
+          fi
+
+      - name: Find an available iPhone simulator
+        id: sim
+        run: |
+          DEVICE_ID=$(xcrun simctl list devices available -j \
+            | python3 -c "import json,sys; d=json.load(sys.stdin); print(next(dev['udid'] for runtime in d['devices'].values() for dev in runtime if dev['name'].startswith('iPhone')))")
+          echo "device_id=$DEVICE_ID" >> "$GITHUB_OUTPUT"
+
+      - name: List available schemes (diagnostic)
+        working-directory: mobile-acceptance/ios
+        run: xcodebuild -list
+
+      - name: xcodebuild test (iOS Simulator)
+        working-directory: mobile-acceptance/ios
+        run: |
+          xcodebuild test \
+            -scheme GenesisAcceptance-Package \
+            -destination "id=${{ steps.sim.outputs.device_id }}"
 
   build:
     name: build ${{ matrix.target }}

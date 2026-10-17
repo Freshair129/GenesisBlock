@@ -425,6 +425,11 @@ The SDK is extracted from the proven Phase A core.
 > [v0.2.0 GitHub Release](https://github.com/Freshair129/GenesisBlock/releases/tag/v0.2.0)
 > — SHA256 `607df0d82d68550a20927ae171928ad1decd7253fb647da450dec87deea1c26d`.
 > The `genesisdb-android` `.aar` (v0.1.0) is attached to the same release.
+> Subsequent version-tag releases build the iOS archive from that exact tag,
+> attach it with a SHA-256 sidecar, verify the downloaded asset, and run the
+> blank Simulator consumer against its published URL/checksum. The default
+> acceptance fixture and CocoaPods pin remain explicit versioned references;
+> release automation does not rewrite them.
 > Still not done: `Package.swift` deliberately has NOT been swapped to the
 > `.binaryTarget(url:, checksum:)` form — that would replace the current
 > host-arch build (which lets `GenesisDBTests` actually execute) with the
@@ -478,8 +483,13 @@ public actor GenesisDB {
 ```
 
 Distribution: Swift Package Manager via `Package.swift` + binary target pointing to the
-xcframework. Release CI uploads the xcframework as a GitHub release asset; `Package.swift`
-references the release URL + checksum.
+xcframework. `release.yml` builds release-mode device/simulator slices from the
+exact version tag, creates the SwiftPM-compatible BSD zip, attaches it and a
+SHA-256 sidecar to the same GitHub Release, verifies the downloaded asset, and
+runs `mobile-acceptance/ios/` against that published URL/checksum. The
+14-day artifact from `mobile-build.yml` is for CI only. The fixture's default
+version and the CocoaPods pin stay explicit and are not silently advanced by
+release automation.
 
 > **B-2 landed (2026-07-03).** `android/genesisdb/` is a real Gradle library
 > module: `Types.kt` (data classes with explicit `@SerialName` snake_case wire
@@ -645,6 +655,9 @@ Not in scope for the initial SDK release; added when there is demonstrated user 
 **iOS SDK:**
 - [x] `GenesisBlockDB.xcframework` builds for `aarch64-apple-ios` + `aarch64-apple-ios-sim`
       (CI: `ios-xcframework`) and is published as a v0.2.0 release asset
+- [x] Version-tag release workflow rebuilds the release-mode xcframework from
+      the exact tag, attaches its BSD zip and SHA-256 sidecar, verifies the
+      public asset, and runs the blank Simulator consumer against it
 - [ ] Swift Package Manager `import GenesisBlockDB` works in a blank Xcode project
       (`ios/genesisdb`'s own `Package.swift` still links a local host-arch
       build, not the published binary target, deliberately — see

@@ -70,6 +70,9 @@ where every command above actually runs:
   `GenesisBlockDB.xcframework` via `xcodebuild -create-xcframework`, uploaded
   as a build artifact — DoD item "`GenesisBlockDB.xcframework` builds for
   `aarch64-apple-ios` + `aarch64-apple-ios-sim`".
+- **`release.yml` iOS release jobs** — rebuild release-mode slices from the
+  exact version tag, attach the BSD zip and SHA-256 sidecar, verify the public
+  asset, and run the blank Simulator consumer against that tag's release URL.
 
 ## Wire format gotcha
 
@@ -93,6 +96,16 @@ job runs) is attached to the
 [v0.2.0 GitHub Release](https://github.com/Freshair129/GenesisBlock/releases/tag/v0.2.0)
 as `GenesisBlockDB.xcframework.zip`
 (SHA256 `607df0d82d68550a20927ae171928ad1decd7253fb647da450dec87deea1c26d`).
+
+`v0.2.0` is the existing pinned reference. For version-tag releases,
+`.github/workflows/release.yml` builds release-mode device and simulator
+slices from that exact tag, creates a BSD zip, attaches the zip and its
+`GenesisBlockDB.xcframework.zip.sha256` sidecar to the same GitHub Release,
+verifies the downloaded bytes, and runs the blank Simulator consumer against
+the published URL/checksum. The 14-day artifact from `mobile-build.yml` is
+only a test output and is not promoted to a release. The release workflow does
+not silently rewrite the version pins in this README, the acceptance fixture,
+or the React Native podspec.
 
 This `Package.swift` deliberately does **not** consume it yet: swapping the
 `GenesisDB` target's local-`.a`-plus-`unsafeFlags` linking for a

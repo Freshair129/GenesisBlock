@@ -183,25 +183,11 @@ jobs:
           path: GenesisBlockDB.xcframework
           retention-days: 14
 
-      # The actual v0.2.0 release asset (GenesisBlockDB.xcframework.zip,
-      # consumed by react-native-genesisdb.podspec's prepare_command and by
-      # mobile-acceptance/ios/Package.swift's .binaryTarget) was zipped by
-      # hand on the Windows dev box (release.yml deliberately ships it as a
-      # manual step, not a package-manager publish — see that workflow's
-      # header comment) — found+fixed by the ios-acceptance-test job's first
-      # real run: Windows zip tools (PowerShell Compress-Archive, .NET
-      # ZipFile, ...) write the zip "version made by" host byte as 0
-      # (MS-DOS/FAT) instead of 3 (Unix), and macOS's Info-ZIP-based unzip
-      # (what SwiftPM's binaryTarget extraction shells out to) treats a
-      # non-Unix host byte as a signal to distrust the archive's path
-      # separators — it aborts with "appears to use backslashes as path
-      # separators" even though every entry inside is already forward-slash
-      # (verified: the actual entry names have zero backslashes; it's the
-      # host-attribute byte alone that trips the check). BSD zip (this step,
-      # running on a real macOS runner) writes host=3, which extracts cleanly.
-      # This step exists so future xcframework re-publishes never repeat the
-      # manual-Windows-zip mistake — always zip (and, when replacing the
-      # release asset, always re-upload) from here, not by hand.
+      # This is a short-lived CI/test artifact, not the release source. Keep
+      # BSD zip here so the simulator consumer can exercise SwiftPM-compatible
+      # extraction. release.yml independently rebuilds release-mode slices
+      # from the exact version tag, attaches that zip, and verifies the public
+      # asset before its tag-specific consumer smoke.
       - name: Zip xcframework with a Unix-attributed zip (portable for SwiftPM binaryTarget)
         run: zip -r -X --symlinks GenesisBlockDB.xcframework.zip GenesisBlockDB.xcframework
 
