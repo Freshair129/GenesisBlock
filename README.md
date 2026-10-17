@@ -286,6 +286,12 @@ Published release asset:
 
 The artifact contains device + simulator slices and is consumed by the repository's external acceptance fixture.
 
+For version-tag releases, `release.yml` builds release-mode slices from that
+exact tag, attaches the BSD-zipped framework and a SHA-256 sidecar to the same
+GitHub Release, verifies the downloaded asset, and runs the blank iOS Simulator
+consumer against the published URL/checksum. The v0.2.0 link above remains the
+existing pinned reference until consumer pins are explicitly updated.
+
 For source development of the Swift SDK itself, build the Rust FFI library first:
 
 ```bash
