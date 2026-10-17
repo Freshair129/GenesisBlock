@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Map `/v1/insight/gaps` access-policy failures to the same HTTP 401
   authorization response used by the other community insight routes.
+- Keep the Studio and mobile Tauri lockfiles synchronized with engine version
+  changes, and include both lockfiles in the version consistency gate.
 
 ### Fixed - Keep node properties aligned through REST recovery
 

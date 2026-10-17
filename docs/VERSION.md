@@ -19,7 +19,7 @@ those as legacy labels superseded by this file.
 
 | Field | Value |
 |---|---|
-| **Engine crate** (`Cargo.toml`, `Cargo.lock`, `package.json`, `package-lock.json`, `modules.json`) | `0.2.10` |
+| **Engine crate** (`Cargo.toml`, all three `Cargo.lock` files, `package.json`, `package-lock.json`, `modules.json`) | `0.2.10` |
 | **Product milestone** | **Mobile SDK** — Phase B (iOS/Android/React Native) shipped and published; on-device acceptance verified for iOS |
 | **Status** | Advanced prototype (durable, benchmarked, suite green) |
 | **Evidence baseline** | 2026-06-21 — audits P14–P30, `REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md` |
