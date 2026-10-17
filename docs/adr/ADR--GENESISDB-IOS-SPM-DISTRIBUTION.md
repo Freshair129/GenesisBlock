@@ -23,6 +23,22 @@ The source Swift package under `ios/genesisdb/` also has a different responsibil
 
 The existing source-development Swift package and the external binary-consumer acceptance fixture remain separate on purpose.
 
+## GitHub Release asset contract
+
+The release workflow builds the device and simulator slices from the exact
+release tag (or the exact tag selected for an asset repair), creates the
+SwiftPM-compatible archive with BSD zip, and attaches
+`GenesisBlockDB.xcframework.zip` plus a SHA-256 sidecar to that tag's GitHub
+Release. It verifies the downloaded release asset against the generated
+checksum and runs the blank Simulator consumer against the published URL and
+checksum. The 14-day artifact from `mobile-build.yml` remains a test output;
+it is not used as a release input.
+
+This automation does not silently change the Swift package or CocoaPods
+version pins. Updating consumer pins remains an explicit, reviewed release
+change so an engine tag cannot claim a checksum or binary that was not built
+from its source.
+
 ## Required gate before public root SPM
 
 A public SwiftPM consumer path may be introduced only when release automation guarantees all of the following for the same version:
@@ -55,6 +71,7 @@ This is preferable if the Swift SDK needs a version cadence independent from the
 - [ ] clean external Simulator round trip (`open` → `addNode` → read/retrieve) passes;
 - [ ] release CI fails if manifest URL/checksum and release artifact drift;
 - [ ] root/source SDK tests remain capable of exercising host-native builds where required.
+- [x] release workflow builds and attaches the same-tag xcframework, verifies its public checksum, and runs the blank Simulator consumer against that asset.
 
 ## Consequences
 
@@ -66,7 +83,7 @@ This is preferable if the Swift SDK needs a version cadence independent from the
 
 ### Negative
 
-- native Swift consumers still use the release xcframework/manual binary integration until the coordinated SPM release path is completed;
+- native Swift consumers still use the release xcframework binary integration until the coordinated SPM release path is completed;
 - adding the repository directly as a Swift package is intentionally not advertised yet.
 
 ## Rejected shortcut

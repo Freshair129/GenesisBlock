@@ -36,7 +36,9 @@ The xcframework's `aarch64-apple-ios-sim` slice is cross-compiled for the
 Simulator ABI — it can't execute as a plain host process, but it **can**
 execute *inside* the iOS Simulator on an Apple Silicon macOS runner, since
 that's a native arm64 execution environment. CI (`.github/workflows/mobile-build.yml`,
-job `ios-acceptance-test`) runs:
+job `ios-acceptance-test`) runs against the explicitly pinned default binary.
+The release workflow also runs this consumer after attaching each version-tag
+asset, using the URL and checksum produced by that same run. Both paths run:
 
 ```bash
 xcodebuild test -scheme GenesisAcceptance-Package -destination "id=<a real simulator udid>"
@@ -59,7 +61,11 @@ xcodebuild test -scheme GenesisAcceptance-Package -destination 'platform=iOS Sim
 
 ## Keeping this in sync
 
-The URL/checksum here are pinned to the `v0.2.0` release, same as
+The default URL/checksum here stay pinned to the `v0.2.0` release, matching
 `react-native-genesisdb.podspec`'s `prepare_command` and `ios/README.md`'s
-"Prebuilt xcframework" section — there's no automatic sync mechanism yet.
-Bump all three together by hand whenever a new xcframework is published.
+"Prebuilt xcframework" section. Release CI overrides the pair with
+`GENESISDB_XCFRAMEWORK_URL` and `GENESISDB_XCFRAMEWORK_CHECKSUM` to test the
+exact tag asset; PR dry runs use `GENESISDB_XCFRAMEWORK_PATH` for the local
+release-mode build. These CI overrides do not rewrite consumer pins. When a
+new binary is intentionally adopted by consumers, update the URL and checksum
+in all three references together.
