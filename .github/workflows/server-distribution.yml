@@ -59,10 +59,23 @@ jobs:
           fi
           echo "release tag matches engine version $EXPECTED"
 
+  server-startup-auth:
+    name: standalone server startup auth tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: server-startup-auth
+      - name: Verify loopback compatibility and non-loopback key requirement
+        run: cargo test --locked --no-default-features --features bins --bin genesis-db-server
+
   container-smoke:
     name: Docker build + persistence smoke
     runs-on: ubuntu-latest
-    needs: release-version-check
+    needs: [release-version-check, server-startup-auth]
     steps:
       - uses: actions/checkout@v4
       - name: Smoke-test container persistence
@@ -71,7 +84,7 @@ jobs:
   server-binaries:
     name: server binary ${{ matrix.target }}
     runs-on: ${{ matrix.host }}
-    needs: release-version-check
+    needs: [release-version-check, server-startup-auth]
     strategy:
       fail-fast: false
       matrix:

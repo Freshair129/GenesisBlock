@@ -19,11 +19,15 @@ those as legacy labels superseded by this file.
 
 | Field | Value |
 |---|---|
-| **Engine crate** (`Cargo.toml`, `Cargo.lock`, `package.json`, `package-lock.json`, `modules.json`) | `0.2.9` |
+| **Engine crate** (`Cargo.toml`, `Cargo.lock`, `package.json`, `package-lock.json`, `modules.json`) | `0.2.10` |
 | **Product milestone** | **Mobile SDK** — Phase B (iOS/Android/React Native) shipped and published; on-device acceptance verified for iOS |
 | **Status** | Advanced prototype (durable, benchmarked, suite green) |
 | **Evidence baseline** | 2026-06-21 — audits P14–P30, `REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md` |
 | **Positioning** | Embedded analytics / agent-memory graph + vector engine |
+
+Release note: `0.2.10` is prepared in source but has not been published. The
+latest published server artifacts remain `v0.2.9` until the matching tag
+release completes.
 
 **Version history:** `0.0.1` → `0.1.0-beta.1` (first beta, WAL compaction) →
 `0.1.0-beta.2` (CI gates, core/napi split) → `0.2.0` (mobile foundation:

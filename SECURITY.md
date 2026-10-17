@@ -2,13 +2,12 @@
 
 ## Supported Versions
 
-GenesisBlockDB is pre-1.0. Security fixes are applied to the latest released
-version only.
+GenesisBlockDB is pre-1.0. Only the latest published stable release is
+supported for security fixes; older releases and prereleases are unsupported.
 
-| Version        | Supported          |
-| -------------- | ------------------ |
-| 0.1.0-beta.x   | :white_check_mark: |
-| < 0.1.0-beta.1 | :x:                |
+A security fix is shipped only when the corresponding release assets and
+registry artifacts have been rebuilt from the fixed revision and verified.
+Merging a fix to `main` does not update already-published binaries or images.
 
 ## Reporting a Vulnerability
 
