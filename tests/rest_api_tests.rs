@@ -1576,7 +1576,7 @@ async fn test_insight_rebuild_and_gaps() {
 }
 
 #[tokio::test]
-async fn insight_community_routes_fail_closed_without_scoped_context() {
+async fn insight_routes_fail_closed_without_scoped_context() {
     let (app, _dir, storage) = make_app_with_storage();
     {
         let storage = storage.write();
@@ -1611,6 +1611,11 @@ async fn insight_community_routes_fail_closed_without_scoped_context() {
         body.get("nodes").is_none(),
         "raw community centroids must not be returned"
     );
+
+    let (status, body) = get_json(&app, "/v1/insight/gaps").await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_eq!(body["error"]["category"], "authorization");
+    assert_eq!(body["error"]["message"], "ACCESS_CONTEXT_REQUIRED");
 
     let (status, body) = post_json(&app, "/v1/insight/rebuild", json!(null)).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);

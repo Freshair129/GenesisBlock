@@ -828,11 +828,7 @@ async fn insight_gaps_handler(State(state): State<AppState>) -> impl IntoRespons
     let storage = state.storage.read();
     match storage.calculate_structural_gaps() {
         Ok(gaps) => (StatusCode::OK, Json(gaps)).into_response(),
-        Err(e) => rest_error_response(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            RestErrorCategory::Integrity,
-            e.to_string(),
-        ),
+        Err(error) => insight_storage_error_response(&storage, error),
     }
 }
 

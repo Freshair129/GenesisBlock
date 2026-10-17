@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- The standalone server now fails closed when bound outside loopback without a
+  non-empty `GENESIS_API_KEY`; this covers the container's default
+  `0.0.0.0` bind. Gossip synchronization now uses operator-configured member
+  identities and enforces MASTER authority at reconciliation ingress.
+- Bound and expire gossip peer and pending-request state, and enforce
+  `AccessPolicy` on unscoped community insight reads.
+
+### Fixed
+
+- Map `/v1/insight/gaps` access-policy failures to the same HTTP 401
+  authorization response used by the other community insight routes.
+- Keep the Studio and mobile Tauri lockfiles synchronized with engine version
+  changes, and include both lockfiles in the version consistency gate.
+
 ### Fixed - Keep node properties aligned through REST recovery
 
 The node-ID allocator now starts at zero when replaying an empty snapshot and
