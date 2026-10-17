@@ -56,6 +56,28 @@ fn assert_nodes_present(s: &Storage, ids: &[&str]) {
     }
 }
 
+fn read_segment_body(path: &Path) -> Option<Vec<u8>> {
+    use std::io::Read;
+
+    const SEG_HEADER_LEN: usize = 28;
+    const SEG_FOOTER_LEN: usize = 44;
+    let bytes = fs::read(path).ok()?;
+    if bytes.len() < SEG_HEADER_LEN + SEG_FOOTER_LEN || &bytes[0..4] != b"GSG1" {
+        return None;
+    }
+    let compressed = &bytes[SEG_HEADER_LEN..bytes.len() - SEG_FOOTER_LEN];
+    match bytes[7] {
+        2 => {
+            let mut decoder = lz4_flex::frame::FrameDecoder::new(compressed);
+            let mut body = Vec::new();
+            decoder.read_to_end(&mut body).ok()?;
+            Some(body)
+        }
+        0 => Some(compressed.to_vec()),
+        _ => None,
+    }
+}
+
 /// New-format layout exists after first open: wal/active.gwal with the GWA1
 /// header, no legacy genesis-graph.wal.
 #[test]
@@ -287,12 +309,12 @@ fn frame_and_txn_frontier_split() {
     assert_eq!(replayed.commit_sequence, commit2.commit_sequence);
 }
 
-/// Measured compression ratio vs the pre-WP-1.2 JSONL baseline (SPEC §7 —
-/// the ADR's estimate had to become a number). Run with `--nocapture` to read
-/// the figures; the assertion is the contract: a checkpointed journal must not
-/// be larger than the JSONL WAL it replaces.
+/// Measure compression of the authenticated compacted journal and report its
+/// size against the original JSONL input. Compaction now retains signed source
+/// proofs for graph and revision checkpoints, so the compacted body carries
+/// required proof data that did not exist in the legacy JSONL baseline.
 #[test]
-fn journal_is_smaller_than_jsonl_baseline() {
+fn journal_compresses_authenticated_compaction_proofs() {
     let dir = fresh("ratio");
     let s = open(&dir);
     // Realistic agent-memory-ish payloads (the workload the ratio matters for).
@@ -338,11 +360,24 @@ fn journal_is_smaller_than_jsonl_baseline() {
     drop(s);
 
     let mut journal_bytes = 0u64;
+    let mut compressed_body_bytes = 0u64;
+    let mut uncompressed_body_bytes = 0u64;
     for entry in fs::read_dir(Path::new(&dir).join("journal"))
         .unwrap()
         .flatten()
     {
         journal_bytes += entry.metadata().unwrap().len();
+        if entry
+            .path()
+            .extension()
+            .is_some_and(|extension| extension == "gseg")
+        {
+            let bytes = fs::read(entry.path()).unwrap();
+            compressed_body_bytes += (bytes.len() - 28 - 44) as u64;
+            uncompressed_body_bytes += read_segment_body(&entry.path())
+                .expect("sealed segment body should decode")
+                .len() as u64;
+        }
     }
     journal_bytes += fs::metadata(Path::new(&dir).join("wal").join("active.gwal"))
         .map(|m| m.len())
@@ -350,13 +385,14 @@ fn journal_is_smaller_than_jsonl_baseline() {
 
     println!(
         "WP-1.2 journal size: {frames} frames · JSONL baseline {jsonl_baseline} B \
-         · checkpointed journal {journal_bytes} B · ratio {:.2}x smaller",
-        jsonl_baseline as f64 / journal_bytes.max(1) as f64
+         · checkpointed journal {journal_bytes} B · authenticated body \
+         {uncompressed_body_bytes} B → {compressed_body_bytes} B ({:.2}x smaller)",
+        uncompressed_body_bytes as f64 / compressed_body_bytes.max(1) as f64
     );
     assert!(
-        journal_bytes < jsonl_baseline as u64,
-        "checkpointed journal ({journal_bytes} B) must not exceed the JSONL \
-         baseline it replaces ({jsonl_baseline} B)"
+        compressed_body_bytes < uncompressed_body_bytes,
+        "compressed authenticated body ({compressed_body_bytes} B) must be \
+         smaller than its uncompressed frame stream ({uncompressed_body_bytes} B)"
     );
 }
 

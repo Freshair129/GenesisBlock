@@ -63,11 +63,16 @@ pub struct BackupBundleInfo {
 pub struct BackupRestoreRequest {
     pub bundle_path: PathBuf,
     pub target_root: PathBuf, // must not exist
+    pub expected_sha256: String, // pinned through a trusted channel
 }
 
 impl Storage {
     pub fn export_backup(&self, request: BackupExportRequest) -> Result<BackupBundleInfo>;
     pub fn restore_backup(request: BackupRestoreRequest) -> Result<BackupBundleInfo>;
+    pub fn restore_backup_with_membership(
+        request: BackupRestoreRequest,
+        membership: PeerMembershipOptions,
+    ) -> Result<BackupBundleInfo>;
 }
 ```
 
@@ -89,6 +94,29 @@ requested destination. It never marks a partial file as a bundle. Archive entry
 paths must be normalized relative paths; absolute paths, `..`, duplicate names,
 symlinks, device paths, and unlisted artifacts are rejected.
 
+Artifact SHA-256 values detect corruption; they do not authenticate who created
+the bundle. Every restore therefore requires `expected_sha256`, the SHA-256 of
+the complete bundle pinned by the caller through a trusted channel (for example,
+the export result stored in authenticated application metadata). Restore first
+hashes the complete bundle before parsing its manifest or creating staging. It
+then rewinds the same open file handle and hashes again while parsing and
+extracting; if the bytes changed between passes, staging is removed and restore
+fails. A bundle that already mismatches the trusted digest causes no artifact
+writes. If another process changes the file during extraction, the second check
+rejects it before recovery or publication and the error path attempts to remove
+staging.
+A digest copied from the same untrusted bundle does not establish trust. Restore
+also verifies the signatures and authorization of every journal event before replay.
+Authorization preflight preserves the fold boundary: source events retained
+before the latest base are checked in frame order, base materializations then
+establish the folded graph state, and later HISTORY or active events are
+checked afterward in frame order.
+`restore_backup` trusts only the database's local identity after the caller has
+authenticated the bundle digest. To restore a database containing events from
+other cluster members, call `restore_backup_with_membership` with the
+operator-pinned roster so the engine can authenticate those events before
+applying them.
+
 ## 4. Coherent capture and restore
 
 The core adds one lifecycle barrier shared by all mutation entry points. Export
@@ -97,9 +125,15 @@ stable frontier/logical clock, and captures WAL, snapshot, SQLite projection,
 graph/vector artifacts, and Genesis-managed blob metadata from that same
 frontier. It then releases the barrier after the bundle is complete or fails.
 
-Restore first validates the whole bundle into a sibling staging directory. It
-does not open the target, mutate a live `Storage`, or create the target until
-manifest, versions, containment, sizes, and every digest pass. The engine then
+Restore reads the complete bundle once to compare its digest with the caller's
+trusted `expected_sha256`, before parsing or writing artifacts. It seeks the
+same open file handle back to the beginning, then extracts into a private
+sibling staging directory while hashing a second pass. A mismatch before
+extraction creates no staging files; a change during extraction is rejected
+before recovery or publication, and the error path attempts to remove staging.
+It does not mutate a live `Storage` or create the target until manifest, versions,
+containment, sizes, internal digests, bundle authentication, journal signatures,
+and authorization checks pass. The engine then
 recovers staging and requires the recovered WAL-frame frontier to equal the
 manifest `stable_frontier`; it rejects a truncated suffix before generation
 publication. It then publishes or reuses a valid generation consistent with
@@ -107,8 +141,8 @@ that frontier, and independently pins/validates it after a read-only reopen. It
 computes the complete `BackupBundleInfo`, including the bundle
 digest, before atomically publishing staging as the non-existing
 `target_root`; after rename succeeds, no further fallible operation may turn
-the API result into an error. A fresh `Storage::open` is the proof that the
-result is usable.
+the API result into an error. The fresh recovery used for validation runs with
+the same membership roster supplied to restore.
 
 Neither export nor restore performs encryption, remote upload, retention, or
 account authorization. Those remain the caller's concerns.
@@ -142,6 +176,8 @@ flowchart LR
    the clean target remains absent.
 4. **Tamper rejection:** a changed artifact, manifest, duplicate path, traversal
    path, or extra archive entry fails before target creation.
+   A bundle whose internal hashes are recomputed still fails when its bytes no
+   longer match the caller-pinned `expected_sha256`.
 5. **Clean-target only:** an existing target and a bundle destination inside the
    live root are rejected without changing either database.
 6. **Interrupted export:** a failing temporary write leaves no completed output

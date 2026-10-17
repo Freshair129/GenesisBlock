@@ -16,6 +16,9 @@ fn test_axiomatic_guards_enforcement() {
         retention: None,
     })
     .expect("Failed to open storage");
+    storage
+        .configure_peer_membership(Vec::new(), "127.0.0.1:31993", false)
+        .unwrap();
 
     // 1. Attempt to create a MASTER node (should fail for external agents)
     let master_res = storage.add_node(NodeInput {
@@ -36,7 +39,7 @@ fn test_axiomatic_guards_enforcement() {
     );
     let err_msg = master_res.unwrap_err().to_string();
     assert!(
-        err_msg.contains("403 Forbidden"),
+        err_msg.contains("GOVERNANCE_AUTH_REQUIRED"),
         "Error should indicate a governance violation"
     );
 

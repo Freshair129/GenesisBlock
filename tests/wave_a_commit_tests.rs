@@ -516,7 +516,7 @@ fn failed_consensus_and_sync_writes_do_not_publish_graph() {
     let proposal = s
         .propose_consensus(Event::Node(proposed.clone()), vec![])
         .unwrap();
-    let signature = s.sign_vote(proposal.clone(), true);
+    let signature = s.sign_vote(proposal.clone(), true).unwrap();
     let peer = s.local_peer_id.clone();
     let before = s.stable_frontier();
     assert!(broken_wal(&mut s, |s| s.submit_vote(proposal, peer, true, signature)).is_err());

@@ -277,7 +277,7 @@ fn transaction_and_consensus_rebind_share_current_and_historical_endpoints() {
     e.to = "A".into();
     e.clock.time += 1;
     let pid = s.propose_consensus(Event::Edge(e), vec![]).unwrap();
-    let sig = s.sign_vote(pid.clone(), true);
+    let sig = s.sign_vote(pid.clone(), true).unwrap();
     assert!(s
         .submit_vote(pid, s.local_peer_id.clone(), true, sig)
         .unwrap());
@@ -293,7 +293,7 @@ fn transaction_and_consensus_rebind_share_current_and_historical_endpoints() {
     stale.to = "D".into();
     stale.clock.time = 0;
     let pid = s.propose_consensus(Event::Edge(stale), vec![]).unwrap();
-    let sig = s.sign_vote(pid.clone(), true);
+    let sig = s.sign_vote(pid.clone(), true).unwrap();
     assert!(s
         .submit_vote(pid, s.local_peer_id.clone(), true, sig)
         .unwrap());
@@ -315,7 +315,7 @@ fn transaction_and_consensus_rebind_share_current_and_historical_endpoints() {
             vec![],
         )
         .unwrap();
-    let sig = s.sign_vote(pid.clone(), true);
+    let sig = s.sign_vote(pid.clone(), true).unwrap();
     assert!(s
         .submit_vote(pid, s.local_peer_id.clone(), true, sig)
         .unwrap());

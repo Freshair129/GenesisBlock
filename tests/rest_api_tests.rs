@@ -1640,10 +1640,37 @@ async fn test_insight_drift_endpoint() {
 #[tokio::test]
 async fn test_consensus_sign_vote_returns_bytes() {
     let (app, _dir) = make_app();
+    let (proposal_status, proposal_id) = post_json(
+        &app,
+        "/v1/consensus/propose",
+        json!({
+            "event": {
+                "Node": {
+                    "id": "sign-vote-probe",
+                    "labels": ["USER"],
+                    "props": {},
+                    "impact": null,
+                    "embedding": null,
+                    "lang": null,
+                    "valid_from": "2026-01-01T00:00:00Z",
+                    "valid_to": null,
+                    "caused_by": null,
+                    "expires_at": null,
+                    "clock": { "time": 0, "peer_id": "test" },
+                    "collection": null
+                }
+            },
+            "signature": []
+        }),
+    )
+    .await;
+    assert_eq!(proposal_status, StatusCode::OK);
+    let proposal_id = proposal_id.as_str().unwrap();
+
     let (status, sig) = post_json(
         &app,
         "/v1/consensus/sign-vote",
-        json!({ "proposal_id": "p1", "approve": true }),
+        json!({ "proposal_id": proposal_id, "approve": true }),
     )
     .await;
     assert_eq!(status, StatusCode::OK);
@@ -1656,6 +1683,27 @@ async fn test_consensus_sign_vote_returns_bytes() {
         !sig.as_array().unwrap().is_empty(),
         "signature must be non-empty"
     );
+
+    let (export_status, exported) = post_json(
+        &app,
+        "/v1/consensus/proposal/export",
+        json!({ "proposal_id": proposal_id }),
+    )
+    .await;
+    assert_eq!(export_status, StatusCode::OK);
+    assert_eq!(exported["proposal_id"], proposal_id);
+    assert_eq!(exported["votes"], json!({}));
+    assert_eq!(exported["quorum_signatures"], json!({}));
+    assert_eq!(exported["committed"], false);
+
+    let (import_status, imported) = post_json(
+        &app,
+        "/v1/consensus/proposal/import",
+        json!({ "proposal": exported }),
+    )
+    .await;
+    assert_eq!(import_status, StatusCode::OK);
+    assert_eq!(imported["imported"], true);
 }
 
 // ---------------------------------------------------------------------------

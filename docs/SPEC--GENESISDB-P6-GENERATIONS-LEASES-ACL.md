@@ -1,9 +1,9 @@
 ---
 doc_id: SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL
 owner: GenesisBlockDB Engineering
-version: 0.5.46b
+version: 0.5.47b
 created_at: "2026-09-22T22:55:00+07:00,ATHER,working-tree"
-last_update: "2026-10-06T02:01:28+07:00,Codex"
+last_update: "2026-10-16T12:00:00+07:00,Codex"
 status: beta
 attributes:
   domain: storage-correctness
@@ -203,7 +203,11 @@ separately captured Storage reference does not inherit ReadView authorization.
 The fail-closed legacy accessors are `get_u32`, `find_fuzzy_id`, `node_view` and `node_view_u32`
 (None), plus `list_collections` and `get_meta_history` (empty). Operational telemetry/frontier and
 capability metadata are outside the record-read ACL. Transport synchronization APIs are also outside
-this read boundary and require a separate peer-authorization contract.
+this read boundary and require a separate peer-authorization contract. The
+current candidate is
+[ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION](adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md).
+The P6 peer-locality addendum covers P6 control events and cursor progress; it
+does not establish peer membership or authorize ordinary transferred events.
 
 Community aggregate reads and rebuilds are also unscoped data operations:
 `insight_communities`, `rebuild_community_insights`, `detect_communities` and
@@ -610,6 +614,11 @@ limitation rather than attributing it to the P6 implementation.
 
 ## CHANGELOG
 
+Version diff 0.5.46b -> 0.5.47b: link the candidate peer-membership
+authorization contract and clarify that P6 cursor-receipt handling does not
+authorize ordinary transferred events. No P6 ACL, lease, schema, or migration
+contract changes.
+
 Version diff 0.5.45b -> 0.5.46b: re-integrate the P6 closeout on mainline `4b78596` while
 preserving the D7/P7 ChangeScan differential and both temporal test lanes. Local Verify on the
 integrated tree passes the exact seven-target P6 acceptance (49/49), focused snapshot/lease/
@@ -783,6 +792,7 @@ broader P6/P8/P13 qualification is claimed.
 
 | Version | Date | Status | Summary | Commit | Agent |
 |---|---|---|---|---|---|
+| 0.5.47b | 2026-10-16 | beta | Link candidate peer-membership authorization contract; clarify P6 cursor-receipt scope does not authorize ordinary sync events; no P6 runtime or schema change | working-tree | Codex |
 | 0.5.46b | 2026-10-06 | beta | Re-integrate onto mainline 4b78596; local Verify P6 49/49, focused snapshot/lease/history 35/35, cargo check/fmt/strict core Clippy/docs/diff pass; Astra Final remains limited to the predecessor slice and was not rerun on this HEAD; hosted checks pending | working-tree | Codex |
 | 0.5.45b | 2026-10-06 | beta | Record Astra 6 Final PASS_WITH_LIMITATIONS for the reviewed local P6 slice; stale-Plan fallback fixture limitation accepted; hosted/cross-platform CI and release/deployment remain NOT_RUN | working-tree | Codex |
 | 0.5.44b | 2026-10-05 | beta | Record corrected-tree independent Verify PASS (P6 49/49, focused 34/34, check/format/docs/diff PASS) and independent broad Review PASS; preserve the bounded stale-Plan fallback fixture limitation; Astra Final pending | working-tree | Codex |

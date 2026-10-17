@@ -17,6 +17,9 @@ fn test_mark_ix_batch_atomicity() {
         retention: None,
     })
     .unwrap();
+    storage
+        .configure_peer_membership(Vec::new(), "127.0.0.1:31992", false)
+        .unwrap();
 
     // 1. Execute a successful batch (1 Node + 1 Edge)
     let batch = BatchInput {

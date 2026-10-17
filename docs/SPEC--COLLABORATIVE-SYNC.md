@@ -10,6 +10,16 @@ Transform GenesisBlockDB from a siloed engine into a **Collaborative Knowledge S
 ## 2. Technical Approach: The Gossip Protocol
 We will implement a lightweight **Gossip Protocol** to handle real-time synchronization.
 
+### Current security status (2026-10-16)
+
+Peer-side Axiomatic Guard validation is enforced at shared reconciliation
+ingress. Signers must be roster members, and `MASTER` changes and retractions
+require `masterAuthority` before WAL or memory changes. The accepted
+[peer-membership authorization ADR](adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md)
+defines signed packets, fixed endpoints, and roster-based quorum. Issues #236
+and #237 have implementation and regression-test coverage; exact-head CI and
+merge evidence remain pending.
+
 ### 2.1 Event Propagation
 - When a `MASTER` or `SPEC` tier node is added, the engine broadcasts a `SyncEvent` to all registered peer addresses.
 - Peers validate the event using their own **Axiomatic Guards** before ingestion.

@@ -276,6 +276,12 @@ fn compaction_drops_history_under_frontier_only() {
 #[test]
 fn meta_v1_gbp1_snapshot_migrates() {
     let path = fresh("e2_v1_migration");
+    fs::create_dir_all(&path).unwrap();
+    fs::write(
+        Path::new(&path).join("state.json"),
+        r#"{"schema_version":4}"#,
+    )
+    .unwrap();
     {
         let s = open_with(&path, "full");
         add_emb(&s, "BIG", 1, vec![1.0, 1.0, 1.0, 1.0]);

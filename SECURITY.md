@@ -32,10 +32,14 @@ release notes unless you prefer to remain anonymous.
 Security-relevant areas of the engine:
 
 - **Governance tiers** — external agents must not be able to create or mutate
-  `MASTER`-tier nodes. Enforcement lives in the engine, not the transport.
-- **Consensus & sync** — `SignedEvent`s are ed25519-signed; the swarm identity
-  keypair is persisted under the database path. Report any signature-bypass or
-  key-handling weakness.
+  `MASTER`-tier nodes. Local direct-write guards live in the engine. Remote
+  reconciliation checks signed membership and `masterAuthority` at the shared
+  ingress boundary. See the accepted peer-membership authorization ADR.
+- **Consensus & sync** — `SignedEvent` values are ed25519-signed and the swarm
+  identity keypair is persisted under the database path. Gossip requires an
+  operator-pinned roster, signed packets, a matching roster digest, and the
+  configured source endpoint. Votes and quorum use only roster members; vote
+  signatures bind to the complete signed event under the proposal ID.
 - **REST surface** (`/v1/*`) — input validation, query handling, and
   authentication boundaries.
 - **Deserialization** — WAL replay and snapshot (`state.json`, `*.bin`) loading.

@@ -1,9 +1,9 @@
 ---
 doc_id: SPEC--GENESISDB-P6-PEER-LOCALITY-ADDENDUM
 owner: GenesisBlockDB Engineering
-version: 0.1.15b
+version: 0.1.16b
 created_at: "2026-09-24T03:25:29+07:00,ATHER,4010702"
-last_update: "2026-10-05T10:35:01+07:00,Codex"
+last_update: "2026-10-16T12:00:00+07:00,Codex"
 status: active
 superseded_by: null
 attributes:
@@ -61,6 +61,14 @@ Decision evidence was reviewed against HEAD 40107027465c246e7f6c8aed3f229772e080
 reviewed src/lib.rs SHA-256 was
 7B3E14911E608938EEA37CD5A8B5048A7E75F89DF69FF4E4FF521E359AF6D4F3. That was the pre-approval
 decision snapshot; implementation evidence is recorded in the RCA and regression gates below.
+
+### Boundary clarification (2026-10-16)
+
+The P6 progress receipt controls remote cursor advancement; it is not blanket
+authorization for event application. Gossip packet authentication, roster
+membership, and `MASTER` role checks are defined separately by the accepted
+[peer-membership authorization ADR](adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md).
+This clarification does not extend the approved P6 scope.
 
 ## Decision and rationale
 
@@ -204,10 +212,11 @@ Machine-checkable commands used for local verification:
     git diff --check
 
 The supplemental compatibility targets were also run: `journal_format_tests` (10/10),
-`journal_migration_tests` (4/4), and `unified_transaction_p5_tests` (4/4). The previous Wave B
-schema warning was stale: the current source defines `SCHEMA_VERSION = 6`, while
-`gossip_rejects_old_schema_before_sending_delta` sends version 3 and expects
-`UpgradeRequired { schema_version: SCHEMA_VERSION }`; these values are consistent.
+`journal_migration_tests` (4/4), and `unified_transaction_p5_tests` (4/4). The
+2026-10-04 compatibility note predates detached MASTER-proof signatures.
+Storage remains at `SCHEMA_VERSION = 6`; gossip negotiation is now
+`GOSSIP_PROTOCOL_VERSION = 7`. The regression test sends a v6 gossip request
+and expects `UpgradeRequired { schema_version: GOSSIP_PROTOCOL_VERSION }`.
 
 ## Local verification status (2026-10-04)
 
@@ -239,6 +248,7 @@ architecture alternatives is required.
 
 | Version | Date | Status | Summary | Commit | Agent |
 |---|---|---|---|---|---|
+| 0.1.16b | 2026-10-16 | active | Clarify that fail-closed cursor receipts do not gate ordinary event application or establish peer membership; link candidate peer authorization ADR; approved P6 scope unchanged | working-tree | Codex |
 | 0.1.15b | 2026-10-05 | active | Record Astra 6 Final PASS_WITH_LIMITATIONS for the reviewed local P6 slice; accept bounded Plan fallback fixture limitation; hosted/cross-platform CI and release/deployment remain NOT_RUN | working-tree | Astra 6 / Codex |
 | 0.1.14b | 2026-10-05 | active | Record corrected-tree independent Verify PASS (P6 49/49, focused 34/34) and broad Review PASS; disclose stale-publication Plan fallback fixture limitation; Astra Final pending; local-only scope unchanged | working-tree | Codex |
 | 0.1.13b | 2026-10-05 | active | Record corrected-tree independent Verify PASS after ACL overflow fix; P6 49/49, focused 34/34, check/fmt/docs/diff pass; independent Review rerun and Astra Final pending | working-tree | Codex |

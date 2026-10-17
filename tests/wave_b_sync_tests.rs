@@ -12,15 +12,18 @@ fn open(p: &std::path::Path) -> Storage {
     .unwrap()
 }
 fn peer(a: &Storage, b: &Storage) {
-    b.peers.insert(
-        a.local_peer_id.clone(),
-        SyncPeer {
-            id: a.local_peer_id.clone(),
-            addr: String::new(),
-            last_seen: 0,
-            verifying_key: a.verifying_key.to_bytes().to_vec(),
-        },
-    );
+    let identity = a.local_identity();
+    b.configure_peer_membership(
+        vec![AuthorizedPeerConfig {
+            peer_id: identity.peer_id,
+            public_key_hex: identity.public_key_hex,
+            gossip_addr: "127.0.0.1:32202".into(),
+            master_authority: false,
+        }],
+        "127.0.0.1:32201",
+        true,
+    )
+    .unwrap();
 }
 #[test]
 fn empty_collection_and_dependent_delta_sync_and_reopen() {
@@ -165,10 +168,42 @@ fn signed_batch_rebind_is_applied_as_one_original_frame() {
 
 #[tokio::test]
 async fn gossip_rejects_old_schema_before_sending_delta() {
-    use std::{sync::Arc, time::Duration};
+    use std::{net::SocketAddr, sync::Arc, time::Duration};
     let dir = tempfile::tempdir().unwrap();
     let s = Arc::new(open(dir.path()));
     let initial_frontier = s.stable_frontier();
+    let peer_dir = tempfile::tempdir().unwrap();
+    let peer_storage = open(peer_dir.path());
+    let peer_socket = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let peer_addr = peer_socket.local_addr().unwrap();
+    let reserve = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let local_addr: SocketAddr = reserve.local_addr().unwrap();
+    drop(reserve);
+    let peer_identity = peer_storage.local_identity();
+    let local_identity = s.local_identity();
+    s.configure_peer_membership(
+        vec![AuthorizedPeerConfig {
+            peer_id: peer_identity.peer_id.clone(),
+            public_key_hex: peer_identity.public_key_hex.clone(),
+            gossip_addr: peer_addr.to_string(),
+            master_authority: false,
+        }],
+        &local_addr.to_string(),
+        true,
+    )
+    .unwrap();
+    peer_storage
+        .configure_peer_membership(
+            vec![AuthorizedPeerConfig {
+                peer_id: local_identity.peer_id,
+                public_key_hex: local_identity.public_key_hex,
+                gossip_addr: local_addr.to_string(),
+                master_authority: true,
+            }],
+            &peer_addr.to_string(),
+            false,
+        )
+        .unwrap();
     Storage::start_gossip_manager(s.clone());
     tokio::time::timeout(Duration::from_secs(3), async {
         while s.gossip_port.load(std::sync::atomic::Ordering::SeqCst) == 0 {
@@ -177,64 +212,125 @@ async fn gossip_rejects_old_schema_before_sending_delta() {
     })
     .await
     .unwrap();
-    let socket = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
-    let addr = format!(
-        "127.0.0.1:{}",
-        s.gossip_port.load(std::sync::atomic::Ordering::SeqCst)
-    );
-    let request = GossipMessage::PullRequest {
-        schema_version: 3,
-        from_clock: 0,
-        target_peer_id: "old".into(),
-        from_commit_seq: Some(0),
-        request_nonce: None,
-    };
-    socket
-        .send_to(&serde_json::to_vec(&request).unwrap(), &addr)
-        .await
-        .unwrap();
     let mut buf = [0u8; 65536];
-    let (len, _) = tokio::time::timeout(Duration::from_secs(3), socket.recv_from(&mut buf))
-        .await
-        .unwrap()
+    let heartbeat = peer_storage
+        .encode_gossip_message(GossipMessage::Heartbeat {
+            schema_version: GOSSIP_PROTOCOL_VERSION,
+            storage_schema_version: 5,
+            peer_id: peer_storage.local_peer_id.clone(),
+            merkle_root: s.get_merkle_root(),
+            logical_time: 0,
+            port: peer_addr.port(),
+            verifying_key: peer_storage.verifying_key.to_bytes().to_vec(),
+        })
         .unwrap();
+    peer_socket.send_to(&heartbeat, local_addr).await.unwrap();
+    let heartbeat_mismatch = tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            let (len, _) = peer_socket.recv_from(&mut buf).await.unwrap();
+            let packet = serde_json::from_slice::<AuthenticatedGossipPacket>(&buf[..len]).unwrap();
+            if matches!(packet.message, GossipMessage::StorageSchemaMismatch { .. }) {
+                break packet.message;
+            }
+        }
+    })
+    .await
+    .unwrap();
     assert!(matches!(
-        serde_json::from_slice::<GossipMessage>(&buf[..len]).unwrap(),
-        GossipMessage::UpgradeRequired {
-            schema_version: SCHEMA_VERSION
+        heartbeat_mismatch,
+        GossipMessage::StorageSchemaMismatch {
+            local_storage_schema_version: SCHEMA_VERSION,
+            peer_storage_schema_version: 5
         }
     ));
-    s.peers.insert(
-        "new".into(),
-        SyncPeer {
-            id: "new".into(),
-            addr: socket.local_addr().unwrap().to_string(),
-            last_seen: 0,
-            verifying_key: vec![],
-        },
+    assert!(
+        s.peers.is_empty(),
+        "schema-incompatible peers are not admitted"
     );
-    let request = GossipMessage::PullRequest {
-        schema_version: SCHEMA_VERSION,
-        from_clock: 0,
-        target_peer_id: "new".into(),
-        from_commit_seq: Some(0),
-        request_nonce: None,
-    };
-    socket
-        .send_to(&serde_json::to_vec(&request).unwrap(), &addr)
-        .await
+
+    let request = peer_storage
+        .encode_gossip_message(GossipMessage::PullRequest {
+            // Peers on the previous wire protocol must negotiate v8 before synchronization.
+            schema_version: GOSSIP_PROTOCOL_VERSION - 1,
+            storage_schema_version: SCHEMA_VERSION,
+            from_clock: 0,
+            target_peer_id: peer_storage.local_peer_id.clone(),
+            from_commit_seq: Some(0),
+            request_nonce: None,
+        })
         .unwrap();
-    let (len, _) = tokio::time::timeout(Duration::from_secs(3), socket.recv_from(&mut buf))
-        .await
-        .unwrap()
-        .unwrap();
+    peer_socket.send_to(&request, local_addr).await.unwrap();
+    let old_schema_response = tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            let (len, _) = peer_socket.recv_from(&mut buf).await.unwrap();
+            let packet = serde_json::from_slice::<AuthenticatedGossipPacket>(&buf[..len]).unwrap();
+            if matches!(packet.message, GossipMessage::UpgradeRequired { .. }) {
+                break packet.message;
+            }
+        }
+    })
+    .await
+    .unwrap();
     assert!(matches!(
-        serde_json::from_slice::<GossipMessage>(&buf[..len]).unwrap(),
-        GossipMessage::PushDelta {
-            through_seq: Some(seq),
-            ..
-        } if seq == initial_frontier
+        old_schema_response,
+        GossipMessage::UpgradeRequired {
+            schema_version: GOSSIP_PROTOCOL_VERSION
+        }
     ));
+    let request = peer_storage
+        .encode_gossip_message(GossipMessage::PullRequest {
+            schema_version: GOSSIP_PROTOCOL_VERSION,
+            storage_schema_version: 5,
+            from_clock: 0,
+            target_peer_id: peer_storage.local_peer_id.clone(),
+            from_commit_seq: Some(0),
+            request_nonce: None,
+        })
+        .unwrap();
+    peer_socket.send_to(&request, local_addr).await.unwrap();
+    let storage_schema_response = tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            let (len, _) = peer_socket.recv_from(&mut buf).await.unwrap();
+            let packet = serde_json::from_slice::<AuthenticatedGossipPacket>(&buf[..len]).unwrap();
+            if matches!(packet.message, GossipMessage::StorageSchemaMismatch { .. }) {
+                break packet.message;
+            }
+        }
+    })
+    .await
+    .unwrap();
+    assert!(matches!(
+        storage_schema_response,
+        GossipMessage::StorageSchemaMismatch {
+            local_storage_schema_version: SCHEMA_VERSION,
+            peer_storage_schema_version: 5
+        }
+    ));
+    let request = peer_storage
+        .encode_gossip_message(GossipMessage::PullRequest {
+            schema_version: GOSSIP_PROTOCOL_VERSION,
+            storage_schema_version: SCHEMA_VERSION,
+            from_clock: 0,
+            target_peer_id: peer_storage.local_peer_id.clone(),
+            from_commit_seq: Some(0),
+            request_nonce: None,
+        })
+        .unwrap();
+    peer_socket.send_to(&request, local_addr).await.unwrap();
+    let delta_response = tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            let (len, _) = peer_socket.recv_from(&mut buf).await.unwrap();
+            let packet = serde_json::from_slice::<AuthenticatedGossipPacket>(&buf[..len]).unwrap();
+            if matches!(packet.message, GossipMessage::PushDelta { .. }) {
+                break packet.message;
+            }
+        }
+    })
+    .await
+    .unwrap();
+    assert!(
+        matches!(delta_response, GossipMessage::PushDelta { through_seq: Some(seq), .. } if seq == initial_frontier)
+    );
     s.add_node(NodeInput {
         id: Some("oversized".into()),
         labels: vec![],
@@ -247,16 +343,28 @@ async fn gossip_rejects_old_schema_before_sending_delta() {
         collection: None,
     })
     .unwrap();
-    socket
-        .send_to(&serde_json::to_vec(&request).unwrap(), &addr)
-        .await
+    let request = peer_storage
+        .encode_gossip_message(GossipMessage::PullRequest {
+            schema_version: GOSSIP_PROTOCOL_VERSION,
+            storage_schema_version: SCHEMA_VERSION,
+            from_clock: 0,
+            target_peer_id: peer_storage.local_peer_id.clone(),
+            from_commit_seq: Some(0),
+            request_nonce: None,
+        })
         .unwrap();
-    let (len, _) = tokio::time::timeout(Duration::from_secs(3), socket.recv_from(&mut buf))
-        .await
-        .unwrap()
-        .unwrap();
-    assert!(
-        matches!(serde_json::from_slice::<GossipMessage>(&buf[..len]).unwrap(),
-        GossipMessage::BootstrapRequired { reason } if reason.contains("SYNC_BOOTSTRAP_REQUIRED"))
-    );
+    peer_socket.send_to(&request, local_addr).await.unwrap();
+    let oversized_response = tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            let (len, _) = peer_socket.recv_from(&mut buf).await.unwrap();
+            let packet = serde_json::from_slice::<AuthenticatedGossipPacket>(&buf[..len]).unwrap();
+            if matches!(packet.message, GossipMessage::BootstrapRequired { .. }) {
+                break packet.message;
+            }
+        }
+    })
+    .await
+    .unwrap();
+    assert!(matches!(oversized_response,
+        GossipMessage::BootstrapRequired { reason } if reason.contains("SYNC_BOOTSTRAP_REQUIRED")));
 }

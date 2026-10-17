@@ -10,7 +10,8 @@ use rand::Rng;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::{self, File, OpenOptions as FileOpenOptions};
-use std::io::{Read, Write};
+use std::io::{Read, Seek, SeekFrom, Write};
+use std::net::SocketAddr;
 // Positioned (offset) reads for the on-disk rerank sidecar. Both are gated by
 // `#[cfg]` so the crate builds on either platform; NEVER mmap (Windows rename /
 // atomic-swap safety — see ADR--GENESISDB-ONDISK-RERANK-SIDECAR).
@@ -41,6 +42,7 @@ const GOSSIP_PEER_TTL_SECS: u32 = 60;
 const GOSSIP_PENDING_SYNC_TTL: Duration = Duration::from_secs(60);
 const GOSSIP_PULL_RETRY_INTERVAL: Duration = Duration::from_secs(1);
 const GOSSIP_STATE_SWEEP_INTERVAL: Duration = Duration::from_secs(15);
+const GOSSIP_PACKET_VERSION: u32 = 1;
 
 #[derive(Clone)]
 struct PendingSyncRequest {
@@ -109,6 +111,10 @@ type Hql2CatalogSnapshotV2 = (
 // v6: durable HQL2 record revisions, row identities and annotation projections.
 pub const SCHEMA_VERSION: u32 = 6;
 const LEGACY_SCHEMA_VERSION: u32 = 5;
+/// Gossip v8 adds authenticated closed peer membership on top of v7's detached
+/// MASTER proofs for compacted SignedEvent signatures. It is independent of the
+/// on-disk schema so older peers fail before sync.
+pub const GOSSIP_PROTOCOL_VERSION: u32 = 8;
 // v3: WP-2.1 node_versions chain (additive CREATE IF NOT EXISTS migration).
 // v4: edges + edges_current view (SPEC--GENESISDB-EDGE-PROJECTION), same
 // additive shape — existing databases gain the table empty and are backfilled
@@ -1211,6 +1217,9 @@ pub struct BackupExportRequest {
 pub struct BackupRestoreRequest {
     pub bundle_path: PathBuf,
     pub target_root: PathBuf,
+    /// SHA-256 of the complete bundle, pinned through a trusted channel by the
+    /// caller. Manifest artifact hashes alone do not authenticate bundle origin.
+    pub expected_sha256: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -1244,6 +1253,35 @@ struct BackupManifest {
     logical_clock: u32,
     created_at: String,
     artifacts: Vec<BackupArtifact>,
+}
+
+struct HashingReader<R> {
+    inner: R,
+    hasher: Sha256,
+    byte_count: u64,
+}
+
+impl<R> HashingReader<R> {
+    fn new(inner: R) -> Self {
+        Self {
+            inner,
+            hasher: Sha256::new(),
+            byte_count: 0,
+        }
+    }
+
+    fn finish(self) -> (u64, String) {
+        (self.byte_count, hex::encode(self.hasher.finalize()))
+    }
+}
+
+impl<R: Read> Read for HashingReader<R> {
+    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        let read = self.inner.read(buffer)?;
+        self.hasher.update(&buffer[..read]);
+        self.byte_count += read as u64;
+        Ok(read)
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -1454,8 +1492,277 @@ pub struct SyncPeer {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SignedEvent {
     pub event: Event,
+    #[serde(with = "signed_event_signature_serde")]
     pub signature: Vec<u8>,
     pub signer_peer_id: String,
+}
+
+/// Compacted protected-state materializations carry the original MASTER-signed
+/// event as an authenticated proof inside the signature bytes. Keeping this out
+/// of `Event` avoids replaying unrelated leaves from a signed Batch/Transaction
+/// while preserving the public `SignedEvent` shape.
+const COMPACTED_MASTER_PROOF_MAGIC: &[u8] = b"GB-COMPACTED-MASTER-PROOF-V1\0";
+const COMPACTED_MASTER_PROOF_V2_MAGIC: &[u8] = b"GB-COMPACTED-MASTER-PROOF-V2\0";
+const COMPACTED_MASTER_PROOF_MAX_BYTES: usize = 1024 * 1024;
+const COMPACTED_BASE_EVENT_MAGIC: &[u8] = b"GB-COMPACTED-BASE-EVENT-V1\0";
+const COMPACTED_BASE_EVENT_V2_MAGIC: &[u8] = b"GB-COMPACTED-BASE-EVENT-V2\0";
+const COMPACTED_BASE_EVENT_MAX_BYTES: usize = 1024 * 1024;
+const COMPACTED_REVISION_CHECKPOINT_MAGIC: &[u8] = b"GB-COMPACTED-REVISION-CHECKPOINT-V1\0";
+const COMPACTED_REVISION_CHECKPOINT_V2_MAGIC: &[u8] = b"GB-COMPACTED-REVISION-CHECKPOINT-V2\0";
+const COMPACTED_REVISION_CHECKPOINT_MAX_BYTES: usize = 1024 * 1024;
+const MAX_GOSSIP_EVENT_JSON_BYTES: usize = 54_000;
+const MAX_GOSSIP_DELTA_JSON_BYTES: usize = 55_000;
+
+fn is_compacted_signature(bytes: &[u8]) -> bool {
+    bytes.starts_with(COMPACTED_MASTER_PROOF_MAGIC)
+        || bytes.starts_with(COMPACTED_MASTER_PROOF_V2_MAGIC)
+        || bytes.starts_with(COMPACTED_BASE_EVENT_MAGIC)
+        || bytes.starts_with(COMPACTED_BASE_EVENT_V2_MAGIC)
+        || bytes.starts_with(COMPACTED_REVISION_CHECKPOINT_MAGIC)
+        || bytes.starts_with(COMPACTED_REVISION_CHECKPOINT_V2_MAGIC)
+}
+
+fn encode_base64(bytes: &[u8]) -> String {
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut encoded = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let first = chunk[0];
+        let second = chunk.get(1).copied();
+        let third = chunk.get(2).copied();
+        encoded.push(TABLE[(first >> 2) as usize] as char);
+        encoded.push(TABLE[(((first & 0x03) << 4) | (second.unwrap_or(0) >> 4)) as usize] as char);
+        encoded.push(match second {
+            Some(second) => {
+                TABLE[(((second & 0x0f) << 2) | (third.unwrap_or(0) >> 6)) as usize] as char
+            }
+            None => '=',
+        });
+        encoded.push(match third {
+            Some(third) => TABLE[(third & 0x3f) as usize] as char,
+            None => '=',
+        });
+    }
+    encoded
+}
+
+fn decode_base64(encoded: &str) -> Option<Vec<u8>> {
+    fn value(byte: u8) -> Option<u8> {
+        match byte {
+            b'A'..=b'Z' => Some(byte - b'A'),
+            b'a'..=b'z' => Some(byte - b'a' + 26),
+            b'0'..=b'9' => Some(byte - b'0' + 52),
+            b'+' => Some(62),
+            b'/' => Some(63),
+            _ => None,
+        }
+    }
+    let input = encoded.as_bytes();
+    let (chunks, remainder) = input.as_chunks::<4>();
+    if !remainder.is_empty() {
+        return None;
+    }
+    let mut decoded = Vec::with_capacity(chunks.len() * 3);
+    for (index, chunk) in chunks.iter().enumerate() {
+        let final_chunk = index + 1 == chunks.len();
+        let a = value(chunk[0])?;
+        let b = value(chunk[1])?;
+        decoded.push((a << 2) | (b >> 4));
+        match (chunk[2], chunk[3]) {
+            (b'=', b'=') if final_chunk && b & 0x0f == 0 => {}
+            (b'=', _) => return None,
+            (c, b'=') if final_chunk => {
+                let c = value(c)?;
+                if c & 0x03 != 0 {
+                    return None;
+                }
+                decoded.push((b << 4) | (c >> 2));
+            }
+            (c, d) => {
+                let c = value(c)?;
+                let d = value(d)?;
+                decoded.push((b << 4) | (c >> 2));
+                decoded.push((c << 6) | d);
+            }
+        }
+        if !final_chunk && chunk[2..].contains(&b'=') {
+            return None;
+        }
+    }
+    Some(decoded)
+}
+
+mod signed_event_signature_serde {
+    use super::{decode_base64, encode_base64, is_compacted_signature};
+    use serde::de::{Error, SeqAccess, Visitor};
+    use serde::{Deserializer, Serialize, Serializer};
+    use std::fmt;
+
+    pub fn serialize<S>(signature: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        if is_compacted_signature(signature) {
+            serializer.serialize_str(&format!("b64:{}", encode_base64(signature)))
+        } else {
+            signature.serialize(serializer)
+        }
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct SignatureVisitor;
+        impl<'de> Visitor<'de> for SignatureVisitor {
+            type Value = Vec<u8>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("a signature byte array or a b64: compacted signature")
+            }
+
+            fn visit_seq<A>(self, mut sequence: A) -> Result<Self::Value, A::Error>
+            where
+                A: SeqAccess<'de>,
+            {
+                let mut bytes = Vec::with_capacity(sequence.size_hint().unwrap_or(0));
+                while let Some(byte) = sequence.next_element::<u8>()? {
+                    bytes.push(byte);
+                }
+                Ok(bytes)
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                let encoded = value
+                    .strip_prefix("b64:")
+                    .ok_or_else(|| E::custom("unsupported signature string encoding"))?;
+                let bytes = decode_base64(encoded)
+                    .ok_or_else(|| E::custom("invalid compacted signature base64"))?;
+                if !is_compacted_signature(&bytes) {
+                    return Err(E::custom("base64 is reserved for compacted signatures"));
+                }
+                Ok(bytes)
+            }
+        }
+        deserializer.deserialize_any(SignatureVisitor)
+    }
+}
+
+fn encode_compacted_envelope<T: Serialize>(
+    magic: &[u8],
+    envelope: &T,
+    max_uncompressed_bytes: usize,
+) -> Result<Vec<u8>> {
+    let json =
+        serde_json::to_vec(envelope).map_err(|error| Error::from_reason(error.to_string()))?;
+    if json.len() > max_uncompressed_bytes {
+        return Err(Error::from_reason("COMPACTION_PROOF_TOO_LARGE"));
+    }
+    let compressed = lz4_flex::compress_prepend_size(&json);
+    if compressed.len() > max_uncompressed_bytes.saturating_add(4) {
+        return Err(Error::from_reason("COMPACTION_PROOF_TOO_LARGE"));
+    }
+    let mut bytes = Vec::with_capacity(magic.len() + compressed.len());
+    bytes.extend_from_slice(magic);
+    bytes.extend_from_slice(&compressed);
+    Ok(bytes)
+}
+
+fn decode_compacted_envelope<T: serde::de::DeserializeOwned>(
+    signature: &[u8],
+    v1_magic: &[u8],
+    v2_magic: &[u8],
+    max_uncompressed_bytes: usize,
+) -> Option<(u32, T)> {
+    let (version, payload) = if let Some(payload) = signature.strip_prefix(v1_magic) {
+        if payload.is_empty() || payload.len() > max_uncompressed_bytes {
+            return None;
+        }
+        (1, payload.to_vec())
+    } else {
+        let compressed = signature.strip_prefix(v2_magic)?;
+        if compressed.len() < 4 || compressed.len() > max_uncompressed_bytes.saturating_add(4) {
+            return None;
+        }
+        let declared_size = u32::from_le_bytes(compressed[..4].try_into().ok()?) as usize;
+        if declared_size == 0 || declared_size > max_uncompressed_bytes {
+            return None;
+        }
+        let payload = lz4_flex::decompress_size_prepended(compressed).ok()?;
+        if payload.len() != declared_size {
+            return None;
+        }
+        (2, payload)
+    };
+    Some((version, serde_json::from_slice(&payload).ok()?))
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct CompactedMasterProofEnvelope {
+    version: u32,
+    proof: SignedEvent,
+    #[serde(default)]
+    revision_proof: Option<SignedEvent>,
+    relay_signature: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct CompactedBaseEventEnvelope {
+    version: u32,
+    proof: SignedEvent,
+    relay_signature: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct CompactedRevisionCheckpointEnvelope {
+    version: u32,
+    proof: SignedEvent,
+    relay_signature: Vec<u8>,
+}
+
+#[derive(Clone)]
+struct CompactedRowRevisionState {
+    row_id: String,
+    revision_id: String,
+    valid_from: DateTime<Utc>,
+    after_image: serde_json::Map<String, Value>,
+}
+
+type CompactedRowRevisionKey = (String, String, Vec<u8>);
+type CompactedRelationalRowRevisionState =
+    HashMap<CompactedRowRevisionKey, CompactedRowRevisionState>;
+
+struct CompactedRowRevisionExpectation<'a> {
+    schema: &'a RelationalSchemaPackage,
+    table: &'a str,
+    key_bytes: &'a [u8],
+    operation: uee_v2::RevisionOperationV1,
+    row_id: Option<&'a str>,
+    expected_revision_id: Option<&'a str>,
+    predecessor_revision_id: Option<&'a str>,
+    payload: &'a Value,
+}
+
+#[derive(Default)]
+struct CompactedBaseMaterializationProofs {
+    nodes: HashMap<String, SignedEvent>,
+    edges: HashMap<String, SignedEvent>,
+    vectors: HashMap<String, SignedEvent>,
+}
+
+#[derive(Default)]
+struct CompactedMasterAuthorityProofs {
+    master_nodes: HashMap<String, SignedEvent>,
+    user_nodes: HashMap<String, (NodeOutput, SignedEvent)>,
+    retractions: HashMap<String, SignedEvent>,
+    master_vectors: HashMap<(String, String), SignedEvent>,
+}
+
+enum CompactedMasterIdentityAction {
+    Node(Box<NodeOutput>, Box<SignedEvent>),
+    Retraction(NodeRetractionEvent),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -1474,6 +1781,8 @@ pub enum GossipMessage {
     Heartbeat {
         #[serde(default)]
         schema_version: u32,
+        #[serde(default)]
+        storage_schema_version: u32,
         peer_id: String,
         merkle_root: String,
         logical_time: u32,
@@ -1483,6 +1792,8 @@ pub enum GossipMessage {
     PullRequest {
         #[serde(default)]
         schema_version: u32,
+        #[serde(default)]
+        storage_schema_version: u32,
         from_clock: u32,
         target_peer_id: String,
         /// WP-1.2 (ADR D4): commit_seq/segment cursor alongside the Lamport
@@ -1507,6 +1818,10 @@ pub enum GossipMessage {
     UpgradeRequired {
         schema_version: u32,
     },
+    StorageSchemaMismatch {
+        local_storage_schema_version: u32,
+        peer_storage_schema_version: u32,
+    },
     BootstrapRequired {
         reason: String,
     },
@@ -1527,6 +1842,79 @@ pub enum GossipMessage {
         approve: bool,
         signature: Vec<u8>,
     },
+}
+
+/// Operator-pinned identity and endpoint for one remote cluster member.
+/// `public_key_hex` is the 32-byte Ed25519 verifying key; `peer_id` must be its
+/// first 16 lowercase hex characters after SHA-256. Discovery never creates
+/// membership entries.
+#[cfg_attr(feature = "napi-bindings", napi(object))]
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct AuthorizedPeerConfig {
+    pub peer_id: String,
+    pub public_key_hex: String,
+    pub gossip_addr: String,
+    pub master_authority: bool,
+}
+
+/// Configuration for the closed gossip membership roster. Every member in a
+/// cluster must configure the same peer IDs, keys, and roles.
+#[cfg_attr(feature = "napi-bindings", napi(object))]
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct PeerMembershipOptions {
+    /// Local UDP bind address, for example `0.0.0.0:30001`.
+    pub local_gossip_addr: String,
+    /// Omit only for single-node mode. Multi-node mode must set this explicitly.
+    pub local_master_authority: Option<bool>,
+    pub peers: Vec<AuthorizedPeerConfig>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AuthenticatedGossipPacket {
+    pub version: u32,
+    pub source_peer_id: String,
+    pub roster_digest: String,
+    pub message: GossipMessage,
+    pub signature: Vec<u8>,
+}
+
+#[cfg_attr(feature = "napi-bindings", napi(object))]
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct PeerIdentity {
+    pub peer_id: String,
+    pub public_key_hex: String,
+}
+
+#[derive(Clone)]
+struct AuthorizedMember {
+    verifying_key: VerifyingKey,
+    gossip_addr: SocketAddr,
+    master_authority: bool,
+}
+
+#[derive(Clone, Default)]
+struct BatchMasterAuthState {
+    node_clock: Option<LogicalClock>,
+    node_is_master: bool,
+    tombstone_clock: Option<LogicalClock>,
+}
+
+#[derive(Clone, Copy)]
+struct CompactedVectorSource<'a> {
+    owner_id: &'a str,
+    collection: &'a str,
+    embedding: &'a [f64],
+    lang: Option<&'a str>,
+    clock: &'a LogicalClock,
+}
+
+struct ReconcileAuthorityContext<'a> {
+    signer_peer_id: &'a str,
+    forwarded_master_proof: Option<&'a SignedEvent>,
+    collection_definitions: Option<&'a HashMap<String, CollectionDefinition>>,
+    protected_vector_owners: &'a HashSet<String>,
+    states: &'a mut HashMap<String, BatchMasterAuthState>,
+    seed_from_live_state: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -1884,6 +2272,428 @@ fn canonical_event_bytes(event: &Event) -> serde_json::Result<Vec<u8>> {
         }
     }
     serde_json::to_vec(event)
+}
+
+fn compacted_master_proof_payload(
+    relay_peer_id: &str,
+    event: &Event,
+    proof: &SignedEvent,
+    revision_proof: Option<&SignedEvent>,
+    envelope_version: u32,
+) -> serde_json::Result<Vec<u8>> {
+    let event_bytes = canonical_event_bytes(event)?;
+    let proof_event_bytes = canonical_event_bytes(&proof.event)?;
+    let mut payload = match envelope_version {
+        1 => b"genesis-block/compacted-master-state/v1\0".to_vec(),
+        2 => b"genesis-block/compacted-master-state/v2\0".to_vec(),
+        _ => {
+            return Err(<serde_json::Error as serde::ser::Error>::custom(
+                "unsupported compacted master proof version",
+            ))
+        }
+    };
+    let revision_proof_json = revision_proof.map(serde_json::to_vec).transpose()?;
+    let parts: Vec<&[u8]> = if envelope_version == 1 {
+        vec![
+            relay_peer_id.as_bytes(),
+            event_bytes.as_slice(),
+            proof.signer_peer_id.as_bytes(),
+            proof_event_bytes.as_slice(),
+            proof.signature.as_slice(),
+        ]
+    } else {
+        let revision_bytes = revision_proof_json.as_deref().unwrap_or_default();
+        vec![
+            relay_peer_id.as_bytes(),
+            event_bytes.as_slice(),
+            proof.signer_peer_id.as_bytes(),
+            proof_event_bytes.as_slice(),
+            proof.signature.as_slice(),
+            revision_bytes,
+        ]
+    };
+    for part in parts {
+        payload.extend_from_slice(&(part.len() as u64).to_le_bytes());
+        payload.extend_from_slice(part);
+    }
+    Ok(payload)
+}
+
+fn compacted_base_event_payload(
+    relay_peer_id: &str,
+    event: &Event,
+    proof: &SignedEvent,
+    envelope_version: u32,
+) -> serde_json::Result<Vec<u8>> {
+    let event_bytes = canonical_event_bytes(event)?;
+    let proof_bytes = serde_json::to_vec(proof)?;
+    let version_bytes = envelope_version.to_le_bytes();
+    let mut payload = match envelope_version {
+        1 => b"genesis-block/compacted-base-event/v1\0".to_vec(),
+        2 => b"genesis-block/compacted-base-event/v2\0".to_vec(),
+        _ => {
+            return Err(<serde_json::Error as serde::ser::Error>::custom(
+                "unsupported compacted base proof version",
+            ))
+        }
+    };
+    let parts: Vec<&[u8]> = if envelope_version == 1 {
+        vec![
+            relay_peer_id.as_bytes(),
+            event_bytes.as_slice(),
+            proof_bytes.as_slice(),
+        ]
+    } else {
+        vec![
+            relay_peer_id.as_bytes(),
+            event_bytes.as_slice(),
+            proof_bytes.as_slice(),
+            &version_bytes,
+        ]
+    };
+    for part in parts {
+        payload.extend_from_slice(&(part.len() as u64).to_le_bytes());
+        payload.extend_from_slice(part);
+    }
+    Ok(payload)
+}
+
+fn compacted_revision_checkpoint_payload(
+    relay_peer_id: &str,
+    event: &Event,
+    proof: &SignedEvent,
+    envelope_version: u32,
+) -> serde_json::Result<Vec<u8>> {
+    let Event::Transaction(transaction) = event else {
+        return Err(<serde_json::Error as serde::ser::Error>::custom(
+            "revision checkpoint must be a transaction",
+        ));
+    };
+    let frame_seq = transaction.local_frame_seq.ok_or_else(|| {
+        <serde_json::Error as serde::ser::Error>::custom(
+            "revision checkpoint must include its local frame sequence",
+        )
+    })?;
+    let event_bytes = canonical_event_bytes(event)?;
+    let proof_bytes = serde_json::to_vec(proof)?;
+    let version_bytes = envelope_version.to_le_bytes();
+    let frame_seq_bytes = frame_seq.to_le_bytes();
+    let mut payload = match envelope_version {
+        1 => b"genesis-block/compacted-revision-checkpoint/v1\0".to_vec(),
+        2 => b"genesis-block/compacted-revision-checkpoint/v2\0".to_vec(),
+        _ => {
+            return Err(<serde_json::Error as serde::ser::Error>::custom(
+                "unsupported compacted revision checkpoint version",
+            ))
+        }
+    };
+    for part in [
+        relay_peer_id.as_bytes(),
+        event_bytes.as_slice(),
+        proof_bytes.as_slice(),
+        frame_seq_bytes.as_slice(),
+        &version_bytes,
+    ] {
+        payload.extend_from_slice(&(part.len() as u64).to_le_bytes());
+        payload.extend_from_slice(part);
+    }
+    Ok(payload)
+}
+
+fn node_projection_matches_proof(target: &NodeOutput, source: &NodeOutput) -> bool {
+    if target.id != source.id
+        || Storage::labels_are_master(&target.labels) != Storage::labels_are_master(&source.labels)
+        || source.clock != target.clock
+    {
+        return false;
+    }
+    // A detached MASTER signature can authorize only the exact signed
+    // projection. In particular, a historical USER transition must not be
+    // reused to authorize a relay-selected payload or larger clock.
+    if target
+        .embedding
+        .as_ref()
+        .is_some_and(|embedding| source.embedding.as_ref() != Some(embedding))
+    {
+        return false;
+    }
+    let mut target = target.clone();
+    let mut source = source.clone();
+    target.embedding = None;
+    source.embedding = None;
+    serde_json::to_vec(&target).ok() == serde_json::to_vec(&source).ok()
+}
+
+fn node_base_projection_matches_proof(target: &NodeOutput, source: &NodeOutput) -> bool {
+    let mut target = target.clone();
+    let mut source = source.clone();
+    target.embedding = None;
+    source.embedding = None;
+    target.impact = None;
+    source.impact = None;
+    serde_json::to_vec(&target).ok() == serde_json::to_vec(&source).ok()
+}
+
+fn find_base_proof_node(event: &Event, target: &NodeOutput) -> Option<NodeOutput> {
+    match effective_proof_identity(event, &target.id) {
+        Some(ProofIdentityState::Node(node))
+            if node_base_projection_matches_proof(target, &node) =>
+        {
+            Some(*node)
+        }
+        _ => None,
+    }
+}
+
+#[derive(Clone)]
+enum ProofIdentityState {
+    Node(Box<NodeOutput>),
+    Retraction(NodeRetractionEvent),
+}
+
+fn apply_proof_event_for_identity(event: &Event, id: &str, state: &mut Option<ProofIdentityState>) {
+    match event {
+        Event::Node(node) if node.id == id => {
+            let wins_over_node = match state {
+                Some(ProofIdentityState::Node(current)) => current.clock <= node.clock,
+                Some(ProofIdentityState::Retraction(_)) | None => true,
+            };
+            let wins_over_tombstone = match state {
+                Some(ProofIdentityState::Retraction(current)) => current.clock < node.clock,
+                _ => true,
+            };
+            if wins_over_node && wins_over_tombstone {
+                *state = Some(ProofIdentityState::Node(Box::new(node.clone())));
+            }
+        }
+        Event::NodeRetract {
+            id: retracted_id,
+            clock,
+            retracted_at,
+        } if retracted_id == id => {
+            let wins = match state {
+                Some(ProofIdentityState::Node(current)) => current.clock <= *clock,
+                Some(ProofIdentityState::Retraction(current)) => current.clock < *clock,
+                None => true,
+            };
+            if wins {
+                *state = Some(ProofIdentityState::Retraction(NodeRetractionEvent {
+                    id: id.to_string(),
+                    clock: clock.clone(),
+                    retracted_at: retracted_at.clone(),
+                }));
+            }
+        }
+        Event::Batch(events) => {
+            for nested in events {
+                apply_proof_event_for_identity(nested, id, state);
+            }
+        }
+        Event::Transaction(transaction) => {
+            // Transaction application replaces nodes in payload order, then
+            // applies retractions. Retractions therefore win for duplicate IDs
+            // even when their logical clock is lower than the node's clock.
+            for node in &transaction.nodes {
+                if node.id == id {
+                    *state = Some(ProofIdentityState::Node(Box::new(node.clone())));
+                }
+            }
+            for retraction in &transaction.node_retractions {
+                if retraction.id == id {
+                    *state = Some(ProofIdentityState::Retraction(retraction.clone()));
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+fn effective_proof_identity(event: &Event, id: &str) -> Option<ProofIdentityState> {
+    let mut state = None;
+    apply_proof_event_for_identity(event, id, &mut state);
+    state
+}
+
+fn find_proof_node(event: &Event, target: &NodeOutput) -> Option<NodeOutput> {
+    match effective_proof_identity(event, &target.id) {
+        Some(ProofIdentityState::Node(node)) if node_projection_matches_proof(target, &node) => {
+            Some(*node)
+        }
+        _ => None,
+    }
+}
+
+fn find_proof_retraction(
+    event: &Event,
+    id: &str,
+    clock: &LogicalClock,
+    retracted_at: &str,
+) -> bool {
+    matches!(
+        effective_proof_identity(event, id),
+        Some(ProofIdentityState::Retraction(ref retraction))
+            if &retraction.clock == clock && retraction.retracted_at == retracted_at
+    )
+}
+
+#[cfg(test)]
+mod compacted_master_proof_effective_state_tests {
+    use super::*;
+
+    fn node(id: &str, clock: LogicalClock) -> NodeOutput {
+        NodeOutput {
+            id: id.to_string(),
+            labels: vec!["MASTER".to_string()],
+            props: serde_json::json!({"value": "signed"}),
+            impact: None,
+            embedding: None,
+            lang: None,
+            valid_from: "2026-10-16T00:00:00Z".to_string(),
+            valid_to: None,
+            caused_by: None,
+            expires_at: None,
+            clock,
+            collection: None,
+        }
+    }
+
+    fn transaction(node: NodeOutput, retraction: NodeRetractionEvent) -> Event {
+        Event::Transaction(GenesisTransactionEvent {
+            transaction_id: "effective-proof-state".to_string(),
+            origin_commit_seq: 0,
+            local_frame_seq: None,
+            payload_hash: String::new(),
+            relational: Vec::new(),
+            nodes: vec![node],
+            edges: Vec::new(),
+            vectors: Vec::new(),
+            node_retractions: vec![retraction],
+            advances_txn_frontier: false,
+            record_revision_transaction: None,
+        })
+    }
+
+    #[test]
+    fn transaction_retraction_invalidates_same_identity_node_proof() {
+        let clock = LogicalClock {
+            time: 7,
+            peer_id: "master-peer".to_string(),
+        };
+        let proof_node = node("transaction-retracted-master", clock.clone());
+        let retraction = NodeRetractionEvent {
+            id: proof_node.id.clone(),
+            clock: clock.clone(),
+            retracted_at: "2026-10-16T00:00:01Z".to_string(),
+        };
+        let proof = transaction(proof_node.clone(), retraction.clone());
+
+        assert!(find_proof_node(&proof, &proof_node).is_none());
+        assert!(find_proof_retraction(
+            &proof,
+            &retraction.id,
+            &retraction.clock,
+            &retraction.retracted_at,
+        ));
+    }
+
+    #[test]
+    fn batch_proof_uses_lww_and_retraction_tie_breaking() {
+        let id = "batch-proof-lww";
+        let node_clock = LogicalClock {
+            time: 9,
+            peer_id: "peer-a".to_string(),
+        };
+        let retraction_clock = LogicalClock {
+            time: 9,
+            peer_id: "peer-b".to_string(),
+        };
+        let master_node = node(id, node_clock.clone());
+        let retraction = NodeRetractionEvent {
+            id: id.to_string(),
+            clock: retraction_clock.clone(),
+            retracted_at: "2026-10-16T00:00:02Z".to_string(),
+        };
+        let tied = Event::Batch(vec![
+            Event::Node(master_node.clone()),
+            Event::NodeRetract {
+                id: id.to_string(),
+                clock: retraction_clock.clone(),
+                retracted_at: retraction.retracted_at.clone(),
+            },
+        ]);
+        assert!(find_proof_node(&tied, &master_node).is_none());
+        assert!(find_proof_retraction(
+            &tied,
+            id,
+            &retraction.clock,
+            &retraction.retracted_at,
+        ));
+
+        let mut later_node = master_node.clone();
+        later_node.clock.time = 10;
+        let node_wins = Event::Batch(vec![
+            Event::NodeRetract {
+                id: id.to_string(),
+                clock: retraction_clock.clone(),
+                retracted_at: retraction.retracted_at.clone(),
+            },
+            Event::Node(later_node.clone()),
+        ]);
+        assert!(find_proof_node(&node_wins, &later_node).is_some());
+        assert!(!find_proof_retraction(
+            &node_wins,
+            id,
+            &retraction.clock,
+            &retraction.retracted_at,
+        ));
+    }
+
+    #[test]
+    fn historical_user_proof_cannot_authorize_changed_payload_or_higher_clock() {
+        let proof_clock = LogicalClock {
+            time: 10,
+            peer_id: "master-peer".to_string(),
+        };
+        let mut proof_node = node("declassified-node", proof_clock);
+        proof_node.labels = vec!["USER".to_string()];
+        let proof = Event::Node(proof_node.clone());
+
+        let mut forged_higher_clock = proof_node.clone();
+        forged_higher_clock.clock.time = 100;
+        forged_higher_clock.props = serde_json::json!({"value": "relay-selected"});
+        assert!(find_proof_node(&proof, &forged_higher_clock).is_none());
+
+        let mut forged_same_clock_payload = proof_node.clone();
+        forged_same_clock_payload.props = serde_json::json!({"value": "relay-selected"});
+        assert!(find_proof_node(&proof, &forged_same_clock_payload).is_none());
+
+        // The proof remains usable for its exact signed materialization.
+        assert!(find_proof_node(&proof, &proof_node).is_some());
+    }
+
+    #[test]
+    fn node_proof_rejects_relay_selected_embedding() {
+        let clock = LogicalClock {
+            time: 7,
+            peer_id: "master-peer".to_string(),
+        };
+        let mut proof_node = node("embedding-proof", clock);
+        proof_node.embedding = Some(vec![0.25, 0.75]);
+
+        let mut altered_projection = proof_node.clone();
+        altered_projection.embedding = Some(vec![0.75, 0.25]);
+        assert!(!node_projection_matches_proof(
+            &altered_projection,
+            &proof_node
+        ));
+
+        let mut separated_vector_projection = proof_node.clone();
+        separated_vector_projection.embedding = None;
+        assert!(node_projection_matches_proof(
+            &separated_vector_projection,
+            &proof_node
+        ));
+    }
 }
 
 fn canonical_sync_progress_receipt_bytes(
@@ -2389,6 +3199,33 @@ pub struct ConsensusProposal {
     #[serde(default)]
     pub committed: bool,
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+struct ConsensusVoteLock {
+    proposal_id: String,
+    peer_id: String,
+    roster_digest: String,
+    proposal_digest: String,
+    approve: bool,
+    signature: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+struct ConsensusCommitReceipt {
+    proposal_id: String,
+    proposal_digest: String,
+    committed: bool,
+}
+
+// Consensus history cannot be pruned safely: old proposal envelopes and signed
+// ballots can be replayed. Bound both the append-only ledgers and fail closed at
+// the cap instead of allowing unbounded disk use or startup allocation.
+const MAX_CONSENSUS_LEDGER_BYTES: u64 = 64 * 1024 * 1024;
+const MAX_CONSENSUS_LEDGER_RECORDS: usize = 100_000;
+const MAX_CONSENSUS_LEDGER_RECORD_BYTES: usize = 4096;
+const MAX_CONSENSUS_PROPOSALS: usize = 1024;
+const MAX_CONSENSUS_PROPOSAL_EVENT_BYTES: usize = 48 * 1024;
+const CONSENSUS_PROPOSAL_IDLE_TTL: Duration = Duration::from_secs(10 * 60);
 
 #[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -3771,6 +4608,14 @@ const SEG_KIND_HISTORY: u8 = 1;
 const SEG_KIND_BASE: u8 = 2;
 const SEG_KIND_LEGACY_JSONL: u8 = 3;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum JournalEventOrigin {
+    Legacy,
+    History,
+    Base,
+    Active,
+}
+
 const CODEC_NONE: u8 = 0;
 // 1 was zstd — dropped in this same PR (SPEC §8): zstd-sys's vendored C
 // fails to link for aarch64-apple-ios ("Undefined symbols... ___chkstk_darwin",
@@ -4066,8 +4911,24 @@ pub struct Storage {
     /// re-creates it (`insert_node_lean`).
     pub tombstones: DashMap<String, NodeTombstone>,
     pub lang_centroids: DashMap<String, Vec<f32>>,
+    /// Live endpoint cache only. It is never a source of membership or keys;
+    /// those come from `authorized_members`.
     pub peers: DashMap<String, SyncPeer>,
+    authorized_members: DashMap<String, AuthorizedMember>,
+    membership_digest: RwLock<String>,
+    local_master_authority: AtomicBool,
+    peer_membership_configured: AtomicBool,
+    gossip_bind_addr: RwLock<SocketAddr>,
+    gossip_manager_started: AtomicBool,
     pub proposals: DashMap<String, ConsensusProposal>,
+    proposal_activity: DashMap<String, Instant>,
+    consensus_vote_locks: DashMap<(String, String, String), ConsensusVoteLock>,
+    consensus_vote_log_path: PathBuf,
+    consensus_vote_ledger_poisoned: AtomicBool,
+    consensus_commit_receipts: DashMap<String, ConsensusCommitReceipt>,
+    consensus_commit_log_path: PathBuf,
+    consensus_commit_ledger_records: AtomicUsize,
+    consensus_commit_ledger_poisoned: AtomicBool,
     pub meta_nodes: DashMap<u32, SuperNode>,
     pub meta_edges: DashMap<String, MetaEdge>,
     pub meta_history: DashMap<u32, Vec<SuperNode>>,
@@ -4098,6 +4959,13 @@ pub struct Storage {
 struct ProjectionCandidate {
     path: PathBuf,
     connection: Option<Connection>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SnapshotLoadOutcome {
+    NotLoaded,
+    Loaded,
+    LoadedProjectionNeedsRebuild,
 }
 
 impl Drop for ProjectionCandidate {
@@ -6788,6 +7656,79 @@ impl Storage {
         Ok(Some(revisions))
     }
 
+    /// A completed schema-5 to schema-6 migration establishes an authenticated
+    /// baseline for existing projection rows, but the original schema-5 WAL
+    /// frames cannot carry schema-6 revision records. During compaction, issue a
+    /// local, revision-bound attestation for exactly one migrated graph
+    /// projection so the compacted state remains verifiable by schema-6 peers.
+    fn schema6_migration_revision_proof_for(&self, event: &Event) -> Result<Option<SignedEvent>> {
+        let migration_active = self
+            .schema6_activation
+            .read()
+            .as_ref()
+            .is_some_and(|activation| activation.migration.is_some());
+        if self.storage_schema_version != SCHEMA_VERSION || !migration_active {
+            return Ok(None);
+        }
+
+        let (nodes, edges, node_retractions, vectors) = match event {
+            Event::Node(node) => (vec![node.clone()], Vec::new(), Vec::new(), Vec::new()),
+            Event::Edge(edge) => (Vec::new(), vec![edge.clone()], Vec::new(), Vec::new()),
+            Event::VectorMaterialized(vector) => {
+                (Vec::new(), Vec::new(), Vec::new(), vec![vector.clone()])
+            }
+            Event::NodeRetract {
+                id,
+                clock,
+                retracted_at,
+            } => (
+                Vec::new(),
+                Vec::new(),
+                vec![NodeRetractionEvent {
+                    id: id.clone(),
+                    clock: clock.clone(),
+                    retracted_at: retracted_at.clone(),
+                }],
+                Vec::new(),
+            ),
+            _ => return Ok(None),
+        };
+
+        let record_revision_transaction = self.build_record_revision_transaction(
+            &nodes,
+            &edges,
+            &node_retractions,
+            &[],
+            &vectors,
+        )?;
+        let payload_hash = hex::encode(Sha256::digest(
+            serde_json::to_vec(&(&nodes, &edges, &node_retractions, &vectors))
+                .map_err(|error| Error::from_reason(error.to_string()))?,
+        ));
+        let transaction = GenesisTransactionEvent {
+            transaction_id: Uuid::new_v4().to_string(),
+            origin_commit_seq: 0,
+            local_frame_seq: None,
+            payload_hash,
+            relational: Vec::new(),
+            nodes,
+            edges,
+            vectors,
+            node_retractions,
+            advances_txn_frontier: false,
+            record_revision_transaction,
+        };
+        let proof_event = Event::Transaction(transaction);
+        if !Self::revision_transaction_binds_graph(&proof_event)
+            || !self.compacted_base_proof_matches_event(event, &proof_event)
+        {
+            return Err(Error::from_reason(
+                "COMPACTION_MIGRATION_BASELINE_PROOF_INVALID",
+            ));
+        }
+        Ok(Some(self.sign_event(&proof_event)))
+    }
+
     fn persist_local_graph_mutations(
         &self,
         nodes: &[NodeOutput],
@@ -8322,6 +9263,7 @@ impl Storage {
         if !exists {
             return Err(Error::from_reason(format!("node '{}' not found", node_id)));
         }
+        self.validate_local_node_mutation(Some(&node_id), &[])?;
         let lang = "en".to_string();
         let coll = Some(collection);
         // Validate the dim BEFORE the WAL write so a bad vector never persists;
@@ -11552,7 +12494,12 @@ impl Storage {
     /// Apply one journal event to the SQLite projection. `frame_seq` is the
     /// event's LOCAL frame stamp (WP-1.2) — the authoritative sequence for
     /// transaction identity and the frontier keys.
-    fn projection_apply_event(&self, event: &Event, frame_seq: u64) -> Result<()> {
+    fn projection_apply_event(
+        &self,
+        event: &Event,
+        frame_seq: u64,
+        allow_revision_checkpoint: bool,
+    ) -> Result<()> {
         if self.read_only {
             return Ok(());
         }
@@ -11697,13 +12644,7 @@ impl Storage {
                 tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
             }
             Event::Transaction(transaction) => {
-                let revision_checkpoint = transaction.local_frame_seq.is_some()
-                    && transaction.relational.is_empty()
-                    && transaction.nodes.is_empty()
-                    && transaction.edges.is_empty()
-                    && transaction.vectors.is_empty()
-                    && transaction.node_retractions.is_empty();
-                if self.storage_schema_version == SCHEMA_VERSION && !revision_checkpoint {
+                if self.storage_schema_version == SCHEMA_VERSION && !allow_revision_checkpoint {
                     self.validate_graph_revision_binding(transaction)?;
                 }
                 // Identity = (transaction_id, payload_hash). The origin sequence
@@ -11789,13 +12730,7 @@ impl Storage {
                         "UPGRADE_REQUIRED: schema 6 requires revision-bound relational transactions",
                     ));
                 }
-                let revision_checkpoint = transaction.local_frame_seq.is_some()
-                    && transaction.relational.is_empty()
-                    && transaction.nodes.is_empty()
-                    && transaction.edges.is_empty()
-                    && transaction.vectors.is_empty()
-                    && transaction.node_retractions.is_empty();
-                if !revision_checkpoint {
+                if !allow_revision_checkpoint {
                     Self::validate_row_revision_binding(
                         &tx,
                         &expected_row_revisions,
@@ -12064,6 +12999,46 @@ impl Storage {
         Ok(())
     }
 
+    fn projection_journal_has_any_events(&self) -> bool {
+        // This is only a negative guard: finding an event does not prove that
+        // the journal is complete. The rebuild path still performs its normal
+        // replay checks before publishing the candidate.
+        let mut found_event = false;
+        self.scan_journal(None, true, &mut |_, _| found_event = true);
+        found_event
+    }
+
+    fn snapshot_has_recovery_material(&self) -> bool {
+        let state_path = self.path.join("state.json");
+        let state_has_snapshot_fields = fs::read(&state_path)
+            .ok()
+            .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+            .and_then(|state| state.as_object().cloned())
+            .is_none_or(|state| state.keys().any(|key| key != "schema_version"));
+        if state_has_snapshot_fields {
+            return true;
+        }
+
+        let Ok(entries) = fs::read_dir(&self.path) else {
+            return true;
+        };
+        entries.flatten().any(|entry| {
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            let is_native_component = matches!(
+                name.as_ref(),
+                "nodes.bin" | "edges.bin" | "edges_retired.bin" | "vector.bin" | "meta.bin"
+            ) || ["vec_", "meta_", "fvec_", "bqmean_", "sq8scale_"]
+                .iter()
+                .any(|prefix| name.starts_with(prefix));
+            is_native_component
+                && entry
+                    .metadata()
+                    .ok()
+                    .is_none_or(|metadata| metadata.len() > 0)
+        })
+    }
+
     fn projection_sync_candidate(
         &self,
         candidate: &mut ProjectionCandidate,
@@ -12231,8 +13206,33 @@ impl Storage {
             if first_err.is_some() {
                 return;
             }
+            let revision_checkpoint = match &signed_event.event {
+                Event::Transaction(transaction) if Self::is_revision_checkpoint(transaction) => {
+                    self.storage_schema_version != SCHEMA_VERSION
+                        || self.verify_compacted_revision_checkpoint(&signed_event)
+                        || (!self.peer_membership_configured.load(Ordering::SeqCst)
+                            && self.compacted_revision_checkpoint_well_formed(&signed_event))
+                        || (signed_event.signer_peer_id == self.local_peer_id
+                            && self.verify_raw_event_signature(&signed_event))
+                }
+                _ => false,
+            };
+            if self.storage_schema_version == SCHEMA_VERSION
+                && matches!(
+                    &signed_event.event,
+                    Event::Transaction(transaction)
+                        if Self::is_revision_checkpoint(transaction)
+                            && transaction.record_revision_transaction.is_some()
+                )
+                && !revision_checkpoint
+            {
+                first_err = Some(Error::from_reason(
+                    "REVISION_CHECKPOINT_PROOF_REQUIRED: journal checkpoint has no verified source event",
+                ));
+                return;
+            }
             let mut apply = |event: Event| {
-                if let Err(e) = self.projection_apply_event(&event, seq) {
+                if let Err(e) = self.projection_apply_event(&event, seq, revision_checkpoint) {
                     first_err = Some(e);
                 }
             };
@@ -12276,11 +13276,25 @@ impl Storage {
         Ok(())
     }
 
-    fn projection_sync_on_open(&self) -> Result<()> {
+    fn projection_sync_on_open(&self, force_rebuild: bool) -> Result<()> {
         if self.read_only {
+            if force_rebuild {
+                return Err(Error::from_reason(
+                    "RECOVERY_REQUIRED: rejected snapshot requires a writable open to rebuild the projection",
+                ));
+            }
             return Ok(());
         }
         let journal_fingerprint = self.projection_journal_fingerprint()?;
+        if force_rebuild {
+            return self
+                .projection_rebuild_fresh_candidate(&journal_fingerprint, None)
+                .map_err(|error| {
+                    Error::from_reason(format!(
+                        "RECOVERY_REQUIRED: rejected or unverifiable snapshot projection rebuild failed: {error}"
+                    ))
+                });
+        }
         if self.projection_journal_fingerprint_matches(&journal_fingerprint) {
             return Ok(());
         }
@@ -13392,7 +14406,7 @@ impl Storage {
         Ok(events)
     }
 
-    fn transaction_checkpoint_events(&self) -> Result<Vec<Event>> {
+    fn transaction_checkpoint_events(&self) -> Result<Vec<SignedEvent>> {
         let conn = self.projection_db.lock();
         let query = if self.storage_schema_version == SCHEMA_VERSION {
             "SELECT a.transaction_id, a.commit_sequence, a.payload_hash, a.frame_seq, a.advances_txn_frontier, r.revision_json
@@ -13420,6 +14434,9 @@ impl Storage {
             .map_err(|e| Error::from_reason(e.to_string()))?
             .collect::<std::result::Result<Vec<_>, _>>()
             .map_err(|e| Error::from_reason(e.to_string()))?;
+        drop(statement);
+        drop(conn);
+
         let events = rows
             .into_iter()
             .map(
@@ -13453,7 +14470,82 @@ impl Storage {
                 },
             )
             .collect::<Result<Vec<_>>>()?;
-        Ok(events)
+
+        let mut source_events: HashMap<(String, String), Vec<SignedEvent>> = HashMap::new();
+        self.scan_journal(None, true, &mut |_, signed_event| {
+            let source = if let Some(proof) =
+                self.compacted_revision_checkpoint_source_proof(&signed_event)
+            {
+                Some(proof)
+            } else if !is_compacted_signature(&signed_event.signature)
+                && self.verify_raw_event_signature(&signed_event)
+            {
+                Some(signed_event.clone())
+            } else {
+                None
+            };
+            let Some(source) = source else {
+                return;
+            };
+            let identity = match &source.event {
+                Event::Transaction(transaction)
+                    if transaction.local_frame_seq.is_none()
+                        && transaction.record_revision_transaction.is_some() =>
+                {
+                    Some((
+                        transaction.transaction_id.clone(),
+                        transaction.payload_hash.clone(),
+                    ))
+                }
+                Event::RelationalRows {
+                    mutation_id,
+                    payload_hash,
+                    record_revision_transaction: Some(_),
+                    ..
+                } if !mutation_id.is_empty() => {
+                    Some((format!("relational:{mutation_id}"), payload_hash.clone()))
+                }
+                _ => None,
+            };
+            if let Some(identity) = identity {
+                source_events.entry(identity).or_default().push(source);
+            }
+        });
+
+        events
+            .into_iter()
+            .map(|event| {
+                let Event::Transaction(checkpoint) = &event else {
+                    unreachable!("transaction checkpoint query only emits transactions")
+                };
+                if self.storage_schema_version == SCHEMA_VERSION
+                    && checkpoint.record_revision_transaction.is_some()
+                {
+                    let identity = (
+                        checkpoint.transaction_id.clone(),
+                        checkpoint.payload_hash.clone(),
+                    );
+                    let proof = source_events
+                        .get(&identity)
+                        .and_then(|candidates| {
+                            candidates.iter().find(|candidate| {
+                                Self::revision_checkpoint_matches_source(
+                                    checkpoint,
+                                    &candidate.event,
+                                )
+                            })
+                        })
+                        .ok_or_else(|| {
+                            Error::from_reason(
+                                "COMPACTION_REVISION_CHECKPOINT_PROOF_MISSING: no signed source event binds the stored revision history",
+                            )
+                        })?;
+                    self.sign_compacted_revision_checkpoint(&event, proof)
+                } else {
+                    Ok(self.sign_event(&event))
+                }
+            })
+            .collect()
     }
 
     fn hydrated_props(&self, node_u32: u32, node: &NodeOutput) -> Value {
@@ -13503,7 +14595,17 @@ impl Storage {
     }
 
     pub fn open(opts: OpenOptions) -> Result<Self> {
-        Self::open_internal(opts, None)
+        Self::open_internal(opts, None, None, false)
+    }
+
+    /// Open a database with the operator-pinned membership roster available
+    /// during journal recovery. This is required when recovering events from
+    /// other cluster members.
+    pub fn open_with_membership(
+        opts: OpenOptions,
+        membership: PeerMembershipOptions,
+    ) -> Result<Self> {
+        Self::open_internal(opts, None, Some(membership), false)
     }
 
     fn open_schema6_migration(
@@ -13511,10 +14613,15 @@ impl Storage {
         migration_id: String,
         manifest_sha256: String,
     ) -> Result<Self> {
-        Self::open_internal(opts, Some((migration_id, manifest_sha256)))
+        Self::open_internal(opts, Some((migration_id, manifest_sha256)), None, false)
     }
 
-    fn open_internal(opts: OpenOptions, migration_token: Option<(String, String)>) -> Result<Self> {
+    fn open_internal(
+        opts: OpenOptions,
+        migration_token: Option<(String, String)>,
+        membership: Option<PeerMembershipOptions>,
+        authenticate_journal_before_replay: bool,
+    ) -> Result<Self> {
         let root = PathBuf::from(opts.path.clone());
         let root_was_missing = !root.exists();
         let fresh_database = root_was_missing
@@ -13958,6 +15065,24 @@ impl Storage {
             )),
         );
 
+        let consensus_vote_log_path = root.join("consensus-votes.jsonl");
+        let consensus_vote_locks = DashMap::new();
+        for lock in Self::load_consensus_vote_locks(&consensus_vote_log_path, !read_only)? {
+            let key = (
+                lock.proposal_id.clone(),
+                lock.roster_digest.clone(),
+                lock.peer_id.clone(),
+            );
+            consensus_vote_locks.insert(key, lock);
+        }
+        let consensus_commit_log_path = root.join("consensus-commits.jsonl");
+        let consensus_commit_receipts = DashMap::new();
+        let (commit_receipts, commit_ledger_records) =
+            Self::load_consensus_commit_receipts(&consensus_commit_log_path, !read_only)?;
+        for receipt in commit_receipts {
+            consensus_commit_receipts.insert(receipt.proposal_id.clone(), receipt);
+        }
+
         let storage = Self {
             path: root,
             read_only,
@@ -13997,7 +15122,21 @@ impl Storage {
             tombstones: DashMap::new(),
             lang_centroids: DashMap::new(),
             peers: DashMap::new(),
+            authorized_members: DashMap::new(),
+            membership_digest: RwLock::new(String::new()),
+            local_master_authority: AtomicBool::new(true),
+            peer_membership_configured: AtomicBool::new(false),
+            gossip_bind_addr: RwLock::new(SocketAddr::from(([0, 0, 0, 0], 0))),
+            gossip_manager_started: AtomicBool::new(false),
             proposals: DashMap::new(),
+            proposal_activity: DashMap::new(),
+            consensus_vote_locks,
+            consensus_vote_log_path,
+            consensus_vote_ledger_poisoned: AtomicBool::new(false),
+            consensus_commit_receipts,
+            consensus_commit_log_path,
+            consensus_commit_ledger_records: AtomicUsize::new(commit_ledger_records),
+            consensus_commit_ledger_poisoned: AtomicBool::new(false),
             meta_nodes: DashMap::new(),
             meta_edges: DashMap::new(),
             meta_history: DashMap::new(),
@@ -14018,6 +15157,23 @@ impl Storage {
             signing_key,
             verifying_key,
         };
+
+        if let Some(membership) = membership {
+            let local_master_authority = match membership.local_master_authority {
+                Some(role) => role,
+                None if membership.peers.is_empty() => true,
+                None => {
+                    return Err(Error::from_reason(
+                        "PEER_MEMBERSHIP_INVALID: localMasterAuthority must be set when peers are configured",
+                    ));
+                }
+            };
+            storage.configure_peer_membership(
+                membership.peers,
+                &membership.local_gossip_addr,
+                local_master_authority,
+            )?;
+        }
 
         // --- Recovery (ADR--GENESISDB-JOURNAL-HISTORY D5): snapshot@frontier +
         // replay journal frames > frontier. The frame stamps make the cursor
@@ -14071,8 +15227,15 @@ impl Storage {
             let sidecar_tail = journal_frontier
                 .is_some_and(|f| f < initial_next_seq.saturating_sub(1))
                 && recovery_definitions.iter().any(|d| d.rerank);
-            let mut snapshot_loaded =
-                !snapshot_stale_vs_fold && !sidecar_tail && storage.try_load_state();
+            let snapshot_outcome = if !snapshot_stale_vs_fold && !sidecar_tail {
+                storage.try_load_state()
+            } else {
+                SnapshotLoadOutcome::NotLoaded
+            };
+            let mut snapshot_loaded = matches!(
+                snapshot_outcome,
+                SnapshotLoadOutcome::Loaded | SnapshotLoadOutcome::LoadedProjectionNeedsRebuild
+            );
             if !snapshot_loaded
                 || storage.collections.iter().any(|c| {
                     let meta = c.metadata.read();
@@ -14123,6 +15286,9 @@ impl Storage {
             for d in &recovery_definitions {
                 storage.apply_collection_definition(d)?;
             }
+            if authenticate_journal_before_replay {
+                storage.preflight_backup_journal_authorization()?;
+            }
             match (snapshot_loaded, journal_frontier) {
                 // Framed snapshot: replay only frames past the seq frontier.
                 (true, Some(frontier)) => storage.replay_journal(Some(frontier), false),
@@ -14142,12 +15308,32 @@ impl Storage {
                 // the recovery source.
                 (false, _) => storage.replay_journal(None, true),
             }
+            // Resolve a WAL-to-receipt crash gap before any later open-time
+            // checkpoint can fold the original signed event into a projection.
+            if !read_only {
+                storage.recover_pending_consensus_commits()?;
+            }
             // Rebuild the HNSW index for BOTH load paths: journal replay and the
             // instant snapshot load (try_load_state populates the vector/metadata
             // arenas but never rehydrates HNSW, leaving semantic search broken
             // until a manual rebuild).
             storage.rehydrate_hnsw_index();
-            storage.projection_sync_on_open()?;
+            // The projection is trusted only when the whole snapshot loaded and
+            // its P6 projection digest was verified. A rejected/skipped snapshot
+            // (or a legacy snapshot without that digest) must not let an unchanged
+            // journal fingerprint hide a stale projection.
+            let projection_snapshot_untrusted = storage.path.join("state.json").exists()
+                && (!snapshot_loaded || snapshot_outcome != SnapshotLoadOutcome::Loaded);
+            if projection_snapshot_untrusted
+                && !snapshot_loaded
+                && !storage.projection_journal_has_any_events()
+                && storage.snapshot_has_recovery_material()
+            {
+                return Err(Error::from_reason(
+                    "RECOVERY_REQUIRED: rejected snapshot could not be loaded and no journal events are available",
+                ));
+            }
+            storage.projection_sync_on_open(projection_snapshot_untrusted)?;
             storage.ensure_readable()?;
             let state_has_migration = fs::read(storage.path.join("state.json"))
                 .ok()
@@ -14297,6 +15483,41 @@ impl Storage {
         }
     }
 
+    fn is_revision_checkpoint(transaction: &GenesisTransactionEvent) -> bool {
+        transaction.local_frame_seq.is_some()
+            && transaction.relational.is_empty()
+            && transaction.nodes.is_empty()
+            && transaction.edges.is_empty()
+            && transaction.vectors.is_empty()
+            && transaction.node_retractions.is_empty()
+    }
+
+    fn validate_consensus_schema_event(&self, event: &Event) -> Result<()> {
+        if self.storage_schema_version != SCHEMA_VERSION {
+            return Ok(());
+        }
+        match event {
+            Event::Node(_)
+            | Event::Edge(_)
+            | Event::Vector(_)
+            | Event::VectorMaterialized(_)
+            | Event::NodeRetract { .. }
+            | Event::Batch(_) => Err(Error::from_reason(
+                "UPGRADE_REQUIRED: schema 6 consensus requires revision-bearing graph events",
+            )),
+            Event::Transaction(transaction) => {
+                if Self::is_revision_checkpoint(transaction) {
+                    return Err(Error::from_reason(
+                        "CONSENSUS_REVISION_CHECKPOINT_UNSUPPORTED",
+                    ));
+                }
+                self.preflight_relational_event(event)
+            }
+            Event::RelationalRows { .. } => self.preflight_relational_event(event),
+            _ => Ok(()),
+        }
+    }
+
     fn validate_graph_revision_binding(&self, transaction: &GenesisTransactionEvent) -> Result<()> {
         let graph_mutation_count =
             transaction.nodes.len() + transaction.edges.len() + transaction.node_retractions.len();
@@ -14443,7 +15664,53 @@ impl Storage {
     }
 
     fn preflight_relational_event(&self, event: &Event) -> Result<()> {
+        self.preflight_relational_event_with_verified_compaction(event, false, false)
+    }
+
+    fn preflight_signed_relational_event(&self, signed_event: &SignedEvent) -> Result<()> {
+        let verified_compaction = self.is_compacted_graph_materialization(signed_event);
+        let verified_revision_checkpoint = self.verify_compacted_revision_checkpoint(signed_event);
         if self.storage_schema_version == SCHEMA_VERSION
+            && matches!(
+                &signed_event.event,
+                Event::Transaction(transaction)
+                    if Self::is_revision_checkpoint(transaction)
+                        && transaction.record_revision_transaction.is_some()
+            )
+            && !verified_revision_checkpoint
+        {
+            return Err(Error::from_reason(
+                "REVISION_CHECKPOINT_PROOF_REQUIRED: schema 6 checkpoint requires a verified source event",
+            ));
+        }
+        self.preflight_relational_event_with_verified_compaction(
+            &signed_event.event,
+            verified_compaction,
+            verified_revision_checkpoint,
+        )
+    }
+
+    fn preflight_relational_event_with_verified_compaction(
+        &self,
+        event: &Event,
+        verified_compaction: bool,
+        verified_revision_checkpoint: bool,
+    ) -> Result<()> {
+        if self.storage_schema_version == SCHEMA_VERSION
+            && matches!(
+                event,
+                Event::Transaction(transaction)
+                    if Self::is_revision_checkpoint(transaction)
+                        && transaction.record_revision_transaction.is_some()
+            )
+            && !verified_revision_checkpoint
+        {
+            return Err(Error::from_reason(
+                "REVISION_CHECKPOINT_PROOF_REQUIRED: schema 6 checkpoint requires a verified source event",
+            ));
+        }
+        if self.storage_schema_version == SCHEMA_VERSION
+            && !verified_compaction
             && Self::graph_event_requires_revision_envelope(event)
         {
             return Err(Error::from_reason(
@@ -14516,24 +15783,47 @@ impl Storage {
         let Event::Transaction(transaction) = event else {
             return Ok(());
         };
-        if self.storage_schema_version == SCHEMA_VERSION {
+        if self.storage_schema_version == SCHEMA_VERSION && !verified_revision_checkpoint {
             self.validate_graph_revision_binding(transaction)?;
         }
         let mut conn = self.projection_db.lock();
-        let existing: Option<String> = conn
-            .query_row(
-                "SELECT payload_hash FROM applied_transactions WHERE transaction_id = ?1",
-                [&transaction.transaction_id],
-                |row| row.get(0),
-            )
+        if self.storage_schema_version == SCHEMA_VERSION {
+            if let Some(revisions) = transaction.record_revision_transaction.as_ref() {
+                revisions
+                    .validate()
+                    .map_err(|error| Error::from_reason(error.to_string()))?;
+            }
+        }
+        let existing_query = if self.storage_schema_version == SCHEMA_VERSION {
+            "SELECT a.payload_hash, r.revision_json
+             FROM applied_transactions a
+             LEFT JOIN hql2_transaction_revisions r ON r.transaction_id=a.transaction_id
+             WHERE a.transaction_id = ?1"
+        } else {
+            "SELECT payload_hash, NULL FROM applied_transactions WHERE transaction_id = ?1"
+        };
+        let existing: Option<(String, Option<String>)> = conn
+            .query_row(existing_query, [&transaction.transaction_id], |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })
             .optional()
             .map_err(|e| Error::from_reason(e.to_string()))?;
-        if let Some(hash) = existing {
-            return if hash == transaction.payload_hash {
-                Ok(())
-            } else {
-                Err(Error::from_reason("transaction identity conflict"))
-            };
+        if let Some((hash, revision_json)) = existing {
+            if hash != transaction.payload_hash {
+                return Err(Error::from_reason("transaction identity conflict"));
+            }
+            if self.storage_schema_version == SCHEMA_VERSION {
+                let incoming_revision_json = transaction
+                    .record_revision_transaction
+                    .as_ref()
+                    .map(serde_json::to_string)
+                    .transpose()
+                    .map_err(|error| Error::from_reason(error.to_string()))?;
+                if incoming_revision_json != revision_json {
+                    return Err(Error::from_reason("transaction identity conflict"));
+                }
+            }
+            return Ok(());
         }
         match (
             self.storage_schema_version == SCHEMA_VERSION,
@@ -14579,12 +15869,14 @@ impl Storage {
                 "UPGRADE_REQUIRED: schema 6 requires revision-bound relational transactions",
             ));
         }
-        Self::validate_row_revision_binding(
-            &tx,
-            &expected_row_revisions,
-            transaction.record_revision_transaction.as_ref(),
-            &self.database_id(),
-        )?;
+        if !verified_revision_checkpoint {
+            Self::validate_row_revision_binding(
+                &tx,
+                &expected_row_revisions,
+                transaction.record_revision_transaction.as_ref(),
+                &self.database_id(),
+            )?;
+        }
         tx.rollback()
             .map_err(|e| Error::from_reason(e.to_string()))?;
         Ok(())
@@ -14595,7 +15887,7 @@ impl Storage {
     /// `reconcile_state`, and `compact` all write through this so the format is
     /// uniform and every reader (`try_load_state` replay, `events_since`) can
     /// parse it back.
-    fn sign_event(&self, event: &Event) -> SignedEvent {
+    pub fn sign_event(&self, event: &Event) -> SignedEvent {
         let event_data = canonical_event_bytes(event).unwrap_or_default();
         let signature = self.signing_key.sign(&event_data).to_bytes().to_vec();
         SignedEvent {
@@ -14603,6 +15895,190 @@ impl Storage {
             signature,
             signer_peer_id: self.local_peer_id.clone(),
         }
+    }
+
+    fn sign_compacted_master_materialization(
+        &self,
+        event: &Event,
+        proof: &SignedEvent,
+        revision_proof: Option<&SignedEvent>,
+    ) -> Result<SignedEvent> {
+        if !self.verify_raw_event_signature(proof)
+            || !self.authorized_master(&proof.signer_peer_id)
+            || !self.compacted_proof_matches_event(event, &proof.event)
+        {
+            return Err(Error::from_reason(
+                "COMPACTION_MASTER_AUTHORITY_PROOF_INVALID: source proof does not authorize materialization",
+            ));
+        }
+        let revision_proof = if self.storage_schema_version == SCHEMA_VERSION {
+            let candidate = match revision_proof {
+                Some(proof) => proof.clone(),
+                None if Self::revision_transaction_binds_graph(&proof.event)
+                    && self.compacted_base_proof_matches_event(event, &proof.event) =>
+                {
+                    proof.clone()
+                }
+                None => self
+                    .schema6_migration_revision_proof_for(event)?
+                    .ok_or_else(|| {
+                        Error::from_reason("COMPACTION_MASTER_REVISION_PROOF_MISSING")
+                    })?,
+            };
+            if !self.verify_raw_event_signature(&candidate)
+                || !Self::revision_transaction_binds_graph(&candidate.event)
+                || !self.compacted_base_proof_matches_event(event, &candidate.event)
+            {
+                return Err(Error::from_reason(
+                    "COMPACTION_MASTER_AUTHORITY_PROOF_INVALID: schema-6 revision proof does not bind materialization",
+                ));
+            }
+            Some(candidate)
+        } else {
+            None
+        };
+        let payload = compacted_master_proof_payload(
+            &self.local_peer_id,
+            event,
+            proof,
+            revision_proof.as_ref(),
+            2,
+        )
+        .map_err(|error| Error::from_reason(error.to_string()))?;
+        let relay_signature = self.signing_key.sign(&payload).to_bytes().to_vec();
+        let envelope = CompactedMasterProofEnvelope {
+            version: 2,
+            proof: proof.clone(),
+            revision_proof,
+            relay_signature,
+        };
+        let signature = encode_compacted_envelope(
+            COMPACTED_MASTER_PROOF_V2_MAGIC,
+            &envelope,
+            COMPACTED_MASTER_PROOF_MAX_BYTES,
+        )
+        .map_err(|_| Error::from_reason("COMPACTION_MASTER_AUTHORITY_PROOF_TOO_LARGE"))?;
+        // A compacted proof is stored in the local journal, not sent as one
+        // gossip datagram. Its envelope has its own hard bound above; transport
+        // size limits are enforced when a peer requests events_since().
+        let signed = SignedEvent {
+            event: event.clone(),
+            signature,
+            signer_peer_id: self.local_peer_id.clone(),
+        };
+        Ok(signed)
+    }
+
+    fn sign_compacted_base_materialization(
+        &self,
+        event: &Event,
+        proof: Option<&SignedEvent>,
+    ) -> Result<SignedEvent> {
+        if !matches!(
+            event,
+            Event::Node(_) | Event::Edge(_) | Event::VectorMaterialized(_)
+        ) {
+            return Err(Error::from_reason(
+                "COMPACTION_BASE_EVENT_INVALID: event is not a compactable graph projection",
+            ));
+        }
+        let Some(proof) = proof else {
+            if self.storage_schema_version != SCHEMA_VERSION {
+                return Ok(self.sign_event(event));
+            }
+            let proof = self
+                .schema6_migration_revision_proof_for(event)?
+                .ok_or_else(|| {
+                    Error::from_reason(
+                        "COMPACTION_BASE_EVENT_PROOF_MISSING: no revision-bound source event",
+                    )
+                })?;
+            return self.sign_compacted_base_materialization(event, Some(&proof));
+        };
+        if !self.verify_raw_event_signature(proof) {
+            return Err(Error::from_reason(
+                "COMPACTION_BASE_EVENT_PROOF_INVALID: source signature is invalid",
+            ));
+        }
+        if !Self::revision_transaction_binds_graph(&proof.event) {
+            return Err(Error::from_reason(
+                "COMPACTION_BASE_EVENT_PROOF_INVALID: source transaction has no valid revision binding",
+            ));
+        }
+        if !self.compacted_base_proof_matches_event(event, &proof.event) {
+            let target = match event {
+                Event::Node(node) => format!("Node {}", node.id),
+                Event::Edge(edge) => format!("Edge {}", edge.id),
+                Event::VectorMaterialized(vector) => {
+                    format!(
+                        "VectorMaterialized {} / {:?}",
+                        vector.node_id, vector.collection
+                    )
+                }
+                _ => "unsupported graph event".to_string(),
+            };
+            return Err(Error::from_reason(format!(
+                "COMPACTION_BASE_EVENT_PROOF_INVALID: source event does not bind {target}"
+            )));
+        }
+        let payload = compacted_base_event_payload(&self.local_peer_id, event, proof, 2)
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let relay_signature = self.signing_key.sign(&payload).to_bytes().to_vec();
+        let envelope = CompactedBaseEventEnvelope {
+            version: 2,
+            proof: proof.clone(),
+            relay_signature,
+        };
+        let signature = encode_compacted_envelope(
+            COMPACTED_BASE_EVENT_V2_MAGIC,
+            &envelope,
+            COMPACTED_BASE_EVENT_MAX_BYTES,
+        )?;
+        let signed = SignedEvent {
+            event: event.clone(),
+            signature,
+            signer_peer_id: self.local_peer_id.clone(),
+        };
+        Ok(signed)
+    }
+
+    fn sign_compacted_revision_checkpoint(
+        &self,
+        event: &Event,
+        proof: &SignedEvent,
+    ) -> Result<SignedEvent> {
+        let Event::Transaction(checkpoint) = event else {
+            return Err(Error::from_reason(
+                "COMPACTION_REVISION_CHECKPOINT_INVALID: expected a transaction",
+            ));
+        };
+        if !self.verify_raw_event_signature(proof)
+            || is_compacted_signature(&proof.signature)
+            || !Self::revision_checkpoint_matches_source(checkpoint, &proof.event)
+        {
+            return Err(Error::from_reason(
+                "COMPACTION_REVISION_CHECKPOINT_PROOF_INVALID: source event does not bind checkpoint",
+            ));
+        }
+        let payload = compacted_revision_checkpoint_payload(&self.local_peer_id, event, proof, 2)
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let relay_signature = self.signing_key.sign(&payload).to_bytes().to_vec();
+        let envelope = CompactedRevisionCheckpointEnvelope {
+            version: 2,
+            proof: proof.clone(),
+            relay_signature,
+        };
+        let signature = encode_compacted_envelope(
+            COMPACTED_REVISION_CHECKPOINT_V2_MAGIC,
+            &envelope,
+            COMPACTED_REVISION_CHECKPOINT_MAX_BYTES,
+        )?;
+        let signed = SignedEvent {
+            event: event.clone(),
+            signature,
+            signer_peer_id: self.local_peer_id.clone(),
+        };
+        Ok(signed)
     }
 
     /// Append + fsync one event; returns the stamped frame `commit_seq`
@@ -14630,10 +16106,17 @@ impl Storage {
         if Self::contains_p6_control_event(event) {
             return Err(Error::from_reason("P6_LOCAL_ONLY"));
         }
+        if self.event_requires_master_authority(event)
+            && !self.local_master_authority.load(Ordering::SeqCst)
+        {
+            return Err(Error::from_reason(
+                "GOVERNANCE_AUTH_REQUIRED: local peer lacks MASTER authority",
+            ));
+        }
         self.preflight_collection_event(event)?;
         self.preflight_relational_event(event)?;
         let seq = self.append_wal_event(event)?;
-        self.projection_apply_event(event, seq)
+        self.projection_apply_event(event, seq, false)
             .map_err(|e| self.durable_apply_error(seq, e))?;
         Ok(seq)
     }
@@ -15003,7 +16486,7 @@ impl Storage {
             }
         }
         for node in &input.graph.nodes {
-            self.validate_governance(&node.labels, false)
+            self.validate_local_node_mutation(node.id.as_deref(), &node.labels)
                 .map_err(|error| {
                     api_error::ApiErrorEnvelopeV1::new(
                         api_error::ApiErrorCategory::Authorization,
@@ -15318,6 +16801,26 @@ impl Storage {
         Ok(())
     }
 
+    fn promote_consensus_nodes_to_master(event: &mut Event) {
+        match event {
+            Event::Node(node) => {
+                if !node
+                    .labels
+                    .iter()
+                    .any(|label| label.eq_ignore_ascii_case("MASTER"))
+                {
+                    node.labels.push("MASTER".to_string());
+                }
+            }
+            Event::Batch(events) => {
+                for nested in events {
+                    Self::promote_consensus_nodes_to_master(nested);
+                }
+            }
+            _ => {}
+        }
+    }
+
     fn revisionize_consensus_event(&self, event: Event) -> Result<Event> {
         if self.storage_schema_version != SCHEMA_VERSION {
             return Ok(event);
@@ -15445,21 +16948,33 @@ impl Storage {
         }
         let _commit_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        let mut event = event;
+        // Consensus-created graph axioms are MASTER state. Promote before
+        // signing so the persisted payload is exactly the one voters approved.
+        Self::promote_consensus_nodes_to_master(&mut event);
         let event = self.revisionize_consensus_event(event)?;
+        self.validate_consensus_schema_event(&event)?;
+        if self.event_requires_master_authority(&event)
+            && !self.local_master_authority.load(Ordering::SeqCst)
+        {
+            return Err(Error::from_reason(
+                "GOVERNANCE_AUTH_REQUIRED: local peer lacks MASTER authority",
+            ));
+        }
+        Self::validate_consensus_proposal_event(&event)?;
         if !self.semantic_verify(&event)? {
             return Err(Error::from_reason(
                 "proposal rejected by semantic_verify (conflicts with a governing axiom)",
             ));
         }
+        self.prune_expired_consensus_proposals();
+        if self.proposals.len() >= MAX_CONSENSUS_PROPOSALS {
+            return Err(Error::from_reason(format!(
+                "CONSENSUS_PROPOSAL_LIMIT: at most {MAX_CONSENSUS_PROPOSALS} active proposals are retained"
+            )));
+        }
         let proposal_id = Uuid::new_v4().to_string();
-        let event_data =
-            canonical_event_bytes(&event).map_err(|e| Error::from_reason(e.to_string()))?;
-        let signature = self.signing_key.sign(&event_data).to_bytes().to_vec();
-        let signed_event = SignedEvent {
-            event,
-            signature,
-            signer_peer_id: self.local_peer_id.clone(),
-        };
+        let signed_event = self.sign_event(&event);
         let proposal = ConsensusProposal {
             proposal_id: proposal_id.clone(),
             signed_event,
@@ -15468,26 +16983,895 @@ impl Storage {
             committed: false,
         };
         self.proposals.insert(proposal_id.clone(), proposal);
+        self.touch_consensus_proposal(&proposal_id);
         Ok(proposal_id)
     }
 
-    /// Canonical bytes a peer signs to cast a vote. Binding the proposal id,
-    /// voter id, and the approve/reject choice prevents replaying a vote onto a
-    /// different proposal or flipping its decision.
-    fn vote_payload(proposal_id: &str, voter_peer_id: &str, approve: bool) -> Vec<u8> {
-        format!("VOTE|{}|{}|{}", proposal_id, voter_peer_id, approve).into_bytes()
+    /// Digest the complete signed proposal so a vote cannot be replayed for a
+    /// different event under a reused proposal ID.
+    fn consensus_proposal_digest(signed_event: &SignedEvent) -> Result<[u8; 32]> {
+        let event_data = canonical_event_bytes(&signed_event.event)
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        let signer = signed_event.signer_peer_id.as_bytes();
+        let mut digest = Sha256::new();
+        digest.update(b"GENESIS-CONSENSUS-PROPOSAL-V1\0");
+        digest.update((event_data.len() as u64).to_be_bytes());
+        digest.update(event_data);
+        digest.update((signer.len() as u64).to_be_bytes());
+        digest.update(signer);
+        digest.update((signed_event.signature.len() as u64).to_be_bytes());
+        digest.update(&signed_event.signature);
+        Ok(digest.finalize().into())
+    }
+
+    fn validate_consensus_proposal_event(event: &Event) -> Result<()> {
+        let serialized_len = canonical_event_bytes(event)
+            .map_err(|error| Error::from_reason(error.to_string()))?
+            .len();
+        if serialized_len > MAX_CONSENSUS_PROPOSAL_EVENT_BYTES {
+            return Err(Error::from_reason(format!(
+                "CONSENSUS_PROPOSAL_TOO_LARGE: event exceeds {MAX_CONSENSUS_PROPOSAL_EVENT_BYTES} bytes"
+            )));
+        }
+        Ok(())
+    }
+
+    fn touch_consensus_proposal(&self, proposal_id: &str) {
+        self.proposal_activity
+            .insert(proposal_id.to_string(), Instant::now());
+    }
+
+    fn prune_expired_consensus_proposals(&self) {
+        let now = Instant::now();
+        let expired = self
+            .proposal_activity
+            .iter()
+            .filter(|entry| {
+                now.saturating_duration_since(*entry.value()) >= CONSENSUS_PROPOSAL_IDLE_TTL
+            })
+            .map(|entry| entry.key().clone())
+            .collect::<Vec<_>>();
+        for proposal_id in expired {
+            self.proposals.remove(&proposal_id);
+            self.proposal_activity.remove(&proposal_id);
+        }
+    }
+
+    fn read_consensus_ledger(path: &Path, ledger_name: &str) -> Result<Vec<u8>> {
+        let metadata = match fs::metadata(path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(error) => {
+                return Err(Error::from_reason(format!(
+                    "{ledger_name}_LEDGER_READ_FAILED: {error}"
+                )))
+            }
+        };
+        if metadata.len() > MAX_CONSENSUS_LEDGER_BYTES {
+            return Err(Error::from_reason(format!(
+                "{ledger_name}_LEDGER_LIMIT: file exceeds {MAX_CONSENSUS_LEDGER_BYTES} bytes"
+            )));
+        }
+        let bytes = fs::read(path).map_err(|error| {
+            Error::from_reason(format!("{ledger_name}_LEDGER_READ_FAILED: {error}"))
+        })?;
+        if bytes.len() as u64 > MAX_CONSENSUS_LEDGER_BYTES {
+            return Err(Error::from_reason(format!(
+                "{ledger_name}_LEDGER_LIMIT: file exceeds {MAX_CONSENSUS_LEDGER_BYTES} bytes"
+            )));
+        }
+        Ok(bytes)
+    }
+
+    fn truncate_torn_consensus_ledger(
+        path: &Path,
+        complete_len: usize,
+        truncate_torn_tail: bool,
+        ledger_name: &str,
+    ) -> Result<()> {
+        if !truncate_torn_tail {
+            return Ok(());
+        }
+        let file = FileOpenOptions::new()
+            .write(true)
+            .open(path)
+            .map_err(|error| {
+                Error::from_reason(format!("{ledger_name}_LEDGER_REPAIR_FAILED: {error}"))
+            })?;
+        file.set_len(complete_len as u64).map_err(|error| {
+            Error::from_reason(format!("{ledger_name}_LEDGER_REPAIR_FAILED: {error}"))
+        })?;
+        file.sync_all().map_err(|error| {
+            Error::from_reason(format!("{ledger_name}_LEDGER_REPAIR_FAILED: {error}"))
+        })?;
+        Self::sync_consensus_ledger_parent(path).map_err(|error| {
+            Error::from_reason(format!("{ledger_name}_LEDGER_REPAIR_FAILED: {error}"))
+        })
+    }
+
+    fn sync_consensus_ledger_parent(path: &Path) -> std::io::Result<()> {
+        #[cfg(unix)]
+        if let Some(parent) = path.parent() {
+            File::open(parent)?.sync_all()?;
+        }
+        #[cfg(not(unix))]
+        let _ = path;
+        // Windows cannot flush a directory handle. Its ledger open path uses
+        // FILE_FLAG_WRITE_THROUGH and sync_all on the file handle instead.
+        Ok(())
+    }
+
+    fn open_consensus_ledger_for_append(path: &Path) -> std::io::Result<File> {
+        let mut options = FileOpenOptions::new();
+        options.create(true).append(true).read(true).write(true);
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::OpenOptionsExt;
+            // FILE_FLAG_WRITE_THROUGH makes NTFS flush metadata changes caused
+            // by creating the first ledger file as part of the file-handle sync.
+            options.custom_flags(0x8000_0000);
+        }
+        options.open(path)
+    }
+
+    fn load_consensus_vote_locks(
+        path: &Path,
+        truncate_torn_tail: bool,
+    ) -> Result<Vec<ConsensusVoteLock>> {
+        let bytes = Self::read_consensus_ledger(path, "CONSENSUS_VOTE")?;
+        if bytes.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // A process may stop during a final append. Only complete newline-terminated
+        // records are acknowledged by sign_vote/submit_vote and therefore restored.
+        let complete_len = bytes
+            .iter()
+            .rposition(|byte| *byte == b'\n')
+            .map_or(0, |index| index + 1);
+        if complete_len < bytes.len() {
+            Self::truncate_torn_consensus_ledger(
+                path,
+                complete_len,
+                truncate_torn_tail,
+                "CONSENSUS_VOTE",
+            )?;
+        }
+        let mut locks: HashMap<(String, String, String), ConsensusVoteLock> = HashMap::new();
+        let mut record_count = 0usize;
+        for line in bytes[..complete_len].split(|byte| *byte == b'\n') {
+            if line.is_empty() {
+                continue;
+            }
+            record_count += 1;
+            if line.len() > MAX_CONSENSUS_LEDGER_RECORD_BYTES
+                || record_count > MAX_CONSENSUS_LEDGER_RECORDS
+            {
+                return Err(Error::from_reason(
+                    "CONSENSUS_VOTE_LEDGER_LIMIT: record size or count exceeds the configured safety bound",
+                ));
+            }
+            let lock = serde_json::from_slice::<ConsensusVoteLock>(line).map_err(|error| {
+                Error::from_reason(format!(
+                    "CONSENSUS_VOTE_LEDGER_CORRUPT: invalid vote-lock record: {error}"
+                ))
+            })?;
+            if lock.proposal_id.is_empty()
+                || lock.peer_id.is_empty()
+                || hex::decode(&lock.roster_digest).is_err()
+                || hex::decode(&lock.proposal_digest).map_or(true, |digest| digest.len() != 32)
+                || lock.signature.len() != 64
+            {
+                return Err(Error::from_reason(
+                    "CONSENSUS_VOTE_LEDGER_CORRUPT: malformed vote-lock record",
+                ));
+            }
+            let key = (
+                lock.proposal_id.clone(),
+                lock.roster_digest.clone(),
+                lock.peer_id.clone(),
+            );
+            if let Some(previous) = locks.get(&key) {
+                if previous != &lock {
+                    return Err(Error::from_reason(
+                        "CONSENSUS_VOTE_LEDGER_CONFLICT: conflicting durable choices exist",
+                    ));
+                }
+                return Err(Error::from_reason(
+                    "CONSENSUS_VOTE_LEDGER_CORRUPT: duplicate durable ballot record",
+                ));
+            } else {
+                locks.insert(key, lock);
+            }
+        }
+        Ok(locks.into_values().collect())
+    }
+
+    fn load_consensus_commit_receipts(
+        path: &Path,
+        truncate_torn_tail: bool,
+    ) -> Result<(Vec<ConsensusCommitReceipt>, usize)> {
+        let bytes = Self::read_consensus_ledger(path, "CONSENSUS_COMMIT")?;
+        if bytes.is_empty() {
+            return Ok((Vec::new(), 0));
+        }
+        let complete_len = bytes
+            .iter()
+            .rposition(|byte| *byte == b'\n')
+            .map_or(0, |index| index + 1);
+        if complete_len < bytes.len() {
+            Self::truncate_torn_consensus_ledger(
+                path,
+                complete_len,
+                truncate_torn_tail,
+                "CONSENSUS_COMMIT",
+            )?;
+        }
+        let mut receipts = HashMap::<String, ConsensusCommitReceipt>::new();
+        let mut record_count = 0usize;
+        for line in bytes[..complete_len].split(|byte| *byte == b'\n') {
+            if line.is_empty() {
+                continue;
+            }
+            record_count += 1;
+            if line.len() > MAX_CONSENSUS_LEDGER_RECORD_BYTES
+                || record_count > MAX_CONSENSUS_LEDGER_RECORDS
+            {
+                return Err(Error::from_reason(
+                    "CONSENSUS_COMMIT_LEDGER_LIMIT: record size or count exceeds the configured safety bound",
+                ));
+            }
+            let receipt =
+                serde_json::from_slice::<ConsensusCommitReceipt>(line).map_err(|error| {
+                    Error::from_reason(format!(
+                        "CONSENSUS_COMMIT_LEDGER_CORRUPT: invalid commit receipt: {error}"
+                    ))
+                })?;
+            if receipt.proposal_id.is_empty()
+                || receipt.proposal_id.len() > 512
+                || hex::decode(&receipt.proposal_digest).map_or(true, |digest| digest.len() != 32)
+            {
+                return Err(Error::from_reason(
+                    "CONSENSUS_COMMIT_LEDGER_CORRUPT: malformed commit receipt",
+                ));
+            }
+            if let Some(previous) = receipts.get(&receipt.proposal_id) {
+                if previous.proposal_digest != receipt.proposal_digest
+                    || (previous.committed && !receipt.committed)
+                {
+                    return Err(Error::from_reason(
+                        "CONSENSUS_COMMIT_LEDGER_CONFLICT: proposal ID has conflicting durable digests",
+                    ));
+                }
+                if receipt.committed {
+                    receipts.insert(receipt.proposal_id.clone(), receipt);
+                }
+            } else {
+                receipts.insert(receipt.proposal_id.clone(), receipt);
+            }
+        }
+        let pending_receipts: Vec<_> = receipts
+            .values()
+            .filter(|receipt| !receipt.committed)
+            .collect();
+        if receipts.len() > MAX_CONSENSUS_LEDGER_RECORDS / 2
+            || record_count.saturating_add(pending_receipts.len()) > MAX_CONSENSUS_LEDGER_RECORDS
+        {
+            return Err(Error::from_reason(
+                "CONSENSUS_COMMIT_LEDGER_LIMIT: retained history exceeds the bounded completion policy",
+            ));
+        }
+        let reserved_completion_bytes =
+            pending_receipts.iter().try_fold(0u64, |total, receipt| {
+                let mut completed = (**receipt).clone();
+                completed.committed = true;
+                let record_size = serde_json::to_vec(&completed)
+                    .map_err(|error| Error::from_reason(error.to_string()))?
+                    .len() as u64
+                    + 1;
+                Ok::<u64, Error>(total.saturating_add(record_size))
+            })?;
+        if (bytes.len() as u64).saturating_add(reserved_completion_bytes)
+            > MAX_CONSENSUS_LEDGER_BYTES
+        {
+            return Err(Error::from_reason(
+                "CONSENSUS_COMMIT_LEDGER_LIMIT: no bounded space remains to complete a prepared receipt",
+            ));
+        }
+        Ok((receipts.into_values().collect(), record_count))
+    }
+
+    fn persist_consensus_vote_lock(&self, lock: &ConsensusVoteLock) -> Result<()> {
+        if self.consensus_vote_ledger_poisoned.load(Ordering::SeqCst) {
+            return Err(Error::from_reason(
+                "CONSENSUS_VOTE_LEDGER_POISONED: reopen database before voting",
+            ));
+        }
+        if self.consensus_vote_locks.len() >= MAX_CONSENSUS_LEDGER_RECORDS {
+            return Err(Error::from_reason(format!(
+                "CONSENSUS_VOTE_LEDGER_LIMIT: reached {MAX_CONSENSUS_LEDGER_RECORDS} durable ballot locks; refusing new votes"
+            )));
+        }
+        let payload =
+            serde_json::to_vec(lock).map_err(|error| Error::from_reason(error.to_string()))?;
+        if payload.len() > MAX_CONSENSUS_LEDGER_RECORD_BYTES {
+            return Err(Error::from_reason(
+                "CONSENSUS_VOTE_LEDGER_LIMIT: ballot record is too large",
+            ));
+        }
+        let mut file = Self::open_consensus_ledger_for_append(&self.consensus_vote_log_path)
+            .map_err(|error| {
+                Error::from_reason(format!("CONSENSUS_VOTE_LEDGER_WRITE_FAILED: {error}"))
+            })?;
+        let original_len = file
+            .metadata()
+            .map_err(|error| Error::from_reason(error.to_string()))?
+            .len();
+        if original_len
+            .saturating_add(payload.len() as u64)
+            .saturating_add(1)
+            > MAX_CONSENSUS_LEDGER_BYTES
+        {
+            return Err(Error::from_reason(format!(
+                "CONSENSUS_VOTE_LEDGER_LIMIT: ledger exceeds {MAX_CONSENSUS_LEDGER_BYTES} bytes; refusing new votes"
+            )));
+        }
+        let write_result = file
+            .write_all(&payload)
+            .and_then(|()| file.write_all(b"\n"))
+            .and_then(|()| file.sync_all());
+        if let Err(error) = write_result {
+            if file
+                .set_len(original_len)
+                .and_then(|()| file.sync_all())
+                .is_err()
+            {
+                self.consensus_vote_ledger_poisoned
+                    .store(true, Ordering::SeqCst);
+            }
+            return Err(Error::from_reason(format!(
+                "CONSENSUS_VOTE_LEDGER_SYNC_FAILED: {error}"
+            )));
+        }
+        if let Err(error) = Self::sync_consensus_ledger_parent(&self.consensus_vote_log_path) {
+            self.consensus_vote_ledger_poisoned
+                .store(true, Ordering::SeqCst);
+            return Err(Error::from_reason(format!(
+                "CONSENSUS_VOTE_LEDGER_DIRECTORY_SYNC_FAILED: {error}"
+            )));
+        }
+        Ok(())
+    }
+
+    fn append_consensus_commit_record(&self, receipt: &ConsensusCommitReceipt) -> Result<()> {
+        if self.consensus_commit_ledger_poisoned.load(Ordering::SeqCst) {
+            return Err(Error::from_reason(
+                "CONSENSUS_COMMIT_LEDGER_POISONED: reopen database before committing proposals",
+            ));
+        }
+        if self.consensus_commit_ledger_records.load(Ordering::SeqCst)
+            >= MAX_CONSENSUS_LEDGER_RECORDS
+        {
+            return Err(Error::from_reason(format!(
+                "CONSENSUS_COMMIT_LEDGER_LIMIT: reached {MAX_CONSENSUS_LEDGER_RECORDS} records"
+            )));
+        }
+        let payload =
+            serde_json::to_vec(receipt).map_err(|error| Error::from_reason(error.to_string()))?;
+        if payload.len() > MAX_CONSENSUS_LEDGER_RECORD_BYTES {
+            return Err(Error::from_reason(
+                "CONSENSUS_COMMIT_LEDGER_LIMIT: receipt record is too large",
+            ));
+        }
+        let mut file = Self::open_consensus_ledger_for_append(&self.consensus_commit_log_path)
+            .map_err(|error| {
+                Error::from_reason(format!("CONSENSUS_COMMIT_LEDGER_WRITE_FAILED: {error}"))
+            })?;
+        let original_len = file
+            .metadata()
+            .map_err(|error| Error::from_reason(error.to_string()))?
+            .len();
+        if original_len
+            .saturating_add(payload.len() as u64)
+            .saturating_add(1)
+            > MAX_CONSENSUS_LEDGER_BYTES
+        {
+            return Err(Error::from_reason(format!(
+                "CONSENSUS_COMMIT_LEDGER_LIMIT: ledger exceeds {MAX_CONSENSUS_LEDGER_BYTES} bytes"
+            )));
+        }
+        let write_result = file
+            .write_all(&payload)
+            .and_then(|()| file.write_all(b"\n"))
+            .and_then(|()| file.sync_all());
+        if let Err(error) = write_result {
+            if file
+                .set_len(original_len)
+                .and_then(|()| file.sync_all())
+                .is_err()
+            {
+                self.consensus_commit_ledger_poisoned
+                    .store(true, Ordering::SeqCst);
+            }
+            return Err(Error::from_reason(format!(
+                "CONSENSUS_COMMIT_LEDGER_SYNC_FAILED: {error}"
+            )));
+        }
+        if let Err(error) = Self::sync_consensus_ledger_parent(&self.consensus_commit_log_path) {
+            self.consensus_commit_ledger_poisoned
+                .store(true, Ordering::SeqCst);
+            return Err(Error::from_reason(format!(
+                "CONSENSUS_COMMIT_LEDGER_DIRECTORY_SYNC_FAILED: {error}"
+            )));
+        }
+        self.consensus_commit_ledger_records
+            .fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    }
+
+    fn ensure_consensus_commit_capacity(&self, proposal_id: &str, digest: &str) -> Result<()> {
+        let existing = self.consensus_commit_receipts.get(proposal_id);
+        if let Some(receipt) = existing.as_ref() {
+            if receipt.proposal_digest != digest {
+                return Err(Error::from_reason(
+                    "CONSENSUS_PROPOSAL_ID_CONFLICT: durable commit binds this ID to another event",
+                ));
+            }
+            if receipt.committed {
+                return Ok(());
+            }
+        } else if self.consensus_commit_receipts.len() >= MAX_CONSENSUS_LEDGER_RECORDS / 2 {
+            return Err(Error::from_reason(format!(
+                "CONSENSUS_COMMIT_LEDGER_LIMIT: reached {} retained proposal receipts; refusing new consensus commits",
+                MAX_CONSENSUS_LEDGER_RECORDS / 2
+            )));
+        }
+
+        // Reserve one pending record and one completion record for a new
+        // proposal. Pending receipts left by a crash also reserve their
+        // completion record before later proposals can consume the cap.
+        let pending_receipts: Vec<ConsensusCommitReceipt> = self
+            .consensus_commit_receipts
+            .iter()
+            .filter(|receipt| !receipt.committed)
+            .map(|receipt| receipt.value().clone())
+            .collect();
+        let is_new = existing.is_none();
+        let mut reserved_records = pending_receipts.len();
+        let mut reserved_bytes = 0u64;
+        for pending in pending_receipts {
+            let mut completed = pending;
+            completed.committed = true;
+            reserved_bytes = reserved_bytes
+                .saturating_add(
+                    serde_json::to_vec(&completed)
+                        .map_err(|error| {
+                            Error::from_reason(format!("CONSENSUS_COMMIT_LEDGER_INVALID: {error}"))
+                        })?
+                        .len() as u64,
+                )
+                .saturating_add(1);
+        }
+        if is_new {
+            reserved_records = reserved_records.saturating_add(2);
+            let pending = ConsensusCommitReceipt {
+                proposal_id: proposal_id.to_string(),
+                proposal_digest: digest.to_string(),
+                committed: false,
+            };
+            let mut completed = pending.clone();
+            completed.committed = true;
+            for receipt in [&pending, &completed] {
+                reserved_bytes = reserved_bytes
+                    .saturating_add(
+                        serde_json::to_vec(receipt)
+                            .map_err(|error| {
+                                Error::from_reason(format!(
+                                    "CONSENSUS_COMMIT_LEDGER_INVALID: {error}"
+                                ))
+                            })?
+                            .len() as u64,
+                    )
+                    .saturating_add(1);
+            }
+        }
+        let record_count = self.consensus_commit_ledger_records.load(Ordering::SeqCst);
+        if record_count.saturating_add(reserved_records) > MAX_CONSENSUS_LEDGER_RECORDS {
+            return Err(Error::from_reason(
+                "CONSENSUS_COMMIT_LEDGER_LIMIT: retained history has no reserved completion slot",
+            ));
+        }
+        let existing_len = fs::metadata(&self.consensus_commit_log_path)
+            .map(|metadata| metadata.len())
+            .or_else(|error| {
+                if error.kind() == std::io::ErrorKind::NotFound {
+                    Ok(0)
+                } else {
+                    Err(error)
+                }
+            })
+            .map_err(|error| {
+                Error::from_reason(format!("CONSENSUS_COMMIT_LEDGER_READ_FAILED: {error}"))
+            })?;
+        if existing_len.saturating_add(reserved_bytes) > MAX_CONSENSUS_LEDGER_BYTES {
+            return Err(Error::from_reason(
+                "CONSENSUS_COMMIT_LEDGER_LIMIT: retained history exceeds the reserved byte bound",
+            ));
+        }
+        Ok(())
+    }
+
+    fn prepare_consensus_commit(&self, receipt: &ConsensusCommitReceipt) -> Result<()> {
+        debug_assert!(!receipt.committed);
+        self.ensure_consensus_commit_capacity(&receipt.proposal_id, &receipt.proposal_digest)?;
+        if self
+            .consensus_commit_receipts
+            .contains_key(&receipt.proposal_id)
+        {
+            return Ok(());
+        }
+        self.append_consensus_commit_record(receipt)?;
+        self.consensus_commit_receipts
+            .insert(receipt.proposal_id.clone(), receipt.clone());
+        Ok(())
+    }
+
+    fn complete_consensus_commit(&self, receipt: &ConsensusCommitReceipt) -> Result<()> {
+        debug_assert!(receipt.committed);
+        if let Some(previous) = self.consensus_commit_receipts.get(&receipt.proposal_id) {
+            if previous.proposal_digest != receipt.proposal_digest {
+                return Err(Error::from_reason(
+                    "CONSENSUS_PROPOSAL_ID_CONFLICT: durable commit binds this ID to another event",
+                ));
+            }
+            if previous.committed {
+                return Ok(());
+            }
+        } else {
+            return Err(Error::from_reason(
+                "CONSENSUS_COMMIT_LEDGER_INVALID: completion has no durable prepare record",
+            ));
+        }
+        self.append_consensus_commit_record(receipt)?;
+        self.consensus_commit_receipts
+            .insert(receipt.proposal_id.clone(), receipt.clone());
+        Ok(())
+    }
+
+    fn recover_pending_consensus_commits(&self) -> Result<()> {
+        let pending: Vec<_> = self
+            .consensus_commit_receipts
+            .iter()
+            .filter(|receipt| !receipt.committed)
+            .map(|receipt| receipt.value().clone())
+            .collect();
+        if pending.is_empty() {
+            return Ok(());
+        }
+
+        // Scan once during open and resolve only receipts whose exact signed
+        // event remains in the recovery journal. A prepared receipt without a
+        // matching frame represents a crash before WAL durability and remains
+        // retryable; it does not block compaction because there is no event to
+        // preserve.
+        let pending_digests: HashSet<_> = pending
+            .iter()
+            .map(|receipt| receipt.proposal_digest.as_str())
+            .collect();
+        let mut matched_digests = HashSet::new();
+        self.scan_journal(None, true, &mut |_, signed_event| {
+            if let Ok(digest) = Self::consensus_proposal_digest(&signed_event) {
+                let digest = hex::encode(digest);
+                if pending_digests.contains(digest.as_str()) {
+                    matched_digests.insert(digest);
+                }
+            }
+        });
+
+        for receipt in pending {
+            if matched_digests.contains(&receipt.proposal_digest) {
+                self.complete_consensus_commit(&ConsensusCommitReceipt {
+                    committed: true,
+                    ..receipt
+                })?;
+            }
+        }
+        Ok(())
+    }
+
+    fn proposal_has_durable_commit(&self, proposal: &ConsensusProposal) -> Result<bool> {
+        let digest = hex::encode(Self::consensus_proposal_digest(&proposal.signed_event)?);
+        if let Some(receipt) = self.consensus_commit_receipts.get(&proposal.proposal_id) {
+            if receipt.proposal_digest != digest {
+                return Err(Error::from_reason(
+                    "CONSENSUS_PROPOSAL_ID_CONFLICT: durable commit binds this ID to another event",
+                ));
+            }
+            if receipt.committed {
+                return Ok(true);
+            }
+        } else {
+            // No prepare record means this proposal has never entered the commit
+            // window. Do not scan the journal for every ordinary proposal import.
+            return Ok(false);
+        }
+
+        // A crash can happen after the event WAL frame is fsynced and before its
+        // receipt is appended. The commit lock prevents a checkpoint from folding
+        // that frame in the gap, so finding the exact signed event is sufficient
+        // to reconstruct the missing receipt without appending it a second time.
+        let mut matching_frame_found = false;
+        self.scan_journal(None, true, &mut |_, stored_event| {
+            if Self::consensus_proposal_digest(&stored_event)
+                .is_ok_and(|stored_digest| hex::encode(stored_digest) == digest)
+            {
+                matching_frame_found = true;
+            }
+        });
+        if matching_frame_found {
+            self.complete_consensus_commit(&ConsensusCommitReceipt {
+                proposal_id: proposal.proposal_id.clone(),
+                proposal_digest: digest,
+                committed: true,
+            })?;
+        }
+        Ok(matching_frame_found)
+    }
+
+    /// Canonical bytes a peer signs to cast a vote. The domain-separated
+    /// payload binds the proposal ID, signed-event digest, voter ID, roster
+    /// digest, and choice.
+    fn vote_payload(
+        proposal_id: &str,
+        voter_peer_id: &str,
+        approve: bool,
+        proposal_digest: &[u8; 32],
+        roster_digest: &str,
+    ) -> Vec<u8> {
+        let mut payload = b"GENESIS-CONSENSUS-VOTE-V1\0".to_vec();
+        for field in [
+            proposal_id.as_bytes(),
+            voter_peer_id.as_bytes(),
+            roster_digest.as_bytes(),
+        ] {
+            payload.extend_from_slice(&(field.len() as u64).to_be_bytes());
+            payload.extend_from_slice(field);
+        }
+        payload.push(u8::from(approve));
+        payload.extend_from_slice(proposal_digest);
+        payload
     }
 
     /// The ed25519 public key for `peer_id`: this node's own key for a self-vote,
-    /// otherwise the key registered for that peer (via gossip Heartbeat). `None`
-    /// if the peer is unknown — an unknown peer cannot have its vote verified.
+    /// otherwise the key pinned in the operator-configured membership roster.
+    /// Discovery state is deliberately not consulted.
     fn peer_verifying_key(&self, peer_id: &str) -> Option<VerifyingKey> {
         if peer_id == self.local_peer_id {
             return Some(self.verifying_key);
         }
-        let bytes = self.peers.get(peer_id)?.verifying_key.clone();
-        let arr: [u8; 32] = bytes.as_slice().try_into().ok()?;
-        VerifyingKey::from_bytes(&arr).ok()
+        self.authorized_members
+            .get(peer_id)
+            .map(|member| member.verifying_key)
+    }
+
+    pub fn local_identity(&self) -> PeerIdentity {
+        PeerIdentity {
+            peer_id: self.local_peer_id.clone(),
+            public_key_hex: hex::encode(self.verifying_key.as_bytes()),
+        }
+    }
+
+    /// Configure the closed peer roster exactly once, before starting gossip.
+    /// Every cluster node must provide the same IDs, public keys, and authority
+    /// roles. Endpoints are numeric SocketAddrs to avoid DNS rebinding.
+    pub fn configure_peer_membership(
+        &self,
+        peers: Vec<AuthorizedPeerConfig>,
+        local_gossip_addr: &str,
+        local_master_authority: bool,
+    ) -> Result<()> {
+        let _commit_guard = self.commit_lock.lock();
+        if self.gossip_manager_started.load(Ordering::SeqCst) {
+            return Err(Error::from_reason(
+                "PEER_MEMBERSHIP_LOCKED: configure the roster before starting gossip",
+            ));
+        }
+        if !self.proposals.is_empty() {
+            return Err(Error::from_reason(
+                "PEER_MEMBERSHIP_LOCKED: configure the roster before consensus begins",
+            ));
+        }
+        if peers.len() > GOSSIP_MAX_PEERS {
+            return Err(Error::from_reason(format!(
+                "PEER_MEMBERSHIP_INVALID: roster exceeds {GOSSIP_MAX_PEERS} peers"
+            )));
+        }
+        let bind_addr = local_gossip_addr.parse::<SocketAddr>().map_err(|_| {
+            Error::from_reason("PEER_MEMBERSHIP_INVALID: invalid local gossip address")
+        })?;
+        if bind_addr.port() == 0 {
+            return Err(Error::from_reason(
+                "PEER_MEMBERSHIP_INVALID: local gossip port must be fixed and non-zero",
+            ));
+        }
+
+        let mut parsed = Vec::with_capacity(peers.len());
+        let mut seen_ids = HashSet::with_capacity(peers.len());
+        let mut seen_addrs = HashSet::with_capacity(peers.len());
+        for peer in peers {
+            let raw_key = hex::decode(&peer.public_key_hex).map_err(|_| {
+                Error::from_reason(format!(
+                    "PEER_MEMBERSHIP_INVALID: invalid public key hex for peer {}",
+                    peer.peer_id
+                ))
+            })?;
+            let key_bytes: [u8; 32] = raw_key.as_slice().try_into().map_err(|_| {
+                Error::from_reason(format!(
+                    "PEER_MEMBERSHIP_INVALID: public key for peer {} must be 32 bytes",
+                    peer.peer_id
+                ))
+            })?;
+            let verifying_key = VerifyingKey::from_bytes(&key_bytes).map_err(|_| {
+                Error::from_reason(format!(
+                    "PEER_MEMBERSHIP_INVALID: malformed public key for peer {}",
+                    peer.peer_id
+                ))
+            })?;
+            let derived_peer_id =
+                hex::encode(Sha256::digest(verifying_key.as_bytes()))[..16].to_string();
+            if peer.peer_id != derived_peer_id || peer.peer_id == self.local_peer_id {
+                return Err(Error::from_reason(format!(
+                    "PEER_MEMBERSHIP_INVALID: peer ID does not match key for peer {}",
+                    peer.peer_id
+                )));
+            }
+            if !seen_ids.insert(peer.peer_id.clone()) {
+                return Err(Error::from_reason(format!(
+                    "PEER_MEMBERSHIP_INVALID: duplicate peer ID {}",
+                    peer.peer_id
+                )));
+            }
+            let gossip_addr = peer.gossip_addr.parse::<SocketAddr>().map_err(|_| {
+                Error::from_reason(format!(
+                    "PEER_MEMBERSHIP_INVALID: invalid numeric gossip address for peer {}",
+                    peer.peer_id
+                ))
+            })?;
+            if gossip_addr.port() == 0 || !seen_addrs.insert(gossip_addr) {
+                return Err(Error::from_reason(
+                    "PEER_MEMBERSHIP_INVALID: peer endpoints must be unique and use non-zero ports",
+                ));
+            }
+            parsed.push((peer, verifying_key, gossip_addr));
+        }
+
+        let mut roster = Vec::with_capacity(parsed.len() + 1);
+        roster.push((
+            self.local_peer_id.clone(),
+            hex::encode(self.verifying_key.as_bytes()),
+            local_master_authority,
+        ));
+        for (peer, verifying_key, _) in &parsed {
+            roster.push((
+                peer.peer_id.clone(),
+                hex::encode(verifying_key.as_bytes()),
+                peer.master_authority,
+            ));
+        }
+        roster.sort_by(|a, b| a.0.cmp(&b.0));
+        let roster_bytes = serde_json::to_vec(&roster)
+            .map_err(|e| Error::from_reason(format!("PEER_MEMBERSHIP_INVALID: {e}")))?;
+        let roster_digest = hex::encode(Sha256::digest(roster_bytes));
+
+        self.peer_membership_configured
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .map_err(|_| {
+                Error::from_reason(
+                    "PEER_MEMBERSHIP_LOCKED: the roster is immutable after configuration",
+                )
+            })?;
+        for (peer, verifying_key, gossip_addr) in parsed {
+            self.authorized_members.insert(
+                peer.peer_id,
+                AuthorizedMember {
+                    verifying_key,
+                    gossip_addr,
+                    master_authority: peer.master_authority,
+                },
+            );
+        }
+        self.local_master_authority
+            .store(local_master_authority, Ordering::SeqCst);
+        *self.gossip_bind_addr.write() = bind_addr;
+        *self.membership_digest.write() = roster_digest;
+        Ok(())
+    }
+
+    fn authorized_peer_addr(&self, peer_id: &str) -> Option<SocketAddr> {
+        self.authorized_members
+            .get(peer_id)
+            .map(|member| member.gossip_addr)
+    }
+
+    fn authorized_master(&self, peer_id: &str) -> bool {
+        if peer_id == self.local_peer_id {
+            return self.local_master_authority.load(Ordering::SeqCst);
+        }
+        self.authorized_members
+            .get(peer_id)
+            .is_some_and(|member| member.master_authority)
+    }
+
+    fn member_count(&self) -> usize {
+        self.authorized_members.len() + 1
+    }
+
+    fn canonical_gossip_payload(
+        version: u32,
+        source_peer_id: &str,
+        roster_digest: &str,
+        message: &GossipMessage,
+    ) -> Result<Vec<u8>> {
+        // Convert to Value first so object keys, including proposal HashMaps,
+        // use serde_json's deterministic map ordering before signing.
+        let canonical_message = serde_json::to_value(message)
+            .map_err(|e| Error::from_reason(format!("GOSSIP_SERIALIZATION: {e}")))?;
+        serde_json::to_vec(&(version, source_peer_id, roster_digest, canonical_message))
+            .map_err(|e| Error::from_reason(format!("GOSSIP_SERIALIZATION: {e}")))
+    }
+
+    pub fn sign_gossip_packet(&self, message: GossipMessage) -> Result<AuthenticatedGossipPacket> {
+        let roster_digest = self.membership_digest.read().clone();
+        let payload = Self::canonical_gossip_payload(
+            GOSSIP_PACKET_VERSION,
+            &self.local_peer_id,
+            &roster_digest,
+            &message,
+        )?;
+        Ok(AuthenticatedGossipPacket {
+            version: GOSSIP_PACKET_VERSION,
+            source_peer_id: self.local_peer_id.clone(),
+            roster_digest,
+            message,
+            signature: self.signing_key.sign(&payload).to_bytes().to_vec(),
+        })
+    }
+
+    pub fn encode_gossip_message(&self, message: GossipMessage) -> Result<Vec<u8>> {
+        let packet = self.sign_gossip_packet(message)?;
+        serde_json::to_vec(&packet)
+            .map_err(|e| Error::from_reason(format!("GOSSIP_SERIALIZATION: {e}")))
+    }
+
+    pub fn verify_gossip_packet(
+        &self,
+        packet: &AuthenticatedGossipPacket,
+        source_addr: SocketAddr,
+    ) -> bool {
+        if packet.version != GOSSIP_PACKET_VERSION
+            || packet.source_peer_id == self.local_peer_id
+            || packet.roster_digest != *self.membership_digest.read()
+        {
+            return false;
+        }
+        let Some(member) = self.authorized_members.get(&packet.source_peer_id) else {
+            return false;
+        };
+        if member.gossip_addr != source_addr {
+            return false;
+        }
+        let Ok(payload) = Self::canonical_gossip_payload(
+            packet.version,
+            &packet.source_peer_id,
+            &packet.roster_digest,
+            &packet.message,
+        ) else {
+            return false;
+        };
+        let Ok(signature) = Signature::from_slice(&packet.signature) else {
+            return false;
+        };
+        member.verifying_key.verify(&payload, &signature).is_ok()
     }
 
     fn sign_sync_progress_receipt(
@@ -15563,6 +17947,55 @@ impl Storage {
     /// the single source of truth for event-level signature checks — the WAL sync
     /// (`reconcile_state`), the consensus propose/commit paths all route here.
     fn verify_event_signature(&self, se: &SignedEvent) -> bool {
+        self.verify_event_signature_with_collection_definitions(se, None)
+    }
+
+    fn verify_event_signature_with_collection_definitions(
+        &self,
+        se: &SignedEvent,
+        collection_definitions: Option<&HashMap<String, CollectionDefinition>>,
+    ) -> bool {
+        if se.signature.starts_with(COMPACTED_MASTER_PROOF_MAGIC)
+            || se.signature.starts_with(COMPACTED_MASTER_PROOF_V2_MAGIC)
+        {
+            return self
+                .compacted_master_authority_proof_with_collection_definitions(
+                    se,
+                    collection_definitions,
+                )
+                .is_some();
+        }
+        if se.signature.starts_with(COMPACTED_BASE_EVENT_MAGIC)
+            || se.signature.starts_with(COMPACTED_BASE_EVENT_V2_MAGIC)
+        {
+            return self.verify_compacted_base_materialization_with_collection_definitions(
+                se,
+                collection_definitions,
+            );
+        }
+        if se
+            .signature
+            .starts_with(COMPACTED_REVISION_CHECKPOINT_MAGIC)
+            || se
+                .signature
+                .starts_with(COMPACTED_REVISION_CHECKPOINT_V2_MAGIC)
+        {
+            return self.verify_compacted_revision_checkpoint(se);
+        }
+        if self.storage_schema_version == SCHEMA_VERSION
+            && matches!(
+                &se.event,
+                Event::Transaction(transaction)
+                    if Self::is_revision_checkpoint(transaction)
+                        && transaction.record_revision_transaction.is_some()
+            )
+        {
+            return false;
+        }
+        self.verify_raw_event_signature(se)
+    }
+
+    fn verify_raw_event_signature(&self, se: &SignedEvent) -> bool {
         let vkey = match self.peer_verifying_key(&se.signer_peer_id) {
             Some(k) => k,
             None => return false,
@@ -15578,11 +18011,2370 @@ impl Storage {
         vkey.verify(&data, &sig).is_ok()
     }
 
-    /// Sign a vote with this node's key so a remote proposal-holder can verify it
-    /// authentically came from this peer. Returns the detached ed25519 signature.
-    pub fn sign_vote(&self, proposal_id: String, approve: bool) -> Vec<u8> {
-        let payload = Self::vote_payload(&proposal_id, &self.local_peer_id, approve);
-        self.signing_key.sign(&payload).to_bytes().to_vec()
+    fn verify_compacted_base_materialization_with_collection_definitions(
+        &self,
+        se: &SignedEvent,
+        collection_definitions: Option<&HashMap<String, CollectionDefinition>>,
+    ) -> bool {
+        if !matches!(
+            &se.event,
+            Event::Node(_) | Event::Edge(_) | Event::VectorMaterialized(_)
+        ) {
+            return false;
+        }
+        let Some((version, envelope)) = decode_compacted_envelope::<CompactedBaseEventEnvelope>(
+            &se.signature,
+            COMPACTED_BASE_EVENT_MAGIC,
+            COMPACTED_BASE_EVENT_V2_MAGIC,
+            COMPACTED_BASE_EVENT_MAX_BYTES,
+        ) else {
+            return false;
+        };
+        if envelope.version != version
+            || is_compacted_signature(&envelope.proof.signature)
+            || !self.verify_raw_event_signature(&envelope.proof)
+            || !Self::revision_transaction_binds_graph(&envelope.proof.event)
+            || !self.compacted_base_proof_matches_event_with_collection_definitions(
+                &se.event,
+                &envelope.proof.event,
+                collection_definitions,
+            )
+        {
+            return false;
+        }
+        let Some(key) = self.peer_verifying_key(&se.signer_peer_id) else {
+            return false;
+        };
+        let Ok(payload) =
+            compacted_base_event_payload(&se.signer_peer_id, &se.event, &envelope.proof, version)
+        else {
+            return false;
+        };
+        let Ok(signature) = Signature::from_slice(&envelope.relay_signature) else {
+            return false;
+        };
+        key.verify(&payload, &signature).is_ok()
+    }
+
+    fn compacted_row_revision_schemas(
+        &self,
+        signed_events: &[SignedEvent],
+    ) -> Result<HashMap<(String, u32), RelationalSchemaPackage>> {
+        let mut schemas = HashMap::new();
+        {
+            let conn = self.projection_db.lock();
+            let mut statement = conn
+                .prepare("SELECT package_json FROM relational_schema_registry")
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let packages = statement
+                .query_map([], |row| row.get::<_, String>(0))
+                .map_err(|error| Error::from_reason(error.to_string()))?
+                .collect::<std::result::Result<Vec<_>, _>>()
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            for json in packages {
+                let package: RelationalSchemaPackage = serde_json::from_str(&json)
+                    .map_err(|error| Error::from_reason(error.to_string()))?;
+                Self::validate_relational_schema(&package)?;
+                schemas.insert((package.namespace.clone(), package.schema_version), package);
+            }
+        }
+
+        for signed_event in signed_events {
+            let Event::RelationalSchema(package) = &signed_event.event else {
+                continue;
+            };
+            Self::validate_relational_schema(package)?;
+            let identity = (package.namespace.clone(), package.schema_version);
+            if schemas
+                .get(&identity)
+                .is_some_and(|existing| existing != package)
+            {
+                return Err(Error::from_reason(
+                    "REVISION_CHECKPOINT_SCHEMA_CONFLICT: multiple schema packages use the same version",
+                ));
+            }
+            schemas.insert(identity, package.clone());
+        }
+        Ok(schemas)
+    }
+
+    fn compacted_row_revision_state(&self) -> Result<CompactedRelationalRowRevisionState> {
+        let database_id = self.database_id();
+        let conn = self.projection_db.lock();
+        let mut statement = conn
+            .prepare(
+                "SELECT r.namespace, r.schema_ref, r.record_id, r.revision_id,
+                        r.operation, r.valid_from, r.payload_json, i.key_bytes
+                 FROM hql2_record_revisions r
+                 JOIN hql2_row_identity_registry i
+                   ON i.database_id=r.database_id AND i.namespace=r.namespace
+                  AND i.table_name=r.schema_ref AND i.row_id=r.record_id
+                 WHERE r.database_id=?1 AND r.kind='row' AND r.tx_to IS NULL",
+            )
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let mut rows = statement
+            .query(params![database_id])
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let mut state = HashMap::new();
+        while let Some(row) = rows
+            .next()
+            .map_err(|error| Error::from_reason(error.to_string()))?
+        {
+            let namespace: String = row
+                .get(0)
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let table: String = row
+                .get(1)
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let row_id: String = row
+                .get(2)
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let revision_id: String = row
+                .get(3)
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let operation: String = row
+                .get(4)
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            if operation.eq_ignore_ascii_case("retract") {
+                continue;
+            }
+            if !operation.eq_ignore_ascii_case("upsert") {
+                return Err(Error::from_reason(
+                    "REVISION_CHECKPOINT_STATE_INVALID: unknown active row operation",
+                ));
+            }
+            let valid_from: String = row
+                .get(5)
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let payload_json: String = row
+                .get(6)
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let key_bytes: Vec<u8> = row
+                .get(7)
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let payload: Value = serde_json::from_str(&payload_json)
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let key_has_null = payload
+                .get("key")
+                .and_then(Value::as_object)
+                .is_some_and(|key| key.values().any(Value::is_null));
+            if key_has_null {
+                // Nullable primary-key rows are intentionally not addressable
+                // by later Update/Delete operations and can share the same
+                // encoded null key. Their insert checkpoints are checked
+                // directly against the source event instead of this key map.
+                continue;
+            }
+            let after_image = payload
+                .get("after_image")
+                .and_then(Value::as_object)
+                .cloned()
+                .ok_or_else(|| {
+                    Error::from_reason(
+                        "REVISION_CHECKPOINT_STATE_INVALID: active row has no after-image",
+                    )
+                })?;
+            let valid_from = DateTime::parse_from_rfc3339(&valid_from)
+                .map_err(|error| Error::from_reason(error.to_string()))?
+                .with_timezone(&Utc);
+            let identity = (namespace, table, key_bytes);
+            if state
+                .insert(
+                    identity,
+                    CompactedRowRevisionState {
+                        row_id,
+                        revision_id,
+                        valid_from,
+                        after_image,
+                    },
+                )
+                .is_some()
+            {
+                return Err(Error::from_reason(
+                    "REVISION_CHECKPOINT_STATE_INVALID: multiple active rows share one key",
+                ));
+            }
+        }
+        Ok(state)
+    }
+
+    fn compacted_relational_value(column: &RelationalColumn, value: &Value) -> Result<Value> {
+        match (&column.column_type, Self::json_to_sql_typed(column, value)?) {
+            (_, SqlValue::Null) => Ok(Value::Null),
+            (RelationalColumnType::Boolean, SqlValue::Integer(value)) => {
+                Ok(Value::Bool(value != 0))
+            }
+            (RelationalColumnType::Json, SqlValue::Text(value)) => {
+                serde_json::from_str(&value).map_err(|error| Error::from_reason(error.to_string()))
+            }
+            (RelationalColumnType::Blob, SqlValue::Blob(value)) => {
+                Ok(Value::Array(value.into_iter().map(Value::from).collect()))
+            }
+            (RelationalColumnType::Integer, SqlValue::Integer(value)) => Ok(Value::from(value)),
+            (RelationalColumnType::Real, SqlValue::Real(value)) => Ok(Value::Number(
+                serde_json::Number::from_f64(value)
+                    .ok_or_else(|| Error::from_reason("REL_STORAGE_TYPE_MISMATCH"))?,
+            )),
+            (RelationalColumnType::Real, SqlValue::Integer(value)) => Ok(Value::Number(
+                serde_json::Number::from_f64(value as f64)
+                    .ok_or_else(|| Error::from_reason("REL_STORAGE_TYPE_MISMATCH"))?,
+            )),
+            (
+                RelationalColumnType::Text
+                | RelationalColumnType::Timestamp
+                | RelationalColumnType::EntityId,
+                SqlValue::Text(value),
+            ) => Ok(Value::String(value)),
+            (_, _) => Err(Error::from_reason("REL_STORAGE_TYPE_MISMATCH")),
+        }
+    }
+
+    fn compacted_complete_relational_insert_image(
+        table: &RelationalTable,
+        mutation: &RelationalRowMutation,
+    ) -> Result<serde_json::Map<String, Value>> {
+        let values = mutation
+            .values
+            .as_object()
+            .ok_or_else(|| Error::from_reason("relational mutation requires an object payload"))?;
+        let mut image = serde_json::Map::new();
+        for column in &table.columns {
+            let value = values
+                .get(&column.name)
+                .or(column.default.as_ref())
+                .cloned()
+                .unwrap_or(Value::Null);
+            image.insert(
+                column.name.clone(),
+                Self::compacted_relational_value(column, &value)?,
+            );
+        }
+        Ok(image)
+    }
+
+    fn take_compacted_row_revision(
+        actual: &mut Vec<uee_v2::RecordRevisionMutationV1>,
+        expected: CompactedRowRevisionExpectation<'_>,
+    ) -> Result<uee_v2::RecordRevisionMutationV1> {
+        let position = actual.iter().position(|candidate| {
+            candidate.namespace == expected.schema.namespace
+                && candidate.kind == uee_v2::RecordKindV2::Row
+                && candidate.schema_ref.as_deref() == Some(expected.table)
+                && candidate.schema_version == Some(expected.schema.schema_version as u64)
+                && candidate.key_codec_version == Some(1)
+                && candidate.key_bytes.as_deref() == Some(expected.key_bytes)
+                && candidate.operation == expected.operation
+                && candidate.expected_revision_id.as_deref() == expected.expected_revision_id
+                && candidate.predecessor_revision_id.as_deref() == expected.predecessor_revision_id
+                && candidate.payload == *expected.payload
+                && expected.row_id.is_none_or(|row_id| candidate.id == row_id)
+        });
+        position
+            .map(|position| actual.remove(position))
+            .ok_or_else(|| {
+                Error::from_reason(
+                "REVISION_CHECKPOINT_SOURCE_MISMATCH: row revision does not match source mutations",
+            )
+            })
+    }
+
+    fn compacted_source_revision_already_applied(&self, source: &Event) -> Result<bool> {
+        let (transaction_id, payload_hash, revisions) = match source {
+            Event::Transaction(transaction) => (
+                transaction.transaction_id.clone(),
+                transaction.payload_hash.clone(),
+                transaction.record_revision_transaction.as_ref(),
+            ),
+            Event::RelationalRows {
+                mutation_id,
+                payload_hash,
+                record_revision_transaction,
+                ..
+            } if !mutation_id.is_empty() => (
+                format!("relational:{mutation_id}"),
+                payload_hash.clone(),
+                record_revision_transaction.as_ref(),
+            ),
+            _ => return Ok(false),
+        };
+        let Some(revisions) = revisions else {
+            return Ok(false);
+        };
+        let expected_revision_json = serde_json::to_string(revisions)
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let conn = self.projection_db.lock();
+        let stored: Option<(String, Option<String>)> = conn
+            .query_row(
+                "SELECT a.payload_hash, r.revision_json
+                 FROM applied_transactions a
+                 LEFT JOIN hql2_transaction_revisions r ON r.transaction_id=a.transaction_id
+                 WHERE a.transaction_id=?1",
+                [&transaction_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let Some((stored_hash, stored_revision_json)) = stored else {
+            return Ok(false);
+        };
+        if stored_hash != payload_hash
+            || stored_revision_json.as_deref() != Some(&expected_revision_json)
+        {
+            return Err(Error::from_reason(
+                "REVISION_CHECKPOINT_IDENTITY_CONFLICT: applied row event has different revision history",
+            ));
+        }
+        Ok(true)
+    }
+
+    fn validate_compacted_row_source_event(
+        &self,
+        source: &Event,
+        schemas: &HashMap<(String, u32), RelationalSchemaPackage>,
+        state: &mut CompactedRelationalRowRevisionState,
+    ) -> Result<()> {
+        let (groups, revisions, relational_affected_rows) = match source {
+            Event::RelationalRows {
+                namespace,
+                schema_version,
+                affected_rows,
+                mutations,
+                record_revision_transaction: Some(revisions),
+                ..
+            } => (
+                vec![(
+                    namespace.as_str(),
+                    Some(*schema_version),
+                    mutations.as_slice(),
+                )],
+                revisions,
+                Some(*affected_rows),
+            ),
+            Event::Transaction(transaction) => (
+                transaction
+                    .relational
+                    .iter()
+                    .map(|group| (group.namespace.as_str(), None, group.mutations.as_slice()))
+                    .collect::<Vec<_>>(),
+                transaction
+                    .record_revision_transaction
+                    .as_ref()
+                    .ok_or_else(|| {
+                        Error::from_reason(
+                            "REVISION_CHECKPOINT_SOURCE_MISMATCH: relational source has no revision transaction",
+                        )
+                    })?,
+                None,
+            ),
+            _ => return Ok(()),
+        };
+        revisions
+            .validate()
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let mut actual = revisions
+            .mutations
+            .iter()
+            .filter(|mutation| mutation.kind == uee_v2::RecordKindV2::Row)
+            .cloned()
+            .collect::<Vec<_>>();
+
+        if let Event::RelationalRows { .. } = source {
+            if actual.len() != revisions.mutations.len() {
+                return Err(Error::from_reason(
+                    "REVISION_CHECKPOINT_SOURCE_MISMATCH: relational row source contains non-row revisions",
+                ));
+            }
+        }
+
+        let mut relational_affected = 0u32;
+        for (namespace, declared_version, mutations) in groups {
+            if mutations.is_empty() {
+                continue;
+            }
+            let namespace_versions = actual
+                .iter()
+                .filter(|revision| revision.namespace == namespace)
+                .filter_map(|revision| revision.schema_version)
+                .collect::<std::collections::HashSet<_>>();
+            if namespace_versions.len() > 1 {
+                return Err(Error::from_reason(
+                    "REVISION_CHECKPOINT_SCHEMA_UNAVAILABLE: source transaction spans multiple schema versions in one namespace",
+                ));
+            }
+            let latest_version = schemas
+                .keys()
+                .filter_map(|(candidate_namespace, version)| {
+                    (candidate_namespace == namespace).then_some(*version)
+                })
+                .max();
+            let schema_version = declared_version
+                .filter(|version| *version != 0)
+                .or_else(|| namespace_versions.iter().next().map(|version| *version as u32))
+                .or(latest_version)
+                .ok_or_else(|| {
+                    Error::from_reason(
+                        "REVISION_CHECKPOINT_SCHEMA_UNAVAILABLE: exact relational schema is unavailable",
+                    )
+                })?;
+            let schema = schemas
+                .get(&(namespace.to_string(), schema_version))
+                .ok_or_else(|| {
+                    Error::from_reason(
+                        "REVISION_CHECKPOINT_SCHEMA_UNAVAILABLE: exact historical relational schema is unavailable",
+                    )
+                })?;
+
+            struct RowPlan {
+                table: RelationalTable,
+                key: serde_json::Map<String, Value>,
+                key_bytes: Vec<u8>,
+                before: Option<CompactedRowRevisionState>,
+                after: Option<serde_json::Map<String, Value>>,
+                saw_delete: bool,
+                reinserted: bool,
+            }
+            let mut plans = HashMap::<(String, Vec<u8>), RowPlan>::new();
+            let mut nullable_inserts = Vec::new();
+
+            for mutation in mutations {
+                Self::validate_row_mutation(schema, mutation)?;
+                let table = schema
+                    .tables
+                    .iter()
+                    .find(|table| table.name == mutation.table)
+                    .expect("validated relational mutation table");
+                let key = Self::relational_primary_key_values(table, mutation)?;
+                let key_bytes = Self::encode_relational_primary_key_v1(schema, mutation)?;
+                let has_null = table
+                    .primary_key
+                    .iter()
+                    .any(|name| key.get(name).is_none_or(Value::is_null));
+                if has_null {
+                    if matches!(
+                        mutation.kind,
+                        RelationalMutationKind::Insert | RelationalMutationKind::Upsert
+                    ) {
+                        nullable_inserts.push((table.clone(), key, key_bytes, mutation.clone()));
+                        relational_affected = relational_affected.saturating_add(1);
+                    }
+                    continue;
+                }
+
+                let identity = (table.name.clone(), key_bytes.clone());
+                if !plans.contains_key(&identity) {
+                    let state_key = (namespace.to_string(), table.name.clone(), key_bytes.clone());
+                    let before = state.get(&state_key).cloned();
+                    plans.insert(
+                        identity.clone(),
+                        RowPlan {
+                            table: table.clone(),
+                            key,
+                            key_bytes,
+                            after: before.as_ref().map(|state| state.after_image.clone()),
+                            before,
+                            saw_delete: false,
+                            reinserted: false,
+                        },
+                    );
+                }
+                let plan = plans
+                    .get_mut(&identity)
+                    .expect("row plan inserted for its identity");
+                match mutation.kind {
+                    RelationalMutationKind::Insert => {
+                        if plan.after.is_some() {
+                            return Err(Error::from_reason(
+                                "REVISION_CHECKPOINT_SOURCE_MISMATCH: insert targets an existing row",
+                            ));
+                        }
+                        plan.after = Some(Self::compacted_complete_relational_insert_image(
+                            &plan.table,
+                            mutation,
+                        )?);
+                        relational_affected = relational_affected.saturating_add(1);
+                    }
+                    RelationalMutationKind::Upsert => {
+                        if let Some(after) = plan.after.as_mut() {
+                            let values = mutation.values.as_object().expect("validated values");
+                            let mut updates = 0u32;
+                            for (name, value) in values {
+                                if plan.table.primary_key.contains(name) {
+                                    continue;
+                                }
+                                let column = plan
+                                    .table
+                                    .columns
+                                    .iter()
+                                    .find(|column| column.name == *name)
+                                    .expect("validated mutation column");
+                                after.insert(
+                                    name.clone(),
+                                    Self::compacted_relational_value(column, value)?,
+                                );
+                                updates += 1;
+                            }
+                            if updates > 0 {
+                                relational_affected = relational_affected.saturating_add(1);
+                            }
+                        } else {
+                            plan.after = Some(Self::compacted_complete_relational_insert_image(
+                                &plan.table,
+                                mutation,
+                            )?);
+                            relational_affected = relational_affected.saturating_add(1);
+                        }
+                    }
+                    RelationalMutationKind::Update => {
+                        if let Some(after) = plan.after.as_mut() {
+                            let values = mutation.values.as_object().expect("validated values");
+                            for (name, value) in values {
+                                let column = plan
+                                    .table
+                                    .columns
+                                    .iter()
+                                    .find(|column| column.name == *name)
+                                    .expect("validated mutation column");
+                                after.insert(
+                                    name.clone(),
+                                    Self::compacted_relational_value(column, value)?,
+                                );
+                            }
+                            relational_affected = relational_affected.saturating_add(1);
+                        }
+                    }
+                    RelationalMutationKind::Delete => {
+                        if plan.after.take().is_some() {
+                            relational_affected = relational_affected.saturating_add(1);
+                        }
+                    }
+                }
+                match mutation.kind {
+                    RelationalMutationKind::Delete => plan.saw_delete = true,
+                    RelationalMutationKind::Insert | RelationalMutationKind::Upsert
+                        if plan.saw_delete =>
+                    {
+                        plan.reinserted = true;
+                        plan.saw_delete = false;
+                    }
+                    _ => {}
+                }
+            }
+
+            for (table, key, key_bytes, mutation) in nullable_inserts {
+                let after_image = Self::complete_relational_insert_image(&table, &mutation)?;
+                let payload = serde_json::json!({
+                    "table": table.name,
+                    "key": key,
+                    "key_codec_version": 1,
+                    "key_bytes": hex::encode(&key_bytes),
+                    "after_image": after_image,
+                });
+                let candidate = Self::take_compacted_row_revision(
+                    &mut actual,
+                    CompactedRowRevisionExpectation {
+                        schema,
+                        table: &table.name,
+                        key_bytes: &key_bytes,
+                        operation: uee_v2::RevisionOperationV1::Upsert,
+                        row_id: None,
+                        expected_revision_id: None,
+                        predecessor_revision_id: None,
+                        payload: &payload,
+                    },
+                )?;
+                if candidate.valid_to.is_some() {
+                    return Err(Error::from_reason(
+                        "REVISION_CHECKPOINT_SOURCE_MISMATCH: upsert row revision is closed",
+                    ));
+                }
+            }
+
+            let mut identities = plans.keys().cloned().collect::<Vec<_>>();
+            identities.sort();
+            for identity in identities {
+                let plan = plans
+                    .get(&identity)
+                    .expect("row plan identity was collected from the map");
+                let state_key = (
+                    namespace.to_string(),
+                    plan.table.name.clone(),
+                    plan.key_bytes.clone(),
+                );
+                let mut final_state = None;
+                match (&plan.before, &plan.after) {
+                    (Some(before), None) => {
+                        let payload = serde_json::json!({
+                            "table": plan.table.name,
+                            "key": plan.key,
+                            "key_codec_version": 1,
+                            "key_bytes": hex::encode(&plan.key_bytes),
+                            "tombstone": true,
+                        });
+                        let candidate = Self::take_compacted_row_revision(
+                            &mut actual,
+                            CompactedRowRevisionExpectation {
+                                schema,
+                                table: &plan.table.name,
+                                key_bytes: &plan.key_bytes,
+                                operation: uee_v2::RevisionOperationV1::Retract,
+                                row_id: Some(&before.row_id),
+                                expected_revision_id: Some(&before.revision_id),
+                                predecessor_revision_id: Some(&before.revision_id),
+                                payload: &payload,
+                            },
+                        )?;
+                        if candidate.valid_from != before.valid_from
+                            || candidate
+                                .valid_to
+                                .is_none_or(|valid_to| valid_to <= candidate.valid_from)
+                        {
+                            return Err(Error::from_reason(
+                                "REVISION_CHECKPOINT_SOURCE_MISMATCH: row retraction time does not match its predecessor",
+                            ));
+                        }
+                    }
+                    (Some(before), Some(after_image)) if plan.reinserted => {
+                        let retract_payload = serde_json::json!({
+                            "table": plan.table.name,
+                            "key": plan.key,
+                            "key_codec_version": 1,
+                            "key_bytes": hex::encode(&plan.key_bytes),
+                            "tombstone": true,
+                        });
+                        let retraction = Self::take_compacted_row_revision(
+                            &mut actual,
+                            CompactedRowRevisionExpectation {
+                                schema,
+                                table: &plan.table.name,
+                                key_bytes: &plan.key_bytes,
+                                operation: uee_v2::RevisionOperationV1::Retract,
+                                row_id: Some(&before.row_id),
+                                expected_revision_id: Some(&before.revision_id),
+                                predecessor_revision_id: Some(&before.revision_id),
+                                payload: &retract_payload,
+                            },
+                        )?;
+                        if retraction.valid_from != before.valid_from
+                            || retraction
+                                .valid_to
+                                .is_none_or(|valid_to| valid_to <= retraction.valid_from)
+                        {
+                            return Err(Error::from_reason(
+                                "REVISION_CHECKPOINT_SOURCE_MISMATCH: row retraction time does not match its predecessor",
+                            ));
+                        }
+                        let payload = serde_json::json!({
+                            "table": plan.table.name,
+                            "key": plan.key,
+                            "key_codec_version": 1,
+                            "key_bytes": hex::encode(&plan.key_bytes),
+                            "after_image": after_image,
+                        });
+                        let candidate = Self::take_compacted_row_revision(
+                            &mut actual,
+                            CompactedRowRevisionExpectation {
+                                schema,
+                                table: &plan.table.name,
+                                key_bytes: &plan.key_bytes,
+                                operation: uee_v2::RevisionOperationV1::Upsert,
+                                row_id: None,
+                                expected_revision_id: None,
+                                predecessor_revision_id: None,
+                                payload: &payload,
+                            },
+                        )?;
+                        if candidate.id == before.row_id
+                            || candidate.valid_to.is_some()
+                            || candidate.valid_from != retraction.valid_to.unwrap()
+                        {
+                            return Err(Error::from_reason(
+                                "REVISION_CHECKPOINT_SOURCE_MISMATCH: reinsert must create a fresh row revision",
+                            ));
+                        }
+                        final_state = Some(CompactedRowRevisionState {
+                            row_id: candidate.id,
+                            revision_id: candidate.revision_id,
+                            valid_from: candidate.valid_from,
+                            after_image: after_image.clone(),
+                        });
+                    }
+                    (Some(before), Some(after_image)) => {
+                        let payload = serde_json::json!({
+                            "table": plan.table.name,
+                            "key": plan.key,
+                            "key_codec_version": 1,
+                            "key_bytes": hex::encode(&plan.key_bytes),
+                            "after_image": after_image,
+                        });
+                        let candidate = Self::take_compacted_row_revision(
+                            &mut actual,
+                            CompactedRowRevisionExpectation {
+                                schema,
+                                table: &plan.table.name,
+                                key_bytes: &plan.key_bytes,
+                                operation: uee_v2::RevisionOperationV1::Upsert,
+                                row_id: Some(&before.row_id),
+                                expected_revision_id: Some(&before.revision_id),
+                                predecessor_revision_id: Some(&before.revision_id),
+                                payload: &payload,
+                            },
+                        )?;
+                        if candidate.valid_from <= before.valid_from || candidate.valid_to.is_some()
+                        {
+                            return Err(Error::from_reason(
+                                "REVISION_CHECKPOINT_SOURCE_MISMATCH: row upsert time does not advance its predecessor",
+                            ));
+                        }
+                        final_state = Some(CompactedRowRevisionState {
+                            row_id: candidate.id,
+                            revision_id: candidate.revision_id,
+                            valid_from: candidate.valid_from,
+                            after_image: after_image.clone(),
+                        });
+                    }
+                    (None, Some(after_image)) => {
+                        let payload = serde_json::json!({
+                            "table": plan.table.name,
+                            "key": plan.key,
+                            "key_codec_version": 1,
+                            "key_bytes": hex::encode(&plan.key_bytes),
+                            "after_image": after_image,
+                        });
+                        let candidate = Self::take_compacted_row_revision(
+                            &mut actual,
+                            CompactedRowRevisionExpectation {
+                                schema,
+                                table: &plan.table.name,
+                                key_bytes: &plan.key_bytes,
+                                operation: uee_v2::RevisionOperationV1::Upsert,
+                                row_id: None,
+                                expected_revision_id: None,
+                                predecessor_revision_id: None,
+                                payload: &payload,
+                            },
+                        )?;
+                        if candidate.valid_to.is_some() {
+                            return Err(Error::from_reason(
+                                "REVISION_CHECKPOINT_SOURCE_MISMATCH: new row revision is closed",
+                            ));
+                        }
+                        final_state = Some(CompactedRowRevisionState {
+                            row_id: candidate.id,
+                            revision_id: candidate.revision_id,
+                            valid_from: candidate.valid_from,
+                            after_image: after_image.clone(),
+                        });
+                    }
+                    (None, None) => {}
+                }
+                if let Some(final_state) = final_state {
+                    state.insert(state_key, final_state);
+                } else {
+                    state.remove(&state_key);
+                }
+            }
+        }
+
+        if !actual.is_empty() {
+            return Err(Error::from_reason(
+                "REVISION_CHECKPOINT_SOURCE_MISMATCH: checkpoint includes row revisions with no source mutation",
+            ));
+        }
+        if relational_affected_rows.is_some_and(|affected| affected != relational_affected) {
+            return Err(Error::from_reason(
+                "REVISION_CHECKPOINT_SOURCE_MISMATCH: affected row count does not match source mutations",
+            ));
+        }
+        Ok(())
+    }
+
+    fn revision_checkpoint_matches_source(
+        checkpoint: &GenesisTransactionEvent,
+        source: &Event,
+    ) -> bool {
+        if !Self::is_revision_checkpoint(checkpoint) {
+            return false;
+        }
+        let Some(checkpoint_revisions) = checkpoint.record_revision_transaction.as_ref() else {
+            return false;
+        };
+        if checkpoint_revisions.mutations.is_empty() || checkpoint_revisions.validate().is_err() {
+            return false;
+        }
+        let checkpoint_revisions = serde_json::to_value(checkpoint_revisions).ok();
+        match source {
+            Event::Transaction(transaction) => {
+                if transaction.local_frame_seq.is_some()
+                    || transaction.transaction_id != checkpoint.transaction_id
+                    || transaction.origin_commit_seq != checkpoint.origin_commit_seq
+                    || transaction.payload_hash != checkpoint.payload_hash
+                    || transaction.advances_txn_frontier != checkpoint.advances_txn_frontier
+                    || serde_json::to_value(&transaction.record_revision_transaction).ok()
+                        != checkpoint_revisions
+                {
+                    return false;
+                }
+                Self::revision_transaction_binds_graph(source)
+            }
+            Event::RelationalRows {
+                namespace,
+                mutation_id,
+                payload_hash,
+                record_revision_transaction: Some(revisions),
+                ..
+            } => {
+                format!("relational:{mutation_id}") == checkpoint.transaction_id
+                    && !mutation_id.is_empty()
+                    && payload_hash == &checkpoint.payload_hash
+                    && !checkpoint.advances_txn_frontier
+                    && revisions.validate().is_ok()
+                    && revisions.mutations.iter().all(|mutation| {
+                        mutation.kind == uee_v2::RecordKindV2::Row
+                            && mutation.namespace == *namespace
+                    })
+                    && serde_json::to_value(revisions).ok() == checkpoint_revisions
+            }
+            _ => false,
+        }
+    }
+
+    fn verify_compacted_revision_checkpoint(&self, se: &SignedEvent) -> bool {
+        let Event::Transaction(checkpoint) = &se.event else {
+            return false;
+        };
+        if checkpoint.record_revision_transaction.is_none() {
+            return false;
+        }
+        let Some((version, envelope)) =
+            decode_compacted_envelope::<CompactedRevisionCheckpointEnvelope>(
+                &se.signature,
+                COMPACTED_REVISION_CHECKPOINT_MAGIC,
+                COMPACTED_REVISION_CHECKPOINT_V2_MAGIC,
+                COMPACTED_REVISION_CHECKPOINT_MAX_BYTES,
+            )
+        else {
+            return false;
+        };
+        if envelope.version != version
+            || is_compacted_signature(&envelope.proof.signature)
+            || !self.verify_raw_event_signature(&envelope.proof)
+            || !Self::revision_checkpoint_matches_source(checkpoint, &envelope.proof.event)
+        {
+            return false;
+        }
+        let Some(key) = self.peer_verifying_key(&se.signer_peer_id) else {
+            return false;
+        };
+        let Ok(payload) = compacted_revision_checkpoint_payload(
+            &se.signer_peer_id,
+            &se.event,
+            &envelope.proof,
+            version,
+        ) else {
+            return false;
+        };
+        let Ok(signature) = Signature::from_slice(&envelope.relay_signature) else {
+            return false;
+        };
+        key.verify(&payload, &signature).is_ok()
+    }
+
+    /// Projection replay runs before an operator can restore the in-memory
+    /// membership roster. At that point the local WAL is the durable record of
+    /// events that passed authenticated sync admission. Retain a structural
+    /// check for the signed source binding and envelope shape so a legitimate
+    /// compacted revision checkpoint can rebuild the projection after restart.
+    /// Network ingress always uses `verify_compacted_revision_checkpoint`,
+    /// which verifies both ed25519 signatures against the configured roster.
+    fn compacted_revision_checkpoint_well_formed(&self, se: &SignedEvent) -> bool {
+        let Event::Transaction(checkpoint) = &se.event else {
+            return false;
+        };
+        let Some((version, envelope)) =
+            decode_compacted_envelope::<CompactedRevisionCheckpointEnvelope>(
+                &se.signature,
+                COMPACTED_REVISION_CHECKPOINT_MAGIC,
+                COMPACTED_REVISION_CHECKPOINT_V2_MAGIC,
+                COMPACTED_REVISION_CHECKPOINT_MAX_BYTES,
+            )
+        else {
+            return false;
+        };
+        envelope.version == version
+            && !se.signer_peer_id.is_empty()
+            && !envelope.proof.signer_peer_id.is_empty()
+            && envelope.relay_signature.len() == 64
+            && envelope.proof.signature.len() == 64
+            && !is_compacted_signature(&envelope.proof.signature)
+            && Self::revision_checkpoint_matches_source(checkpoint, &envelope.proof.event)
+            && compacted_revision_checkpoint_payload(
+                &se.signer_peer_id,
+                &se.event,
+                &envelope.proof,
+                version,
+            )
+            .is_ok()
+    }
+
+    fn compacted_revision_checkpoint_source_proof(&self, se: &SignedEvent) -> Option<SignedEvent> {
+        let (version, envelope) = decode_compacted_envelope::<CompactedRevisionCheckpointEnvelope>(
+            &se.signature,
+            COMPACTED_REVISION_CHECKPOINT_MAGIC,
+            COMPACTED_REVISION_CHECKPOINT_V2_MAGIC,
+            COMPACTED_REVISION_CHECKPOINT_MAX_BYTES,
+        )?;
+        (envelope.version == version && self.verify_compacted_revision_checkpoint(se))
+            .then_some(envelope.proof)
+    }
+
+    fn is_compacted_graph_materialization(&self, se: &SignedEvent) -> bool {
+        self.is_compacted_graph_materialization_with_collection_definitions(se, None)
+    }
+
+    fn is_compacted_graph_materialization_with_collection_definitions(
+        &self,
+        se: &SignedEvent,
+        collection_definitions: Option<&HashMap<String, CollectionDefinition>>,
+    ) -> bool {
+        self.verify_compacted_base_materialization_with_collection_definitions(
+            se,
+            collection_definitions,
+        ) || (self
+            .compacted_master_authority_proof_with_collection_definitions(
+                se,
+                collection_definitions,
+            )
+            .is_some()
+            && self
+                .compacted_master_revision_proof_with_collection_definitions(
+                    se,
+                    collection_definitions,
+                )
+                .is_some_and(|proof| {
+                    Self::revision_transaction_binds_graph(&proof.event)
+                        && self.compacted_base_proof_matches_event_with_collection_definitions(
+                            &se.event,
+                            &proof.event,
+                            collection_definitions,
+                        )
+                }))
+    }
+
+    fn signed_event_requires_revision_envelope_with_collection_definitions(
+        &self,
+        se: &SignedEvent,
+        collection_definitions: Option<&HashMap<String, CollectionDefinition>>,
+    ) -> bool {
+        Self::graph_event_requires_revision_envelope(&se.event)
+            && !self.is_compacted_graph_materialization_with_collection_definitions(
+                se,
+                collection_definitions,
+            )
+    }
+
+    fn compacted_proof_matches_event(&self, event: &Event, proof_event: &Event) -> bool {
+        self.compacted_proof_matches_event_with_collection_definitions(event, proof_event, None)
+    }
+
+    fn compacted_proof_matches_event_with_collection_definitions(
+        &self,
+        event: &Event,
+        proof_event: &Event,
+        collection_definitions: Option<&HashMap<String, CollectionDefinition>>,
+    ) -> bool {
+        match event {
+            Event::Node(node) => find_proof_node(proof_event, node).is_some(),
+            Event::NodeRetract {
+                id,
+                clock,
+                retracted_at,
+            } => find_proof_retraction(proof_event, id, clock, retracted_at),
+            Event::VectorMaterialized(_) => self
+                .compacted_master_vector_source_matches_event_with_collection_definitions(
+                    event,
+                    proof_event,
+                    collection_definitions,
+                ),
+            _ => false,
+        }
+    }
+
+    fn revision_transaction_binds_graph(event: &Event) -> bool {
+        let Event::Transaction(transaction) = event else {
+            return false;
+        };
+        let Some(revisions) = transaction.record_revision_transaction.as_ref() else {
+            return false;
+        };
+        if revisions.validate().is_err() {
+            return false;
+        }
+
+        let graph_revision_count = revisions
+            .mutations
+            .iter()
+            .filter(|mutation| {
+                matches!(
+                    mutation.kind,
+                    uee_v2::RecordKindV2::Node | uee_v2::RecordKindV2::Edge
+                )
+            })
+            .count();
+        if graph_revision_count
+            != transaction.nodes.len()
+                + transaction.edges.len()
+                + transaction.node_retractions.len()
+        {
+            return false;
+        }
+        let validate_graph_mutation = |kind: uee_v2::RecordKindV2,
+                                       id: &str,
+                                       operation: uee_v2::RevisionOperationV1,
+                                       payload: Value|
+         -> bool {
+            let mut matching = revisions
+                .mutations
+                .iter()
+                .filter(|mutation| mutation.kind == kind && mutation.id == id);
+            let Some(mutation) = matching.next() else {
+                return false;
+            };
+            mutation.namespace == "default"
+                && mutation.operation == operation
+                && mutation.payload == payload
+                && matching.next().is_none()
+        };
+
+        let mut graph_ids = HashSet::new();
+        for node in &transaction.nodes {
+            if !graph_ids.insert(format!("node:{}", node.id))
+                || !validate_graph_mutation(
+                    uee_v2::RecordKindV2::Node,
+                    &node.id,
+                    uee_v2::RevisionOperationV1::Upsert,
+                    serde_json::to_value(node).unwrap_or(Value::Null),
+                )
+            {
+                return false;
+            }
+        }
+        for edge in &transaction.edges {
+            if !graph_ids.insert(format!("edge:{}", edge.id))
+                || !validate_graph_mutation(
+                    uee_v2::RecordKindV2::Edge,
+                    &edge.id,
+                    if edge.valid_to.is_some() {
+                        uee_v2::RevisionOperationV1::Retract
+                    } else {
+                        uee_v2::RevisionOperationV1::Upsert
+                    },
+                    serde_json::to_value(edge).unwrap_or(Value::Null),
+                )
+            {
+                return false;
+            }
+        }
+        for retraction in &transaction.node_retractions {
+            if !graph_ids.insert(format!("node:{}", retraction.id))
+                || !validate_graph_mutation(
+                    uee_v2::RecordKindV2::Node,
+                    &retraction.id,
+                    uee_v2::RevisionOperationV1::Retract,
+                    serde_json::json!({
+                        "id": retraction.id,
+                        "retracted_at": retraction.retracted_at,
+                    }),
+                )
+            {
+                return false;
+            }
+        }
+
+        let expected_vector_count = transaction
+            .nodes
+            .iter()
+            .filter(|node| node.embedding.is_some())
+            .count()
+            + transaction.vectors.len();
+        if revisions
+            .mutations
+            .iter()
+            .filter(|mutation| mutation.kind == uee_v2::RecordKindV2::Vector)
+            .count()
+            != expected_vector_count
+        {
+            return false;
+        }
+        let mut vector_ids = HashSet::new();
+        let validate_vector = |owner_id: &str,
+                               source_collection: &Option<String>,
+                               embedding: &[f64],
+                               lang: Option<&str>,
+                               owner_valid_from: Option<&chrono::DateTime<Utc>>,
+                               vector_ids: &mut HashSet<String>|
+         -> bool {
+            let Ok(embedding_payload) = serde_json::to_value(embedding) else {
+                return false;
+            };
+            let Some(mutation) = revisions.mutations.iter().find(|mutation| {
+                mutation.kind == uee_v2::RecordKindV2::Vector
+                    && mutation.namespace == "default"
+                    && mutation.operation == uee_v2::RevisionOperationV1::Upsert
+                    && mutation.payload["owner_id"].as_str() == Some(owner_id)
+                    && mutation.payload["embedding"] == embedding_payload
+                    && mutation.payload["lang"].as_str() == Some(lang.unwrap_or("en"))
+            }) else {
+                return false;
+            };
+            let Some(collection) = mutation.payload["collection"].as_str() else {
+                return false;
+            };
+            if source_collection
+                .as_deref()
+                .is_some_and(|source| source != collection)
+                || mutation.schema_ref.as_deref() != Some(collection)
+                || mutation.schema_version != Some(1)
+                || Self::vector_revision_record_id(owner_id, collection)
+                    .ok()
+                    .as_deref()
+                    != Some(mutation.id.as_str())
+                || !vector_ids.insert(mutation.id.clone())
+            {
+                return false;
+            }
+            if let Some(owner_valid_from) = owner_valid_from {
+                if let Some(owner) = revisions.mutations.iter().find(|candidate| {
+                    candidate.kind == uee_v2::RecordKindV2::Node
+                        && candidate.namespace == "default"
+                        && candidate.id == owner_id
+                }) {
+                    if owner.operation != uee_v2::RevisionOperationV1::Upsert
+                        || mutation.payload["owner_revision_id"].as_str()
+                            != Some(owner.revision_id.as_str())
+                        || mutation.valid_from != *owner_valid_from
+                    {
+                        return false;
+                    }
+                }
+            }
+            true
+        };
+        for node in &transaction.nodes {
+            if let Some(embedding) = &node.embedding {
+                let Ok(valid_from) = Self::parse_revision_time(&node.valid_from) else {
+                    return false;
+                };
+                if !validate_vector(
+                    &node.id,
+                    &node.collection,
+                    embedding,
+                    node.lang.as_deref(),
+                    Some(&valid_from),
+                    &mut vector_ids,
+                ) {
+                    return false;
+                }
+            }
+        }
+        for vector in &transaction.vectors {
+            if !validate_vector(
+                &vector.node_id,
+                &vector.collection,
+                &vector.embedding,
+                vector.lang.as_deref(),
+                None,
+                &mut vector_ids,
+            ) {
+                return false;
+            }
+        }
+        vector_ids.len() == expected_vector_count
+    }
+
+    fn compacted_vector_source_clock(
+        &self,
+        proof_event: &Event,
+        owner_id: &str,
+        collection: &str,
+    ) -> Option<LogicalClock> {
+        let is_collection = |candidate: &Option<String>| {
+            candidate.as_deref().unwrap_or(&self.default_collection) == collection
+        };
+        match proof_event {
+            Event::Vector(vector) | Event::VectorMaterialized(vector)
+                if vector.node_id == owner_id && is_collection(&vector.collection) =>
+            {
+                Some(vector.clock.clone())
+            }
+            Event::Node(node)
+                if node.id == owner_id
+                    && node.embedding.is_some()
+                    && is_collection(&node.collection) =>
+            {
+                Some(node.clock.clone())
+            }
+            Event::Batch(events) => events.iter().rev().find_map(|nested| {
+                self.compacted_vector_source_clock(nested, owner_id, collection)
+            }),
+            Event::Transaction(transaction) => transaction
+                .vectors
+                .iter()
+                .rev()
+                .find(|vector| vector.node_id == owner_id && is_collection(&vector.collection))
+                .map(|vector| vector.clock.clone())
+                .or_else(|| {
+                    transaction
+                        .nodes
+                        .iter()
+                        .rev()
+                        .find(|node| {
+                            node.id == owner_id
+                                && node.embedding.is_some()
+                                && is_collection(&node.collection)
+                        })
+                        .map(|node| node.clock.clone())
+                }),
+            _ => None,
+        }
+    }
+
+    fn compacted_base_proof_matches_event(&self, event: &Event, proof_event: &Event) -> bool {
+        self.compacted_base_proof_matches_event_with_collection_definitions(
+            event,
+            proof_event,
+            None,
+        )
+    }
+
+    fn compacted_vector_materialization_matches_source(
+        &self,
+        target: &VectorEvent,
+        source: CompactedVectorSource<'_>,
+        collection_definitions: Option<&HashMap<String, CollectionDefinition>>,
+    ) -> bool {
+        let CompactedVectorSource {
+            owner_id,
+            collection,
+            embedding: source_embedding,
+            lang: source_lang,
+            clock: source_clock,
+        } = source;
+        let source_f32: Vec<f32> = source_embedding.iter().map(|value| *value as f32).collect();
+        // Check the deterministic projection that compaction reads from the
+        // collection arena. Rerank sidecars preserve f32 values; other arena
+        // formats apply the collection's quantization and calibration.
+        let live_collection = self.collections.get(collection);
+        let definition = collection_definitions
+            .and_then(|definitions| definitions.get(collection))
+            .cloned()
+            .or_else(|| {
+                self.collection_definitions
+                    .get(collection)
+                    .map(|definition| definition.clone())
+            });
+        let quant = definition
+            .as_ref()
+            .map(|definition| definition.quant)
+            .or_else(|| live_collection.as_ref().map(|entry| entry.quant));
+        let metric = definition
+            .as_ref()
+            .map(|definition| definition.metric)
+            .or_else(|| live_collection.as_ref().map(|entry| entry.metric));
+        let rerank = definition
+            .as_ref()
+            .map(|definition| definition.rerank)
+            .or_else(|| {
+                live_collection
+                    .as_ref()
+                    .map(|entry| entry.f32_sidecar.is_some())
+            });
+        let mut prepared_f32 = source_f32;
+        if metric == Some(Metric::Cosine) {
+            let norm = prepared_f32
+                .iter()
+                .map(|value| value * value)
+                .sum::<f32>()
+                .sqrt();
+            if norm > 0.0 {
+                for value in &mut prepared_f32 {
+                    *value /= norm;
+                }
+            }
+        }
+        let projected = match (quant, metric, rerank) {
+            (Some(_), Some(_), Some(true)) => Some(prepared_f32.clone()),
+            (Some(Quant::ScalarU8), Some(_), Some(false)) => {
+                let (scale, bias) = live_collection
+                    .as_ref()
+                    .map(|entry| entry.sq8_snapshot())
+                    .unwrap_or(SQ8_FIXED);
+                Some(
+                    prepared_f32
+                        .iter()
+                        .map(|value| sq8_dq(sq8_q(*value, scale, bias), scale, bias))
+                        .collect(),
+                )
+            }
+            (Some(Quant::Binary), Some(_), Some(false)) => {
+                let center = live_collection
+                    .as_ref()
+                    .and_then(|entry| entry.center_snapshot());
+                Some(bq_unpack(
+                    &bq_pack_centered(&prepared_f32, center.as_deref()),
+                    prepared_f32.len(),
+                ))
+            }
+            (Some(Quant::F16), Some(_), Some(false)) => Some(
+                prepared_f32
+                    .iter()
+                    .map(|value| f16::from_f32(*value).to_f32())
+                    .collect(),
+            ),
+            (Some(Quant::None), Some(_), Some(false)) => Some(prepared_f32.clone()),
+            // Unknown quantization or rerank contracts cannot authorize a
+            // materialized vector.
+            _ => None,
+        };
+        let materialized_matches = projected.is_some_and(|embedding| {
+            target.embedding == embedding.into_iter().map(f64::from).collect::<Vec<_>>()
+        });
+        target.node_id == owner_id
+            && target.collection.as_deref() == Some(collection)
+            && materialized_matches
+            && target.lang.as_deref() == Some(source_lang.unwrap_or("en"))
+            && &target.clock == source_clock
+    }
+
+    fn compacted_master_vector_source_matches_event_with_collection_definitions(
+        &self,
+        event: &Event,
+        proof_event: &Event,
+        collection_definitions: Option<&HashMap<String, CollectionDefinition>>,
+    ) -> bool {
+        let Event::VectorMaterialized(target) = event else {
+            return false;
+        };
+        if matches!(
+            proof_event,
+            Event::Transaction(transaction)
+                if transaction.record_revision_transaction.is_some()
+        ) {
+            return self.compacted_base_proof_matches_event_with_collection_definitions(
+                event,
+                proof_event,
+                collection_definitions,
+            );
+        }
+        fn latest_vector_source<'a>(
+            event: &'a Event,
+            owner_id: &str,
+            collection: &str,
+            default_collection: &str,
+        ) -> Option<(&'a [f64], Option<&'a str>, &'a LogicalClock)> {
+            let matches_collection =
+                |candidate: Option<&str>| candidate.unwrap_or(default_collection) == collection;
+            match event {
+                Event::Vector(vector) | Event::VectorMaterialized(vector)
+                    if vector.node_id == owner_id
+                        && matches_collection(vector.collection.as_deref()) =>
+                {
+                    Some((&vector.embedding, vector.lang.as_deref(), &vector.clock))
+                }
+                Event::Node(node)
+                    if node.id == owner_id
+                        && node.embedding.is_some()
+                        && matches_collection(node.collection.as_deref()) =>
+                {
+                    Some((
+                        node.embedding.as_deref()?,
+                        node.lang.as_deref(),
+                        &node.clock,
+                    ))
+                }
+                Event::Batch(events) => events.iter().rev().find_map(|nested| {
+                    latest_vector_source(nested, owner_id, collection, default_collection)
+                }),
+                Event::Transaction(transaction) => transaction
+                    .vectors
+                    .iter()
+                    .rev()
+                    .find(|vector| {
+                        vector.node_id == owner_id
+                            && matches_collection(vector.collection.as_deref())
+                    })
+                    .map(|vector| {
+                        (
+                            vector.embedding.as_slice(),
+                            vector.lang.as_deref(),
+                            &vector.clock,
+                        )
+                    })
+                    .or_else(|| {
+                        transaction
+                            .nodes
+                            .iter()
+                            .rev()
+                            .find(|node| {
+                                node.id == owner_id
+                                    && node.embedding.is_some()
+                                    && matches_collection(node.collection.as_deref())
+                            })
+                            .map(|node| {
+                                (
+                                    node.embedding.as_deref().unwrap_or_default(),
+                                    node.lang.as_deref(),
+                                    &node.clock,
+                                )
+                            })
+                    }),
+                _ => None,
+            }
+        }
+        let collection = target
+            .collection
+            .as_deref()
+            .unwrap_or(&self.default_collection);
+        let Some((embedding, lang, clock)) = latest_vector_source(
+            proof_event,
+            &target.node_id,
+            collection,
+            &self.default_collection,
+        ) else {
+            return false;
+        };
+        self.compacted_vector_materialization_matches_source(
+            target,
+            CompactedVectorSource {
+                owner_id: &target.node_id,
+                collection,
+                embedding,
+                lang,
+                clock,
+            },
+            collection_definitions,
+        )
+    }
+
+    fn compacted_base_proof_matches_event_with_collection_definitions(
+        &self,
+        event: &Event,
+        proof_event: &Event,
+        collection_definitions: Option<&HashMap<String, CollectionDefinition>>,
+    ) -> bool {
+        let Event::Transaction(transaction) = proof_event else {
+            return false;
+        };
+        if !Self::revision_transaction_binds_graph(proof_event) {
+            return false;
+        }
+        match event {
+            Event::Node(node) => find_proof_node(proof_event, node).is_some(),
+            Event::NodeRetract {
+                id,
+                clock,
+                retracted_at,
+            } => find_proof_retraction(proof_event, id, clock, retracted_at),
+            Event::Edge(edge) => transaction
+                .edges
+                .iter()
+                .filter(|source| source.id == edge.id)
+                .any(|source| serde_json::to_value(source).ok() == serde_json::to_value(edge).ok()),
+            Event::VectorMaterialized(target) => {
+                let Some(revisions) = transaction.record_revision_transaction.as_ref() else {
+                    return false;
+                };
+                let matches_source =
+                    |owner_id: &str,
+                     source_collection: &Option<String>,
+                     source_embedding: &[f64],
+                     source_lang: Option<&str>,
+                     source_clock: &LogicalClock| {
+                        let Ok(embedding_payload) = serde_json::to_value(source_embedding) else {
+                            return false;
+                        };
+                        let Some(mutation) = revisions.mutations.iter().find(|mutation| {
+                            mutation.kind == uee_v2::RecordKindV2::Vector
+                                && mutation.namespace == "default"
+                                && mutation.operation == uee_v2::RevisionOperationV1::Upsert
+                                && mutation.payload["owner_id"].as_str() == Some(owner_id)
+                                && mutation.payload["embedding"] == embedding_payload
+                                && mutation.payload["lang"].as_str()
+                                    == Some(source_lang.unwrap_or("en"))
+                                && source_collection.as_deref().is_none_or(|name| {
+                                    mutation.payload["collection"].as_str() == Some(name)
+                                })
+                        }) else {
+                            return false;
+                        };
+                        let Some(collection) = mutation.payload["collection"].as_str() else {
+                            return false;
+                        };
+                        self.compacted_vector_materialization_matches_source(
+                            target,
+                            CompactedVectorSource {
+                                owner_id,
+                                collection,
+                                embedding: source_embedding,
+                                lang: source_lang,
+                                clock: source_clock,
+                            },
+                            collection_definitions,
+                        )
+                    };
+                transaction.nodes.iter().any(|node| {
+                    node.embedding.as_ref().is_some_and(|embedding| {
+                        matches_source(
+                            &node.id,
+                            &node.collection,
+                            embedding,
+                            node.lang.as_deref(),
+                            &node.clock,
+                        )
+                    })
+                }) || transaction.vectors.iter().any(|vector| {
+                    matches_source(
+                        &vector.node_id,
+                        &vector.collection,
+                        &vector.embedding,
+                        vector.lang.as_deref(),
+                        &vector.clock,
+                    )
+                })
+            }
+            _ => false,
+        }
+    }
+
+    fn compacted_base_source_proof(&self, se: &SignedEvent) -> Option<SignedEvent> {
+        self.compacted_base_source_proof_with_collection_definitions(se, None)
+    }
+
+    fn compacted_base_source_proof_with_collection_definitions(
+        &self,
+        se: &SignedEvent,
+        collection_definitions: Option<&HashMap<String, CollectionDefinition>>,
+    ) -> Option<SignedEvent> {
+        let (version, envelope) = decode_compacted_envelope::<CompactedBaseEventEnvelope>(
+            &se.signature,
+            COMPACTED_BASE_EVENT_MAGIC,
+            COMPACTED_BASE_EVENT_V2_MAGIC,
+            COMPACTED_BASE_EVENT_MAX_BYTES,
+        )?;
+        (envelope.version == version
+            && self.verify_compacted_base_materialization_with_collection_definitions(
+                se,
+                collection_definitions,
+            )
+            && !is_compacted_signature(&envelope.proof.signature))
+        .then_some(envelope.proof)
+    }
+
+    fn compacted_master_authority_proof(&self, se: &SignedEvent) -> Option<SignedEvent> {
+        self.compacted_master_authority_proof_with_collection_definitions(se, None)
+    }
+
+    fn compacted_master_authority_proof_with_collection_definitions(
+        &self,
+        se: &SignedEvent,
+        collection_definitions: Option<&HashMap<String, CollectionDefinition>>,
+    ) -> Option<SignedEvent> {
+        let (version, envelope) = decode_compacted_envelope::<CompactedMasterProofEnvelope>(
+            &se.signature,
+            COMPACTED_MASTER_PROOF_MAGIC,
+            COMPACTED_MASTER_PROOF_V2_MAGIC,
+            COMPACTED_MASTER_PROOF_MAX_BYTES,
+        )?;
+        if envelope.version != version
+            || is_compacted_signature(&envelope.proof.signature)
+            || !self.verify_raw_event_signature(&envelope.proof)
+            || !self.authorized_master(&envelope.proof.signer_peer_id)
+            || !self.compacted_proof_matches_event_with_collection_definitions(
+                &se.event,
+                &envelope.proof.event,
+                collection_definitions,
+            )
+        {
+            return None;
+        }
+        let revision_proof = envelope.revision_proof.as_ref().unwrap_or(&envelope.proof);
+        if (self.storage_schema_version == SCHEMA_VERSION || envelope.revision_proof.is_some())
+            && (!self.verify_raw_event_signature(revision_proof)
+                || !Self::revision_transaction_binds_graph(&revision_proof.event)
+                || !self.compacted_base_proof_matches_event_with_collection_definitions(
+                    &se.event,
+                    &revision_proof.event,
+                    collection_definitions,
+                ))
+        {
+            return None;
+        }
+        let key = self.peer_verifying_key(&se.signer_peer_id)?;
+        let payload = compacted_master_proof_payload(
+            &se.signer_peer_id,
+            &se.event,
+            &envelope.proof,
+            envelope.revision_proof.as_ref(),
+            version,
+        )
+        .ok()?;
+        let relay_signature = Signature::from_slice(&envelope.relay_signature).ok()?;
+        key.verify(&payload, &relay_signature).ok()?;
+        Some(envelope.proof)
+    }
+
+    fn compacted_master_revision_proof(&self, se: &SignedEvent) -> Option<SignedEvent> {
+        self.compacted_master_revision_proof_with_collection_definitions(se, None)
+    }
+
+    fn compacted_master_revision_proof_with_collection_definitions(
+        &self,
+        se: &SignedEvent,
+        collection_definitions: Option<&HashMap<String, CollectionDefinition>>,
+    ) -> Option<SignedEvent> {
+        self.compacted_master_authority_proof_with_collection_definitions(
+            se,
+            collection_definitions,
+        )?;
+        let (_, envelope) = decode_compacted_envelope::<CompactedMasterProofEnvelope>(
+            &se.signature,
+            COMPACTED_MASTER_PROOF_MAGIC,
+            COMPACTED_MASTER_PROOF_V2_MAGIC,
+            COMPACTED_MASTER_PROOF_MAX_BYTES,
+        )?;
+        envelope.revision_proof.or(Some(envelope.proof))
+    }
+
+    fn current_node_is_master(&self, node_id: &str) -> bool {
+        self.get_u32_unlocked(node_id)
+            .and_then(|id| self.nodes.get(&id))
+            .is_some_and(|node| Self::labels_are_master(&node.labels))
+    }
+
+    fn node_identity_requires_master(&self, node_id: &str) -> bool {
+        self.current_node_is_master(node_id) || self.tombstones.contains_key(node_id)
+    }
+
+    fn labels_are_master(labels: &[String]) -> bool {
+        labels
+            .iter()
+            .any(|label| label.eq_ignore_ascii_case("MASTER"))
+    }
+
+    fn batch_master_auth_state<'a>(
+        &self,
+        node_id: &str,
+        states: &'a mut HashMap<String, BatchMasterAuthState>,
+        seed_from_live_state: bool,
+    ) -> &'a mut BatchMasterAuthState {
+        if !states.contains_key(node_id) {
+            let current = seed_from_live_state
+                .then(|| {
+                    self.get_u32_unlocked(node_id)
+                        .and_then(|id| self.nodes.get(&id).map(|node| node.value().clone()))
+                })
+                .flatten();
+            let tombstone = seed_from_live_state
+                .then(|| {
+                    self.tombstones
+                        .get(node_id)
+                        .map(|tombstone| tombstone.clock.clone())
+                })
+                .flatten();
+            states.insert(
+                node_id.to_string(),
+                BatchMasterAuthState {
+                    node_clock: current.as_ref().map(|node| node.clock.clone()),
+                    node_is_master: current
+                        .as_ref()
+                        .is_some_and(|node| Self::labels_are_master(&node.labels))
+                        || tombstone.is_some(),
+                    tombstone_clock: tombstone,
+                },
+            );
+        }
+        states
+            .get_mut(node_id)
+            .expect("state was inserted before lookup")
+    }
+
+    fn require_master_event_authority(&self, signer_peer_id: &str) -> Result<()> {
+        if self.authorized_master(signer_peer_id) {
+            return Ok(());
+        }
+        Err(Error::from_reason(format!(
+            "GOVERNANCE_AUTH_REQUIRED: peer {signer_peer_id} lacks MASTER authority"
+        )))
+    }
+
+    fn compacted_proof_authorizes_protected_node(
+        &self,
+        node: &NodeOutput,
+        proof: &SignedEvent,
+        state: &BatchMasterAuthState,
+    ) -> bool {
+        let Some(proof_node) = find_proof_node(&proof.event, node) else {
+            return false;
+        };
+        if Self::labels_are_master(&node.labels) {
+            return true;
+        }
+        if !state.node_is_master {
+            return true;
+        }
+        state
+            .node_clock
+            .as_ref()
+            .is_none_or(|clock| clock < &proof_node.clock)
+            && state
+                .tombstone_clock
+                .as_ref()
+                .is_none_or(|clock| clock < &proof_node.clock)
+    }
+
+    /// Preflight authorization in the same logical order that reconcile will
+    /// apply the events. The state overlay closes a same-batch role downgrade:
+    /// a later USER-labeled upsert sees an earlier MASTER creation even though
+    /// neither event has reached the live map or WAL yet.
+    fn preflight_reconcile_event_authority(
+        &self,
+        event: &Event,
+        context: &mut ReconcileAuthorityContext<'_>,
+    ) -> Result<()> {
+        let signer_peer_id = context.signer_peer_id;
+        let forwarded_master_proof = context.forwarded_master_proof;
+        let collection_definitions = context.collection_definitions;
+        let protected_vector_owners = context.protected_vector_owners;
+        let seed_from_live_state = context.seed_from_live_state;
+        let states = &mut *context.states;
+        let direct_master_authority = self.authorized_master(signer_peer_id);
+        match event {
+            Event::Node(node) => {
+                let state = self.batch_master_auth_state(&node.id, states, seed_from_live_state);
+                let forwarded_authority = forwarded_master_proof.is_some_and(|proof| {
+                    self.compacted_proof_authorizes_protected_node(node, proof, state)
+                });
+                if (Self::labels_are_master(&node.labels) || state.node_is_master)
+                    && !direct_master_authority
+                    && !forwarded_authority
+                {
+                    return self.require_master_event_authority(signer_peer_id);
+                }
+                let wins_over_node = state
+                    .node_clock
+                    .as_ref()
+                    .is_none_or(|clock| clock <= &node.clock);
+                let wins_over_tombstone = state
+                    .tombstone_clock
+                    .as_ref()
+                    .is_none_or(|clock| clock < &node.clock);
+                if wins_over_node && wins_over_tombstone {
+                    state.node_clock = Some(node.clock.clone());
+                    state.node_is_master = Self::labels_are_master(&node.labels);
+                    state.tombstone_clock = None;
+                }
+            }
+            Event::NodeRetract {
+                id,
+                clock,
+                retracted_at,
+            } => {
+                let forwarded_authority = forwarded_master_proof.is_some_and(|proof| {
+                    find_proof_retraction(&proof.event, id, clock, retracted_at)
+                });
+                if !direct_master_authority && !forwarded_authority {
+                    return self.require_master_event_authority(signer_peer_id);
+                }
+                let state = self.batch_master_auth_state(id, states, seed_from_live_state);
+                let wins_over_node = state
+                    .node_clock
+                    .as_ref()
+                    .is_none_or(|node_clock| node_clock <= clock);
+                let wins_over_tombstone = state
+                    .tombstone_clock
+                    .as_ref()
+                    .is_none_or(|tombstone_clock| tombstone_clock < clock);
+                if wins_over_node && wins_over_tombstone {
+                    state.node_clock = None;
+                    // A deletion is itself a privileged transition; retain
+                    // authority over this identity while its tombstone exists.
+                    state.node_is_master = true;
+                    state.tombstone_clock = Some(clock.clone());
+                }
+            }
+            Event::Vector(vector) => {
+                let state =
+                    self.batch_master_auth_state(&vector.node_id, states, seed_from_live_state);
+                if (state.node_is_master || protected_vector_owners.contains(&vector.node_id))
+                    && !direct_master_authority
+                {
+                    return self.require_master_event_authority(signer_peer_id);
+                }
+            }
+            Event::VectorMaterialized(vector) => {
+                let state =
+                    self.batch_master_auth_state(&vector.node_id, states, seed_from_live_state);
+                let forwarded_authority = forwarded_master_proof.is_some_and(|proof| {
+                    self.authorized_master(&proof.signer_peer_id)
+                        && self
+                            .compacted_master_vector_source_matches_event_with_collection_definitions(
+                            &Event::VectorMaterialized(vector.clone()),
+                            &proof.event,
+                            collection_definitions,
+                        )
+                });
+                if (state.node_is_master || protected_vector_owners.contains(&vector.node_id))
+                    && !direct_master_authority
+                    && !forwarded_authority
+                {
+                    return self.require_master_event_authority(signer_peer_id);
+                }
+            }
+            Event::Batch(events) => {
+                for nested in events {
+                    let mut nested_context = ReconcileAuthorityContext {
+                        signer_peer_id,
+                        forwarded_master_proof: None,
+                        collection_definitions,
+                        protected_vector_owners,
+                        states: &mut *states,
+                        seed_from_live_state,
+                    };
+                    self.preflight_reconcile_event_authority(nested, &mut nested_context)?;
+                }
+            }
+            Event::Transaction(transaction) => {
+                // Transaction application replaces graph nodes in payload
+                // order, then applies retractions. Mirror that order here so
+                // nested changes cannot evade the same authorization rule.
+                for node in &transaction.nodes {
+                    let state =
+                        self.batch_master_auth_state(&node.id, states, seed_from_live_state);
+                    if (Self::labels_are_master(&node.labels) || state.node_is_master)
+                        && !direct_master_authority
+                    {
+                        return self.require_master_event_authority(signer_peer_id);
+                    }
+                    state.node_clock = Some(node.clock.clone());
+                    state.node_is_master = Self::labels_are_master(&node.labels);
+                    state.tombstone_clock = None;
+                }
+                for retraction in &transaction.node_retractions {
+                    if !direct_master_authority {
+                        return self.require_master_event_authority(signer_peer_id);
+                    }
+                    let state =
+                        self.batch_master_auth_state(&retraction.id, states, seed_from_live_state);
+                    state.node_clock = None;
+                    state.node_is_master = true;
+                    state.tombstone_clock = Some(retraction.clock.clone());
+                }
+                for vector in &transaction.vectors {
+                    let state =
+                        self.batch_master_auth_state(&vector.node_id, states, seed_from_live_state);
+                    if (state.node_is_master || protected_vector_owners.contains(&vector.node_id))
+                        && !direct_master_authority
+                    {
+                        return self.require_master_event_authority(signer_peer_id);
+                    }
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn preflight_reconcile_authorization(&self, signed_events: &[SignedEvent]) -> Result<()> {
+        self.preflight_reconcile_authorization_with_graph_baseline(signed_events, true)
+    }
+
+    fn preflight_reconcile_authorization_with_graph_baseline(
+        &self,
+        signed_events: &[SignedEvent],
+        seed_from_live_state: bool,
+    ) -> Result<()> {
+        self.preflight_reconcile_authorization_with_graph_events(
+            signed_events,
+            signed_events,
+            seed_from_live_state,
+        )
+    }
+
+    fn preflight_reconcile_authorization_with_graph_events(
+        &self,
+        signed_events: &[SignedEvent],
+        graph_auth_events: &[SignedEvent],
+        seed_from_live_state: bool,
+    ) -> Result<()> {
+        let mut collection_definitions = self
+            .collections
+            .iter()
+            .map(|collection| {
+                (
+                    collection.key().clone(),
+                    self.definition_for(collection.value()),
+                )
+            })
+            .collect::<HashMap<_, _>>();
+        let row_schemas = if self.storage_schema_version == SCHEMA_VERSION {
+            self.compacted_row_revision_schemas(signed_events)?
+        } else {
+            HashMap::new()
+        };
+        let mut row_revision_state = if self.storage_schema_version == SCHEMA_VERSION {
+            self.compacted_row_revision_state()?
+        } else {
+            HashMap::new()
+        };
+        let mut checked_row_sources = std::collections::HashSet::new();
+        for signed_event in signed_events {
+            if !self.verify_event_signature_with_collection_definitions(
+                signed_event,
+                Some(&collection_definitions),
+            ) {
+                return Err(Error::from_reason(format!(
+                    "SYNC_AUTH_REQUIRED: invalid signature or unauthorized event signer {}",
+                    signed_event.signer_peer_id
+                )));
+            }
+            Self::validate_collection_event(&signed_event.event, &mut collection_definitions)?;
+            let source_proof = self.compacted_revision_checkpoint_source_proof(signed_event);
+            if let Some(source_proof) = source_proof.as_ref() {
+                if Self::contains_p6_control_event(&source_proof.event) {
+                    return Err(Error::from_reason("P6_LOCAL_ONLY"));
+                }
+            }
+            if self.storage_schema_version == SCHEMA_VERSION {
+                let row_source = source_proof
+                    .as_ref()
+                    .map(|proof| &proof.event)
+                    .unwrap_or(&signed_event.event);
+                let has_revision_envelope = match row_source {
+                    Event::Transaction(transaction) => transaction
+                        .record_revision_transaction
+                        .as_ref()
+                        .is_some_and(|revisions| {
+                            revisions
+                                .mutations
+                                .iter()
+                                .any(|mutation| mutation.kind == uee_v2::RecordKindV2::Row)
+                                || !transaction.relational.is_empty()
+                        }),
+                    Event::RelationalRows {
+                        record_revision_transaction: Some(_),
+                        ..
+                    } => true,
+                    _ => false,
+                };
+                if has_revision_envelope
+                    && !self.compacted_source_revision_already_applied(row_source)?
+                {
+                    let identity = match row_source {
+                        Event::Transaction(transaction) => (
+                            transaction.transaction_id.clone(),
+                            transaction.payload_hash.clone(),
+                            serde_json::to_string(&transaction.record_revision_transaction)
+                                .map_err(|error| Error::from_reason(error.to_string()))?,
+                        ),
+                        Event::RelationalRows {
+                            mutation_id,
+                            payload_hash,
+                            record_revision_transaction,
+                            ..
+                        } => (
+                            format!("relational:{mutation_id}"),
+                            payload_hash.clone(),
+                            serde_json::to_string(record_revision_transaction)
+                                .map_err(|error| Error::from_reason(error.to_string()))?,
+                        ),
+                        _ => unreachable!("row revision source event was checked above"),
+                    };
+                    if checked_row_sources.insert(identity) {
+                        self.validate_compacted_row_source_event(
+                            row_source,
+                            &row_schemas,
+                            &mut row_revision_state,
+                        )?;
+                    }
+                }
+            }
+        }
+
+        // Graph authorization follows the source event order. Compacted base
+        // materializations describe the final state at the fold frontier, so
+        // they are checked after historical checkpoint proofs have rebuilt the
+        // authorization overlay.
+        fn collect_master_node_ids(event: &Event, ids: &mut HashSet<String>) {
+            match event {
+                Event::Node(node) if Storage::labels_are_master(&node.labels) => {
+                    ids.insert(node.id.clone());
+                }
+                Event::Batch(events) => {
+                    for nested in events {
+                        collect_master_node_ids(nested, ids);
+                    }
+                }
+                Event::Transaction(transaction) => {
+                    for node in &transaction.nodes {
+                        if Storage::labels_are_master(&node.labels) {
+                            ids.insert(node.id.clone());
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        let mut protected_vector_owners = HashSet::new();
+        for signed_event in graph_auth_events {
+            collect_master_node_ids(&signed_event.event, &mut protected_vector_owners);
+            for proof in [
+                self.compacted_revision_checkpoint_source_proof(signed_event),
+                self.compacted_master_authority_proof_with_collection_definitions(
+                    signed_event,
+                    Some(&collection_definitions),
+                ),
+                self.compacted_base_source_proof_with_collection_definitions(
+                    signed_event,
+                    Some(&collection_definitions),
+                ),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                collect_master_node_ids(&proof.event, &mut protected_vector_owners);
+            }
+        }
+        let mut states = HashMap::new();
+        for signed_event in graph_auth_events {
+            if let Some(source_proof) =
+                self.compacted_revision_checkpoint_source_proof(signed_event)
+            {
+                // The checkpoint is a compact representation of its source
+                // event. Carry that event's authorized graph transitions into
+                // the batch overlay so later proofs cannot bypass MASTER state
+                // established by an earlier checkpoint.
+                let mut context = ReconcileAuthorityContext {
+                    signer_peer_id: &source_proof.signer_peer_id,
+                    forwarded_master_proof: None,
+                    collection_definitions: Some(&collection_definitions),
+                    protected_vector_owners: &protected_vector_owners,
+                    states: &mut states,
+                    seed_from_live_state,
+                };
+                self.preflight_reconcile_event_authority(&source_proof.event, &mut context)?;
+            }
+            let forwarded_master_proof = self
+                .compacted_master_authority_proof_with_collection_definitions(
+                    signed_event,
+                    Some(&collection_definitions),
+                )
+                .or_else(|| {
+                    self.compacted_base_source_proof_with_collection_definitions(
+                        signed_event,
+                        Some(&collection_definitions),
+                    )
+                    .filter(|proof| self.authorized_master(&proof.signer_peer_id))
+                });
+            let mut context = ReconcileAuthorityContext {
+                signer_peer_id: &signed_event.signer_peer_id,
+                forwarded_master_proof: forwarded_master_proof.as_ref(),
+                collection_definitions: Some(&collection_definitions),
+                protected_vector_owners: &protected_vector_owners,
+                states: &mut states,
+                seed_from_live_state,
+            };
+            self.preflight_reconcile_event_authority(&signed_event.event, &mut context)?;
+        }
+        Ok(())
+    }
+
+    fn validate_local_node_mutation(&self, node_id: Option<&str>, labels: &[String]) -> Result<()> {
+        let local_master_authority = self.local_master_authority.load(Ordering::SeqCst);
+        if (Self::labels_are_master(labels)
+            || node_id.is_some_and(|node_id| self.node_identity_requires_master(node_id)))
+            && !local_master_authority
+        {
+            return Err(Error::from_reason(
+                "GOVERNANCE_AUTH_REQUIRED: local peer lacks MASTER authority",
+            ));
+        }
+        self.validate_governance(labels, local_master_authority)
+    }
+
+    /// MASTER authority covers creating, changing, or retracting MASTER state,
+    /// including nested graph batches and transaction envelopes. Ordinary graph
+    /// replication remains available to any roster member.
+    fn event_requires_master_authority(&self, event: &Event) -> bool {
+        match event {
+            Event::Node(node) => {
+                node.labels
+                    .iter()
+                    .any(|label| label.eq_ignore_ascii_case("MASTER"))
+                    || self.node_identity_requires_master(&node.id)
+            }
+            // Retraction events do not carry authenticated pre-state labels.
+            // Require master authority for every remote retraction so a peer
+            // cannot suppress a MASTER node that is not yet resident here.
+            Event::NodeRetract { .. } => true,
+            Event::Batch(events) => events
+                .iter()
+                .any(|nested| self.event_requires_master_authority(nested)),
+            Event::Transaction(transaction) => {
+                transaction.nodes.iter().any(|node| {
+                    node.labels
+                        .iter()
+                        .any(|label| label.eq_ignore_ascii_case("MASTER"))
+                        || self.node_identity_requires_master(&node.id)
+                }) || !transaction.node_retractions.is_empty()
+                    || transaction
+                        .vectors
+                        .iter()
+                        .any(|vector| self.node_identity_requires_master(&vector.node_id))
+            }
+            Event::Vector(vector) | Event::VectorMaterialized(vector) => {
+                self.node_identity_requires_master(&vector.node_id)
+            }
+            _ => false,
+        }
+    }
+
+    fn validate_signed_event_authorization(&self, signed_event: &SignedEvent) -> Result<()> {
+        self.preflight_reconcile_authorization(std::slice::from_ref(signed_event))
+    }
+
+    fn accept_consensus_proposal(&self, mut proposal: ConsensusProposal) -> Result<()> {
+        if Self::contains_p6_control_event(&proposal.signed_event.event) {
+            return Err(Error::from_reason("P6_LOCAL_ONLY"));
+        }
+        if proposal.proposal_id.is_empty() || proposal.proposal_id.len() > 128 {
+            return Err(Error::from_reason(
+                "CONSENSUS_PROPOSAL_INVALID: proposal ID must contain 1 to 128 bytes",
+            ));
+        }
+        let _commit_guard = self.commit_lock.lock();
+        self.ensure_writable()?;
+        self.validate_signed_event_authorization(&proposal.signed_event)?;
+        self.validate_consensus_schema_event(&proposal.signed_event.event)?;
+        Self::validate_consensus_proposal_event(&proposal.signed_event.event)?;
+        self.prune_expired_consensus_proposals();
+        proposal.votes.clear();
+        proposal.quorum_signatures.clear();
+        proposal.committed = false;
+        self.restore_consensus_vote_locks(&mut proposal)?;
+        proposal.committed = self.proposal_has_durable_commit(&proposal)?;
+        if let Some(existing) = self.proposals.get(&proposal.proposal_id) {
+            let existing_digest = Self::consensus_proposal_digest(&existing.signed_event)?;
+            let incoming_digest = Self::consensus_proposal_digest(&proposal.signed_event)?;
+            if existing_digest != incoming_digest {
+                return Err(Error::from_reason(
+                    "CONSENSUS_PROPOSAL_ID_CONFLICT: proposal ID is already bound to another event",
+                ));
+            }
+            self.touch_consensus_proposal(&proposal.proposal_id);
+            return Ok(());
+        }
+        if self.proposals.len() >= MAX_CONSENSUS_PROPOSALS {
+            return Err(Error::from_reason(format!(
+                "CONSENSUS_PROPOSAL_LIMIT: at most {MAX_CONSENSUS_PROPOSALS} active proposals are retained"
+            )));
+        }
+        let proposal_id = proposal.proposal_id.clone();
+        self.proposals.insert(proposal_id.clone(), proposal);
+        self.touch_consensus_proposal(&proposal_id);
+        Ok(())
+    }
+
+    /// Return the signed proposal envelope for transport to other roster
+    /// members. Vote state is local consensus progress and is never exported.
+    pub fn export_consensus_proposal(&self, proposal_id: &str) -> Result<ConsensusProposal> {
+        let _commit_guard = self.commit_lock.lock();
+        let mut proposal = self
+            .proposals
+            .get(proposal_id)
+            .map(|entry| entry.value().clone())
+            .ok_or_else(|| Error::from_reason(format!("unknown proposal '{proposal_id}'")))?;
+        proposal.votes.clear();
+        proposal.quorum_signatures.clear();
+        proposal.committed = false;
+        Ok(proposal)
+    }
+
+    fn restore_consensus_vote_locks(&self, proposal: &mut ConsensusProposal) -> Result<()> {
+        let roster_digest = self.membership_digest.read().clone();
+        let proposal_digest = hex::encode(Self::consensus_proposal_digest(&proposal.signed_event)?);
+        for entry in self.consensus_vote_locks.iter() {
+            let (stored_proposal_id, stored_roster_digest, peer_id) = entry.key();
+            if stored_proposal_id != &proposal.proposal_id || stored_roster_digest != &roster_digest
+            {
+                continue;
+            }
+            let lock = entry.value();
+            if lock.proposal_digest != proposal_digest {
+                return Err(Error::from_reason(
+                    "CONSENSUS_PROPOSAL_ID_CONFLICT: durable votes bind this ID to another event",
+                ));
+            }
+            let vkey = self.peer_verifying_key(peer_id).ok_or_else(|| {
+                Error::from_reason(format!(
+                    "CONSENSUS_VOTE_LEDGER_INVALID: voter {peer_id} is not in the configured roster"
+                ))
+            })?;
+            let payload = Self::vote_payload(
+                &proposal.proposal_id,
+                peer_id,
+                lock.approve,
+                &Self::consensus_proposal_digest(&proposal.signed_event)?,
+                &roster_digest,
+            );
+            let signature = Signature::from_slice(&lock.signature).map_err(|_| {
+                Error::from_reason("CONSENSUS_VOTE_LEDGER_INVALID: malformed stored signature")
+            })?;
+            vkey.verify(&payload, &signature).map_err(|_| {
+                Error::from_reason("CONSENSUS_VOTE_LEDGER_INVALID: stored signature failed")
+            })?;
+            proposal.votes.insert(peer_id.clone(), lock.approve);
+            proposal
+                .quorum_signatures
+                .insert(peer_id.clone(), lock.signature.clone());
+        }
+        Ok(())
+    }
+
+    /// Quorum is derived only from the private, durable vote-lock ledger. The
+    /// public proposal vote maps are useful for display/relay compatibility,
+    /// but Rust callers can mutate them and they must never grant authority.
+    fn verified_consensus_approval_count(
+        &self,
+        proposal_id: &str,
+        event_digest: &[u8; 32],
+        roster_digest: &str,
+    ) -> Result<usize> {
+        let expected_digest = hex::encode(event_digest);
+        let mut approvals = 0;
+        for entry in self.consensus_vote_locks.iter() {
+            let (stored_proposal_id, stored_roster_digest, peer_id) = entry.key();
+            if stored_proposal_id != proposal_id || stored_roster_digest != roster_digest {
+                continue;
+            }
+            let lock = entry.value();
+            if lock.proposal_id != proposal_id
+                || lock.peer_id != *peer_id
+                || lock.roster_digest != roster_digest
+                || lock.proposal_digest != expected_digest
+            {
+                return Err(Error::from_reason(
+                    "CONSENSUS_VOTE_LEDGER_INVALID: stored vote lock does not match its key or proposal",
+                ));
+            }
+            let verifying_key = self.peer_verifying_key(peer_id).ok_or_else(|| {
+                Error::from_reason(format!(
+                    "CONSENSUS_VOTE_LEDGER_INVALID: voter {peer_id} is not in the configured roster"
+                ))
+            })?;
+            let payload = Self::vote_payload(
+                proposal_id,
+                peer_id,
+                lock.approve,
+                event_digest,
+                roster_digest,
+            );
+            let signature = Signature::from_slice(&lock.signature).map_err(|_| {
+                Error::from_reason("CONSENSUS_VOTE_LEDGER_INVALID: malformed stored signature")
+            })?;
+            verifying_key.verify(&payload, &signature).map_err(|_| {
+                Error::from_reason("CONSENSUS_VOTE_LEDGER_INVALID: stored signature failed")
+            })?;
+            if lock.approve {
+                approvals += 1;
+            }
+        }
+        Ok(approvals)
+    }
+
+    /// Import a proposal received from another member or an operator's relay.
+    /// The same event-signature and MASTER-role checks used by gossip admission
+    /// run before it becomes available for local voting.
+    pub fn import_consensus_proposal(&self, proposal: ConsensusProposal) -> Result<()> {
+        self.accept_consensus_proposal(proposal)
+    }
+
+    /// Sign a vote over the proposal currently stored under `proposal_id`.
+    /// A remote peer must first accept the signed proposal so the vote binds to
+    /// the same signed event that the recipient will commit.
+    pub fn sign_vote(&self, proposal_id: String, approve: bool) -> Result<Vec<u8>> {
+        let _commit_guard = self.commit_lock.lock();
+        self.ensure_writable()?;
+        let proposal = self
+            .proposals
+            .get(&proposal_id)
+            .ok_or_else(|| Error::from_reason(format!("unknown proposal '{}'", proposal_id)))?;
+        if proposal.proposal_id != proposal_id {
+            return Err(Error::from_reason(
+                "CONSENSUS_PROPOSAL_ID_CONFLICT: proposal key does not match its envelope",
+            ));
+        }
+        if Self::contains_p6_control_event(&proposal.signed_event.event) {
+            return Err(Error::from_reason("P6_LOCAL_ONLY"));
+        }
+        self.validate_signed_event_authorization(&proposal.signed_event)?;
+        self.validate_consensus_schema_event(&proposal.signed_event.event)?;
+        self.touch_consensus_proposal(&proposal_id);
+        let event_digest = Self::consensus_proposal_digest(&proposal.signed_event)?;
+        let proposal_digest = hex::encode(event_digest);
+        let roster_digest = self.membership_digest.read().clone();
+        let lock_key = (
+            proposal_id.clone(),
+            roster_digest.clone(),
+            self.local_peer_id.clone(),
+        );
+        if self.proposal_has_durable_commit(&proposal)?
+            && !self.consensus_vote_locks.contains_key(&lock_key)
+        {
+            return Err(Error::from_reason(
+                "CONSENSUS_PROPOSAL_ALREADY_COMMITTED: no new votes may be signed",
+            ));
+        }
+        if let Some(previous) = self.consensus_vote_locks.get(&lock_key) {
+            if previous.proposal_digest != proposal_digest || previous.approve != approve {
+                return Err(Error::from_reason(
+                    "CONFLICTING_VOTE: local peer already signed a different vote for this proposal",
+                ));
+            }
+            let payload = Self::vote_payload(
+                &proposal_id,
+                &self.local_peer_id,
+                approve,
+                &event_digest,
+                &roster_digest,
+            );
+            let signature = Signature::from_slice(&previous.signature).map_err(|_| {
+                Error::from_reason("CONSENSUS_VOTE_LEDGER_INVALID: malformed stored signature")
+            })?;
+            self.verifying_key
+                .verify(&payload, &signature)
+                .map_err(|_| {
+                    Error::from_reason("CONSENSUS_VOTE_LEDGER_INVALID: stored signature failed")
+                })?;
+            return Ok(previous.signature.clone());
+        }
+        let payload = Self::vote_payload(
+            &proposal_id,
+            &self.local_peer_id,
+            approve,
+            &event_digest,
+            &roster_digest,
+        );
+        let signature = self.signing_key.sign(&payload).to_bytes().to_vec();
+        let lock = ConsensusVoteLock {
+            proposal_id,
+            peer_id: self.local_peer_id.clone(),
+            roster_digest,
+            proposal_digest,
+            approve,
+            signature: signature.clone(),
+        };
+        self.persist_consensus_vote_lock(&lock)?;
+        self.consensus_vote_locks.insert(lock_key, lock);
+        Ok(signature)
     }
 
     pub fn submit_vote(
@@ -15596,18 +20388,6 @@ impl Storage {
         // it — otherwise any caller could forge votes on another peer's behalf and
         // drive a proposal to quorum. Unknown peers, malformed or non-matching
         // signatures are rejected (the vote is not counted).
-        let vkey = self.peer_verifying_key(&peer_id).ok_or_else(|| {
-            Error::from_reason(format!(
-                "unknown voter peer '{}' (no verifying key)",
-                peer_id
-            ))
-        })?;
-        let payload = Self::vote_payload(&proposal_id, &peer_id, approve);
-        let sig = Signature::from_slice(&signature)
-            .map_err(|_| Error::from_reason("malformed vote signature"))?;
-        vkey.verify(&payload, &sig)
-            .map_err(|_| Error::from_reason("invalid vote signature"))?;
-
         // Serialize the vote-commit section with every other writer and with
         // save_state/compact (RCA--PERSIST-SIGNED-CHECKPOINT-RACE). Committing
         // persists before publishing memory; without this lock
@@ -15619,35 +20399,135 @@ impl Storage {
         // replay recovers it).
         //
         // Taken BEFORE `proposals.get_mut` so the lock order is
-        // commit_lock -> proposals. `self.proposals` is touched only here and in
-        // `propose_consensus` (which takes no commit_lock), so no path acquires
-        // them in the opposite order and no cycle exists. The signature checks
-        // above touch only `self.peers`, so they stay off this global lock.
+        // commit_lock -> proposals. Proposal creation, admission, export, and
+        // signing use the same lock before touching proposal state, so no path
+        // acquires them in the opposite order. Verification is held under this
+        // lock so the proposal digest cannot change between checking the vote
+        // and recording it.
         let _commit_guard = self.commit_lock.lock();
-        self.ensure_readable()?;
+        self.ensure_writable()?;
+        let vkey = self.peer_verifying_key(&peer_id).ok_or_else(|| {
+            Error::from_reason(format!(
+                "unknown voter peer '{}' (no verifying key)",
+                peer_id
+            ))
+        })?;
+
+        let (envelope_proposal_id, signed_event) = self
+            .proposals
+            .get(&proposal_id)
+            .map(|proposal| (proposal.proposal_id.clone(), proposal.signed_event.clone()))
+            .ok_or_else(|| Error::from_reason(format!("unknown proposal '{}'", proposal_id)))?;
+        if envelope_proposal_id != proposal_id {
+            return Err(Error::from_reason(
+                "CONSENSUS_PROPOSAL_ID_CONFLICT: proposal key does not match its envelope",
+            ));
+        }
+        self.validate_signed_event_authorization(&signed_event)?;
+        self.validate_consensus_schema_event(&signed_event.event)?;
+        let event_digest = Self::consensus_proposal_digest(&signed_event)?;
+        let proposal_digest = hex::encode(event_digest);
+        let roster_digest = self.membership_digest.read().clone();
+        let payload = Self::vote_payload(
+            &proposal_id,
+            &peer_id,
+            approve,
+            &event_digest,
+            &roster_digest,
+        );
+        let sig = Signature::from_slice(&signature)
+            .map_err(|_| Error::from_reason("malformed vote signature"))?;
+        vkey.verify(&payload, &sig)
+            .map_err(|_| Error::from_reason("invalid vote signature"))?;
+        let lock_key = (proposal_id.clone(), roster_digest.clone(), peer_id.clone());
 
         if let Some(mut proposal_ref) = self.proposals.get_mut(&proposal_id) {
             let proposal = proposal_ref.value_mut();
+            let current_event_digest = Self::consensus_proposal_digest(&proposal.signed_event)?;
+            if proposal.proposal_id != proposal_id || current_event_digest != event_digest {
+                return Err(Error::from_reason(
+                    "CONSENSUS_PROPOSAL_ID_CONFLICT: proposal changed during vote verification",
+                ));
+            }
+            self.validate_signed_event_authorization(&proposal.signed_event)?;
             if Self::contains_p6_control_event(&proposal.signed_event.event) {
                 return Err(Error::from_reason("P6_LOCAL_ONLY"));
             }
-            // Already-committed guard: once quorum is crossed and the event applied,
-            // later approving votes must not re-apply or re-persist it.
-            if proposal.committed {
+            // Rebuild the public display maps from the private durable ledger;
+            // caller-injected entries cannot block or satisfy a vote.
+            proposal.votes.clear();
+            proposal.quorum_signatures.clear();
+            self.restore_consensus_vote_locks(proposal)?;
+            if self.proposal_has_durable_commit(proposal)? {
+                proposal.committed = true;
                 return Ok(true);
             }
+            proposal.committed = false;
+            let stored_lock = self
+                .consensus_vote_locks
+                .get(&lock_key)
+                .map(|entry| entry.value().clone());
+            let lock = if let Some(stored) = stored_lock {
+                if stored.proposal_digest != proposal_digest || stored.approve != approve {
+                    return Err(Error::from_reason(format!(
+                        "CONFLICTING_VOTE: peer {peer_id} already cast a different vote for this proposal"
+                    )));
+                }
+                let stored_payload = Self::vote_payload(
+                    &proposal_id,
+                    &peer_id,
+                    stored.approve,
+                    &event_digest,
+                    &roster_digest,
+                );
+                let stored_signature = Signature::from_slice(&stored.signature).map_err(|_| {
+                    Error::from_reason("CONSENSUS_VOTE_LEDGER_INVALID: malformed stored signature")
+                })?;
+                vkey.verify(&stored_payload, &stored_signature)
+                    .map_err(|_| {
+                        Error::from_reason("CONSENSUS_VOTE_LEDGER_INVALID: stored signature failed")
+                    })?;
+                stored
+            } else {
+                let lock = ConsensusVoteLock {
+                    proposal_id: proposal_id.clone(),
+                    peer_id: peer_id.clone(),
+                    roster_digest: roster_digest.clone(),
+                    proposal_digest: proposal_digest.clone(),
+                    approve,
+                    signature: signature.clone(),
+                };
+                // The durable lock is fsynced before the vote is acknowledged or
+                // added to the in-memory quorum. A restart cannot accept an older,
+                // conflicting signature as a fresh first vote.
+                self.persist_consensus_vote_lock(&lock)?;
+                self.consensus_vote_locks
+                    .insert(lock_key.clone(), lock.clone());
+                lock
+            };
+            // Already-committed guard: once quorum is crossed and the event applied,
+            // later approving votes must not re-apply or re-persist it.
             proposal.votes.insert(peer_id.clone(), approve);
             // Retain the verified signature as proof of the vote (quorum_signatures).
             proposal
                 .quorum_signatures
-                .insert(peer_id.clone(), signature);
+                .insert(peer_id.clone(), lock.signature);
 
-            let approvals = proposal.votes.values().filter(|&&v| v).count();
+            let approvals = self.verified_consensus_approval_count(
+                &proposal_id,
+                &event_digest,
+                &roster_digest,
+            )?;
 
             // Quorum is a strict majority of the swarm. `self.peers` excludes this
             // node, so the membership denominator is peers + self.
-            if approvals <= self.peers.len().div_ceil(2) {
+            if approvals <= self.member_count() / 2 {
                 return Ok(false);
+            }
+
+            if self.proposal_has_durable_commit(proposal)? {
+                proposal.committed = true;
+                return Ok(true);
             }
 
             // Last gate before the event becomes durable state: re-verify the
@@ -15657,16 +20537,20 @@ impl Storage {
             if Self::contains_p6_control_event(&signed_event.event) {
                 return Err(Error::from_reason("P6_LOCAL_ONLY"));
             }
-            if !self.verify_event_signature(&signed_event) {
-                return Err(Error::from_reason(
-                    "proposal event signature invalid at commit",
-                ));
-            }
+            self.validate_signed_event_authorization(&signed_event)?;
+            self.validate_consensus_schema_event(&signed_event.event)?;
             if !self.semantic_verify(&signed_event.event)? {
                 return Err(Error::from_reason(
                     "proposal rejected by semantic_verify at commit",
                 ));
             }
+
+            let proposal_digest = hex::encode(Self::consensus_proposal_digest(&signed_event)?);
+            self.prepare_consensus_commit(&ConsensusCommitReceipt {
+                proposal_id: proposal_id.clone(),
+                proposal_digest: proposal_digest.clone(),
+                committed: false,
+            })?;
 
             match &signed_event.event {
                 Event::CollectionDefinition(d) => {
@@ -15685,17 +20569,10 @@ impl Storage {
                         .map_err(|e| self.durable_apply_error(seq, e))?;
                 }
                 Event::Node(n) => {
-                    let mut n_axiom = n.clone();
-                    if !n_axiom.labels.contains(&"MASTER".to_string()) {
-                        n_axiom.labels.push("MASTER".to_string());
-                    }
-                    self.persist_signed(SignedEvent {
-                        event: Event::Node(n_axiom.clone()),
-                        signature: signed_event.signature.clone(),
-                        signer_peer_id: signed_event.signer_peer_id.clone(),
-                    })?;
-                    let u32_id = self.get_or_intern_id(&n_axiom.id);
-                    self.insert_node_lean(u32_id, n_axiom);
+                    let seq = self.persist_signed(signed_event.clone())?;
+                    self.apply_event_memory(seq, Event::Node(n.clone()), true);
+                    self.ensure_readable()
+                        .map_err(|e| self.durable_apply_error(seq, e))?;
                 }
                 Event::Edge(e) => {
                     let seq = self.persist_signed(signed_event.clone())?;
@@ -15706,22 +20583,9 @@ impl Storage {
                 }
                 Event::Batch(events) => {
                     let seq = self.persist_signed(signed_event.clone())?;
-                    for e in events {
-                        match e {
-                            Event::Node(n) => {
-                                let mut n_axiom = n.clone();
-                                if !n_axiom.labels.contains(&"MASTER".to_string()) {
-                                    n_axiom.labels.push("MASTER".to_string());
-                                }
-                                let u32_id = self.get_or_intern_id(&n_axiom.id);
-                                self.insert_node_lean(u32_id, n_axiom);
-                            }
-                            Event::Edge(edge) => {
-                                self.apply_event_memory(seq, Event::Edge(edge.clone()), true);
-                            }
-                            _ => {}
-                        }
-                    }
+                    self.apply_event_memory(seq, Event::Batch(events.clone()), true);
+                    self.ensure_readable()
+                        .map_err(|e| self.durable_apply_error(seq, e))?;
                 }
                 // A committed vector is staged + enqueued (index=true) so it is
                 // searchable in this process, matching the CRDT-sync path — not
@@ -15767,6 +20631,17 @@ impl Storage {
                     let seq = self.persist_signed(signed_event.clone())?;
                     self.apply_event_memory(seq, signed_event.event.clone(), true);
                 }
+            }
+            if let Err(error) = self.complete_consensus_commit(&ConsensusCommitReceipt {
+                proposal_id: proposal_id.clone(),
+                proposal_digest,
+                committed: true,
+            }) {
+                // The event is already durable and applied. Keep this process
+                // from appending it again; the pending ledger entry lets reopen
+                // recover the completion marker from the journal frame.
+                proposal.committed = true;
+                return Err(error);
             }
             proposal.committed = true;
             return Ok(true);
@@ -15889,8 +20764,8 @@ impl Storage {
         self.ensure_writable()?;
         let _commit_guard = self.commit_lock.lock();
         self.ensure_readable()?;
-        self.validate_governance(&args.labels, false)?;
         let id = args.id.unwrap_or_else(|| format!("N-{}", Uuid::new_v4()));
+        self.validate_local_node_mutation(Some(&id), &args.labels)?;
         let lang = args.lang.clone().unwrap_or("en".to_string());
 
         let now = Utc::now();
@@ -15990,6 +20865,7 @@ impl Storage {
             Some(node) => self.hydrated_node(u32_id, node.value()),
             None => return Err(Error::from_reason("Node not in memory index")),
         };
+        self.validate_local_node_mutation(Some(&id), &old_node.labels)?;
 
         old_node.valid_to = Some(now.clone());
         let closed_seq = self.persist_local_graph_mutations(&[old_node.clone()], &[], &[])?;
@@ -19010,7 +23886,12 @@ impl Storage {
         }
 
         for id in to_delete {
-            let _ = self.retract_node(&id);
+            if let Err(error) = self.retract_node(&id) {
+                eprintln!(
+                    "maintenance: node retraction skipped for '{}': {}",
+                    id, error
+                );
+            }
         }
         Ok(())
     }
@@ -19023,6 +23904,11 @@ impl Storage {
             Some(i) => i,
             None => return Ok(()),
         };
+        if !self.local_master_authority.load(Ordering::SeqCst) {
+            return Err(Error::from_reason(
+                "GOVERNANCE_AUTH_REQUIRED: local peer lacks MASTER authority for node retraction",
+            ));
+        }
         // RCA--SLICE0-DURABILITY defect 2: the retraction must be durable
         // BEFORE the live view mutates — a crash after this call returns must
         // not resurrect the node on replay (the hourly autonomic TTL/orphan
@@ -19140,10 +24026,32 @@ impl Storage {
         {
             return Err(Error::from_reason("P6_LOCAL_ONLY"));
         }
+        let mut incoming_collection_definitions = self
+            .collections
+            .iter()
+            .map(|collection| {
+                (
+                    collection.key().clone(),
+                    self.definition_for(collection.value()),
+                )
+            })
+            .collect::<HashMap<_, _>>();
+        for signed_event in &signed_events {
+            // This temporary map supports same-batch compacted proofs for
+            // custom collections. Full signature and definition validation
+            // still happens in the preflight pass below.
+            let _ = Self::validate_collection_event(
+                &signed_event.event,
+                &mut incoming_collection_definitions,
+            );
+        }
         if self.storage_schema_version == SCHEMA_VERSION
-            && signed_events
-                .iter()
-                .any(|signed| Self::graph_event_requires_revision_envelope(&signed.event))
+            && signed_events.iter().any(|signed| {
+                self.signed_event_requires_revision_envelope_with_collection_definitions(
+                    signed,
+                    Some(&incoming_collection_definitions),
+                )
+            })
         {
             return Err(Error::from_reason(
                 "UPGRADE_REQUIRED: schema 6 requires revision-bearing graph events",
@@ -19159,21 +24067,21 @@ impl Storage {
                 "UPGRADE_REQUIRED: revision-bearing events require schema 6",
             ));
         }
+        // Preflight the entire batch before the first WAL write. A rejected
+        // member, signature, or MASTER-authority claim must not leave a valid
+        // prefix durably applied. Compatibility failures retain precedence so
+        // callers still receive the actionable schema-upgrade error.
+        self.preflight_reconcile_authorization(&signed_events)?;
         for signed_event in signed_events {
             let event = &signed_event.event;
             let signer_id = &signed_event.signer_peer_id;
 
-            // 1. Verify Signature (local events are self-trusted; remote events
-            // must carry an authentic signature from their registered peer key).
-            if signer_id != &self.local_peer_id && !self.verify_event_signature(&signed_event) {
-                println!(
-                    "consensus: rejected event from {}. Invalid signature or unknown peer.",
-                    signer_id
-                );
-                continue;
-            }
+            // Authorization was validated for every event above while holding
+            // commit_lock. In particular, a local peer ID is not a signature
+            // bypass and discovery state cannot supply a key.
+            let _authorized_signer_id = signer_id;
 
-            // 2. Apply Event logic
+            // Apply Event logic only after the complete batch passed preflight.
             match event {
                 Event::CollectionDefinition(d) => {
                     self.preflight_collection_event(event)?;
@@ -19272,6 +24180,7 @@ impl Storage {
                             &remote_edge.to,
                         );
                         self.edges.insert(u32_id, remote_edge.clone());
+                        self.refresh_impacts(Some(vec![remote_edge.to.clone()]));
                     }
                 }
                 Event::Vector(remote_vec) => {
@@ -19308,7 +24217,7 @@ impl Storage {
                     self.persist_signed(signed_event.clone())?;
                 }
                 Event::Transaction(transaction) => {
-                    self.preflight_relational_event(event)?;
+                    self.preflight_signed_relational_event(&signed_event)?;
                     // ADR D2.2: no fetch_max of the peer's origin sequence —
                     // see the consensus-commit arm for the rationale.
                     let seq = self.persist_signed(signed_event.clone())?;
@@ -19407,7 +24316,7 @@ impl Storage {
     /// Callers: `submit_vote` and `reconcile_state_unlocked`, both under the
     /// lock (save_state/compact hold the SAME mutex, so this fully serializes
     /// them against a concurrent fold regardless of the journal format).
-    pub fn persist_signed(&self, signed_event: SignedEvent) -> Result<u64> {
+    fn persist_signed(&self, signed_event: SignedEvent) -> Result<u64> {
         debug_assert!(
             self.commit_lock.is_owned_by_current_thread(),
             "persist_signed requires the caller to hold commit_lock \
@@ -19418,9 +24327,17 @@ impl Storage {
             return Err(Error::from_reason("P6_LOCAL_ONLY"));
         }
         self.preflight_collection_event(&signed_event.event)?;
-        self.preflight_relational_event(&signed_event.event)?;
+        self.preflight_signed_relational_event(&signed_event)?;
         let (ack_tx, ack_rx) = unbounded();
         let event = signed_event.event.clone();
+        let revision_checkpoint = match &signed_event.event {
+            Event::Transaction(transaction) if Self::is_revision_checkpoint(transaction) => {
+                self.storage_schema_version != SCHEMA_VERSION
+                    || transaction.record_revision_transaction.is_none()
+                    || self.verify_compacted_revision_checkpoint(&signed_event)
+            }
+            _ => false,
+        };
         // A folded receipt may carry the source replica's local frame for
         // local recovery. When ingesting it from a peer, the projection must
         // stamp the fresh local frame instead; origin-local sequence numbers
@@ -19443,7 +24360,7 @@ impl Storage {
             )
         })?;
         self.commit_sequence.fetch_max(seq, Ordering::SeqCst);
-        self.projection_apply_event(&projection_event, seq)
+        self.projection_apply_event(&projection_event, seq, revision_checkpoint)
             .map_err(|e| self.durable_apply_error(seq, e))?;
         Ok(seq)
     }
@@ -19799,13 +24716,20 @@ impl Storage {
         if std::env::var_os("GENESIS_MCP_STDIO").is_some() {
             return;
         }
-        let _peer_id = storage.local_peer_id.clone();
-        let _verifying_key_bytes = storage.verifying_key.to_bytes().to_vec();
+        // A legacy `open()` with no operator-configured roster is intentionally
+        // self-only. It performs no discovery, trusts no heartbeat, and opens
+        // no network socket.
+        if storage.authorized_members.is_empty()
+            || storage.gossip_manager_started.swap(true, Ordering::SeqCst)
+        {
+            return;
+        }
+        let bind_addr = *storage.gossip_bind_addr.read();
 
         tokio::spawn(async move {
             let mut sync_cursors: HashMap<String, u64> = HashMap::new();
             let mut pending_sync_requests: HashMap<String, PendingSyncRequest> = HashMap::new();
-            let socket = match tokio::net::UdpSocket::bind("0.0.0.0:0").await {
+            let socket = match tokio::net::UdpSocket::bind(bind_addr).await {
                 Ok(s) => {
                     let addr = match s.local_addr() {
                         Ok(a) => a,
@@ -19825,11 +24749,6 @@ impl Storage {
                     return;
                 }
             };
-            if let Err(e) = socket.set_broadcast(true) {
-                println!("gossip: failed to enable broadcast: {}", e);
-                return;
-            }
-
             let mut buf = [0u8; 65535];
             let mut heartbeat_interval = tokio::time::interval(Duration::from_secs(5));
             let mut gossip_state_sweep = tokio::time::interval(GOSSIP_STATE_SWEEP_INTERVAL);
@@ -19841,23 +24760,41 @@ impl Storage {
                     }
                     _ = heartbeat_interval.tick() => {
                         let msg = GossipMessage::Heartbeat {
-                            schema_version: SCHEMA_VERSION,
+                            schema_version: GOSSIP_PROTOCOL_VERSION,
+                            storage_schema_version: storage.storage_schema_version,
                             peer_id: storage.local_peer_id.clone(),
                             merkle_root: storage.get_merkle_root(),
                             logical_time: storage.get_logical_clock(),
                             port: storage.gossip_port.load(Ordering::SeqCst) as u16,
                             verifying_key: storage.verifying_key.to_bytes().to_vec(),
                         };
-                        if let Ok(data) = serde_json::to_vec(&msg) {
-                            let _ = socket.send_to(&data, "255.255.255.255:30001").await;
+                        if let Ok(data) = storage.encode_gossip_message(msg) {
+                            for peer in storage.authorized_members.iter() {
+                                let _ = socket.send_to(&data, peer.gossip_addr).await;
+                            }
                         }
                     }
                     result = socket.recv_from(&mut buf) => {
                         if let Ok((len, addr)) = result {
-                            if let Ok(msg) = serde_json::from_slice::<GossipMessage>(&buf[..len]) {
+                            if let Ok(packet) = serde_json::from_slice::<AuthenticatedGossipPacket>(&buf[..len]) {
+                                if !storage.verify_gossip_packet(&packet, addr) {
+                                    continue;
+                                }
+                                let source_peer_id = packet.source_peer_id.clone();
+                                let msg = packet.message;
                                 match msg {
-                                    GossipMessage::Heartbeat { schema_version, peer_id: p_id, merkle_root, logical_time: _, port, verifying_key } => {
-                                        if p_id != storage.local_peer_id {
+                                    GossipMessage::Heartbeat { schema_version, storage_schema_version, peer_id: p_id, merkle_root, logical_time: _, port, verifying_key } => {
+                                        let Some(configured_addr) = storage.authorized_peer_addr(&source_peer_id) else {
+                                            continue;
+                                        };
+                                        let Some(configured_key) = storage.peer_verifying_key(&source_peer_id) else {
+                                            continue;
+                                        };
+                                        if p_id == source_peer_id
+                                            && port == configured_addr.port()
+                                            && verifying_key.as_slice() == configured_key.as_bytes()
+                                            && p_id != storage.local_peer_id
+                                        {
                                             // Expire old state before admission so a peer flood
                                             // cannot grow the map beyond its fixed capacity.
                                             storage.prune_gossip_state(&mut sync_cursors, &mut pending_sync_requests);
@@ -19867,18 +24804,30 @@ impl Storage {
                                             {
                                                 continue;
                                             }
-                                            let peer_addr = format!("{}:{}", addr.ip(), port);
+                                            if schema_version != GOSSIP_PROTOCOL_VERSION {
+                                                eprintln!("SYNC_UPGRADE_REQUIRED: peer {} supports gossip protocol {}",p_id,schema_version);
+                                                if let Ok(data) = storage.encode_gossip_message(GossipMessage::UpgradeRequired { schema_version: GOSSIP_PROTOCOL_VERSION }) {
+                                                    let _ = socket.send_to(&data, configured_addr).await;
+                                                }
+                                                continue;
+                                            }
+                                            if storage_schema_version != storage.storage_schema_version {
+                                                eprintln!("SYNC_STORAGE_SCHEMA_MISMATCH: peer {} uses storage schema {}; local schema is {}",p_id,storage_schema_version,storage.storage_schema_version);
+                                                let mismatch = GossipMessage::StorageSchemaMismatch {
+                                                    local_storage_schema_version: storage.storage_schema_version,
+                                                    peer_storage_schema_version: storage_schema_version,
+                                                };
+                                                if let Ok(data) = storage.encode_gossip_message(mismatch) {
+                                                    let _ = socket.send_to(&data, configured_addr).await;
+                                                }
+                                                continue;
+                                            }
                                             storage.peers.insert(p_id.clone(), SyncPeer {
                                                 id: p_id.clone(),
-                                                addr: peer_addr.clone(),
+                                                addr: configured_addr.to_string(),
                                                 last_seen: Utc::now().timestamp() as u32,
                                                 verifying_key,
                                             });
-
-                                            if schema_version != SCHEMA_VERSION {
-                                                eprintln!("SYNC_UPGRADE_REQUIRED: peer {} supports schema {}",p_id,schema_version);
-                                                continue;
-                                            }
                                             if merkle_root != storage.get_merkle_root() {
                                                 // Keep one outstanding request per peer. Retries
                                                 // reuse its nonce and original expiry; a heartbeat
@@ -19909,7 +24858,8 @@ impl Storage {
                                                         (request_nonce, from_commit_seq)
                                                     };
                                                 let req = GossipMessage::PullRequest {
-                                                    schema_version:SCHEMA_VERSION,
+                                                    schema_version:GOSSIP_PROTOCOL_VERSION,
+                                                    storage_schema_version: storage.storage_schema_version,
                                                     from_clock: storage.get_logical_clock(),
                                                     target_peer_id: storage.local_peer_id.clone(),
                                                     // WP-1.2: per-peer responder-domain
@@ -19920,16 +24870,32 @@ impl Storage {
                                                     from_commit_seq: Some(from_commit_seq),
                                                     request_nonce: Some(request_nonce),
                                                 };
-                                                if let Ok(data) = serde_json::to_vec(&req) {
-                                                    let _ = socket.send_to(&data, peer_addr).await;
+                                                if let Ok(data) = storage.encode_gossip_message(req) {
+                                                    let _ = socket.send_to(&data, configured_addr).await;
                                                 }
                                             }
                                         }
                                     }
-                                    GossipMessage::PullRequest { schema_version, from_clock, target_peer_id, from_commit_seq, request_nonce } => {
-                                        if schema_version != SCHEMA_VERSION {
-                                            if let Ok(data)=serde_json::to_vec(&GossipMessage::UpgradeRequired{schema_version:SCHEMA_VERSION}) {
-                                                let _=socket.send_to(&data,addr).await;
+                                    GossipMessage::PullRequest { schema_version, storage_schema_version, from_clock, target_peer_id, from_commit_seq, request_nonce } => {
+                                        if target_peer_id != source_peer_id {
+                                            continue;
+                                        }
+                                        let Some(reply_addr) = storage.authorized_peer_addr(&source_peer_id) else {
+                                            continue;
+                                        };
+                                        if schema_version != GOSSIP_PROTOCOL_VERSION {
+                                            if let Ok(data)=storage.encode_gossip_message(GossipMessage::UpgradeRequired{schema_version:GOSSIP_PROTOCOL_VERSION}) {
+                                                let _=socket.send_to(&data,reply_addr).await;
+                                            }
+                                            continue;
+                                        }
+                                        if storage_schema_version != storage.storage_schema_version {
+                                            let mismatch = GossipMessage::StorageSchemaMismatch {
+                                                local_storage_schema_version: storage.storage_schema_version,
+                                                peer_storage_schema_version: storage_schema_version,
+                                            };
+                                            if let Ok(data) = storage.encode_gossip_message(mismatch) {
+                                                let _ = socket.send_to(&data, reply_addr).await;
                                             }
                                             continue;
                                         }
@@ -19940,10 +24906,8 @@ impl Storage {
                                         if let Some(cursor) = from_commit_seq {
                                             let horizon = storage.history_horizon();
                                             if cursor != 0 && cursor < horizon {
-                                                if let Some(reply_addr) = storage.peers.get(&target_peer_id).map(|p| p.addr.clone()) {
-                                                    if let Ok(data) = serde_json::to_vec(&GossipMessage::BeyondHorizon { horizon }) {
-                                                        let _ = socket.send_to(&data, reply_addr).await;
-                                                    }
+                                                if let Ok(data) = storage.encode_gossip_message(GossipMessage::BeyondHorizon { horizon }) {
+                                                    let _ = socket.send_to(&data, reply_addr).await;
                                                 }
                                                 continue;
                                             }
@@ -19954,9 +24918,8 @@ impl Storage {
                                         // Bound the reply to one UDP datagram; the requester's
                                         // clock advances on apply, so the next heartbeat round
                                         // pulls the remainder until the roots stop differing.
-                                        if let Some(reply_addr) = storage.peers.get(&target_peer_id).map(|p| p.addr.clone()) {
-                                            let _=from_clock; // v4 sync uses responder-local frame cursors.
-                                            match storage.sync_delta(from_commit_seq.unwrap_or(0)) {
+                                        let _=from_clock; // v4 sync uses responder-local frame cursors.
+                                        match storage.sync_delta(from_commit_seq.unwrap_or(0)) {
                                                 Ok((events,through_seq,filtered_local_only)) if !events.is_empty() || filtered_local_only => {
                                                     let progress_receipt = request_nonce
                                                         .as_deref()
@@ -19970,32 +24933,32 @@ impl Storage {
                                                                 )
                                                                 .ok()
                                                         });
-                                                    if let Ok(data)=serde_json::to_vec(&GossipMessage::PushDelta {events,source_peer_id:storage.local_peer_id.clone(),through_seq:Some(through_seq),progress_receipt}) {
+                                                    if let Ok(data)=storage.encode_gossip_message(GossipMessage::PushDelta {events,source_peer_id:storage.local_peer_id.clone(),through_seq:Some(through_seq),progress_receipt}) {
                                                         let _=socket.send_to(&data,reply_addr).await;
                                                     }
                                                 }
                                                 Err(e)=> {
                                                     let reply=GossipMessage::BootstrapRequired{reason:e.to_string()};
-                                                    if let Ok(data)=serde_json::to_vec(&reply) {
+                                                    if let Ok(data)=storage.encode_gossip_message(reply) {
                                                         let _=socket.send_to(&data,reply_addr).await;
                                                     }
                                                 },
                                                 _=>{}
                                             }
-                                        }
                                     }
                                     GossipMessage::PushDelta { events,source_peer_id,through_seq,progress_receipt } => {
+                                        if source_peer_id != packet.source_peer_id {
+                                            continue;
+                                        }
                                         // No cursor advancement on a rejected signature/schema/dependency.
                                         if events.iter().all(|e|storage.verify_event_signature(e)) {
                                             let pending = pending_sync_requests.get(&source_peer_id).cloned();
-                                            // Heartbeat and Storage.peers keys have no independent trust provenance.
-                                            // This P6 slice has no remote receipt-key source, so remain fail-closed.
-                                            let trusted_responder_key: Option<&VerifyingKey> = None;
+                                            let trusted_responder_key = storage.peer_verifying_key(&source_peer_id);
                                             let verified_through_seq = pending.as_ref().and_then(|pending| {
                                                 progress_receipt.as_ref().and_then(|receipt| {
                                                     Storage::verify_sync_progress_receipt(
                                                         receipt,
-                                                        trusted_responder_key,
+                                                        trusted_responder_key.as_ref(),
                                                         &source_peer_id,
                                                         &storage.local_peer_id,
                                                         &pending.request_nonce,
@@ -20020,6 +24983,7 @@ impl Storage {
                                         }
                                     }
                                     GossipMessage::UpgradeRequired{schema_version} => eprintln!("SYNC_UPGRADE_REQUIRED: schema {schema_version}"),
+                                    GossipMessage::StorageSchemaMismatch{local_storage_schema_version, peer_storage_schema_version} => eprintln!("SYNC_STORAGE_SCHEMA_MISMATCH: local schema {local_storage_schema_version}, peer schema {peer_storage_schema_version}; synchronization paused"),
                                     GossipMessage::BootstrapRequired{reason} => eprintln!("Sync: {reason}; bootstrap required before cursor advancement"),
                                     GossipMessage::BeyondHorizon { horizon } => {
                                         // WP-1.2 requester handling: delta-pull cannot
@@ -20034,19 +24998,9 @@ impl Storage {
                                         );
                                     }
                                     GossipMessage::ConsensusPropose { proposal } => {
-                                        // Verify the proposal's event is authentically signed by
-                                        // its claimed originator before storing it. An unsigned or
-                                        // forged proposal could otherwise be driven to quorum and
-                                        // applied as a MASTER axiom, bypassing governance.
-                                        if Storage::contains_p6_control_event(&proposal.signed_event.event) {
-                                            println!(
-                                                "consensus: rejected local-only P6 proposal {}",
-                                                proposal.proposal_id
-                                            );
-                                        } else if storage.verify_event_signature(&proposal.signed_event) {
-                                            storage.proposals.insert(proposal.proposal_id.clone(), *proposal);
-                                        } else {
-                                            println!("consensus: rejected proposal {} — invalid event signature or unknown signer.", proposal.proposal_id);
+                                        let proposal_id = proposal.proposal_id.clone();
+                                        if let Err(error) = storage.accept_consensus_proposal(*proposal) {
+                                            println!("consensus: rejected proposal {proposal_id}: {error}");
                                         }
                                     }
                                     GossipMessage::ConsensusVote { proposal_id, voter_peer_id, approve, signature } => {
@@ -20054,36 +25008,13 @@ impl Storage {
                                         // against the voter's registered key before counting
                                         // it (see Storage::submit_vote); forged or unsigned
                                         // votes are rejected and never reach quorum.
-                                        let _ = storage.submit_vote(proposal_id, voter_peer_id, approve, signature);
+                                        if voter_peer_id == source_peer_id {
+                                            let _ = storage.submit_vote(proposal_id, voter_peer_id, approve, signature);
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
-                }
-            }
-        });
-
-        // Also bind discovery listener on the fixed port
-        tokio::spawn(async move {
-            let socket = match tokio::net::UdpSocket::bind("0.0.0.0:30001").await {
-                Ok(s) => s,
-                Err(_) => return,
-            };
-            if let Err(e) = socket.set_broadcast(true) {
-                println!(
-                    "Gossip: Failed to enable broadcast on discovery listener: {}",
-                    e
-                );
-                return;
-            }
-            let mut buf = [0u8; 65535];
-            loop {
-                if let Ok((len, _addr)) = socket.recv_from(&mut buf).await {
-                    if let Ok(GossipMessage::Heartbeat { .. }) =
-                        serde_json::from_slice::<GossipMessage>(&buf[..len])
-                    {
-                        // Discovery logic handled via broadcast in main loop
                     }
                 }
             }
@@ -20115,6 +25046,22 @@ impl Storage {
     }
 
     fn validate_p6_snapshot_at(root: &Path, state: &serde_json::Value) -> Result<Option<String>> {
+        Self::validate_p6_snapshot_at_with_projection_status(root, state, false)
+            .map(|(digest, _)| digest)
+    }
+
+    fn validate_p6_snapshot_for_open(
+        root: &Path,
+        state: &serde_json::Value,
+    ) -> Result<(Option<String>, bool)> {
+        Self::validate_p6_snapshot_at_with_projection_status(root, state, true)
+    }
+
+    fn validate_p6_snapshot_at_with_projection_status(
+        root: &Path,
+        state: &serde_json::Value,
+        allow_projection_rebuild: bool,
+    ) -> Result<(Option<String>, bool)> {
         let schema_version = state["schema_version"].as_u64().unwrap_or(0) as u32;
         let Some(p6) = state.get("p6") else {
             if schema_version >= SCHEMA_VERSION {
@@ -20124,7 +25071,9 @@ impl Storage {
             }
             // v4 and older snapshots remain on the legacy load path and are
             // upgraded only after complete WAL recovery is available.
-            return Ok(None);
+            // Legacy snapshots have no projection digest. Their projection may
+            // be usable, but it is not integrity-verified and must be rebuilt.
+            return Ok((None, false));
         };
         let manifest = p6.get("manifest").ok_or_else(|| {
             Error::from_reason("SNAPSHOT_MANIFEST_INVALID: manifest object missing")
@@ -20159,6 +25108,7 @@ impl Storage {
         }
         let mut canonical_components = Vec::with_capacity(components.len());
         let mut seen = HashSet::new();
+        let mut projection_valid = true;
         for component in components {
             let path = component["path"].as_str().ok_or_else(|| {
                 Error::from_reason("SNAPSHOT_MANIFEST_INVALID: component path missing")
@@ -20190,15 +25140,23 @@ impl Storage {
                 ));
             }
             let full_path = root.join(relative);
-            let (actual_bytes, actual_hash) = Self::sha256_file(&full_path).map_err(|_| {
-                Error::from_reason(format!(
-                    "SNAPSHOT_COMPONENT_INVALID: missing or unreadable component {path}"
-                ))
-            })?;
-            if actual_bytes != bytes || actual_hash != expected_hash {
-                return Err(Error::from_reason(format!(
-                    "SNAPSHOT_COMPONENT_INVALID: byte count or digest mismatch for {path}"
-                )));
+            let is_projection = path == PROJECTION_DB_FILE;
+            match Self::sha256_file(&full_path) {
+                Ok((actual_bytes, actual_hash))
+                    if actual_bytes == bytes && actual_hash == expected_hash => {}
+                Ok(_) | Err(_) if allow_projection_rebuild && is_projection => {
+                    projection_valid = false;
+                }
+                Err(_) => {
+                    return Err(Error::from_reason(format!(
+                        "SNAPSHOT_COMPONENT_INVALID: missing or unreadable component {path}"
+                    )));
+                }
+                Ok(_) => {
+                    return Err(Error::from_reason(format!(
+                        "SNAPSHOT_COMPONENT_INVALID: byte count or digest mismatch for {path}"
+                    )));
+                }
             }
             canonical_components.push(serde_json::json!({
                 "path": path,
@@ -20260,7 +25218,7 @@ impl Storage {
                 Error::from_reason("SNAPSHOT_MANIFEST_INVALID: generation is malformed")
             })?;
         }
-        Ok(Some(digest))
+        Ok((Some(digest), projection_valid))
     }
 
     fn validate_p6_snapshot_authority(&self, state: &serde_json::Value) -> Result<()> {
@@ -20846,6 +25804,8 @@ impl Storage {
         matches!(
             name,
             "identity.bin"
+                | "consensus-votes.jsonl"
+                | "consensus-commits.jsonl"
                 | "genesis-graph.wal" // legacy bundles (pre-WP-1.2) still restore
                 | "state.json"
                 | "nodes.bin"
@@ -21157,7 +26117,7 @@ impl Storage {
             .map_err(|e| Error::from_reason(e.to_string()))
     }
 
-    fn read_u32(reader: &mut File) -> Result<u32> {
+    fn read_u32<R: Read>(reader: &mut R) -> Result<u32> {
         let mut bytes = [0u8; 4];
         reader
             .read_exact(&mut bytes)
@@ -21165,7 +26125,7 @@ impl Storage {
         Ok(u32::from_le_bytes(bytes))
     }
 
-    fn read_u64(reader: &mut File) -> Result<u64> {
+    fn read_u64<R: Read>(reader: &mut R) -> Result<u64> {
         let mut bytes = [0u8; 8];
         reader
             .read_exact(&mut bytes)
@@ -21175,7 +26135,21 @@ impl Storage {
 
     fn backup_info(manifest: &BackupManifest, bundle_path: PathBuf) -> Result<BackupBundleInfo> {
         let (byte_count, sha256) = Self::sha256_file(&bundle_path)?;
-        Ok(BackupBundleInfo {
+        Ok(Self::backup_info_with_digest(
+            manifest,
+            bundle_path,
+            byte_count,
+            sha256,
+        ))
+    }
+
+    fn backup_info_with_digest(
+        manifest: &BackupManifest,
+        bundle_path: PathBuf,
+        byte_count: u64,
+        sha256: String,
+    ) -> BackupBundleInfo {
+        BackupBundleInfo {
             format_version: manifest.format_version,
             engine_name: manifest.engine_name.clone(),
             engine_version: manifest.engine_version.clone(),
@@ -21186,7 +26160,7 @@ impl Storage {
             bundle_path,
             byte_count,
             sha256,
-        })
+        }
     }
 
     fn validate_backup_manifest(manifest: &BackupManifest) -> Result<()> {
@@ -21932,6 +26906,23 @@ impl Storage {
 
     /// Verifies one opaque bundle before publishing it as a non-existing root.
     pub fn restore_backup(request: BackupRestoreRequest) -> Result<BackupBundleInfo> {
+        Self::restore_backup_internal(request, None)
+    }
+
+    /// Restore a backup that contains events from other cluster members. The
+    /// supplied operator-pinned roster is installed before journal recovery so
+    /// every stored event and compacted checkpoint can be authenticated.
+    pub fn restore_backup_with_membership(
+        request: BackupRestoreRequest,
+        membership: PeerMembershipOptions,
+    ) -> Result<BackupBundleInfo> {
+        Self::restore_backup_internal(request, Some(membership))
+    }
+
+    fn restore_backup_internal(
+        request: BackupRestoreRequest,
+        membership: Option<PeerMembershipOptions>,
+    ) -> Result<BackupBundleInfo> {
         if request.target_root.exists() {
             return Err(Error::from_reason("restore target must not already exist"));
         }
@@ -21950,10 +26941,35 @@ impl Storage {
         let staging = parent.join(format!(".genesis-restore-{}", Uuid::new_v4()));
         let bundle_path = fs::canonicalize(&request.bundle_path)
             .map_err(|e| Error::from_reason(e.to_string()))?;
+        if !Self::is_lower_sha256(&request.expected_sha256) {
+            return Err(Error::from_reason(
+                "BACKUP_AUTH_REQUIRED: restore requires a trusted lowercase bundle SHA-256",
+            ));
+        }
+
+        // Authenticate the complete bundle before parsing attacker-controlled
+        // manifest lengths or creating any staging files. Keep the same open
+        // handle for extraction so a path replacement cannot swap the input
+        // between the verification and extraction passes.
+        let mut bundle_file =
+            File::open(&bundle_path).map_err(|e| Error::from_reason(e.to_string()))?;
+        let (preflight_byte_count, preflight_sha256) = {
+            let mut preflight = HashingReader::new(&mut bundle_file);
+            std::io::copy(&mut preflight, &mut std::io::sink())
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            preflight.finish()
+        };
+        if preflight_sha256 != request.expected_sha256 {
+            return Err(Error::from_reason(
+                "BACKUP_AUTH_REQUIRED: bundle does not match the trusted expected SHA-256",
+            ));
+        }
+        bundle_file
+            .seek(SeekFrom::Start(0))
+            .map_err(|e| Error::from_reason(e.to_string()))?;
 
         let result = (|| -> Result<BackupBundleInfo> {
-            let mut input =
-                File::open(&bundle_path).map_err(|e| Error::from_reason(e.to_string()))?;
+            let mut input = HashingReader::new(bundle_file);
             let mut magic = vec![0u8; BACKUP_MAGIC.len()];
             input
                 .read_exact(&mut magic)
@@ -22049,17 +27065,31 @@ impl Storage {
                     "Genesis backup bundle has trailing data",
                 ));
             }
+            let (bundle_byte_count, bundle_sha256) = input.finish();
+            if bundle_byte_count != preflight_byte_count
+                || bundle_sha256 != preflight_sha256
+                || bundle_sha256 != request.expected_sha256
+            {
+                return Err(Error::from_reason(
+                    "BACKUP_AUTH_REQUIRED: bundle does not match the trusted expected SHA-256",
+                ));
+            }
 
             // A fresh open validates the engine's own snapshot/WAL compatibility
             // before staging becomes caller-visible. Full retention prevents its
             // shutdown checkpoint from folding the only restored journal copy.
-            let staging_storage = Storage::open(OpenOptions {
-                path: staging.display().to_string(),
-                page_cache_mb: Some(16),
-                read_only: Some(false),
-                vector_dim: None,
-                retention: Some("full".into()),
-            })?;
+            let staging_storage = Storage::open_internal(
+                OpenOptions {
+                    path: staging.display().to_string(),
+                    page_cache_mb: Some(16),
+                    read_only: Some(false),
+                    vector_dim: None,
+                    retention: Some("full".into()),
+                },
+                None,
+                membership.clone(),
+                true,
+            )?;
             if staging_storage.stable_frontier() != manifest.stable_frontier {
                 return Err(Error::from_reason(
                     "GENERATION_STALE: recovered WAL frontier mismatch",
@@ -22077,13 +27107,18 @@ impl Storage {
 
             // Verify the newly published generation through a separate
             // read-only recovery before the restore target becomes visible.
-            let read_only_validation = Storage::open(OpenOptions {
-                path: staging.display().to_string(),
-                page_cache_mb: Some(16),
-                read_only: Some(true),
-                vector_dim: None,
-                retention: Some("full".into()),
-            })?;
+            let read_only_validation = Storage::open_internal(
+                OpenOptions {
+                    path: staging.display().to_string(),
+                    page_cache_mb: Some(16),
+                    read_only: Some(true),
+                    vector_dim: None,
+                    retention: Some("full".into()),
+                },
+                None,
+                membership.clone(),
+                true,
+            )?;
             let lease = read_only_validation.pin_generation(
                 AccessContext {
                     principal: "backup-restore-verifier".into(),
@@ -22100,7 +27135,12 @@ impl Storage {
             drop(read_only_validation);
             // Prepare every fallible return value before the rename publishes
             // the target. A bundle I/O error must not leave a visible restore.
-            Self::backup_info(&manifest, bundle_path.clone())
+            Ok(Self::backup_info_with_digest(
+                &manifest,
+                bundle_path.clone(),
+                bundle_byte_count,
+                bundle_sha256,
+            ))
         })();
         match result {
             Ok(bundle_info) => match fs::rename(&staging, &target_root) {
@@ -22117,10 +27157,10 @@ impl Storage {
         }
     }
 
-    fn try_load_state(&self) -> bool {
+    fn try_load_state(&self) -> SnapshotLoadOutcome {
         let state_path = self.path.join("state.json");
         if !state_path.exists() {
-            return false;
+            return SnapshotLoadOutcome::NotLoaded;
         }
 
         println!("snapshot: attempting instant load from binary state...");
@@ -22131,22 +27171,26 @@ impl Storage {
             .and_then(|c| serde_json::from_str(&c).ok())
         {
             Some(v) => v,
-            None => return false,
+            None => return SnapshotLoadOutcome::NotLoaded,
         };
-        match Self::validate_p6_snapshot_at(&self.path, &state_val) {
-            Err(error) => {
-                println!("snapshot: rejecting candidate state: {error}");
-                // No in-memory state has been touched yet. Recovery will replay
-                // the complete WAL and will not retain a partial candidate load.
-                return false;
-            }
-            Ok(Some(_)) => {
-                if let Err(error) = self.validate_p6_snapshot_authority(&state_val) {
-                    println!("snapshot: rejecting candidate P6 authority: {error}");
-                    return false;
+        let (snapshot_digest, projection_valid) =
+            match Self::validate_p6_snapshot_for_open(&self.path, &state_val) {
+                Err(error) => {
+                    println!("snapshot: rejecting candidate state: {error}");
+                    // No in-memory state has been touched yet. Recovery will replay
+                    // the complete WAL and will not retain a partial candidate load.
+                    return SnapshotLoadOutcome::NotLoaded;
                 }
+                Ok(validation) => validation,
+            };
+        if snapshot_digest.is_some() {
+            if let Err(error) = self.validate_p6_snapshot_authority(&state_val) {
+                println!("snapshot: rejecting candidate P6 authority: {error}");
+                return SnapshotLoadOutcome::NotLoaded;
             }
-            Ok(None) => {}
+        }
+        if !projection_valid {
+            println!("snapshot: projection.sqlite is not integrity-verified; rebuilding it from the journal");
         }
 
         if let Some(policy) = state_val
@@ -22364,7 +27408,7 @@ impl Storage {
             self.collections
                 .insert("default".to_string(), Arc::new(coll));
         } else {
-            return false;
+            return SnapshotLoadOutcome::NotLoaded;
         }
         // Guarantee the default collection always exists post-load.
         if !self.collections.contains_key(&self.default_collection) {
@@ -22411,7 +27455,7 @@ impl Storage {
                 }
                 Err(e) => {
                     println!("snapshot: failed to deserialize nodes: {}", e);
-                    return false;
+                    return SnapshotLoadOutcome::NotLoaded;
                 }
             }
         } else {
@@ -22508,7 +27552,11 @@ impl Storage {
         }
 
         println!("snapshot: instant load complete in {:?}", start.elapsed());
-        true
+        if projection_valid {
+            SnapshotLoadOutcome::Loaded
+        } else {
+            SnapshotLoadOutcome::LoadedProjectionNeedsRebuild
+        }
     }
 
     pub fn execute_batch(&self, input: BatchInput) -> Result<BatchOutput> {
@@ -22518,7 +27566,7 @@ impl Storage {
 
         // 1. Validation Phase (All-or-Nothing)
         for node in &input.nodes {
-            self.validate_governance(&node.labels, false)?;
+            self.validate_local_node_mutation(node.id.as_deref(), &node.labels)?;
         }
 
         let mut output_nodes = Vec::with_capacity(input.nodes.len());
@@ -23122,7 +28170,7 @@ impl Storage {
                 let size = serde_json::to_vec(signed_event)
                     .map(|v| v.len())
                     .unwrap_or(usize::MAX);
-                if size > 40_000 {
+                if size > MAX_GOSSIP_EVENT_JSON_BYTES {
                     oversized = true;
                     break;
                 }
@@ -23131,7 +28179,7 @@ impl Storage {
             if oversized {
                 break;
             }
-            if bytes + group_bytes > 40_000 && seq != through {
+            if bytes + group_bytes > MAX_GOSSIP_DELTA_JSON_BYTES && seq != through {
                 break;
             }
 
@@ -23157,7 +28205,7 @@ impl Storage {
         if serde_json::to_vec(&events)
             .map_err(|e| Error::from_reason(e.to_string()))?
             .len()
-            > 55_000
+            > MAX_GOSSIP_DELTA_JSON_BYTES
         {
             return Err(Error::from_reason(
                 "SYNC_BOOTSTRAP_REQUIRED: base/dependencies exceed datagram budget",
@@ -23250,6 +28298,528 @@ impl Storage {
         }
     }
 
+    fn compacted_master_authority_proofs(
+        &self,
+        now: &str,
+    ) -> Result<CompactedMasterAuthorityProofs> {
+        let mut required_nodes = HashMap::new();
+        for entry in self.nodes.iter() {
+            let node = entry.value();
+            if node.valid_to.is_none()
+                && !node
+                    .expires_at
+                    .as_ref()
+                    .is_some_and(|expires_at| now > expires_at.as_str())
+                && Self::labels_are_master(&node.labels)
+            {
+                let mut materialized = node.clone();
+                materialized.props = self.hydrated_props(*entry.key(), &materialized);
+                materialized.embedding = None;
+                required_nodes.insert(node.id.clone(), materialized);
+            }
+        }
+
+        let mut required_retractions = HashMap::new();
+        for tombstone in self.tombstones.iter() {
+            if !Self::retention_expired(&tombstone.retracted_at, now) {
+                required_retractions.insert(
+                    tombstone.key().clone(),
+                    (tombstone.clock.clone(), tombstone.retracted_at.clone()),
+                );
+            }
+        }
+
+        fn collect_matches(
+            event: &Event,
+            required_nodes: &HashMap<String, NodeOutput>,
+            required_retractions: &HashMap<String, (LogicalClock, String)>,
+            matches: &mut Vec<String>,
+        ) {
+            match event {
+                Event::Node(node)
+                    if Storage::labels_are_master(&node.labels)
+                        && required_nodes
+                            .get(&node.id)
+                            .is_some_and(|target| target.clock == node.clock) =>
+                {
+                    matches.push(format!("node:{}", node.id));
+                }
+                Event::NodeRetract { id, clock, .. }
+                    if required_retractions
+                        .get(id)
+                        .is_some_and(|(target_clock, _)| target_clock == clock) =>
+                {
+                    matches.push(format!("retraction:{id}"));
+                }
+                Event::Batch(events) => {
+                    for nested in events {
+                        collect_matches(nested, required_nodes, required_retractions, matches);
+                    }
+                }
+                Event::Transaction(transaction) => {
+                    for node in &transaction.nodes {
+                        if Storage::labels_are_master(&node.labels)
+                            && required_nodes
+                                .get(&node.id)
+                                .is_some_and(|target| target.clock == node.clock)
+                        {
+                            matches.push(format!("node:{}", node.id));
+                        }
+                    }
+                    for retraction in &transaction.node_retractions {
+                        if required_retractions
+                            .get(&retraction.id)
+                            .is_some_and(|(target_clock, _)| target_clock == &retraction.clock)
+                        {
+                            matches.push(format!("retraction:{}", retraction.id));
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        fn record_vector_source(
+            owner_id: &str,
+            collection: Option<&str>,
+            proof: &SignedEvent,
+            default_collection: &str,
+            order: &mut u64,
+            latest: &mut HashMap<(String, String), (u64, SignedEvent)>,
+        ) {
+            *order = order.saturating_add(1);
+            latest.insert(
+                (
+                    owner_id.to_string(),
+                    collection.unwrap_or(default_collection).to_string(),
+                ),
+                (*order, proof.clone()),
+            );
+        }
+
+        fn record_vector_sources(
+            event: &Event,
+            proof: &SignedEvent,
+            default_collection: &str,
+            order: &mut u64,
+            latest: &mut HashMap<(String, String), (u64, SignedEvent)>,
+        ) {
+            match event {
+                Event::Vector(vector) | Event::VectorMaterialized(vector) => {
+                    record_vector_source(
+                        &vector.node_id,
+                        vector.collection.as_deref(),
+                        proof,
+                        default_collection,
+                        order,
+                        latest,
+                    );
+                }
+                Event::Node(node) if node.embedding.is_some() => {
+                    record_vector_source(
+                        &node.id,
+                        node.collection.as_deref(),
+                        proof,
+                        default_collection,
+                        order,
+                        latest,
+                    );
+                }
+                Event::Batch(events) => {
+                    for nested in events {
+                        record_vector_sources(nested, proof, default_collection, order, latest);
+                    }
+                }
+                Event::Transaction(transaction) => {
+                    for node in &transaction.nodes {
+                        if node.embedding.is_some() {
+                            record_vector_source(
+                                &node.id,
+                                node.collection.as_deref(),
+                                proof,
+                                default_collection,
+                                order,
+                                latest,
+                            );
+                        }
+                    }
+                    for vector in &transaction.vectors {
+                        record_vector_source(
+                            &vector.node_id,
+                            vector.collection.as_deref(),
+                            proof,
+                            default_collection,
+                            order,
+                            latest,
+                        );
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        fn record_actions(
+            event: &Event,
+            proof: &SignedEvent,
+            order: &mut u64,
+            latest: &mut HashMap<String, (u64, CompactedMasterIdentityAction)>,
+        ) {
+            fn action_state(
+                latest: &HashMap<String, (u64, CompactedMasterIdentityAction)>,
+                id: &str,
+            ) -> Option<ProofIdentityState> {
+                latest.get(id).map(|(_, action)| match action {
+                    CompactedMasterIdentityAction::Node(node, _) => {
+                        ProofIdentityState::Node(node.clone())
+                    }
+                    CompactedMasterIdentityAction::Retraction(retraction) => {
+                        ProofIdentityState::Retraction(retraction.clone())
+                    }
+                })
+            }
+
+            fn record_lww_action(
+                event: &Event,
+                id: &str,
+                action: CompactedMasterIdentityAction,
+                order: &mut u64,
+                latest: &mut HashMap<String, (u64, CompactedMasterIdentityAction)>,
+            ) {
+                let mut projected = action_state(latest, id);
+                apply_proof_event_for_identity(event, id, &mut projected);
+                let accepted = match (&action, projected) {
+                    (
+                        CompactedMasterIdentityAction::Node(candidate, _),
+                        Some(ProofIdentityState::Node(current)),
+                    ) => node_projection_matches_proof(&current, candidate),
+                    (
+                        CompactedMasterIdentityAction::Retraction(candidate),
+                        Some(ProofIdentityState::Retraction(current)),
+                    ) => {
+                        candidate.id == current.id
+                            && candidate.clock == current.clock
+                            && candidate.retracted_at == current.retracted_at
+                    }
+                    _ => false,
+                };
+                if accepted {
+                    *order = order.saturating_add(1);
+                    latest.insert(id.to_string(), (*order, action));
+                }
+            }
+
+            match event {
+                Event::Node(node) => {
+                    let prior_state_is_protected =
+                        action_state(latest, &node.id).is_some_and(|state| match state {
+                            ProofIdentityState::Node(prior) => {
+                                Storage::labels_are_master(&prior.labels)
+                            }
+                            ProofIdentityState::Retraction(_) => true,
+                        });
+                    // A MASTER-authorized writer may also create ordinary USER
+                    // nodes. Preserve a USER action only when it transitions an
+                    // identity that was already MASTER-protected (or retracted),
+                    // so the compacted journal does not turn unrelated USER data
+                    // into state that every receiving member must authorize as
+                    // MASTER.
+                    if Storage::labels_are_master(&node.labels) || prior_state_is_protected {
+                        record_lww_action(
+                            event,
+                            &node.id,
+                            CompactedMasterIdentityAction::Node(
+                                Box::new(node.clone()),
+                                Box::new(proof.clone()),
+                            ),
+                            order,
+                            latest,
+                        );
+                    }
+                }
+                Event::NodeRetract {
+                    id,
+                    clock,
+                    retracted_at,
+                } => {
+                    let retraction = NodeRetractionEvent {
+                        id: id.clone(),
+                        clock: clock.clone(),
+                        retracted_at: retracted_at.clone(),
+                    };
+                    record_lww_action(
+                        event,
+                        id,
+                        CompactedMasterIdentityAction::Retraction(retraction),
+                        order,
+                        latest,
+                    );
+                }
+                Event::Batch(events) => {
+                    for nested in events {
+                        record_actions(nested, proof, order, latest);
+                    }
+                }
+                Event::Transaction(transaction) => {
+                    for node in &transaction.nodes {
+                        let prior_state_is_protected =
+                            action_state(latest, &node.id).is_some_and(|state| match state {
+                                ProofIdentityState::Node(prior) => {
+                                    Storage::labels_are_master(&prior.labels)
+                                }
+                                ProofIdentityState::Retraction(_) => true,
+                            });
+                        if Storage::labels_are_master(&node.labels) || prior_state_is_protected {
+                            *order = order.saturating_add(1);
+                            latest.insert(
+                                node.id.clone(),
+                                (
+                                    *order,
+                                    CompactedMasterIdentityAction::Node(
+                                        Box::new(node.clone()),
+                                        Box::new(proof.clone()),
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    for retraction in &transaction.node_retractions {
+                        *order = order.saturating_add(1);
+                        latest.insert(
+                            retraction.id.clone(),
+                            (
+                                *order,
+                                CompactedMasterIdentityAction::Retraction(retraction.clone()),
+                            ),
+                        );
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        let mut latest_proofs: HashMap<String, (u64, SignedEvent)> = HashMap::new();
+        let mut latest_master_vectors: HashMap<(String, String), (u64, SignedEvent)> =
+            HashMap::new();
+        let mut vector_source_order = 0u64;
+        let mut latest_actions: HashMap<String, (u64, CompactedMasterIdentityAction)> =
+            HashMap::new();
+        let mut journal_order = 0u64;
+        self.scan_journal(None, true, &mut |_, signed_event| {
+            journal_order = journal_order.saturating_add(1);
+            let order = journal_order;
+            let proof = if signed_event
+                .signature
+                .starts_with(COMPACTED_MASTER_PROOF_MAGIC)
+                || signed_event
+                    .signature
+                    .starts_with(COMPACTED_MASTER_PROOF_V2_MAGIC)
+            {
+                self.compacted_master_authority_proof(&signed_event)
+            } else if self.authorized_master(&signed_event.signer_peer_id)
+                && self.verify_raw_event_signature(&signed_event)
+            {
+                Some(signed_event.clone())
+            } else {
+                None
+            };
+            let Some(proof) = proof else {
+                return;
+            };
+            record_vector_sources(
+                &proof.event,
+                &proof,
+                &self.default_collection,
+                &mut vector_source_order,
+                &mut latest_master_vectors,
+            );
+            let mut matches = Vec::new();
+            collect_matches(
+                &proof.event,
+                &required_nodes,
+                &required_retractions,
+                &mut matches,
+            );
+            matches.sort();
+            matches.dedup();
+            for key in matches {
+                latest_proofs.insert(key, (order, proof.clone()));
+            }
+            if signed_event
+                .signature
+                .starts_with(COMPACTED_MASTER_PROOF_MAGIC)
+                || signed_event
+                    .signature
+                    .starts_with(COMPACTED_MASTER_PROOF_V2_MAGIC)
+            {
+                record_actions(
+                    &signed_event.event,
+                    &proof,
+                    &mut journal_order,
+                    &mut latest_actions,
+                );
+            } else {
+                let mut leaf_order = order.saturating_mul(1_000_000);
+                record_actions(&proof.event, &proof, &mut leaf_order, &mut latest_actions);
+            }
+        });
+
+        let mut proofs = CompactedMasterAuthorityProofs::default();
+        let mut missing = Vec::new();
+        for (id, target) in &required_nodes {
+            match latest_proofs.get(&format!("node:{id}")) {
+                Some((_, proof)) if find_base_proof_node(&proof.event, target).is_some() => {
+                    proofs.master_nodes.insert(id.clone(), proof.clone());
+                }
+                _ => missing.push(format!("MASTER node {id}")),
+            }
+        }
+        for (id, (clock, retracted_at)) in &required_retractions {
+            match latest_proofs.get(&format!("retraction:{id}")) {
+                Some((_, proof))
+                    if find_proof_retraction(&proof.event, id, clock, retracted_at) =>
+                {
+                    proofs.retractions.insert(id.clone(), proof.clone());
+                }
+                _ => missing.push(format!("MASTER retraction {id}")),
+            }
+        }
+        for (key, (_, proof)) in latest_master_vectors {
+            if self.current_node_is_master(&key.0) {
+                proofs.master_vectors.insert(key, proof);
+            }
+        }
+        for entry in self.nodes.iter() {
+            let node = entry.value();
+            if node.valid_to.is_some()
+                || Self::labels_are_master(&node.labels)
+                || node
+                    .expires_at
+                    .as_ref()
+                    .is_some_and(|expires_at| now > expires_at.as_str())
+            {
+                continue;
+            }
+            match latest_actions.get(&node.id).map(|(_, action)| action) {
+                Some(CompactedMasterIdentityAction::Node(proof_node, proof))
+                    if !Self::labels_are_master(&proof_node.labels)
+                        && proof_node.clock <= node.clock =>
+                {
+                    proofs
+                        .user_nodes
+                        .insert(node.id.clone(), ((**proof_node).clone(), (**proof).clone()));
+                }
+                Some(_) => missing.push(format!(
+                    "MASTER-authorized USER transition for node {}",
+                    node.id
+                )),
+                None => {}
+            }
+        }
+        if !missing.is_empty() {
+            return Err(Error::from_reason(format!(
+                "COMPACTION_MASTER_AUTHORITY_PROOF_MISSING: {}",
+                missing.join(", ")
+            )));
+        }
+        Ok(proofs)
+    }
+
+    fn compacted_base_materialization_proofs(&self) -> Result<CompactedBaseMaterializationProofs> {
+        let mut proofs = CompactedBaseMaterializationProofs::default();
+        self.scan_journal(None, true, &mut |_, signed_event| {
+            let proof = if signed_event
+                .signature
+                .starts_with(COMPACTED_BASE_EVENT_MAGIC)
+                || signed_event
+                    .signature
+                    .starts_with(COMPACTED_BASE_EVENT_V2_MAGIC)
+            {
+                self.compacted_base_source_proof(&signed_event)
+            } else if signed_event
+                .signature
+                .starts_with(COMPACTED_MASTER_PROOF_MAGIC)
+                || signed_event
+                    .signature
+                    .starts_with(COMPACTED_MASTER_PROOF_V2_MAGIC)
+            {
+                self.compacted_master_revision_proof(&signed_event)
+            } else if self.verify_raw_event_signature(&signed_event) {
+                Some(signed_event.clone())
+            } else {
+                None
+            };
+            let Some(proof) = proof else {
+                return;
+            };
+            if !self.verify_raw_event_signature(&proof)
+                || !Self::revision_transaction_binds_graph(&proof.event)
+            {
+                return;
+            }
+            let Event::Transaction(transaction) = &proof.event else {
+                return;
+            };
+            for node in &transaction.nodes {
+                proofs.nodes.insert(node.id.clone(), proof.clone());
+            }
+            for edge in &transaction.edges {
+                proofs.edges.insert(edge.id.clone(), proof.clone());
+            }
+            if let Some(revisions) = transaction.record_revision_transaction.as_ref() {
+                for mutation in &revisions.mutations {
+                    if mutation.kind != uee_v2::RecordKindV2::Vector
+                        || mutation.namespace != "default"
+                    {
+                        continue;
+                    }
+                    let Some(owner_id) = mutation.payload["owner_id"].as_str() else {
+                        continue;
+                    };
+                    let Some(collection) = mutation.payload["collection"].as_str() else {
+                        continue;
+                    };
+                    if let Ok(vector_id) = Self::vector_revision_record_id(owner_id, collection) {
+                        proofs.vectors.insert(vector_id, proof.clone());
+                    }
+                }
+            }
+        });
+        let migration_active = self
+            .schema6_activation
+            .read()
+            .as_ref()
+            .is_some_and(|activation| activation.migration.is_some());
+        if migration_active {
+            for entry in self.nodes.iter() {
+                let node = entry.value();
+                if node.valid_to.is_some()
+                    || Self::labels_are_master(&node.labels)
+                    || proofs.nodes.contains_key(&node.id)
+                {
+                    continue;
+                }
+                let mut baseline = node.clone();
+                baseline.props = self.hydrated_props(*entry.key(), &baseline);
+                baseline.embedding = None;
+                let event = Event::Node(baseline);
+                if let Some(proof) = self.schema6_migration_revision_proof_for(&event)? {
+                    proofs.nodes.insert(node.id.clone(), proof);
+                }
+            }
+            for entry in self.edges.iter() {
+                let edge = entry.value();
+                if proofs.edges.contains_key(&edge.id) {
+                    continue;
+                }
+                let event = Event::Edge(edge.clone());
+                if let Some(proof) = self.schema6_migration_revision_proof_for(&event)? {
+                    proofs.edges.insert(edge.id.clone(), proof);
+                }
+            }
+        }
+        Ok(proofs)
+    }
+
     /// Serialize current live state as the fold payload (the `SignedEvent`
     /// JSONL lines the writer thread frames into a base segment at the fold
     /// frontier — WP-1.2). Split out of `compact_unlocked` so
@@ -23258,12 +28828,87 @@ impl Storage {
     /// live state cannot move between the build and the fold).
     fn build_compacted_wal(&self) -> Result<(Vec<u8>, usize)> {
         self.ensure_writable()?;
+        // The current projection is final state, so validate source proofs by
+        // their retained journal order before creating checkpoints. Checking
+        // each historical source against the live MASTER state would reject
+        // USER events that predate a later authorized MASTER promotion.
+        self.preflight_journal_authorization_in_source_order(false)?;
         // Build the live-state snapshot in memory, then hand it to the WAL thread
         // to atomically replace the file (serialized with appends; see WalMsg).
         let mut buf: Vec<u8> = Vec::new();
 
         let now = Utc::now().to_rfc3339();
         let mut count = 0;
+        if self
+            .schema6_activation
+            .read()
+            .as_ref()
+            .is_some_and(|activation| activation.migration.is_some())
+        {
+            self.validate_schema6_migration_authority()?;
+        }
+        // Detached base-event proofs are the schema-6 revision contract. Legacy
+        // schema-5 graph events have no revision envelope, so they must remain
+        // locally signed materializations instead of being misclassified as a
+        // schema-6 source proof and rejected during folding.
+        let base_proofs = if self.storage_schema_version == SCHEMA_VERSION {
+            self.compacted_base_materialization_proofs()?
+        } else {
+            CompactedBaseMaterializationProofs::default()
+        };
+        let authority_proofs = self.compacted_master_authority_proofs(&now)?;
+
+        // Sign only the current protected projection and carry the original
+        // MASTER event as detached signature evidence. Replaying the original
+        // Batch/Transaction here would reapply unrelated historical leaves.
+        for (id, proof) in &authority_proofs.master_nodes {
+            let node_key = self.get_u32_unlocked(id).ok_or_else(|| {
+                Error::from_reason(format!("COMPACTION_MASTER_NODE_MISSING: {id}"))
+            })?;
+            let mut current_node = self
+                .nodes
+                .get(&node_key)
+                .map(|node| node.value().clone())
+                .ok_or_else(|| {
+                    Error::from_reason(format!("COMPACTION_MASTER_NODE_MISSING: {id}"))
+                })?;
+            current_node.props = self.hydrated_props(node_key, &current_node);
+            current_node.embedding = None;
+            let mut source_node = find_base_proof_node(&proof.event, &current_node).ok_or_else(|| {
+                Error::from_reason(format!(
+                    "COMPACTION_MASTER_AUTHORITY_PROOF_MISSING: source node {id} no longer matches current state"
+                ))
+            })?;
+            source_node.embedding = None;
+            let event = Event::Node(source_node);
+            let signed = self.sign_compacted_master_materialization(
+                &event,
+                proof,
+                base_proofs.nodes.get(id),
+            )?;
+            let json =
+                serde_json::to_vec(&signed).map_err(|e| Error::from_reason(e.to_string()))?;
+            buf.extend_from_slice(&json);
+            buf.push(b'\n');
+            count += 1;
+        }
+        for (id, proof) in &authority_proofs.retractions {
+            let tombstone = self
+                .tombstones
+                .get(id)
+                .ok_or_else(|| Error::from_reason(format!("COMPACTION_TOMBSTONE_MISSING: {id}")))?;
+            let event = Event::NodeRetract {
+                id: id.clone(),
+                clock: tombstone.clock.clone(),
+                retracted_at: tombstone.retracted_at.clone(),
+            };
+            let signed = self.sign_compacted_master_materialization(&event, proof, None)?;
+            let json =
+                serde_json::to_vec(&signed).map_err(|e| Error::from_reason(e.to_string()))?;
+            buf.extend_from_slice(&json);
+            buf.push(b'\n');
+            count += 1;
+        }
 
         // Definitions and calibrated packing state precede every vector, even
         // for empty collections. These are derived base materializations.
@@ -23292,13 +28937,99 @@ impl Storage {
                 }
             }
             if node.valid_to.is_none() {
+                // The original MASTER-signed event was retained above. A
+                // non-MASTER relay must not re-sign the protected snapshot.
+                if Self::labels_are_master(&node.labels) {
+                    continue;
+                }
                 let mut node = node.clone();
                 node.props = self.hydrated_props(*entry.key(), &node);
                 // Both primary and secondary vectors are emitted below with
                 // an explicit already-prepared representation.
                 node.embedding = None;
-                if let Ok(json) = serde_json::to_string(&self.sign_event(&Event::Node(node))) {
-                    buf.extend_from_slice(json.as_bytes());
+                let mut materializations = Vec::with_capacity(2);
+                if self.storage_schema_version != SCHEMA_VERSION {
+                    if let Some((declassified_node, master_proof)) =
+                        authority_proofs.user_nodes.get(&node.id)
+                    {
+                        // Legacy graph frames have no revision-bound base proof.
+                        // Preserve the privileged transition itself, then let
+                        // the relay sign a later ordinary USER update locally.
+                        let mut transition = declassified_node.clone();
+                        transition.embedding = None;
+                        let transition_event = Event::Node(transition.clone());
+                        materializations.push(self.sign_compacted_master_materialization(
+                            &transition_event,
+                            master_proof,
+                            None,
+                        )?);
+                        if !node_base_projection_matches_proof(&node, &transition) {
+                            if node.clock <= transition.clock {
+                                return Err(Error::from_reason(format!(
+                                    "COMPACTION_MASTER_AUTHORITY_PROOF_MISSING: USER update for node {} does not follow its MASTER transition",
+                                    node.id
+                                )));
+                            }
+                            materializations.push(self.sign_event(&Event::Node(node.clone())));
+                        }
+                    } else {
+                        materializations.push(self.sign_event(&Event::Node(node.clone())));
+                    }
+                } else if let Some((declassified_node, master_proof)) =
+                    authority_proofs.user_nodes.get(&node.id)
+                {
+                    // Preserve the exact MASTER-authorized USER transition.
+                    // If a later ordinary USER transaction changed the row,
+                    // apply its independently revision-bound base proof only
+                    // after this transition has removed the protected state.
+                    let mut transition = declassified_node.clone();
+                    transition.embedding = None;
+                    let transition_event = Event::Node(transition.clone());
+                    materializations.push(self.sign_compacted_master_materialization(
+                        &transition_event,
+                        master_proof,
+                        base_proofs.nodes.get(&node.id),
+                    )?);
+                    if !node_base_projection_matches_proof(&node, &transition) {
+                        if node.clock <= transition.clock {
+                            return Err(Error::from_reason(format!(
+                                "COMPACTION_MASTER_AUTHORITY_PROOF_MISSING: USER update for node {} does not follow its MASTER transition",
+                                node.id
+                            )));
+                        }
+                        let proof = base_proofs.nodes.get(&node.id);
+                        let current_source = proof
+                            .and_then(|proof| find_base_proof_node(&proof.event, &node))
+                            .ok_or_else(|| {
+                                Error::from_reason(format!(
+                                    "COMPACTION_BASE_EVENT_PROOF_INVALID: source event does not bind Node {}",
+                                    node.id
+                                ))
+                            })?;
+                        let mut current_source = current_source;
+                        current_source.embedding = None;
+                        let event = Event::Node(current_source);
+                        materializations
+                            .push(self.sign_compacted_base_materialization(&event, proof)?);
+                    }
+                } else {
+                    let proof = base_proofs.nodes.get(&node.id);
+                    let mut source = proof
+                        .and_then(|proof| find_base_proof_node(&proof.event, &node))
+                        .ok_or_else(|| {
+                            Error::from_reason(format!(
+                                "COMPACTION_BASE_EVENT_PROOF_INVALID: source event does not bind Node {}",
+                                node.id
+                            ))
+                        })?;
+                    source.embedding = None;
+                    let event = Event::Node(source);
+                    materializations.push(self.sign_compacted_base_materialization(&event, proof)?);
+                }
+                for signed in materializations {
+                    let json = serde_json::to_vec(&signed)
+                        .map_err(|error| Error::from_reason(error.to_string()))?;
+                    buf.extend_from_slice(&json);
                     buf.push(b'\n');
                     count += 1;
                 }
@@ -23319,13 +29050,14 @@ impl Storage {
                 Some(retired) => !Self::retention_expired(retired, &now),
             };
             if keep {
-                if let Ok(json) =
-                    serde_json::to_string(&self.sign_event(&Event::Edge(edge.clone())))
-                {
-                    buf.extend_from_slice(json.as_bytes());
-                    buf.push(b'\n');
-                    count += 1;
-                }
+                let event = Event::Edge(edge.clone());
+                let proof = base_proofs.edges.get(&edge.id);
+                let signed = self.sign_compacted_base_materialization(&event, proof)?;
+                let json = serde_json::to_string(&signed)
+                    .map_err(|error| Error::from_reason(error.to_string()))?;
+                buf.extend_from_slice(json.as_bytes());
+                buf.push(b'\n');
+                count += 1;
             }
         }
 
@@ -23341,16 +29073,8 @@ impl Storage {
                     expired.push(t.key().clone());
                     continue;
                 }
-                let event = Event::NodeRetract {
-                    id: t.key().clone(),
-                    clock: t.value().clock.clone(),
-                    retracted_at: t.value().retracted_at.clone(),
-                };
-                if let Ok(json) = serde_json::to_string(&self.sign_event(&event)) {
-                    buf.extend_from_slice(json.as_bytes());
-                    buf.push(b'\n');
-                    count += 1;
-                }
+                // The current retraction materialization was emitted above
+                // with detached MASTER proof; it is not replayed as source WAL.
             }
             for id in expired {
                 self.tombstones.remove(&id);
@@ -23385,15 +29109,54 @@ impl Storage {
                     }
                     arena.f32_at(m.embedding_offset as usize, m.vector_dim as usize)
                 };
+                let vector_id = Self::vector_revision_record_id(&node.id, &c.name)?;
+                let proof = base_proofs.vectors.get(&vector_id);
+                let master_proof = if Self::labels_are_master(&node.labels) {
+                    Some(
+                        authority_proofs
+                            .master_vectors
+                            .get(&(node.id.clone(), c.name.clone()))
+                            .ok_or_else(|| {
+                                Error::from_reason(format!(
+                                    "COMPACTION_MASTER_AUTHORITY_PROOF_MISSING: vector mapping {}/{}",
+                                    node.id, c.name
+                                ))
+                            })?,
+                    )
+                } else {
+                    None
+                };
+                let source_proof = master_proof.or(proof);
                 let event = Event::VectorMaterialized(VectorEvent {
                     node_id: node.id.clone(),
                     collection: Some(c.name.clone()),
                     embedding: values.into_iter().map(|v| v as f64).collect(),
                     lang: Some(m.lang.clone()),
-                    clock: node.clock.clone(),
+                    clock: source_proof
+                        .and_then(|proof| {
+                            self.compacted_vector_source_clock(&proof.event, &node.id, &c.name)
+                        })
+                        .unwrap_or_else(|| node.clock.clone()),
                 });
-                let json = serde_json::to_vec(&self.sign_event(&event))
-                    .map_err(|e| Error::from_reason(e.to_string()))?;
+                let signed = if let Some(master_proof) = master_proof {
+                    if !self
+                        .compacted_master_vector_source_matches_event_with_collection_definitions(
+                            &event,
+                            &master_proof.event,
+                            None,
+                        )
+                    {
+                        return Err(Error::from_reason(format!(
+                            "COMPACTION_MASTER_AUTHORITY_PROOF_MISSING: vector mapping {}/{} no longer matches current state",
+                            node.id, c.name
+                        )));
+                    }
+                    self.sign_compacted_master_materialization(&event, master_proof, proof)?
+                } else {
+                    self.sign_compacted_base_materialization(&event, proof)?
+                };
+                let json =
+                    serde_json::to_vec(&signed).map_err(|e| Error::from_reason(e.to_string()))?;
                 buf.extend_from_slice(&json);
                 buf.push(b'\n');
                 count += 1;
@@ -23412,8 +29175,8 @@ impl Storage {
 
         // 5. Preserve transaction identities and stable frontier across WAL
         // compaction without replaying their logical mutations a second time.
-        for event in self.transaction_checkpoint_events()? {
-            let json = serde_json::to_string(&self.sign_event(&event))
+        for signed_event in self.transaction_checkpoint_events()? {
+            let json = serde_json::to_string(&signed_event)
                 .map_err(|e| Error::from_reason(e.to_string()))?;
             buf.extend_from_slice(json.as_bytes());
             buf.push(b'\n');
@@ -23943,6 +29706,17 @@ impl Storage {
         include_legacy: bool,
         f: &mut dyn FnMut(u64, SignedEvent),
     ) {
+        self.scan_journal_with_origin(from_seq, include_legacy, &mut |seq, _, signed_event| {
+            f(seq, signed_event);
+        });
+    }
+
+    fn scan_journal_with_origin(
+        &self,
+        from_seq: Option<u64>,
+        include_legacy: bool,
+        f: &mut dyn FnMut(u64, JournalEventOrigin, SignedEvent),
+    ) {
         use std::io::BufRead;
         let base_frontier = Self::journal_list_segments(&self.path)
             .into_iter()
@@ -23950,22 +29724,23 @@ impl Storage {
             .map(|segment| segment.max_seq)
             .max()
             .unwrap_or(0);
-        let emit_lines = |bytes: &[u8], f: &mut dyn FnMut(u64, SignedEvent)| {
-            for line in bytes.split(|b| *b == b'\n') {
-                if line.is_empty() {
-                    continue;
+        let emit_lines =
+            |bytes: &[u8], origin, f: &mut dyn FnMut(u64, JournalEventOrigin, SignedEvent)| {
+                for line in bytes.split(|b| *b == b'\n') {
+                    if line.is_empty() {
+                        continue;
+                    }
+                    if let Ok(se) = serde_json::from_slice::<SignedEvent>(line) {
+                        f(0, origin, se);
+                    }
                 }
-                if let Ok(se) = serde_json::from_slice::<SignedEvent>(line) {
-                    f(0, se);
-                }
-            }
-        };
+            };
         // Pre-migration / read-only legacy file, in place.
         if include_legacy && self.legacy_log_path.exists() {
             if let Ok(file) = File::open(&self.legacy_log_path) {
                 for line in std::io::BufReader::new(file).lines().map_while(|r| r.ok()) {
                     if let Ok(se) = serde_json::from_str::<SignedEvent>(&line) {
-                        f(0, se);
+                        f(0, JournalEventOrigin::Legacy, se);
                     }
                 }
             }
@@ -23974,7 +29749,7 @@ impl Storage {
             if seg.kind == SEG_KIND_LEGACY_JSONL {
                 if include_legacy {
                     if let Some((_, body)) = read_segment_body(&seg.path) {
-                        emit_lines(&body, f);
+                        emit_lines(&body, JournalEventOrigin::Legacy, f);
                     }
                 }
                 continue;
@@ -23986,7 +29761,12 @@ impl Storage {
                 walk_frames(&body, 0, |seq, payload| {
                     if from_seq.is_none_or(|cursor| seq > cursor) {
                         if let Ok(se) = serde_json::from_slice::<SignedEvent>(payload) {
-                            f(seq, se);
+                            let origin = if seg.kind == SEG_KIND_BASE {
+                                JournalEventOrigin::Base
+                            } else {
+                                JournalEventOrigin::History
+                            };
+                            f(seq, origin, se);
                         }
                     }
                 });
@@ -23997,7 +29777,7 @@ impl Storage {
                 walk_frames(&bytes, ACTIVE_HEADER_LEN, |seq, payload| {
                     if seq > base_frontier && from_seq.is_none_or(|cursor| seq > cursor) {
                         if let Ok(se) = serde_json::from_slice::<SignedEvent>(payload) {
-                            f(seq, se);
+                            f(seq, JournalEventOrigin::Active, se);
                         }
                     }
                 });
@@ -24033,6 +29813,77 @@ impl Storage {
             }
             self.apply_replay_event(seq, self.normalize_replayed_event(signed_event));
         });
+    }
+
+    fn preflight_backup_journal_authorization(&self) -> Result<()> {
+        self.preflight_journal_authorization_in_source_order(false)
+            .map_err(|error| Error::from_reason(format!("BACKUP_AUTH_REQUIRED: {error}")))
+    }
+
+    fn preflight_journal_authorization_in_source_order(
+        &self,
+        seed_from_live_state: bool,
+    ) -> Result<()> {
+        let mut journal_events = Vec::new();
+        self.scan_journal_with_origin(None, true, &mut |seq, origin, signed_event| {
+            journal_events.push((seq, origin, signed_event));
+        });
+        let signed_events = journal_events
+            .iter()
+            .map(|(_, _, signed_event)| signed_event.clone())
+            .collect::<Vec<_>>();
+        let graph_auth_events = Self::graph_authorization_event_order(&journal_events);
+        // A loaded snapshot is the final materialized state. Replaying auth
+        // from journal start must not use it as the initial state, because a
+        // later MASTER promotion would retroactively protect earlier USER
+        // transactions. Base checkpoints carry their source transactions at
+        // original frame sequence; base materializations then establish the
+        // authorization state used by the post-base journal tail.
+        self.preflight_reconcile_authorization_with_graph_events(
+            &signed_events,
+            &graph_auth_events,
+            seed_from_live_state,
+        )
+    }
+
+    fn graph_authorization_event_order(
+        journal_events: &[(u64, JournalEventOrigin, SignedEvent)],
+    ) -> Vec<SignedEvent> {
+        let base_frontier = journal_events
+            .iter()
+            .filter(|(_, origin, _)| *origin == JournalEventOrigin::Base)
+            .map(|(seq, _, _)| *seq)
+            .max()
+            .unwrap_or(0);
+        let mut ordered = journal_events
+            .iter()
+            .enumerate()
+            .map(|(order, (seq, origin, signed_event))| {
+                let (phase, source_seq) = match origin {
+                    JournalEventOrigin::Legacy => (0, *seq),
+                    JournalEventOrigin::History if *seq <= base_frontier => (0, *seq),
+                    JournalEventOrigin::History => (2, *seq),
+                    JournalEventOrigin::Base => {
+                        let source_seq = match &signed_event.event {
+                            Event::Transaction(transaction)
+                                if Self::is_revision_checkpoint(transaction) =>
+                            {
+                                transaction.local_frame_seq.unwrap_or(*seq)
+                            }
+                            _ => return (1, *seq, order, signed_event.clone()),
+                        };
+                        (0, source_seq)
+                    }
+                    JournalEventOrigin::Active => (2, *seq),
+                };
+                (phase, source_seq, order, signed_event.clone())
+            })
+            .collect::<Vec<_>>();
+        ordered.sort_by_key(|(phase, seq, order, _)| (*phase, *seq, *order));
+        ordered
+            .into_iter()
+            .map(|(_, _, _, signed_event)| signed_event)
+            .collect()
     }
 
     fn apply_replay_event(&self, seq: u64, event: Event) {
@@ -26528,6 +32379,24 @@ impl GenesisDatabase {
         Storage::start_gossip_manager(Arc::clone(&storage));
         Ok(Self { inner: storage })
     }
+
+    /// Open a multi-node instance with an operator-pinned peer roster. Plain
+    /// `open()` remains self-only and does not accept discovered members.
+    #[napi(factory)]
+    pub fn open_with_membership(
+        opts: OpenOptions,
+        membership: PeerMembershipOptions,
+    ) -> Result<Self> {
+        let storage = Arc::new(Storage::open_with_membership(opts, membership)?);
+        Storage::start_autonomic_loop(Arc::clone(&storage));
+        Storage::start_gossip_manager(Arc::clone(&storage));
+        Ok(Self { inner: storage })
+    }
+
+    #[napi]
+    pub fn local_identity(&self) -> PeerIdentity {
+        self.inner.local_identity()
+    }
     #[napi]
     pub async fn bulk_add_nodes(&self, inputs: Vec<NodeInput>) -> Result<()> {
         let i = Arc::clone(&self.inner);
@@ -26985,6 +32854,27 @@ impl GenesisDatabase {
             .await
             .map_err(|e| Error::from_reason(e.to_string()))?
     }
+    /// Export the signed proposal envelope as JSON for relay to other members.
+    #[napi]
+    pub async fn export_consensus_proposal(&self, proposal_id: String) -> Result<String> {
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || {
+            serde_json::to_string(&i.export_consensus_proposal(&proposal_id)?)
+                .map_err(|e| Error::from_reason(e.to_string()))
+        })
+        .await
+        .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    /// Import a relayed signed proposal before signing a vote for it.
+    #[napi]
+    pub async fn import_consensus_proposal(&self, proposal_json: String) -> Result<()> {
+        let i = Arc::clone(&self.inner);
+        let proposal = serde_json::from_str::<ConsensusProposal>(&proposal_json)
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        tokio::task::spawn_blocking(move || i.import_consensus_proposal(proposal))
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?
+    }
     #[napi]
     pub async fn submit_vote(
         &self,
@@ -26999,7 +32889,7 @@ impl GenesisDatabase {
             .map_err(|e| Error::from_reason(e.to_string()))?
     }
     #[napi]
-    pub fn sign_vote(&self, proposal_id: String, approve: bool) -> Vec<u8> {
+    pub fn sign_vote(&self, proposal_id: String, approve: bool) -> Result<Vec<u8>> {
         self.inner.sign_vote(proposal_id, approve)
     }
     #[napi]
@@ -27309,5 +33199,977 @@ mod api_error_contract_tests {
         assert_eq!(error.category, api_error::ApiErrorCategory::Validation);
         assert_eq!(error.code, "GENESIS_VALIDATION_ERROR");
         assert!(error.message.contains("REL_TYPE_MISMATCH"));
+    }
+}
+
+#[cfg(test)]
+mod compacted_row_revision_binding_tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn schema() -> RelationalSchemaPackage {
+        RelationalSchemaPackage {
+            namespace: "checkpoint_rows".into(),
+            schema_version: 1,
+            previous_version: None,
+            package_id: Uuid::new_v4().to_string(),
+            schema_hash: String::new(),
+            tables: vec![RelationalTable {
+                name: "records".into(),
+                columns: vec![
+                    RelationalColumn::required("id", RelationalColumnType::Text),
+                    RelationalColumn::required("title", RelationalColumnType::Text),
+                ],
+                primary_key: vec!["id".into()],
+                foreign_keys: Vec::new(),
+                indexes: Vec::new(),
+            }],
+            named_queries: Vec::new(),
+        }
+    }
+
+    fn row_revision(
+        schema: &RelationalSchemaPackage,
+        mutation: &RelationalRowMutation,
+        row_id: &str,
+        revision_id: &str,
+        expected_revision_id: Option<&str>,
+        after_image: Value,
+        valid_from: DateTime<Utc>,
+    ) -> uee_v2::RecordRevisionMutationV1 {
+        let table = &schema.tables[0];
+        let key = Storage::relational_primary_key_values(table, mutation).unwrap();
+        let key_bytes = Storage::encode_relational_primary_key_v1(schema, mutation).unwrap();
+        uee_v2::RecordRevisionMutationV1 {
+            namespace: schema.namespace.clone(),
+            kind: uee_v2::RecordKindV2::Row,
+            id: row_id.into(),
+            revision_id: revision_id.into(),
+            expected_revision_id: expected_revision_id.map(str::to_string),
+            predecessor_revision_id: expected_revision_id.map(str::to_string),
+            operation: uee_v2::RevisionOperationV1::Upsert,
+            valid_from,
+            valid_to: None,
+            schema_ref: Some(table.name.clone()),
+            schema_version: Some(schema.schema_version as u64),
+            key_codec_version: Some(1),
+            key_bytes: Some(key_bytes.clone()),
+            payload: serde_json::json!({
+                "table": table.name,
+                "key": key,
+                "key_codec_version": 1,
+                "key_bytes": hex::encode(key_bytes),
+                "after_image": after_image,
+            }),
+        }
+    }
+
+    fn source_event(
+        mutation_id: &str,
+        mutation: RelationalRowMutation,
+        revision: uee_v2::RecordRevisionMutationV1,
+    ) -> Event {
+        Event::RelationalRows {
+            namespace: "checkpoint_rows".into(),
+            schema_version: 1,
+            mutation_id: mutation_id.into(),
+            payload_hash: "1".repeat(64),
+            affected_rows: 1,
+            mutations: vec![mutation],
+            record_revision_transaction: Some(uee_v2::RecordRevisionTransactionV1 {
+                transaction_id: Uuid::new_v4(),
+                origin_database_id: "0".repeat(64),
+                mutations: vec![revision],
+            }),
+        }
+    }
+
+    fn open_storage() -> (TempDir, Storage) {
+        open_storage_with_retention(None)
+    }
+
+    fn open_storage_with_retention(retention: Option<&str>) -> (TempDir, Storage) {
+        let directory = TempDir::new().unwrap();
+        let storage = Storage::open(OpenOptions {
+            path: directory.path().to_string_lossy().into_owned(),
+            page_cache_mb: Some(16),
+            read_only: Some(false),
+            vector_dim: Some(2),
+            retention: retention.map(str::to_string),
+        })
+        .unwrap();
+        (directory, storage)
+    }
+
+    fn authorized_peer(
+        storage: &Storage,
+        port: u16,
+        master_authority: bool,
+    ) -> AuthorizedPeerConfig {
+        let identity = storage.local_identity();
+        AuthorizedPeerConfig {
+            peer_id: identity.peer_id,
+            public_key_hex: identity.public_key_hex,
+            gossip_addr: format!("127.0.0.1:{port}"),
+            master_authority,
+        }
+    }
+
+    fn compacted_checkpoint(relay: &Storage, source_event: Event) -> Result<SignedEvent> {
+        let source = relay.sign_event(&source_event);
+        let Event::RelationalRows {
+            mutation_id,
+            payload_hash,
+            record_revision_transaction: Some(revisions),
+            ..
+        } = &source_event
+        else {
+            panic!("expected a revision-bearing relational source event");
+        };
+        let checkpoint = Event::Transaction(GenesisTransactionEvent {
+            transaction_id: format!("relational:{mutation_id}"),
+            origin_commit_seq: 1,
+            local_frame_seq: Some(1),
+            payload_hash: payload_hash.clone(),
+            relational: Vec::new(),
+            nodes: Vec::new(),
+            edges: Vec::new(),
+            vectors: Vec::new(),
+            node_retractions: Vec::new(),
+            advances_txn_frontier: false,
+            record_revision_transaction: Some(revisions.clone()),
+        });
+        relay.sign_compacted_revision_checkpoint(&checkpoint, &source)
+    }
+
+    fn compacted_graph_checkpoint(relay: &Storage, source: &SignedEvent) -> Result<SignedEvent> {
+        let Event::Transaction(source_transaction) = &source.event else {
+            return Err(Error::from_reason(
+                "expected a revision-bearing graph transaction",
+            ));
+        };
+        let mut checkpoint = source_transaction.clone();
+        checkpoint.local_frame_seq = Some(1);
+        checkpoint.relational.clear();
+        checkpoint.nodes.clear();
+        checkpoint.edges.clear();
+        checkpoint.vectors.clear();
+        checkpoint.node_retractions.clear();
+        relay.sign_compacted_revision_checkpoint(&Event::Transaction(checkpoint), source)
+    }
+
+    fn append_signed_event(storage: &Storage, signed_event: SignedEvent) {
+        let (ack_tx, ack_rx) = unbounded();
+        storage
+            .wal_sender
+            .send(WalMsg::Append(Box::new(signed_event), ack_tx))
+            .unwrap();
+        let seq = ack_rx.recv().unwrap().unwrap();
+        storage.commit_sequence.fetch_max(seq, Ordering::SeqCst);
+    }
+
+    #[test]
+    fn backup_restore_requires_roster_for_remote_revision_checkpoint() {
+        let (_relay_dir, relay) = open_storage();
+        let (_untrusted_dir, untrusted_restore) = open_storage();
+        let (_trusted_dir, trusted_restore) = open_storage();
+        let schema = schema();
+        let mutation = RelationalRowMutation {
+            table: "records".into(),
+            kind: RelationalMutationKind::Insert,
+            values: serde_json::json!({"id": "backup-row", "title": "trusted source"}),
+            key: None,
+        };
+        let source = source_event(
+            "backup-row-insert",
+            mutation.clone(),
+            row_revision(
+                &schema,
+                &mutation,
+                &Uuid::new_v4().to_string(),
+                &Uuid::new_v4().to_string(),
+                None,
+                serde_json::json!({"id": "backup-row", "title": "trusted source"}),
+                Utc::now(),
+            ),
+        );
+        let checkpoint = compacted_checkpoint(&relay, source).unwrap();
+        assert!(untrusted_restore.compacted_revision_checkpoint_well_formed(&checkpoint));
+        assert!(!untrusted_restore.verify_compacted_revision_checkpoint(&checkpoint));
+
+        untrusted_restore
+            .register_relational_schema(schema.clone())
+            .unwrap();
+        append_signed_event(&untrusted_restore, checkpoint.clone());
+        let error = untrusted_restore
+            .preflight_backup_journal_authorization()
+            .unwrap_err();
+        assert!(error.to_string().contains("BACKUP_AUTH_REQUIRED"));
+
+        trusted_restore
+            .configure_peer_membership(
+                vec![authorized_peer(&relay, 31841, true)],
+                "127.0.0.1:31842",
+                false,
+            )
+            .unwrap();
+        trusted_restore.register_relational_schema(schema).unwrap();
+        append_signed_event(&trusted_restore, checkpoint);
+        trusted_restore
+            .preflight_backup_journal_authorization()
+            .unwrap();
+    }
+
+    #[test]
+    fn backup_restore_with_membership_authenticates_remote_journal_before_publish() {
+        for retention in [Some("full"), None] {
+            let (_source_dir, source) = open_storage_with_retention(retention);
+            let (_remote_dir, remote) = open_storage();
+            let source_gossip_addr = "127.0.0.1:31852";
+            let membership = PeerMembershipOptions {
+                local_gossip_addr: "127.0.0.1:31853".into(),
+                local_master_authority: Some(true),
+                peers: vec![authorized_peer(&remote, 31851, false)],
+            };
+            source
+                .configure_peer_membership(membership.peers.clone(), source_gossip_addr, true)
+                .unwrap();
+            remote
+                .add_node(NodeInput {
+                    id: Some("backup-remote-member".into()),
+                    labels: vec!["USER".into()],
+                    props: Some(serde_json::json!({"origin": "authorized-member"})),
+                    embedding: None,
+                    lang: None,
+                    valid_from: None,
+                    caused_by: None,
+                    ttl: None,
+                    collection: None,
+                })
+                .unwrap();
+            source
+                .reconcile_state(vec![remote.events_since_seq(0).pop().unwrap()])
+                .unwrap();
+            // This later, authorized promotion must not retroactively make the
+            // preceding USER event unauthorized in either retained or folded history.
+            source
+                .add_node(NodeInput {
+                    id: Some("backup-remote-member".into()),
+                    labels: vec!["MASTER".into()],
+                    props: Some(serde_json::json!({"origin": "authorized-master-promotion"})),
+                    embedding: None,
+                    lang: None,
+                    valid_from: None,
+                    caused_by: None,
+                    ttl: None,
+                    collection: None,
+                })
+                .unwrap();
+
+            let backup_dir = TempDir::new().unwrap();
+            let bundle_path = backup_dir.path().join("remote-member.genesis");
+            let export = source
+                .export_backup(BackupExportRequest {
+                    destination: bundle_path.clone(),
+                })
+                .unwrap();
+            if retention.is_none() {
+                assert_eq!(source.history_horizon(), source.stable_frontier());
+            } else {
+                assert_eq!(source.history_horizon(), 0);
+            }
+            let untrusted_target = backup_dir.path().join("without-roster");
+            let untrusted_error = Storage::restore_backup(BackupRestoreRequest {
+                bundle_path: bundle_path.clone(),
+                target_root: untrusted_target.clone(),
+                expected_sha256: export.sha256.clone(),
+            })
+            .unwrap_err();
+            assert!(untrusted_error.to_string().contains("BACKUP_AUTH_REQUIRED"));
+            assert!(!untrusted_target.exists());
+
+            let trusted_target = backup_dir.path().join("with-roster");
+            Storage::restore_backup_with_membership(
+                BackupRestoreRequest {
+                    bundle_path,
+                    target_root: trusted_target.clone(),
+                    expected_sha256: export.sha256,
+                },
+                membership.clone(),
+            )
+            .unwrap();
+            assert!(trusted_target.exists());
+            let restored = Storage::open_with_membership(
+                OpenOptions {
+                    path: trusted_target.to_string_lossy().into_owned(),
+                    page_cache_mb: Some(16),
+                    read_only: Some(true),
+                    vector_dim: Some(2),
+                    retention: None,
+                },
+                membership,
+            )
+            .unwrap();
+            assert!(restored
+                .node_view("backup-remote-member")
+                .is_some_and(|node| Storage::labels_are_master(&node.labels)));
+        }
+    }
+
+    #[test]
+    fn frontier_only_backup_rejects_user_update_after_master_promotion() {
+        let (_source_dir, source) = open_storage();
+        let (_remote_dir, remote) = open_storage();
+        let membership = PeerMembershipOptions {
+            local_gossip_addr: "127.0.0.1:31863".into(),
+            local_master_authority: Some(true),
+            peers: vec![authorized_peer(&remote, 31861, false)],
+        };
+        source
+            .configure_peer_membership(membership.peers.clone(), "127.0.0.1:31862", true)
+            .unwrap();
+        remote
+            .add_node(NodeInput {
+                id: Some("backup-unauthorized-member".into()),
+                labels: vec!["USER".into()],
+                props: Some(serde_json::json!({"revision": "before-promotion"})),
+                embedding: None,
+                lang: None,
+                valid_from: None,
+                caused_by: None,
+                ttl: None,
+                collection: None,
+            })
+            .unwrap();
+        source
+            .reconcile_state(vec![remote.events_since_seq(0).pop().unwrap()])
+            .unwrap();
+        source
+            .add_node(NodeInput {
+                id: Some("backup-unauthorized-member".into()),
+                labels: vec!["MASTER".into()],
+                props: Some(serde_json::json!({"revision": "master-promotion"})),
+                embedding: None,
+                lang: None,
+                valid_from: None,
+                caused_by: None,
+                ttl: None,
+                collection: None,
+            })
+            .unwrap();
+        remote
+            .add_node(NodeInput {
+                id: Some("backup-unauthorized-member".into()),
+                labels: vec!["USER".into()],
+                props: Some(serde_json::json!({"revision": "unauthorized-after-promotion"})),
+                embedding: None,
+                lang: None,
+                valid_from: None,
+                caused_by: None,
+                ttl: None,
+                collection: None,
+            })
+            .unwrap();
+
+        // Simulate a signed event that bypassed sync admission. Compaction must
+        // still validate the complete journal before it signs folded proofs.
+        append_signed_event(&source, remote.events_since_seq(0).last().unwrap().clone());
+
+        let backup_dir = TempDir::new().unwrap();
+        let bundle_path = backup_dir.path().join("unauthorized.genesis");
+        let error = source
+            .export_backup(BackupExportRequest {
+                destination: bundle_path.clone(),
+            })
+            .unwrap_err();
+        assert!(error.to_string().contains("GOVERNANCE_AUTH_REQUIRED"));
+        assert!(!bundle_path.exists());
+    }
+
+    #[test]
+    fn frontier_only_backup_rejects_user_update_in_post_base_history() {
+        let (_source_dir, mut source) = open_storage_with_retention(Some("budget:1"));
+        let (_remote_dir, remote) = open_storage();
+        let membership = PeerMembershipOptions {
+            local_gossip_addr: "127.0.0.1:31866".into(),
+            local_master_authority: Some(true),
+            peers: vec![authorized_peer(&remote, 31864, false)],
+        };
+        source
+            .configure_peer_membership(membership.peers.clone(), "127.0.0.1:31865", true)
+            .unwrap();
+        remote
+            .add_node(NodeInput {
+                id: Some("legacy-base-protected-member".into()),
+                labels: vec!["USER".into()],
+                props: Some(serde_json::json!({"revision": "before-promotion"})),
+                embedding: None,
+                lang: None,
+                valid_from: None,
+                caused_by: None,
+                ttl: None,
+                collection: None,
+            })
+            .unwrap();
+        source
+            .reconcile_state(vec![remote.events_since_seq(0).pop().unwrap()])
+            .unwrap();
+        source
+            .add_node(NodeInput {
+                id: Some("legacy-base-protected-member".into()),
+                labels: vec!["MASTER".into()],
+                props: Some(serde_json::json!({"revision": "master-promotion"})),
+                embedding: None,
+                lang: None,
+                valid_from: None,
+                caused_by: None,
+                ttl: None,
+                collection: None,
+            })
+            .unwrap();
+
+        // Schema-5 folds retain locally signed graph materializations without
+        // schema-6 revision envelopes. This exercises that compatibility path.
+        source.storage_schema_version = LEGACY_SCHEMA_VERSION;
+        source.compact().unwrap();
+        let base_frontier = source.history_horizon();
+        assert!(base_frontier > 0);
+
+        // The roster member can sign a USER event, but it cannot update a
+        // MASTER-protected identity. Make the frame large enough to cross the
+        // test budget's 64 KiB seal threshold and become a HISTORY segment.
+        let oversized_padding = "x".repeat(72 * 1024);
+        remote
+            .add_node(NodeInput {
+                id: Some("legacy-base-protected-member".into()),
+                labels: vec!["USER".into()],
+                props: Some(serde_json::json!({
+                    "revision": "unauthorized-after-fold",
+                    "padding": oversized_padding,
+                })),
+                embedding: None,
+                lang: None,
+                valid_from: None,
+                caused_by: None,
+                ttl: None,
+                collection: None,
+            })
+            .unwrap();
+        append_signed_event(&source, remote.events_since_seq(0).last().unwrap().clone());
+
+        let mut sealed_after_base = false;
+        for _ in 0..100 {
+            sealed_after_base =
+                Storage::journal_list_segments(&source.path)
+                    .iter()
+                    .any(|segment| {
+                        segment.kind == SEG_KIND_HISTORY
+                            && segment.min_seq > base_frontier
+                            && segment.max_seq > base_frontier
+                    });
+            if sealed_after_base {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(
+            sealed_after_base,
+            "post-base event was not sealed to HISTORY"
+        );
+
+        let error = source.preflight_backup_journal_authorization().unwrap_err();
+        assert!(error.to_string().contains("GOVERNANCE_AUTH_REQUIRED"));
+
+        let backup_dir = TempDir::new().unwrap();
+        let bundle_path = backup_dir.path().join("unauthorized-post-base.genesis");
+        let export_error = source
+            .export_backup(BackupExportRequest {
+                destination: bundle_path.clone(),
+            })
+            .unwrap_err();
+        assert!(export_error
+            .to_string()
+            .contains("GOVERNANCE_AUTH_REQUIRED"));
+        assert!(!bundle_path.exists());
+    }
+
+    #[test]
+    fn compacted_row_checkpoint_binds_after_image_to_insert_and_update() {
+        let (_directory, storage) = open_storage();
+        let schema = schema();
+        Storage::validate_relational_schema(&schema).unwrap();
+        let schemas = HashMap::from([((schema.namespace.clone(), 1), schema.clone())]);
+        let mut state = HashMap::new();
+
+        let row_id = Uuid::new_v4().to_string();
+        let insert_revision_id = Uuid::new_v4().to_string();
+        let insert = RelationalRowMutation {
+            table: "records".into(),
+            kind: RelationalMutationKind::Insert,
+            values: serde_json::json!({"id": "row-1", "title": "submitted"}),
+            key: None,
+        };
+        let valid_insert = source_event(
+            "row-insert",
+            insert.clone(),
+            row_revision(
+                &schema,
+                &insert,
+                &row_id,
+                &insert_revision_id,
+                None,
+                serde_json::json!({"id": "row-1", "title": "submitted"}),
+                Utc::now(),
+            ),
+        );
+        storage
+            .validate_compacted_row_source_event(&valid_insert, &schemas, &mut state)
+            .unwrap();
+
+        let forged_insert = source_event(
+            "forged-row-insert",
+            insert,
+            row_revision(
+                &schema,
+                &RelationalRowMutation {
+                    table: "records".into(),
+                    kind: RelationalMutationKind::Insert,
+                    values: serde_json::json!({"id": "row-1", "title": "submitted"}),
+                    key: None,
+                },
+                &Uuid::new_v4().to_string(),
+                &Uuid::new_v4().to_string(),
+                None,
+                serde_json::json!({"id": "row-1", "title": "forged"}),
+                Utc::now(),
+            ),
+        );
+        let mut empty_state = HashMap::new();
+        assert!(storage
+            .validate_compacted_row_source_event(&forged_insert, &schemas, &mut empty_state)
+            .unwrap_err()
+            .to_string()
+            .contains("REVISION_CHECKPOINT_SOURCE_MISMATCH"));
+
+        let predecessor_time = state
+            .get(&(
+                schema.namespace.clone(),
+                "records".to_string(),
+                Storage::encode_relational_primary_key_v1(
+                    &schema,
+                    &RelationalRowMutation {
+                        table: "records".into(),
+                        kind: RelationalMutationKind::Upsert,
+                        values: serde_json::json!({"id": "row-1", "title": "ignored"}),
+                        key: None,
+                    },
+                )
+                .unwrap(),
+            ))
+            .unwrap()
+            .valid_from;
+        let pre_update_state = state.clone();
+        let update = RelationalRowMutation {
+            table: "records".into(),
+            kind: RelationalMutationKind::Update,
+            values: serde_json::json!({"title": "updated"}),
+            key: Some(serde_json::json!({"id": "row-1"})),
+        };
+        let valid_update = source_event(
+            "row-update",
+            update.clone(),
+            row_revision(
+                &schema,
+                &update,
+                &row_id,
+                &Uuid::new_v4().to_string(),
+                Some(&insert_revision_id),
+                serde_json::json!({"id": "row-1", "title": "updated"}),
+                predecessor_time + chrono::Duration::nanoseconds(1),
+            ),
+        );
+        storage
+            .validate_compacted_row_source_event(&valid_update, &schemas, &mut state)
+            .unwrap();
+
+        let active = state
+            .get(&(
+                schema.namespace.clone(),
+                "records".to_string(),
+                Storage::encode_relational_primary_key_v1(
+                    &schema,
+                    &RelationalRowMutation {
+                        table: "records".into(),
+                        kind: RelationalMutationKind::Upsert,
+                        values: serde_json::json!({"id": "row-1", "title": "ignored"}),
+                        key: None,
+                    },
+                )
+                .unwrap(),
+            ))
+            .unwrap()
+            .clone();
+        let delete = RelationalRowMutation {
+            table: "records".into(),
+            kind: RelationalMutationKind::Delete,
+            values: serde_json::json!({}),
+            key: Some(serde_json::json!({"id": "row-1"})),
+        };
+        let reinsert = RelationalRowMutation {
+            table: "records".into(),
+            kind: RelationalMutationKind::Insert,
+            values: serde_json::json!({"id": "row-1", "title": "reinserted"}),
+            key: None,
+        };
+        let key = Storage::relational_primary_key_values(&schema.tables[0], &delete).unwrap();
+        let key_bytes = Storage::encode_relational_primary_key_v1(&schema, &delete).unwrap();
+        let reinserted_at = Utc::now().max(active.valid_from + chrono::Duration::nanoseconds(1));
+        let retracted_revision = uee_v2::RecordRevisionMutationV1 {
+            namespace: schema.namespace.clone(),
+            kind: uee_v2::RecordKindV2::Row,
+            id: active.row_id.clone(),
+            revision_id: Uuid::new_v4().to_string(),
+            expected_revision_id: Some(active.revision_id.clone()),
+            predecessor_revision_id: Some(active.revision_id.clone()),
+            operation: uee_v2::RevisionOperationV1::Retract,
+            valid_from: active.valid_from,
+            valid_to: Some(reinserted_at),
+            schema_ref: Some("records".into()),
+            schema_version: Some(schema.schema_version as u64),
+            key_codec_version: Some(1),
+            key_bytes: Some(key_bytes),
+            payload: serde_json::json!({
+                "table": "records",
+                "key": key,
+                "key_codec_version": 1,
+                "key_bytes": hex::encode(
+                    Storage::encode_relational_primary_key_v1(&schema, &delete).unwrap()
+                ),
+                "tombstone": true,
+            }),
+        };
+        let reinserted_row_id = Uuid::new_v4().to_string();
+        let reinserted_revision_id = Uuid::new_v4().to_string();
+        let reinserted_revision = row_revision(
+            &schema,
+            &reinsert,
+            &reinserted_row_id,
+            &reinserted_revision_id,
+            None,
+            serde_json::json!({"id": "row-1", "title": "reinserted"}),
+            reinserted_at,
+        );
+        let valid_delete_reinsert = Event::RelationalRows {
+            namespace: schema.namespace.clone(),
+            schema_version: schema.schema_version,
+            mutation_id: "row-delete-reinsert".into(),
+            payload_hash: "2".repeat(64),
+            affected_rows: 2,
+            mutations: vec![delete, reinsert],
+            record_revision_transaction: Some(uee_v2::RecordRevisionTransactionV1 {
+                transaction_id: Uuid::new_v4(),
+                origin_database_id: "0".repeat(64),
+                mutations: vec![retracted_revision, reinserted_revision],
+            }),
+        };
+        storage
+            .validate_compacted_row_source_event(&valid_delete_reinsert, &schemas, &mut state)
+            .unwrap();
+        assert_eq!(
+            state
+                .get(&(
+                    schema.namespace.clone(),
+                    "records".to_string(),
+                    Storage::encode_relational_primary_key_v1(
+                        &schema,
+                        &RelationalRowMutation {
+                            table: "records".into(),
+                            kind: RelationalMutationKind::Upsert,
+                            values: serde_json::json!({"id": "row-1", "title": "ignored"}),
+                            key: None,
+                        },
+                    )
+                    .unwrap(),
+                ))
+                .unwrap()
+                .row_id,
+            reinserted_row_id
+        );
+
+        let forged_update = source_event(
+            "forged-row-update",
+            update.clone(),
+            row_revision(
+                &schema,
+                &update,
+                &row_id,
+                &Uuid::new_v4().to_string(),
+                Some(&insert_revision_id),
+                serde_json::json!({"id": "row-1", "title": "forged"}),
+                predecessor_time + chrono::Duration::nanoseconds(1),
+            ),
+        );
+        let mut forged_state = pre_update_state;
+        assert!(storage
+            .validate_compacted_row_source_event(&forged_update, &schemas, &mut forged_state)
+            .unwrap_err()
+            .to_string()
+            .contains("REVISION_CHECKPOINT_SOURCE_MISMATCH"));
+    }
+
+    #[test]
+    fn reconcile_rejects_forged_compacted_row_after_image_before_wal_write() {
+        let (_relay_dir, relay) = open_storage();
+        let (_receiver_dir, receiver) = open_storage();
+        let schema = schema();
+        receiver.register_relational_schema(schema.clone()).unwrap();
+        let relay_peer = authorized_peer(&relay, 31841, true);
+        let receiver_peer = authorized_peer(&receiver, 31842, false);
+        relay
+            .configure_peer_membership(vec![receiver_peer.clone()], "127.0.0.1:31841", true)
+            .unwrap();
+        receiver
+            .configure_peer_membership(vec![relay_peer], "127.0.0.1:31842", false)
+            .unwrap();
+
+        let mutation = RelationalRowMutation {
+            table: "records".into(),
+            kind: RelationalMutationKind::Insert,
+            values: serde_json::json!({"id": "row-1", "title": "submitted"}),
+            key: None,
+        };
+        let forged_source = source_event(
+            "forged-checkpoint-row",
+            mutation.clone(),
+            row_revision(
+                &schema,
+                &mutation,
+                &Uuid::new_v4().to_string(),
+                &Uuid::new_v4().to_string(),
+                None,
+                serde_json::json!({"id": "row-1", "title": "forged"}),
+                Utc::now(),
+            ),
+        );
+        let forged_checkpoint = compacted_checkpoint(&relay, forged_source).unwrap();
+        let frontier_before = receiver.stable_frontier();
+        let wal_count_before = receiver.events_since_seq(0).len();
+        let error = receiver
+            .reconcile_state(vec![forged_checkpoint])
+            .unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("REVISION_CHECKPOINT_SOURCE_MISMATCH"));
+        assert_eq!(receiver.stable_frontier(), frontier_before);
+        assert_eq!(receiver.events_since_seq(0).len(), wal_count_before);
+
+        let valid_source = source_event(
+            "valid-checkpoint-row",
+            mutation.clone(),
+            row_revision(
+                &schema,
+                &mutation,
+                &Uuid::new_v4().to_string(),
+                &Uuid::new_v4().to_string(),
+                None,
+                serde_json::json!({"id": "row-1", "title": "submitted"}),
+                Utc::now(),
+            ),
+        );
+        let valid_checkpoint = compacted_checkpoint(&relay, valid_source).unwrap();
+        receiver.reconcile_state(vec![valid_checkpoint]).unwrap();
+    }
+
+    #[test]
+    fn compacted_revision_source_proof_uses_prior_batch_master_state() {
+        let (_master_dir, master) = open_storage();
+        let (_user_dir, user) = open_storage();
+        let (_receiver_dir, receiver) = open_storage();
+        let protected_id = "batch-master-checkpoint";
+
+        master
+            .add_node(NodeInput {
+                id: Some(protected_id.into()),
+                labels: vec!["MASTER".into()],
+                props: Some(serde_json::json!({"owner": "master"})),
+                embedding: None,
+                lang: None,
+                valid_from: None,
+                caused_by: None,
+                ttl: None,
+                collection: None,
+            })
+            .unwrap();
+
+        user.configure_peer_membership(
+            vec![
+                authorized_peer(&master, 31861, true),
+                authorized_peer(&receiver, 31862, false),
+            ],
+            "127.0.0.1:31863",
+            false,
+        )
+        .unwrap();
+        receiver
+            .configure_peer_membership(
+                vec![
+                    authorized_peer(&master, 31861, true),
+                    authorized_peer(&user, 31863, false),
+                ],
+                "127.0.0.1:31862",
+                false,
+            )
+            .unwrap();
+        user.add_node(NodeInput {
+            id: Some(protected_id.into()),
+            labels: vec!["USER".into()],
+            props: Some(serde_json::json!({"owner": "user"})),
+            embedding: None,
+            lang: None,
+            valid_from: None,
+            caused_by: None,
+            ttl: None,
+            collection: None,
+        })
+        .unwrap();
+
+        let source = user
+            .events_since_seq(0)
+            .into_iter()
+            .find(|signed| {
+                matches!(&signed.event, Event::Transaction(transaction)
+                    if transaction.nodes.iter().any(|node| node.id == protected_id))
+            })
+            .expect("user source transaction should be present in its WAL");
+        let Event::Transaction(source_transaction) = &source.event else {
+            unreachable!();
+        };
+        let mut checkpoint_transaction = source_transaction.clone();
+        checkpoint_transaction.local_frame_seq = Some(1);
+        checkpoint_transaction.relational.clear();
+        checkpoint_transaction.nodes.clear();
+        checkpoint_transaction.edges.clear();
+        checkpoint_transaction.vectors.clear();
+        checkpoint_transaction.node_retractions.clear();
+        let checkpoint = user
+            .sign_compacted_revision_checkpoint(
+                &Event::Transaction(checkpoint_transaction),
+                &source,
+            )
+            .unwrap();
+        let master_event = master.events_since_seq(0).pop().unwrap();
+
+        let frontier_before = receiver.stable_frontier();
+        let wal_count_before = receiver.events_since_seq(0).len();
+        let error = receiver
+            .reconcile_state(vec![master_event, checkpoint])
+            .unwrap_err();
+        assert!(error.to_string().contains("GOVERNANCE_AUTH_REQUIRED"));
+        assert_eq!(receiver.stable_frontier(), frontier_before);
+        assert_eq!(receiver.events_since_seq(0).len(), wal_count_before);
+        assert!(receiver.node_view(protected_id).is_none());
+    }
+
+    #[test]
+    fn compacted_revision_checkpoint_proof_advances_batch_master_state() {
+        let (_master_dir, master) = open_storage();
+        let (_user_dir, user) = open_storage();
+        let (_receiver_dir, receiver) = open_storage();
+        let protected_id = "checkpoint-master-chain";
+
+        master
+            .add_node(NodeInput {
+                id: Some(protected_id.into()),
+                labels: vec!["MASTER".into()],
+                props: Some(serde_json::json!({"owner": "master"})),
+                embedding: None,
+                lang: None,
+                valid_from: None,
+                caused_by: None,
+                ttl: None,
+                collection: None,
+            })
+            .unwrap();
+
+        user.configure_peer_membership(
+            vec![
+                authorized_peer(&master, 31871, true),
+                authorized_peer(&receiver, 31872, false),
+            ],
+            "127.0.0.1:31873",
+            false,
+        )
+        .unwrap();
+        receiver
+            .configure_peer_membership(
+                vec![
+                    authorized_peer(&master, 31871, true),
+                    authorized_peer(&user, 31873, false),
+                ],
+                "127.0.0.1:31872",
+                false,
+            )
+            .unwrap();
+
+        user.add_node(NodeInput {
+            id: Some(protected_id.into()),
+            labels: vec!["USER".into()],
+            props: Some(serde_json::json!({"owner": "user"})),
+            embedding: None,
+            lang: None,
+            valid_from: None,
+            caused_by: None,
+            ttl: None,
+            collection: None,
+        })
+        .unwrap();
+
+        let master_source = master.events_since_seq(0).pop().unwrap();
+        let master_revision_id = match &master_source.event {
+            Event::Transaction(transaction) => transaction
+                .record_revision_transaction
+                .as_ref()
+                .unwrap()
+                .mutations
+                .iter()
+                .find(|mutation| {
+                    mutation.kind == uee_v2::RecordKindV2::Node && mutation.id == protected_id
+                })
+                .unwrap()
+                .revision_id
+                .clone(),
+            _ => panic!("expected a master graph transaction"),
+        };
+
+        let user_source = user.events_since_seq(0).pop().unwrap();
+        let Event::Transaction(mut user_transaction) = user_source.event else {
+            panic!("expected a user graph transaction");
+        };
+        let user_revision = user_transaction
+            .record_revision_transaction
+            .as_mut()
+            .unwrap()
+            .mutations
+            .iter_mut()
+            .find(|mutation| {
+                mutation.kind == uee_v2::RecordKindV2::Node && mutation.id == protected_id
+            })
+            .unwrap();
+        user_revision.expected_revision_id = Some(master_revision_id.clone());
+        user_revision.predecessor_revision_id = Some(master_revision_id);
+        let user_source = user.sign_event(&Event::Transaction(user_transaction));
+
+        let master_checkpoint = compacted_graph_checkpoint(&master, &master_source).unwrap();
+        let user_checkpoint = compacted_graph_checkpoint(&user, &user_source).unwrap();
+        let frontier_before = receiver.stable_frontier();
+        let wal_count_before = receiver.events_since_seq(0).len();
+        let error = receiver
+            .reconcile_state(vec![master_checkpoint, user_checkpoint])
+            .unwrap_err();
+
+        assert!(error.to_string().contains("GOVERNANCE_AUTH_REQUIRED"));
+        assert_eq!(receiver.stable_frontier(), frontier_before);
+        assert_eq!(receiver.events_since_seq(0).len(), wal_count_before);
+        assert!(receiver.node_view(protected_id).is_none());
     }
 }

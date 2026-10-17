@@ -122,6 +122,16 @@ Shipped. Proposals are ed25519-verified on propose, on gossip receipt, and at
 commit; `semantic_verify` gates both ends; commit is idempotent and applies edges
 and vectors completely.
 
+### Security boundary follow-up (2026-10-16)
+
+The proposal and commit signature checks establish authenticity relative to the
+key resolved for the claimed signer. The accepted
+[peer-membership authorization ADR](ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md)
+adds authorized roster membership, a fixed electorate, and shared-ingress
+`MASTER` checks. The proposal-auth tests remain evidence for signature and
+semantic-conflict checks; the security regression tests cover the membership
+and role boundary for issues #236 and #237.
+
 ---
 ### Related Links
 - **Builds on:** [[ADR--GENESISDB-CONSENSUS-VOTE-SIGNATURES]]
@@ -132,4 +142,5 @@ and vectors completely.
 ## Changelog
 | Version | Date | Summary |
 |---|---|---|
+| 0.1.1 | 2026-10-16 | Scope shipped proposal-signature evidence to key authenticity and semantic checks; record missing peer membership and privileged-sync authorization as open follow-ups. |
 | 0.1.0 | 2026-06-23 | Proposed & accepted & shipped: proposal authentication (verify on propose/gossip/commit), `semantic_verify` enforced on the consensus path, `committed` guard for once-only apply, edges/vectors committed completely (adjacency-indexed / staged), quorum denominator includes self, search dedupe by node id. |

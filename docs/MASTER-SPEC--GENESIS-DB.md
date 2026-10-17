@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.43b"
-updated: "2026-10-06"
+version: "2.3.45b"
+updated: "2026-10-16"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 related_issue: 84
@@ -17,6 +17,7 @@ related_docs:
   - "docs/adr/ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS.md"
   - "docs/adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md"
   - "docs/adr/ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY.md"
+  - "docs/adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md"
   - "docs/SPEC--GENESISDB-TYPED-QUERY-IR-V1.md"
   - "docs/SPEC--WAVE-A-COMMIT-CORRECTNESS.md"
   - "docs/ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md"
@@ -310,6 +311,13 @@ A client may map them to:
 
 The core SHALL not require one mapping for all clients.
 
+Cryptographic signatures establish event integrity against a key; peer
+discovery alone does not establish membership or client authority. The accepted
+[peer-membership authorization ADR](adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md)
+defines the engine's closed roster, signed gossip, and role checks. Client
+semantic authority remains client-owned; the engine does not infer it from a
+client tier or business label.
+
 ## 8. Distributed Synchronization
 
 Where enabled, synchronization uses documented logical-clock, reconciliation and CRDT behavior.
@@ -318,7 +326,11 @@ Where enabled, synchronization uses documented logical-clock, reconciliation and
 - LWW or other configured reconciliation behavior must be documented as a storage conflict rule, not a substitute for client semantic conflict policy.
 - Local clock advancement follows the documented protocol.
 
-Client-level semantic conflicts may require review even when storage-level reconciliation succeeds.
+Client-level semantic conflicts may require review even when storage-level
+reconciliation succeeds. Enabled synchronization uses the operator-configured
+roster and authenticated gossip envelope defined by the accepted
+peer-membership ADR. P6 transport synchronization remains outside the
+record-read ACL.
 
 ## 9. HQL and Typed Query IR
 
@@ -449,6 +461,16 @@ independent-review or broad P8/P13 gates.
 
 ## Changelog
 
+Version diff 2.3.44b -> 2.3.45b: accept the closed roster, authenticated gossip,
+MASTER-role, fixed-quorum, and event-bound vote contract; require an explicit
+local role for multi-node configuration and synchronize implementation
+entrypoints for security issues #236 and #237. Client semantic authority
+remains client-owned.
+
+Version diff 2.3.43b -> 2.3.44b: clarify that peer discovery and signatures do
+not establish membership or client authority; link the candidate peer
+authorization ADR. No wire, schema, or authority-policy decision is approved.
+
 Version diff 2.3.42b -> 2.3.43b: distinguish the candidate GenesisRAG17 engine
 source from its historical baseline and link qualification to the worker ADR;
 no core ontology, pipeline ownership or wire-contract change is implied, and
@@ -464,6 +486,8 @@ shared-runtime and broad P8/P13 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 2.3.45b | 2026-10-16 | GenesisBlockDB Architecture | Accept closed peer roster, authenticated gossip, MASTER role checks, fixed-roster quorum, and event-bound votes for issues #236 and #237; require explicit multi-node local role and preserve client-owned semantic authority |
+| 2.3.44b | 2026-10-16 | GenesisBlockDB Architecture | Clarify discovery/signature versus membership/authority; link candidate peer authorization ADR; no trust policy, schema, or wire change |
 | 2.3.43b | 2026-10-06 | GenesisBlockDB Architecture | Record GenesisRAG17 candidate engine source/qualification through the worker ADR; preserve historical baseline and TEST-only boundary; no schema or wire change; full integration qualification pending |
 | 2.3.42b | 2026-10-05 | GenesisBlockDB Architecture | Extend approved D7 with one unlabeled zero-hop property projection and exact-seed depth-one TRAVERSE; adapter 13/13, property/order/filter 2/2 each, HQL2 404/0/1 across 39 targets and U9 restore 7/7; sync R5 restore evidence; preserve fail-closed boundaries and broad shared-runtime/P8/P13 gates |
 | 2.3.41b | 2026-10-04 | GenesisBlockDB Architecture | Extend D7 after legacy/HQL2 differential to the exact same-alias string ID predicate on labeled zero-hop scans; adapter/order/filter 11/11, 2/2, 2/2 incl. wrong-label and backslash/Unicode; HQL2 394/0/1 across 35 targets, selected P6 peers 45/0/0 across 7; PR #213 code commit checks 40 pass, 4 worker failures with cause unconfirmed, 5 skipped, 1 Windows Cargo cancellation at 15-minute job limit; no P6/schema/transport change; broad shared-runtime/P8/P13 gates open |

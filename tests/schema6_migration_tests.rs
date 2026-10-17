@@ -256,7 +256,7 @@ fn fresh_database_is_initialized_as_schema6_ready() {
 }
 
 #[test]
-fn old_transaction_projection_adds_frontier_kind_with_legacy_true_default() {
+fn unverified_legacy_transaction_projection_is_rebuilt_from_journal() {
     let dir = TempDir::new().unwrap();
     fs::write(dir.path().join("state.json"), r#"{"schema_version":5}"#).unwrap();
     fs::write(dir.path().join("identity.bin"), [7u8; 32]).unwrap();
@@ -280,17 +280,32 @@ fn old_transaction_projection_adds_frontier_kind_with_legacy_true_default() {
     let storage = open(dir.path(), false).unwrap();
     drop(storage);
 
-    let upgraded = rusqlite::Connection::open(projection_path).unwrap();
-    let legacy_value: i64 = upgraded
+    let rebuilt = rusqlite::Connection::open(projection_path).unwrap();
+    let stale_receipt_survived: bool = rebuilt
         .query_row(
-            "SELECT advances_txn_frontier FROM applied_transactions WHERE transaction_id='legacy-tx'",
+            "SELECT EXISTS(SELECT 1 FROM applied_transactions WHERE transaction_id='legacy-tx')",
             [],
             |row| row.get(0),
         )
         .unwrap();
-    assert_eq!(
-        legacy_value, 1,
-        "preexisting transaction receipts retain semantics"
+    assert!(
+        !stale_receipt_survived,
+        "an unverified projection-only receipt must not survive journal rebuild"
+    );
+
+    let has_frontier_column: bool = rebuilt
+        .query_row(
+            "SELECT EXISTS(
+                SELECT 1 FROM pragma_table_info('applied_transactions')
+                WHERE name='advances_txn_frontier'
+            )",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert!(
+        has_frontier_column,
+        "journal rebuild installs the current schema"
     );
 }
 

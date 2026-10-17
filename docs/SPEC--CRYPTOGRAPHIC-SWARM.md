@@ -7,6 +7,18 @@ status: current
 ## 1. Introduction
 GenesisBlockDB currently allows any network participant to join the Gossip swarm and propose mutations. **Mark X** introduces a cryptographic trust layer. By assigning every agent a unique ed25519 identity, the system can verify the origin of knowledge atoms and enforce strict governance rules based on cryptographic proofs.
 
+### Membership and authority boundary (2026-10-16)
+
+Ed25519 signatures provide cryptographic integrity relative to a pinned public
+key. Votes additionally bind to the digest of the complete signed proposal event.
+In multi-node mode the local `masterAuthority` role is required explicitly. The accepted
+[peer-membership authorization ADR](adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md)
+defines the closed roster, derived peer ID, authenticated gossip envelope,
+configured endpoint, voter eligibility, and `masterAuthority` role. A valid
+signature without roster membership does not authorize a peer. Issues #236
+and #237 are addressed by the implementation and security regression tests;
+formal scan and hosted merge gates remain separate validation evidence.
+
 ## 2. Functional Requirements
 
 ### FR1: Peer Identity (ed25519)
@@ -55,9 +67,10 @@ In `Storage::persist`, automatically wrap the `Event` into a `SignedEvent` using
 
 ### 2.3 Verification Pipeline
 In `Storage::reconcile_state`, for every received event:
-1.  Lookup the `signer_peer_id` in the `peers` DashMap.
-2.  Verify the signature against the event bytes.
-3.  Reject if verification fails.
+1.  Lookup the `signer_peer_id` in the immutable authorized-member roster (or use the local key for a locally signed event).
+2.  Verify the signature against the canonical event bytes.
+3.  Enforce `masterAuthority` for MASTER state and node retractions.
+4.  Reject before WAL or memory effects if identity, signature, or role checks fail.
 
 ---
 

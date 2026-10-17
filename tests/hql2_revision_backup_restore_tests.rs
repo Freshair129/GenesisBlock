@@ -384,6 +384,7 @@ fn h2_d11_revision_identity_schema_floors_and_history_survive_backup_restore() {
     let restored_bundle = Storage::restore_backup(BackupRestoreRequest {
         bundle_path,
         target_root: restore_root.clone(),
+        expected_sha256: exported.sha256.clone(),
     })
     .unwrap();
     assert_eq!(restored_bundle.sha256, exported.sha256);
