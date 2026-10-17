@@ -72,9 +72,10 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
 
   rust-tests:
-    # The full stress, recovery, and compaction suite exceeded the previous
-    # 25-minute budget on hosted runners. Allow it to finish before cleanup.
-    timeout-minutes: 120
+    # The hosted Ubuntu suite exceeded two hours and was still running WAL
+    # compaction tests when Actions canceled the job. Match the mobile host
+    # suite's four-hour ceiling so the full recovery/compaction suite can end.
+    timeout-minutes: 240
     name: cargo test (${{ matrix.host }})
     runs-on: ${{ matrix.host }}
     strategy:
