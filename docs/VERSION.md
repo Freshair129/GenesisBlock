@@ -25,9 +25,14 @@ those as legacy labels superseded by this file.
 | **Evidence baseline** | 2026-06-21 — audits P14–P30, `REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md` |
 | **Positioning** | Embedded analytics / agent-memory graph + vector engine |
 
-Release note: `0.2.10` is prepared in source but has not been published. The
-latest published server artifacts remain `v0.2.9` until the matching tag
-release completes.
+Release note: `0.2.10` was published on 2026-10-17 from merge `c444ee6`. The
+GitHub Release and GHCR image are live. The initial Server Distribution run
+[39036902527](https://github.com/Freshair129/GenesisBlock/actions/runs/39036902527)
+published the artifacts and anonymously pulled the image, but its consumer
+smoke omitted the required API key. The corrected follow-up job in workflow
+dispatch [39050029414](https://github.com/Freshair129/GenesisBlock/actions/runs/39050029414)
+passed anonymous pull plus authenticated write/restart persistence validation
+against the already-published image.
 
 **Version history:** `0.0.1` → `0.1.0-beta.1` (first beta, WAL compaction) →
 `0.1.0-beta.2` (CI gates, core/napi split) → `0.2.0` (mobile foundation:
@@ -54,6 +59,9 @@ package `genesisblockdb-client==0.1.0` is published via Trusted Publishing;
 the tag publish passed in [run 36305930749](https://github.com/Freshair129/GenesisBlock/actions/runs/36305930749)
 and the clean public registry consumer passed in
 [run 36322437144](https://github.com/Freshair129/GenesisBlock/actions/runs/36322437144).
+**`0.2.10` (2026-10-17)** publishes the fail-closed API-key startup guard and
+security fixes merged in PR #240, with standalone server artifacts and the
+public GHCR image.
 The crate version is kept in lock-step across
 `Cargo.toml`, `Cargo.lock`, `package.json`, `package-lock.json`, and `modules.json`
 by `scripts/version.mjs` (`npm run version:check` is a CI gate).
