@@ -40,8 +40,8 @@ GenesisBlockDB can be used in three broad modes:
 |---|---|---|---|
 | **Node.js / TypeScript embedded** | ✅ Published | `npm install @freshair129/gks-genesis-block-native` | Primary embedded desktop/server package; Node.js `>=20` |
 | **Rust core** | ✅ Source only | clone repo + `cargo build --release` | Root crate intentionally remains `publish = false` until a stable public Rust API exists; see the accepted [crates.io ADR](docs/adr/ADR--GENESISDB-RUST-CRATES-IO-DISTRIBUTION.md) |
-| **Standalone REST server** | ✅ Published | GitHub Release binaries or `docker run -e GENESIS_API_KEY -p 3000:3000 -v genesisdb-data:/data ghcr.io/freshair129/genesisblock:0.2.8` | Linux x64, Windows x64, macOS x64/arm64 binaries include SHA-256 sidecars; GHCR image is public |
-| **MCP server** | ✅ Published | `npx --yes --package @freshair129/gks-genesis-block-native@0.2.8 genesisblock-mcp` | Set `GENESIS_DB_PATH` for the database directory; distributed with the main npm package |
+| **Standalone REST server** | ✅ Published | GitHub Release binaries or `docker run -e GENESIS_API_KEY -p 3000:3000 -v genesisdb-data:/data ghcr.io/freshair129/genesisblock:0.2.10` | Linux x64, Windows x64, macOS x64/arm64 binaries include SHA-256 sidecars; GHCR image is public |
+| **MCP server** | ✅ Published | `npx --yes --package @freshair129/gks-genesis-block-native@0.2.10 genesisblock-mcp` | Set `GENESIS_DB_PATH` for the database directory; distributed with the main npm package |
 | **Python SDK** | ✅ Published | `python -m pip install genesisblockdb-client` | PyPI `0.1.0`; REST client, imported as `genesisdb`; requires Python `>=3.10` and a running server |
 | **Go SDK** | ✅ Published | `go get github.com/Freshair129/GenesisBlock/genesisdb-go@v0.1.0` | Version tag resolves through the public Go module proxy; REST client for the standalone server |
 | **Android** | ✅ Published | Maven Central: `io.github.freshair129:genesisdb-android:0.1.2` | Preferred Android path; resolves anonymously |
@@ -49,7 +49,7 @@ GenesisBlockDB can be used in three broad modes:
 | **React Native** | ✅ Published | `npm install react-native-genesisdb` | Android uses Maven Central; iOS uses CocoaPods + published xcframework during install |
 | **iOS binary** | ✅ Published | `GenesisBlockDB.xcframework.zip` from GitHub Releases | General public SPM package URL is not yet the canonical path |
 | **C FFI** | ✅ Source only | build Rust with `ffi` feature + use `include/genesisdb.h` | Suitable for C/C++/Swift/other FFI hosts |
-| **Docker / OCI** | ✅ Published | `ghcr.io/freshair129/genesisblock:0.2.8` | Public GHCR image; data persists at `/data` when mounted to a named volume |
+| **Docker / OCI** | ✅ Published | `ghcr.io/freshair129/genesisblock:0.2.10` | Public GHCR image; data persists at `/data` when mounted to a named volume |
 | **PyPI** | ✅ Published | `python -m pip install genesisblockdb-client` | Version `0.1.0`; clean public registry install passed in [run 36322437144](https://github.com/Freshair129/GenesisBlock/actions/runs/36322437144) |
 | **crates.io** | 🟡 Not published; decision resolved | — | Root crate remains `publish = false` until a stable public Rust API exists; see the accepted [ADR](docs/adr/ADR--GENESISDB-RUST-CRATES-IO-DISTRIBUTION.md) |
 | **Public Go module distribution** | ✅ Published | `go get github.com/Freshair129/GenesisBlock/genesisdb-go@v0.1.0` | Clean Go consumer and live-server integration passed on the versioned tag |
@@ -142,14 +142,14 @@ GenesisBlockDB REST server
    Rust engine
 ```
 
-Stable server binaries are available from [GitHub Releases](https://github.com/Freshair129/GenesisBlock/releases/tag/v0.2.8), with SHA-256 sidecars for Linux x64, Windows x64, macOS x64, and macOS arm64. The public GHCR image is `ghcr.io/freshair129/genesisblock:0.2.8`; mount a named volume at `/data` so database state survives container replacement. The release image was pulled without credentials and passed a write/restart persistence smoke.
+Stable server binaries are available from [GitHub Releases](https://github.com/Freshair129/GenesisBlock/releases/tag/v0.2.10), with SHA-256 sidecars for Linux x64, Windows x64, macOS x64, and macOS arm64. The public GHCR image is `ghcr.io/freshair129/genesisblock:0.2.10`; mount a named volume at `/data` so database state survives container replacement. The image was pulled anonymously and passed an authenticated write/restart persistence smoke in [workflow run 39050029414](https://github.com/Freshair129/GenesisBlock/actions/runs/39050029414).
 
 ### 4. MCP server — AI agents
 
 Install and run the published CLI without cloning the repository:
 
 ```bash
-npx --yes --package @freshair129/gks-genesis-block-native@0.2.8 genesisblock-mcp
+npx --yes --package @freshair129/gks-genesis-block-native@0.2.10 genesisblock-mcp
 ```
 
 Set `GENESIS_DB_PATH` in the MCP host process to choose the database directory. The CLI is included in the main npm package, and a clean consumer installed the public npm version, completed the MCP handshake with five tools, and wrote through the native addon. See the [MCP guide](docs/MCP-GUIDE.md) for client configuration.
@@ -328,7 +328,7 @@ This is the underlying path used by the iOS native SDK and can also be integrate
 
 ### 12. Docker / GHCR — published server image
 
-Pull and run the public v0.2.8 image with persistent storage:
+Pull and run the public v0.2.10 image with persistent storage:
 
 ```bash
 export GENESIS_API_KEY="$(openssl rand -hex 32)"
@@ -337,10 +337,10 @@ docker run --rm \
   -e GENESIS_API_KEY \
   -p 3000:3000 \
   -v genesisdb-data:/data \
-  ghcr.io/freshair129/genesisblock:0.2.8
+  ghcr.io/freshair129/genesisblock:0.2.10
 ```
 
-The example supplies a non-empty `GENESIS_API_KEY` to the published image. The Dockerfile in this source binds to all container interfaces, and images rebuilt from this source fail to start without a non-empty key. Keep the generated value for clients to send as `Authorization: Bearer <key>`. The image listens on port `3000` and stores database files under `/data`. Back up the mounted volume while the server is stopped, or after taking an application-consistent copy. An anonymous GHCR pull and a write/restart smoke using the same volume both passed. Binary archives and SHA-256 sidecars are attached to the [v0.2.8 release](https://github.com/Freshair129/GenesisBlock/releases/tag/v0.2.8).
+The example supplies a non-empty `GENESIS_API_KEY` to the published image. The Dockerfile binds to all container interfaces, and images rebuilt from this source fail to start without a non-empty key. Keep the generated value for clients to send as `Authorization: Bearer <key>`. The image listens on port `3000` and stores database files under `/data`. Back up the mounted volume while the server is stopped, or after taking an application-consistent copy. An anonymous pull and authenticated write/restart smoke with the same volume passed against `v0.2.10` in [workflow run 39050029414](https://github.com/Freshair129/GenesisBlock/actions/runs/39050029414). Binary archives and SHA-256 sidecars are attached to the [v0.2.10 release](https://github.com/Freshair129/GenesisBlock/releases/tag/v0.2.10).
 
 ### 13. PyPI — published
 

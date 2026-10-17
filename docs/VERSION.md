@@ -26,11 +26,13 @@ those as legacy labels superseded by this file.
 | **Positioning** | Embedded analytics / agent-memory graph + vector engine |
 
 Release note: `0.2.10` was published on 2026-10-17 from merge `c444ee6`. The
-GitHub Release and GHCR image are live. Server Distribution run
+GitHub Release and GHCR image are live. The initial Server Distribution run
 [39036902527](https://github.com/Freshair129/GenesisBlock/actions/runs/39036902527)
 published the artifacts and anonymously pulled the image, but its consumer
-persistence smoke failed because the test harness did not configure the
-required API key. Corrected post-release validation is pending.
+smoke omitted the required API key. The corrected follow-up job in workflow
+dispatch [39050029414](https://github.com/Freshair129/GenesisBlock/actions/runs/39050029414)
+passed anonymous pull plus authenticated write/restart persistence validation
+against the already-published image.
 
 **Version history:** `0.0.1` → `0.1.0-beta.1` (first beta, WAL compaction) →
 `0.1.0-beta.2` (CI gates, core/napi split) → `0.2.0` (mobile foundation:
