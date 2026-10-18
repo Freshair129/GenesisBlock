@@ -38,6 +38,25 @@ before starting gossip. If the roster is configured after `open()` through the
 storage API, the retained journal is checked against the proposed roster before
 membership is enabled; failure leaves gossip unavailable.
 
+Membership authorization preflight is resource-bounded before journal events
+are accumulated for source-order evaluation. It counts the aggregate
+uncompressed signed-event payload bytes and top-level journal records across
+the legacy JSONL file, legacy JSONL segments, framed history/base segments, and
+the active WAL. The production limits are 64 MiB and 100,000 records, matching
+the existing fail-closed consensus-ledger limits. Before whole-file reads,
+source lengths are capped at 64 MiB plus 16 bytes per allowed record; one
+sealed-segment read also allows its fixed 72-byte envelope and up to 1 MiB of
+LZ4 container overhead. The declared uncompressed segment length bounds
+decompression, so a frame at the 64 MiB format maximum fits while a segment at
+the 128 MiB reader maximum is rejected before its body is read. Exceeding either
+limit makes membership-aware startup fail with `RECOVERY_AUTH_REQUIRED` before
+replay. Late configuration reports the same error after plain `open()` may have
+replayed state for local-only use; it rolls back the staged roster and leaves
+membership disabled. Backup restore reports `BACKUP_AUTH_REQUIRED` before the
+target is published. This is an input/vector-growth bound, not an empirical
+peak-RSS guarantee. A database above the limits needs a trusted migration or
+compaction before it can be opened with multi-node membership.
+
 Compacted `MASTER` nodes and retained node retractions are emitted as current
 single-event projections. Their `SignedEvent.signature` contains a versioned
 proof envelope: the relay signs the projection together with the original

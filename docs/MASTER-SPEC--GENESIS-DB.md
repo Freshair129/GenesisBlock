@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.45b"
-updated: "2026-10-16"
+version: "2.3.46b"
+updated: "2026-10-19"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 related_issue: 84
@@ -332,6 +332,21 @@ roster and authenticated gossip envelope defined by the accepted
 peer-membership ADR. P6 transport synchronization remains outside the
 record-read ACL.
 
+Membership authorization preflight is bounded before it accumulates retained
+journal events: at most 64 MiB of uncompressed signed-event payload and 100,000
+records across legacy, sealed, and active sources. Exceeding either limit fails
+closed before membership activation. Membership-aware startup also fails before
+replay; late configuration can occur after plain single-node `open()` has
+replayed local state, which is retained while the staged roster is rolled back.
+Backup restore fails before publishing its target. Source reads allow 16 bytes
+of framing per record plus a 72-byte segment envelope and up to 1 MiB of LZ4
+container overhead for an individual sealed segment. The declared body length
+caps decompression; a maximum-size frame fits within the allowance, while a
+128 MiB segment is rejected before body read. The bounds mirror the
+consensus-ledger policy and do not claim measured peak RSS; see the
+[journal format spec](SPEC--GENESISDB-JOURNAL-FORMAT-V1.md) and
+[P2P gossip spec](SPEC--P2P-GOSSIP-PROTOCOL.md).
+
 ## 9. HQL and Typed Query IR
 
 The accepted public-query architecture is a versioned typed Query IR. Its
@@ -461,6 +476,11 @@ independent-review or broad P8/P13 gates.
 
 ## Changelog
 
+Version diff 2.3.45b -> 2.3.46b: bound membership authorization preflight for
+legacy, sealed, and active journal sources by uncompressed payload and record
+count before journal-wide accumulation; preserve fail-closed context errors and
+document the non-measured memory tradeoff.
+
 Version diff 2.3.44b -> 2.3.45b: accept the closed roster, authenticated gossip,
 MASTER-role, fixed-quorum, and event-bound vote contract; require an explicit
 local role for multi-node configuration and synchronize implementation
@@ -486,6 +506,7 @@ shared-runtime and broad P8/P13 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 2.3.46b | 2026-10-19 | GenesisBlockDB Architecture | Bound membership journal-authorization preflight by uncompressed payload bytes and record count before accumulation; preserve fail-closed startup/configuration/restore errors; document memory measurement limit |
 | 2.3.45b | 2026-10-16 | GenesisBlockDB Architecture | Accept closed peer roster, authenticated gossip, MASTER role checks, fixed-roster quorum, and event-bound votes for issues #236 and #237; require explicit multi-node local role and preserve client-owned semantic authority |
 | 2.3.44b | 2026-10-16 | GenesisBlockDB Architecture | Clarify discovery/signature versus membership/authority; link candidate peer authorization ADR; no trust policy, schema, or wire change |
 | 2.3.43b | 2026-10-06 | GenesisBlockDB Architecture | Record GenesisRAG17 candidate engine source/qualification through the worker ADR; preserve historical baseline and TEST-only boundary; no schema or wire change; full integration qualification pending |

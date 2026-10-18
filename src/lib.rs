@@ -176,6 +176,8 @@ pub const ENGINE_NAME: &str = "genesis-block";
 pub const ENGINE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg(test)]
+mod journal_authorization_budget_tests;
+#[cfg(test)]
 mod projection_rebuild_tests;
 
 // --- Types (PROTOCOL §3) ---
@@ -1873,6 +1875,43 @@ pub struct PeerMembershipOptions {
 enum JournalAuthorizationContext {
     MembershipRecovery,
     BackupRestore,
+}
+
+impl JournalAuthorizationContext {
+    fn wrap_error(self, error: Error) -> Error {
+        let prefix = match self {
+            Self::MembershipRecovery => "RECOVERY_AUTH_REQUIRED",
+            Self::BackupRestore => "BACKUP_AUTH_REQUIRED",
+        };
+        Error::from_reason(format!("{prefix}: {error}"))
+    }
+}
+
+/// Fail-closed bounds for authorization preflight over retained journal input.
+/// These cap serialized event bytes and top-level records; they are not an
+/// estimate or guarantee of process RSS after JSON deserialization.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct JournalAuthorizationBudget {
+    max_payload_bytes: u64,
+    max_event_count: usize,
+}
+
+impl JournalAuthorizationBudget {
+    const DEFAULT: Self = Self {
+        max_payload_bytes: MAX_CONSENSUS_LEDGER_BYTES,
+        max_event_count: MAX_CONSENSUS_LEDGER_RECORDS,
+    };
+
+    /// Allow at most one frame header per event while checking raw source
+    /// lengths before reading or decompressing journal files. JSONL separators
+    /// fit inside the same conservative allowance.
+    fn max_uncompressed_source_bytes(self) -> Option<u64> {
+        self.max_payload_bytes.checked_add(
+            u64::try_from(self.max_event_count)
+                .ok()?
+                .checked_mul(FRAME_HEADER_LEN as u64)?,
+        )
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -4609,6 +4648,9 @@ const MAX_JOURNAL_FRAME_PAYLOAD_BYTES: usize = 64 * 1024 * 1024;
 const MAX_JOURNAL_SEGMENT_BODY_BYTES: u64 = 128 * 1024 * 1024;
 const MAX_JOURNAL_SEGMENT_FILE_BYTES: u64 =
     MAX_JOURNAL_SEGMENT_BODY_BYTES + (SEG_HEADER_LEN + SEG_FOOTER_LEN) as u64;
+/// Upper allowance for one LZ4 frame's codec/container overhead during an
+/// authorization preflight. Each segment is read and released before the next.
+const MAX_AUTH_SEGMENT_CODEC_OVERHEAD_BYTES: u64 = 1024 * 1024;
 
 const SEG_KIND_HISTORY: u8 = 1;
 const SEG_KIND_BASE: u8 = 2;
@@ -4737,13 +4779,32 @@ fn read_segment_header(path: &std::path::Path) -> Option<SegmentInfo> {
 /// on any integrity failure (magic/sha/crc/codec) — the caller treats the
 /// segment as unreadable and recovery degrades explicitly, never silently.
 fn read_segment_body(path: &std::path::Path) -> Option<(u8, Vec<u8>)> {
-    let file_len = fs::metadata(path).ok()?.len();
-    if file_len > MAX_JOURNAL_SEGMENT_FILE_BYTES {
-        return None;
+    read_segment_body_with_limits(
+        path,
+        MAX_JOURNAL_SEGMENT_FILE_BYTES,
+        MAX_JOURNAL_SEGMENT_BODY_BYTES,
+    )
+    .ok()
+    .flatten()
+}
+
+fn read_segment_body_with_limits(
+    path: &std::path::Path,
+    max_file_bytes: u64,
+    max_body_bytes: u64,
+) -> Result<Option<(u8, Vec<u8>)>> {
+    let file_len = fs::metadata(path)
+        .map_err(|error| Error::from_reason(error.to_string()))?
+        .len();
+    if file_len > max_file_bytes {
+        return Err(Error::from_reason(format!(
+            "JOURNAL_AUTH_PREFLIGHT_LIMIT: {} is {file_len} bytes; read limit is {max_file_bytes} bytes",
+            path.display()
+        )));
     }
-    let bytes = fs::read(path).ok()?;
+    let bytes = read_journal_source_bounded(path, max_file_bytes)?;
     if bytes.len() < SEG_HEADER_LEN + SEG_FOOTER_LEN || bytes[0..4] != SEG_MAGIC {
-        return None;
+        return Ok(None);
     }
     let kind = bytes[6];
     let codec = bytes[7];
@@ -4754,8 +4815,13 @@ fn read_segment_body(path: &std::path::Path) -> Option<(u8, Vec<u8>)> {
             .try_into()
             .unwrap(),
     );
+    if body_len > max_body_bytes {
+        return Err(Error::from_reason(format!(
+            "JOURNAL_AUTH_PREFLIGHT_LIMIT: segment declares {body_len} uncompressed bytes; read limit is {max_body_bytes} bytes"
+        )));
+    }
     if body_len > MAX_JOURNAL_SEGMENT_BODY_BYTES {
-        return None;
+        return Ok(None);
     }
     let crc_expected = u32::from_le_bytes(
         bytes[footer_start + 40..footer_start + 44]
@@ -4767,21 +4833,47 @@ fn read_segment_body(path: &std::path::Path) -> Option<(u8, Vec<u8>)> {
     crc_input.extend_from_slice(sha_expected);
     crc_input.extend_from_slice(&body_len.to_le_bytes());
     if crc32c::crc32c(&crc_input) != crc_expected {
-        return None;
+        return Ok(None);
     }
     let compressed = &bytes[SEG_HEADER_LEN..footer_start];
     let body = match codec {
-        CODEC_LZ4 => {
-            lz4_frame_decompress_bounded(compressed, MAX_JOURNAL_SEGMENT_BODY_BYTES as usize)
-                .ok()?
-        }
-        CODEC_NONE => compressed.to_vec(),
-        _ => return None,
+        CODEC_LZ4 => match lz4_frame_decompress_bounded(compressed, body_len as usize) {
+            Ok(body) => body,
+            Err(_) => return Ok(None),
+        },
+        CODEC_NONE if compressed.len() as u64 == body_len => compressed.to_vec(),
+        CODEC_NONE => return Ok(None),
+        _ => return Ok(None),
     };
     if body.len() as u64 != body_len || Sha256::digest(&body)[..] != sha_expected[..] {
-        return None;
+        return Ok(None);
     }
-    Some((kind, body))
+    Ok(Some((kind, body)))
+}
+
+fn read_journal_source_bounded(path: &std::path::Path, max_bytes: u64) -> Result<Vec<u8>> {
+    let file = File::open(path).map_err(|error| Error::from_reason(error.to_string()))?;
+    let file_len = file
+        .metadata()
+        .map_err(|error| Error::from_reason(error.to_string()))?
+        .len();
+    if file_len > max_bytes {
+        return Err(Error::from_reason(format!(
+            "JOURNAL_AUTH_PREFLIGHT_LIMIT: {} is {file_len} bytes; read limit is {max_bytes} bytes",
+            path.display()
+        )));
+    }
+    let mut bytes = Vec::with_capacity(file_len as usize);
+    file.take(max_bytes.saturating_add(1))
+        .read_to_end(&mut bytes)
+        .map_err(|error| Error::from_reason(error.to_string()))?;
+    if bytes.len() as u64 > max_bytes {
+        return Err(Error::from_reason(format!(
+            "JOURNAL_AUTH_PREFLIGHT_LIMIT: {} grew beyond {max_bytes} bytes while reading",
+            path.display()
+        )));
+    }
+    Ok(bytes)
 }
 
 /// Seal `body` (uncompressed frame bytes, or raw JSONL for legacy segments)
@@ -4925,6 +5017,7 @@ pub struct Storage {
     local_master_authority: AtomicBool,
     peer_membership_configured: AtomicBool,
     startup_recovery_complete: AtomicBool,
+    journal_authorization_budget: JournalAuthorizationBudget,
     gossip_bind_addr: RwLock<SocketAddr>,
     gossip_manager_started: AtomicBool,
     pub proposals: DashMap<String, ConsensusProposal>,
@@ -9458,6 +9551,7 @@ impl Storage {
     fn preflight_journal(
         root: &std::path::Path,
         requested_dim: Option<u32>,
+        authorization_budget: Option<JournalAuthorizationBudget>,
     ) -> Result<(Vec<CollectionDefinition>, HashSet<String>)> {
         let err = |msg: String| Error::from_reason(format!("JOURNAL_PREFLIGHT_FAILED: {msg}"));
         let state_path = root.join("state.json");
@@ -9527,42 +9621,48 @@ impl Storage {
         // only explicitly evidenced migration definitions before the ordered
         // validation pass; ordinary creations never authorize earlier vectors.
         let mut journal_definitions = HashSet::new();
-        Self::visit_verified_journal(root, &mut |_, se| {
-            fn discover(
-                e: &Event,
-                defs: &mut HashMap<String, CollectionDefinition>,
-                names: &mut HashSet<String>,
-            ) -> Result<()> {
-                match e {
-                    Event::CollectionDefinition(d) => {
-                        d.validate()?;
-                        names.insert(d.name.clone());
-                        if matches!(
-                            d.provenance.as_str(),
-                            "legacy-manifest" | "legacy-default-options"
-                        ) {
-                            if defs.get(&d.name).is_some_and(|old| old.hash() != d.hash()) {
-                                return Err(Error::from_reason("COLLECTION_DEFINITION_CONFLICT"));
+        Self::visit_verified_journal_with_base_and_payload_len_bounded(
+            root,
+            authorization_budget,
+            &mut |_, _, se, _payload_len| {
+                fn discover(
+                    e: &Event,
+                    defs: &mut HashMap<String, CollectionDefinition>,
+                    names: &mut HashSet<String>,
+                ) -> Result<()> {
+                    match e {
+                        Event::CollectionDefinition(d) => {
+                            d.validate()?;
+                            names.insert(d.name.clone());
+                            if matches!(
+                                d.provenance.as_str(),
+                                "legacy-manifest" | "legacy-default-options"
+                            ) {
+                                if defs.get(&d.name).is_some_and(|old| old.hash() != d.hash()) {
+                                    return Err(Error::from_reason(
+                                        "COLLECTION_DEFINITION_CONFLICT",
+                                    ));
+                                }
+                                defs.insert(d.name.clone(), d.clone());
                             }
-                            defs.insert(d.name.clone(), d.clone());
                         }
-                    }
-                    Event::CollectionMaterialization(m) => discover(
-                        &Event::CollectionDefinition(m.definition.clone()),
-                        defs,
-                        names,
-                    )?,
-                    Event::Batch(v) => {
-                        for e in v {
-                            discover(e, defs, names)?;
+                        Event::CollectionMaterialization(m) => discover(
+                            &Event::CollectionDefinition(m.definition.clone()),
+                            defs,
+                            names,
+                        )?,
+                        Event::Batch(v) => {
+                            for e in v {
+                                discover(e, defs, names)?;
+                            }
                         }
+                        _ => {}
                     }
-                    _ => {}
+                    Ok(())
                 }
-                Ok(())
-            }
-            discover(&se.event, &mut definitions, &mut journal_definitions)
-        })?;
+                discover(&se.event, &mut definitions, &mut journal_definitions)
+            },
+        )?;
         let recovery_definitions = definitions.values().cloned().collect::<Vec<_>>();
         if !definitions.contains_key("default") {
             let mut d = CollectionDefinition {
@@ -9585,23 +9685,27 @@ impl Storage {
             d.definition_hash = d.hash();
             definitions.insert("default".into(), d);
         }
-        Self::visit_verified_journal(root, &mut |_, se| {
-            let declared = match &se.event {
-                Event::CollectionDefinition(d) => Some(d),
-                Event::CollectionMaterialization(m) => Some(&m.definition),
-                _ => None,
-            };
-            if let Some(d) = declared {
-                if d.name == "default"
-                    && definitions.get("default").is_some_and(|old| {
-                        old.provenance == "legacy-default-options" && old.clock.time == 0
-                    })
-                {
-                    definitions.remove("default");
+        Self::visit_verified_journal_with_base_and_payload_len_bounded(
+            root,
+            authorization_budget,
+            &mut |_, _, se, _payload_len| {
+                let declared = match &se.event {
+                    Event::CollectionDefinition(d) => Some(d),
+                    Event::CollectionMaterialization(m) => Some(&m.definition),
+                    _ => None,
+                };
+                if let Some(d) = declared {
+                    if d.name == "default"
+                        && definitions.get("default").is_some_and(|old| {
+                            old.provenance == "legacy-default-options" && old.clock.time == 0
+                        })
+                    {
+                        definitions.remove("default");
+                    }
                 }
-            }
-            Self::validate_collection_event(&se.event, &mut definitions)
-        })?;
+                Self::validate_collection_event(&se.event, &mut definitions)
+            },
+        )?;
         if let (Some(dim), Some(d)) = (requested_dim, definitions.get("default")) {
             if dim != d.dim {
                 return Err(err(
@@ -9613,22 +9717,212 @@ impl Storage {
         Ok((recovery_definitions, journal_definitions))
     }
 
-    /// Bound preflight memory to one segment, not the retained journal size.
-    fn visit_verified_journal(
+    /// Check source metadata before any journal-sized read or decompression.
+    /// The event payload allowance includes one frame-header's worth of
+    /// structural bytes per configured record.
+    fn preflight_journal_authorization_source_bounds(
         root: &std::path::Path,
-        visit: &mut dyn FnMut(Option<u64>, SignedEvent) -> Result<()>,
-    ) -> Result<()> {
-        Self::visit_verified_journal_with_base(root, &mut |seq, _, event| visit(seq, event))
+        budget: JournalAuthorizationBudget,
+    ) -> Result<u64> {
+        let limit_error =
+            |detail: &str| Error::from_reason(format!("JOURNAL_AUTH_PREFLIGHT_LIMIT: {detail}"));
+        let source_limit = budget
+            .max_uncompressed_source_bytes()
+            .ok_or_else(|| limit_error("budget arithmetic overflow"))?;
+        let segment_file_limit = source_limit
+            .saturating_add((SEG_HEADER_LEN + SEG_FOOTER_LEN) as u64)
+            .saturating_add(MAX_AUTH_SEGMENT_CODEC_OVERHEAD_BYTES)
+            .min(MAX_JOURNAL_SEGMENT_FILE_BYTES);
+        let mut aggregate_source_bytes = 0u64;
+        let add_source_bytes = |total: &mut u64, amount: u64| -> Result<()> {
+            *total = total
+                .checked_add(amount)
+                .ok_or_else(|| limit_error("aggregate source length overflow"))?;
+            if *total > source_limit {
+                return Err(limit_error(&format!(
+                    "uncompressed journal sources exceed {source_limit} bytes"
+                )));
+            }
+            Ok(())
+        };
+        let source_metadata = |path: &std::path::Path| -> Result<Option<fs::Metadata>> {
+            match fs::metadata(path) {
+                Ok(metadata) => Ok(Some(metadata)),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+                Err(error) => Err(Error::from_reason(error.to_string())),
+            }
+        };
+
+        let legacy = root.join("genesis-graph.wal");
+        if let Some(metadata) = source_metadata(&legacy)? {
+            add_source_bytes(&mut aggregate_source_bytes, metadata.len())?;
+        }
+
+        let segment_dir = root.join("journal");
+        let mut segment_count = 0usize;
+        let segment_entries = match fs::read_dir(&segment_dir) {
+            Ok(entries) => Some(entries),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) => return Err(Error::from_reason(error.to_string())),
+        };
+        if let Some(entries) = segment_entries {
+            for entry in entries {
+                let path = entry
+                    .map_err(|error| Error::from_reason(error.to_string()))?
+                    .path();
+                if path.extension().is_none_or(|extension| extension != "gseg") {
+                    continue;
+                }
+                segment_count = segment_count.saturating_add(1);
+                if segment_count > budget.max_event_count {
+                    return Err(limit_error(&format!(
+                        "journal segment count exceeds {}",
+                        budget.max_event_count
+                    )));
+                }
+                let metadata = source_metadata(&path)?
+                    .ok_or_else(|| Error::from_reason("journal segment disappeared"))?;
+                let file_len = metadata.len();
+                if file_len > segment_file_limit {
+                    return Err(limit_error(&format!(
+                        "segment {} is {file_len} bytes; per-segment authorization read limit is {segment_file_limit} bytes",
+                        path.display()
+                    )));
+                }
+                if file_len < (SEG_HEADER_LEN + SEG_FOOTER_LEN) as u64 {
+                    return Err(Error::from_reason(
+                        "JOURNAL_PREFLIGHT_FAILED: corrupt segment",
+                    ));
+                }
+                let mut file =
+                    File::open(&path).map_err(|error| Error::from_reason(error.to_string()))?;
+                let mut header = [0u8; SEG_HEADER_LEN];
+                file.read_exact(&mut header).map_err(|_| {
+                    Error::from_reason("JOURNAL_PREFLIGHT_FAILED: truncated segment header")
+                })?;
+                file.seek(SeekFrom::Start(file_len - SEG_FOOTER_LEN as u64))
+                    .map_err(|error| Error::from_reason(error.to_string()))?;
+                let mut footer = [0u8; SEG_FOOTER_LEN];
+                file.read_exact(&mut footer).map_err(|_| {
+                    Error::from_reason("JOURNAL_PREFLIGHT_FAILED: truncated segment footer")
+                })?;
+                if header[0..4] != SEG_MAGIC
+                    || u16::from_le_bytes([header[4], header[5]]) != JOURNAL_FORMAT_VERSION
+                    || !matches!(
+                        header[6],
+                        SEG_KIND_LEGACY_JSONL | SEG_KIND_BASE | SEG_KIND_HISTORY
+                    )
+                {
+                    return Err(Error::from_reason(
+                        "JOURNAL_PREFLIGHT_FAILED: unsupported segment header",
+                    ));
+                }
+                let body_len = u64::from_le_bytes(footer[32..40].try_into().unwrap());
+                if body_len > MAX_JOURNAL_SEGMENT_BODY_BYTES || body_len > source_limit {
+                    return Err(limit_error(&format!(
+                        "segment declares {body_len} uncompressed bytes; per-source authorization limit is {source_limit} bytes"
+                    )));
+                }
+                add_source_bytes(&mut aggregate_source_bytes, body_len)?;
+            }
+        }
+
+        let active = root.join("wal/active.gwal");
+        if let Some(metadata) = source_metadata(&active)? {
+            let file_len = metadata.len();
+            let active_limit = source_limit.saturating_add(ACTIVE_HEADER_LEN as u64);
+            if file_len > active_limit {
+                return Err(limit_error(&format!(
+                    "active WAL is {file_len} bytes; authorization read limit is {active_limit} bytes"
+                )));
+            }
+            add_source_bytes(
+                &mut aggregate_source_bytes,
+                file_len.saturating_sub(ACTIVE_HEADER_LEN as u64),
+            )?;
+        }
+
+        Ok(source_limit)
+    }
+
+    /// Count serialized payload bytes and top-level records without retaining
+    /// events. The returned count is safe for the later authorization vector.
+    fn preflight_journal_authorization_budget(
+        root: &std::path::Path,
+        budget: JournalAuthorizationBudget,
+    ) -> Result<usize> {
+        let mut event_count = 0usize;
+        Self::visit_verified_journal_with_base_and_payload_len_bounded(
+            root,
+            Some(budget),
+            &mut |_seq, _base_segment, _signed_event, _payload_len| {
+                event_count = event_count.saturating_add(1);
+                Ok(())
+            },
+        )?;
+        Ok(event_count)
     }
 
     fn visit_verified_journal_with_base(
         root: &std::path::Path,
         visit: &mut dyn FnMut(Option<u64>, bool, SignedEvent) -> Result<()>,
     ) -> Result<()> {
+        Self::visit_verified_journal_with_base_and_payload_len(
+            root,
+            &mut |seq, base_segment, event, _payload_len| visit(seq, base_segment, event),
+        )
+    }
+
+    fn visit_verified_journal_with_base_and_payload_len(
+        root: &std::path::Path,
+        visit: &mut dyn FnMut(Option<u64>, bool, SignedEvent, usize) -> Result<()>,
+    ) -> Result<()> {
+        Self::visit_verified_journal_with_base_and_payload_len_bounded(root, None, visit)
+    }
+
+    fn visit_verified_journal_with_base_and_payload_len_bounded(
+        root: &std::path::Path,
+        budget: Option<JournalAuthorizationBudget>,
+        visit: &mut dyn FnMut(Option<u64>, bool, SignedEvent, usize) -> Result<()>,
+    ) -> Result<()> {
+        let source_limit = budget
+            .map(|budget| Self::preflight_journal_authorization_source_bounds(root, budget))
+            .transpose()?;
+        let segment_file_limit = source_limit.map(|source_limit| {
+            source_limit
+                .saturating_add((SEG_HEADER_LEN + SEG_FOOTER_LEN) as u64)
+                .saturating_add(MAX_AUTH_SEGMENT_CODEC_OVERHEAD_BYTES)
+                .min(MAX_JOURNAL_SEGMENT_FILE_BYTES)
+        });
+        let limit_error =
+            |detail: &str| Error::from_reason(format!("JOURNAL_AUTH_PREFLIGHT_LIMIT: {detail}"));
+        let mut seen_payload_bytes = 0u64;
+        let mut seen_event_count = 0usize;
+        let mut bounded_visit = |seq, base_segment, event, payload_len| {
+            if let Some(budget) = budget {
+                seen_event_count = seen_event_count.saturating_add(1);
+                if seen_event_count > budget.max_event_count {
+                    return Err(limit_error(&format!(
+                        "journal event count exceeds {}",
+                        budget.max_event_count
+                    )));
+                }
+                seen_payload_bytes = seen_payload_bytes
+                    .checked_add(payload_len as u64)
+                    .ok_or_else(|| limit_error("aggregate payload length overflow"))?;
+                if seen_payload_bytes > budget.max_payload_bytes {
+                    return Err(limit_error(&format!(
+                        "aggregate event payload exceeds {} bytes",
+                        budget.max_payload_bytes
+                    )));
+                }
+            }
+            visit(seq, base_segment, event, payload_len)
+        };
         let error = |msg: &str| Error::from_reason(format!("JOURNAL_PREFLIGHT_FAILED: {msg}"));
         fn lines(
             bytes: &[u8],
-            visit: &mut dyn FnMut(Option<u64>, bool, SignedEvent) -> Result<()>,
+            visit: &mut dyn FnMut(Option<u64>, bool, SignedEvent, usize) -> Result<()>,
         ) -> Result<()> {
             for line in bytes
                 .split(|b| *b == b'\n')
@@ -9639,7 +9933,7 @@ impl Storage {
                         "JOURNAL_PREFLIGHT_FAILED: invalid legacy event: {e}"
                     ))
                 })?;
-                visit(None, false, e)?;
+                visit(None, false, e, line.len())?;
             }
             Ok(())
         }
@@ -9648,7 +9942,7 @@ impl Storage {
             offset: usize,
             torn_tail: bool,
             base_segment: bool,
-            visit: &mut dyn FnMut(Option<u64>, bool, SignedEvent) -> Result<()>,
+            visit: &mut dyn FnMut(Option<u64>, bool, SignedEvent, usize) -> Result<()>,
         ) -> Result<()> {
             let mut error = None;
             let end = walk_frames(bytes, offset, |seq, payload| {
@@ -9659,7 +9953,7 @@ impl Storage {
                                 "JOURNAL_PREFLIGHT_FAILED: unsupported/invalid event: {e}"
                             ))
                         })
-                        .and_then(|event| visit(Some(seq), base_segment, event))
+                        .and_then(|event| visit(Some(seq), base_segment, event, payload.len()))
                     {
                         Ok(()) => {}
                         Err(e) => error = Some(e),
@@ -9694,10 +9988,12 @@ impl Storage {
         }
         let legacy = root.join("genesis-graph.wal");
         if legacy.exists() {
-            lines(
-                &fs::read(legacy).map_err(|e| Error::from_reason(e.to_string()))?,
-                visit,
-            )?;
+            let bytes = if let Some(source_limit) = source_limit {
+                read_journal_source_bounded(&legacy, source_limit)?
+            } else {
+                fs::read(&legacy).map_err(|e| Error::from_reason(e.to_string()))?
+            };
+            lines(&bytes, &mut bounded_visit)?;
         }
         let mut segments = Vec::new();
         let dir = root.join("journal");
@@ -9731,17 +10027,30 @@ impl Storage {
             .unwrap_or(0);
         segments.sort_by_key(|s| (s.kind != SEG_KIND_LEGACY_JSONL, s.min_seq));
         for segment in segments {
-            let (kind, body) =
-                read_segment_body(&segment.path).ok_or_else(|| error("corrupt segment"))?;
-            if kind == SEG_KIND_LEGACY_JSONL {
-                lines(&body, visit)?;
+            let (kind, body) = if let (Some(source_limit), Some(file_limit)) =
+                (source_limit, segment_file_limit)
+            {
+                read_segment_body_with_limits(&segment.path, file_limit, source_limit)?
+                    .ok_or_else(|| error("corrupt segment"))?
             } else {
-                frames(&body, 0, false, kind == SEG_KIND_BASE, visit)?;
+                read_segment_body(&segment.path).ok_or_else(|| error("corrupt segment"))?
+            };
+            if kind == SEG_KIND_LEGACY_JSONL {
+                lines(&body, &mut bounded_visit)?;
+            } else {
+                frames(&body, 0, false, kind == SEG_KIND_BASE, &mut bounded_visit)?;
             }
         }
         let active = root.join("wal/active.gwal");
         if active.exists() {
-            let body = fs::read(active).map_err(|e| Error::from_reason(e.to_string()))?;
+            let body = if let Some(source_limit) = source_limit {
+                read_journal_source_bounded(
+                    &active,
+                    source_limit.saturating_add(ACTIVE_HEADER_LEN as u64),
+                )?
+            } else {
+                fs::read(&active).map_err(|e| Error::from_reason(e.to_string()))?
+            };
             if !body.is_empty() {
                 if body.len() < ACTIVE_HEADER_LEN
                     || body[0..4] != ACTIVE_MAGIC
@@ -9754,11 +10063,11 @@ impl Storage {
                     ACTIVE_HEADER_LEN,
                     true,
                     false,
-                    &mut |seq, base_segment, event| {
+                    &mut |seq, base_segment, event, payload_len| {
                         if seq.is_some_and(|seq| seq <= base_frontier) {
                             Ok(())
                         } else {
-                            visit(seq, base_segment, event)
+                            bounded_visit(seq, base_segment, event, payload_len)
                         }
                     },
                 )?;
@@ -14634,6 +14943,22 @@ impl Storage {
         membership: Option<PeerMembershipOptions>,
         journal_authorization_context: Option<JournalAuthorizationContext>,
     ) -> Result<Self> {
+        Self::open_internal_with_budget(
+            opts,
+            migration_token,
+            membership,
+            journal_authorization_context,
+            JournalAuthorizationBudget::DEFAULT,
+        )
+    }
+
+    fn open_internal_with_budget(
+        opts: OpenOptions,
+        migration_token: Option<(String, String)>,
+        membership: Option<PeerMembershipOptions>,
+        journal_authorization_context: Option<JournalAuthorizationContext>,
+        journal_authorization_budget: JournalAuthorizationBudget,
+    ) -> Result<Self> {
         let root = PathBuf::from(opts.path.clone());
         let root_was_missing = !root.exists();
         let fresh_database = root_was_missing
@@ -14702,8 +15027,19 @@ impl Storage {
                 println!("Schema: v5 legacy mode; HQL2 v6 migration is explicit and offline.");
             }
         }
-        let (recovery_definitions, journal_definitions) =
-            Self::preflight_journal(&root, opts.vector_dim)?;
+        if let Some(context) = journal_authorization_context {
+            Self::preflight_journal_authorization_budget(&root, journal_authorization_budget)
+                .map_err(|error| context.wrap_error(error))?;
+        }
+        let (recovery_definitions, journal_definitions) = Self::preflight_journal(
+            &root,
+            opts.vector_dim,
+            journal_authorization_context.map(|_| journal_authorization_budget),
+        )
+        .map_err(|error| match journal_authorization_context {
+            Some(context) => context.wrap_error(error),
+            None => error,
+        })?;
 
         // --- Cryptographic Identity (Mark X) ---
         let identity_path = root.join("identity.bin");
@@ -15139,6 +15475,7 @@ impl Storage {
             local_master_authority: AtomicBool::new(true),
             peer_membership_configured: AtomicBool::new(false),
             startup_recovery_complete: AtomicBool::new(false),
+            journal_authorization_budget,
             gossip_bind_addr: RwLock::new(SocketAddr::from(([0, 0, 0, 0], 0))),
             gossip_manager_started: AtomicBool::new(false),
             proposals: DashMap::new(),
@@ -26980,6 +27317,18 @@ impl Storage {
         request: BackupRestoreRequest,
         membership: Option<PeerMembershipOptions>,
     ) -> Result<BackupBundleInfo> {
+        Self::restore_backup_internal_with_budget(
+            request,
+            membership,
+            JournalAuthorizationBudget::DEFAULT,
+        )
+    }
+
+    fn restore_backup_internal_with_budget(
+        request: BackupRestoreRequest,
+        membership: Option<PeerMembershipOptions>,
+        journal_authorization_budget: JournalAuthorizationBudget,
+    ) -> Result<BackupBundleInfo> {
         if request.target_root.exists() {
             return Err(Error::from_reason("restore target must not already exist"));
         }
@@ -27135,7 +27484,7 @@ impl Storage {
             // A fresh open validates the engine's own snapshot/WAL compatibility
             // before staging becomes caller-visible. Full retention prevents its
             // shutdown checkpoint from folding the only restored journal copy.
-            let staging_storage = Storage::open_internal(
+            let staging_storage = Storage::open_internal_with_budget(
                 OpenOptions {
                     path: staging.display().to_string(),
                     page_cache_mb: Some(16),
@@ -27146,6 +27495,7 @@ impl Storage {
                 None,
                 membership.clone(),
                 Some(JournalAuthorizationContext::BackupRestore),
+                journal_authorization_budget,
             )?;
             if staging_storage.stable_frontier() != manifest.stable_frontier {
                 return Err(Error::from_reason(
@@ -27164,7 +27514,7 @@ impl Storage {
 
             // Verify the newly published generation through a separate
             // read-only recovery before the restore target becomes visible.
-            let read_only_validation = Storage::open_internal(
+            let read_only_validation = Storage::open_internal_with_budget(
                 OpenOptions {
                     path: staging.display().to_string(),
                     page_cache_mb: Some(16),
@@ -27175,6 +27525,7 @@ impl Storage {
                 None,
                 membership.clone(),
                 Some(JournalAuthorizationContext::BackupRestore),
+                journal_authorization_budget,
             )?;
             let lease = read_only_validation.pin_generation(
                 AccessContext {
@@ -29763,18 +30114,60 @@ impl Storage {
         include_legacy: bool,
         f: &mut dyn FnMut(u64, SignedEvent),
     ) {
-        self.scan_journal_with_origin(from_seq, include_legacy, &mut |seq, _, signed_event| {
-            f(seq, signed_event);
-        });
+        let _ = self.scan_journal_with_origin(
+            from_seq,
+            include_legacy,
+            None,
+            &mut |seq, _, signed_event, _payload_len| f(seq, signed_event),
+        );
     }
 
     fn scan_journal_with_origin(
         &self,
         from_seq: Option<u64>,
         include_legacy: bool,
-        f: &mut dyn FnMut(u64, JournalEventOrigin, SignedEvent),
-    ) {
+        budget: Option<JournalAuthorizationBudget>,
+        f: &mut dyn FnMut(u64, JournalEventOrigin, SignedEvent, usize),
+    ) -> Result<()> {
         use std::io::BufRead;
+        let source_limit = budget
+            .map(|budget| Self::preflight_journal_authorization_source_bounds(&self.path, budget))
+            .transpose()?;
+        let segment_file_limit = source_limit.map(|source_limit| {
+            source_limit
+                .saturating_add((SEG_HEADER_LEN + SEG_FOOTER_LEN) as u64)
+                .saturating_add(MAX_AUTH_SEGMENT_CODEC_OVERHEAD_BYTES)
+                .min(MAX_JOURNAL_SEGMENT_FILE_BYTES)
+        });
+        let mut seen_payload_bytes = 0u64;
+        let mut seen_event_count = 0usize;
+        let mut limit_error = None;
+        let mut emit = |seq, origin, signed_event, payload_len| {
+            if let Some(budget) = budget {
+                if limit_error.is_some() {
+                    return;
+                }
+                seen_event_count = seen_event_count.saturating_add(1);
+                if seen_event_count > budget.max_event_count {
+                    limit_error = Some(Error::from_reason(format!(
+                        "JOURNAL_AUTH_PREFLIGHT_LIMIT: journal event count exceeds {}",
+                        budget.max_event_count
+                    )));
+                    return;
+                }
+                seen_payload_bytes = match seen_payload_bytes.checked_add(payload_len as u64) {
+                    Some(total) if total <= budget.max_payload_bytes => total,
+                    _ => {
+                        limit_error = Some(Error::from_reason(format!(
+                            "JOURNAL_AUTH_PREFLIGHT_LIMIT: aggregate event payload exceeds {} bytes",
+                            budget.max_payload_bytes
+                        )));
+                        return;
+                    }
+                };
+            }
+            f(seq, origin, signed_event, payload_len);
+        };
         let base_frontier = Self::journal_list_segments(&self.path)
             .into_iter()
             .filter(|segment| segment.kind == SEG_KIND_BASE)
@@ -29782,22 +30175,27 @@ impl Storage {
             .max()
             .unwrap_or(0);
         let emit_lines =
-            |bytes: &[u8], origin, f: &mut dyn FnMut(u64, JournalEventOrigin, SignedEvent)| {
+            |bytes: &[u8],
+             origin,
+             f: &mut dyn FnMut(u64, JournalEventOrigin, SignedEvent, usize)| {
                 for line in bytes.split(|b| *b == b'\n') {
                     if line.is_empty() {
                         continue;
                     }
                     if let Ok(se) = serde_json::from_slice::<SignedEvent>(line) {
-                        f(0, origin, se);
+                        f(0, origin, se, line.len());
                     }
                 }
             };
         // Pre-migration / read-only legacy file, in place.
         if include_legacy && self.legacy_log_path.exists() {
-            if let Ok(file) = File::open(&self.legacy_log_path) {
+            if let Some(source_limit) = source_limit {
+                let bytes = read_journal_source_bounded(&self.legacy_log_path, source_limit)?;
+                emit_lines(&bytes, JournalEventOrigin::Legacy, &mut emit);
+            } else if let Ok(file) = File::open(&self.legacy_log_path) {
                 for line in std::io::BufReader::new(file).lines().map_while(|r| r.ok()) {
                     if let Ok(se) = serde_json::from_str::<SignedEvent>(&line) {
-                        f(0, JournalEventOrigin::Legacy, se);
+                        emit(0, JournalEventOrigin::Legacy, se, line.len());
                     }
                 }
             }
@@ -29805,8 +30203,21 @@ impl Storage {
         for seg in Self::journal_list_segments(&self.path) {
             if seg.kind == SEG_KIND_LEGACY_JSONL {
                 if include_legacy {
-                    if let Some((_, body)) = read_segment_body(&seg.path) {
-                        emit_lines(&body, JournalEventOrigin::Legacy, f);
+                    let body = if let (Some(source_limit), Some(file_limit)) =
+                        (source_limit, segment_file_limit)
+                    {
+                        Some(
+                            read_segment_body_with_limits(&seg.path, file_limit, source_limit)?
+                                .ok_or_else(|| {
+                                    Error::from_reason("JOURNAL_PREFLIGHT_FAILED: corrupt segment")
+                                })?
+                                .1,
+                        )
+                    } else {
+                        read_segment_body(&seg.path).map(|(_, body)| body)
+                    };
+                    if let Some(body) = body {
+                        emit_lines(&body, JournalEventOrigin::Legacy, &mut emit);
                     }
                 }
                 continue;
@@ -29814,7 +30225,20 @@ impl Storage {
             if from_seq.is_some_and(|cursor| seg.max_seq <= cursor) {
                 continue;
             }
-            if let Some((_, body)) = read_segment_body(&seg.path) {
+            let body = if let (Some(source_limit), Some(file_limit)) =
+                (source_limit, segment_file_limit)
+            {
+                Some(
+                    read_segment_body_with_limits(&seg.path, file_limit, source_limit)?
+                        .ok_or_else(|| {
+                            Error::from_reason("JOURNAL_PREFLIGHT_FAILED: corrupt segment")
+                        })?
+                        .1,
+                )
+            } else {
+                read_segment_body(&seg.path).map(|(_, body)| body)
+            };
+            if let Some(body) = body {
                 walk_frames(&body, 0, |seq, payload| {
                     if from_seq.is_none_or(|cursor| seq > cursor) {
                         if let Ok(se) = serde_json::from_slice::<SignedEvent>(payload) {
@@ -29823,23 +30247,36 @@ impl Storage {
                             } else {
                                 JournalEventOrigin::History
                             };
-                            f(seq, origin, se);
+                            emit(seq, origin, se, payload.len());
                         }
                     }
                 });
             }
         }
-        if let Ok(bytes) = fs::read(&self.log_path) {
+        let active_bytes = if let Some(source_limit) = source_limit {
+            Some(read_journal_source_bounded(
+                &self.log_path,
+                source_limit.saturating_add(ACTIVE_HEADER_LEN as u64),
+            )?)
+        } else {
+            fs::read(&self.log_path).ok()
+        };
+        if let Some(bytes) = active_bytes {
             if bytes.len() > ACTIVE_HEADER_LEN && bytes[0..4] == ACTIVE_MAGIC {
                 walk_frames(&bytes, ACTIVE_HEADER_LEN, |seq, payload| {
                     if seq > base_frontier && from_seq.is_none_or(|cursor| seq > cursor) {
                         if let Ok(se) = serde_json::from_slice::<SignedEvent>(payload) {
-                            f(seq, JournalEventOrigin::Active, se);
+                            emit(seq, JournalEventOrigin::Active, se, payload.len());
                         }
                     }
                 });
             }
         }
+        drop(emit);
+        if let Some(error) = limit_error {
+            return Err(error);
+        }
+        Ok(())
     }
 
     /// Remove replica-local receipt metadata from events ingested from peers
@@ -29885,10 +30322,19 @@ impl Storage {
         &self,
         seed_from_live_state: bool,
     ) -> Result<()> {
-        let mut journal_events = Vec::new();
-        self.scan_journal_with_origin(None, true, &mut |seq, origin, signed_event| {
-            journal_events.push((seq, origin, signed_event));
-        });
+        let event_count = Self::preflight_journal_authorization_budget(
+            &self.path,
+            self.journal_authorization_budget,
+        )?;
+        let mut journal_events = Vec::with_capacity(event_count);
+        self.scan_journal_with_origin(
+            None,
+            true,
+            Some(self.journal_authorization_budget),
+            &mut |seq, origin, signed_event, _payload_len| {
+                journal_events.push((seq, origin, signed_event));
+            },
+        )?;
         let graph_auth_order = Self::graph_authorization_event_order(&journal_events);
         let signed_events = journal_events
             .iter()
