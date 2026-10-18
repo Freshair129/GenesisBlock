@@ -49,15 +49,26 @@ fn bounded_active_journal_read_accepts_a_not_yet_created_wal() {
     assert!(read_active_journal_source_bounded(
         &active_path,
         source_limit + ACTIVE_HEADER_LEN as u64,
+        true,
     )
     .unwrap()
     .is_none());
+    assert!(read_active_journal_source_bounded(
+        &active_path,
+        source_limit + ACTIVE_HEADER_LEN as u64,
+        false,
+    )
+    .is_err());
 
     fs::create_dir_all(active_path.parent().unwrap()).unwrap();
     fs::write(&active_path, active_header(1)).unwrap();
     assert_eq!(
-        read_active_journal_source_bounded(&active_path, source_limit + ACTIVE_HEADER_LEN as u64,)
-            .unwrap(),
+        read_active_journal_source_bounded(
+            &active_path,
+            source_limit + ACTIVE_HEADER_LEN as u64,
+            false,
+        )
+        .unwrap(),
         Some(active_header(1).to_vec())
     );
 }

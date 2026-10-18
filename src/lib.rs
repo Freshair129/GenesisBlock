@@ -4879,10 +4879,13 @@ fn read_journal_source_bounded(path: &std::path::Path, max_bytes: u64) -> Result
 fn read_active_journal_source_bounded(
     path: &std::path::Path,
     max_bytes: u64,
+    missing_is_empty: bool,
 ) -> Result<Option<Vec<u8>>> {
     let file = match File::open(path) {
         Ok(file) => file,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound && missing_is_empty => {
+            return Ok(None)
+        }
         Err(error) => return Err(Error::from_reason(error.to_string())),
     };
     let file_len = file
@@ -30289,6 +30292,7 @@ impl Storage {
             read_active_journal_source_bounded(
                 &self.log_path,
                 source_limit.saturating_add(ACTIVE_HEADER_LEN as u64),
+                !self.startup_recovery_complete.load(Ordering::SeqCst),
             )?
         } else {
             fs::read(&self.log_path).ok()
