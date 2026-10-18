@@ -69,5 +69,10 @@ Existing REST/NAPI collection and status payloads gain factual coverage data
 without changing search semantics. Consumers must not infer exactness or ANN
 recall from `coverage.state == READY`.
 
-The explicit validation method is initially a core Rust capability. Transport
-maintenance endpoints and SDK methods belong to the later G9 parity lane.
+The explicit validation method is exposed through the authenticated
+`POST /v1/index/coverage/validate` REST route, returning before/after frame and
+transaction frontiers with the per-collection reports. Consumers reject a
+report whose frontiers differ or no longer match the source being verified.
+The route shares query admission and changes only derived index/cache state;
+it does not append WAL events. See [the REST contract](../API_REFERENCE.md).
+Additional SDK maintenance methods remain a later transport-parity task.

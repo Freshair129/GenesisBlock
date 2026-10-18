@@ -204,6 +204,7 @@ exact boundary, tests and performance limitations.
 | POST | `/v1/edge/retract` | `{ id, at? }` | `EdgeOutput` (retracted) |
 | POST | `/v1/collection/create` | `{ name, model, dim, metric? }` | `{ ok: true }` |
 | GET | `/v1/collections` | _none_ | `CollectionInfo[]` |
+| POST | `/v1/index/coverage/validate` | _none_ | `{ frontier_before, frontier_after, reports: IndexCoverageReport[] }` |
 | POST | `/v1/vector/add` | `{ node_id, collection, embedding }` | `{ ok: true }` |
 | POST | `/v1/bulk/nodes` | `NodeInput[]` | `200` (empty) |
 | POST | `/v1/bulk/edges` | `EdgeInput[]` | `200` (empty) |
@@ -424,8 +425,38 @@ collection dim — a mismatch is a typed error, not garbage neighbors.)_
 _(Create with `POST /v1/collection/create` `{ name, model, dim, metric? }`;
 `metric` defaults to `L2`. A `default` collection always exists. `coverage`
 is structural source-to-HNSW membership only; `READY` is not an exactness or
-ANN-recall claim. The core validation operation is explicit and is not yet a
-REST maintenance route.)_
+ANN-recall claim. Trigger explicit validation with the route below.)_
+
+### Validate structural index coverage (`POST /v1/index/coverage/validate`)
+
+Uses the same API-key authentication as other `/v1/*` routes. No request body
+is required. The explicit O(n) operation drains asynchronous indexing, compares
+durable vector metadata IDs with actual HNSW origin IDs in every collection,
+and refreshes the in-memory coverage report. It does not append WAL events or
+change vectors, source nodes, or application approval state.
+
+```jsonc
+{
+  "frontier_before": { "frame": u64, "txn": u64 },
+  "frontier_after": { "frame": u64, "txn": u64 },
+  "reports": [ /* CollectionInfo.coverage objects, sorted by collection */ ]
+}
+```
+
+Both frontiers must match each other and the caller's expected dataset frontier
+before accepting the report. Concurrent commits can make them differ; retry
+against a stable source. A valid structural result requires `validated: true`,
+`state: "READY"`, and zero `missing_count`, `extra_count`, and `pending_count`
+for every expected collection. Empty collections are included. `pending_count`
+is the engine-global queue backlog; collection source/built frontiers describe
+vector metadata, not the transaction frontier. Historical vector slots are
+included until compaction, so callers must separately compare their eligible
+source IDs and provenance against the engine dataset.
+
+The route shares query admission (`429 QUERY_ADMISSION_REJECTED` when full)
+and runs on the blocking pool. Structural coverage does not establish graph
+connectivity, ANN recall, exact reranking, or semantic retrieval quality.
+
 ### Attach a vector to a node (`POST /v1/vector/add`)
 ```jsonc
 { "node_id": "N-1", "collection": "code", "embedding": [f64] }

@@ -771,6 +771,41 @@ async fn list_collections_handler(State(state): State<AppState>) -> impl IntoRes
     (StatusCode::OK, Json(storage.list_collections())).into_response()
 }
 
+async fn validate_index_coverage_handler(State(state): State<AppState>) -> impl IntoResponse {
+    let permit = match acquire_query_permit(&state) {
+        Some(permit) => permit,
+        None => return query_admission_rejected(),
+    };
+    let storage = Arc::clone(&state.storage);
+    let result = tokio::task::spawn_blocking(move || {
+        // Keep admission until the O(n) scan finishes, including if the client
+        // disconnects while this blocking job is still running.
+        let _permit = permit;
+        let storage = storage.read();
+        let frontier_before = serde_json::json!({
+            "frame": storage.stable_frontier(),
+            "txn": storage.txn_frontier(),
+        });
+        let mut reports = storage.validate_index_coverage()?;
+        let frontier_after = serde_json::json!({
+            "frame": storage.stable_frontier(),
+            "txn": storage.txn_frontier(),
+        });
+        reports.sort_by(|a, b| a.collection.cmp(&b.collection));
+        Ok::<_, crate::Error>(serde_json::json!({
+            "frontier_before": frontier_before,
+            "frontier_after": frontier_after,
+            "reports": reports,
+        }))
+    })
+    .await;
+    match result {
+        Ok(Ok(report)) => (StatusCode::OK, Json(report)).into_response(),
+        Ok(Err(error)) => query_storage_error_response(error),
+        Err(error) => blocking_query_failure(error),
+    }
+}
+
 async fn add_vector_handler(
     State(state): State<AppState>,
     ApiJson(input): ApiJson<AddVectorInput>,
@@ -1571,6 +1606,10 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/edge/retract", post(retract_edge_handler))
         .route("/v1/collection/create", post(create_collection_handler))
         .route("/v1/collections", get(list_collections_handler))
+        .route(
+            "/v1/index/coverage/validate",
+            post(validate_index_coverage_handler),
+        )
         .route("/v1/vector/add", post(add_vector_handler))
         .route(
             "/v1/insight/drift/:cluster_id",

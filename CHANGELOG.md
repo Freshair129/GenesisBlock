@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add authenticated `POST /v1/index/coverage/validate` for explicit structural
+  source-to-HNSW validation across collections, including before/after commit
+  frontiers. `READY` remains a structural membership result, not an ANN-recall
+  or retrieval-quality guarantee.
+
 ### Security
 
 - The standalone server now fails closed when bound outside loopback without a
