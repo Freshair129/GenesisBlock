@@ -556,6 +556,10 @@ export declare function schemaVersionSync(): number
 export declare function versionSync(): string
 export declare class GenesisDatabase {
   static open(opts: OpenOptions): GenesisDatabase
+  /**
+   * Open a multi-node instance with an operator-pinned peer roster. Plain
+   * `open()` remains self-only and does not accept discovered members.
+   */
   static openWithMembership(opts: OpenOptions, membership: PeerMembershipOptions): GenesisDatabase
   localIdentity(): PeerIdentity
   bulkAddNodes(inputs: Array<NodeInput>): Promise<void>
