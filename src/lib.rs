@@ -4876,6 +4876,38 @@ fn read_journal_source_bounded(path: &std::path::Path, max_bytes: u64) -> Result
     Ok(bytes)
 }
 
+fn read_active_journal_source_bounded(
+    path: &std::path::Path,
+    max_bytes: u64,
+) -> Result<Option<Vec<u8>>> {
+    let file = match File::open(path) {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(Error::from_reason(error.to_string())),
+    };
+    let file_len = file
+        .metadata()
+        .map_err(|error| Error::from_reason(error.to_string()))?
+        .len();
+    if file_len > max_bytes {
+        return Err(Error::from_reason(format!(
+            "JOURNAL_AUTH_PREFLIGHT_LIMIT: {} is {file_len} bytes; read limit is {max_bytes} bytes",
+            path.display()
+        )));
+    }
+    let mut bytes = Vec::with_capacity(file_len as usize);
+    file.take(max_bytes.saturating_add(1))
+        .read_to_end(&mut bytes)
+        .map_err(|error| Error::from_reason(error.to_string()))?;
+    if bytes.len() as u64 > max_bytes {
+        return Err(Error::from_reason(format!(
+            "JOURNAL_AUTH_PREFLIGHT_LIMIT: {} grew beyond {max_bytes} bytes while reading",
+            path.display()
+        )));
+    }
+    Ok(Some(bytes))
+}
+
 /// Seal `body` (uncompressed frame bytes, or raw JSONL for legacy segments)
 /// into `final_path` with I9 atomicity: tmp → fsync → rename → best-effort
 /// directory fsync (Windows has no directory fsync; rename durability there is
@@ -30254,10 +30286,10 @@ impl Storage {
             }
         }
         let active_bytes = if let Some(source_limit) = source_limit {
-            Some(read_journal_source_bounded(
+            read_active_journal_source_bounded(
                 &self.log_path,
                 source_limit.saturating_add(ACTIVE_HEADER_LEN as u64),
-            )?)
+            )?
         } else {
             fs::read(&self.log_path).ok()
         };
