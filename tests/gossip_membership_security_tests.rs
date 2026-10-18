@@ -1,7 +1,7 @@
 use genesis_block_native::{
     AuthorizedPeerConfig, BatchInput, ConsensusProposal, EdgeInput, Event, GenesisTransaction,
     GenesisTransactionEvent, GossipMessage, HybridSearchInput, LogicalClock, NodeInput, NodeOutput,
-    OpenOptions, Storage, VectorEvent,
+    OpenOptions, PeerMembershipOptions, Storage, VectorEvent,
 };
 use std::fs;
 use std::path::Path;
@@ -119,6 +119,42 @@ fn node_input(id: &str, labels: &[&str]) -> NodeInput {
         ttl: None,
         collection: None,
     }
+}
+
+fn write_legacy_journal_event(dir: &Path, signed_event: &genesis_block_native::SignedEvent) {
+    let mut jsonl = serde_json::to_vec(signed_event).unwrap();
+    jsonl.push(b'\n');
+    fs::write(dir.join("genesis-graph.wal"), jsonl).unwrap();
+}
+
+fn prepare_legacy_database(dir: &Path) {
+    let storage = Storage::open(OpenOptions {
+        path: dir.to_string_lossy().into_owned(),
+        page_cache_mb: Some(16),
+        read_only: Some(false),
+        vector_dim: Some(2),
+        retention: Some("full".into()),
+    })
+    .unwrap();
+    drop(storage);
+
+    for entry in fs::read_dir(dir).unwrap() {
+        let entry = entry.unwrap();
+        let path = entry.path();
+        if matches!(
+            entry.file_name().to_str(),
+            Some("identity.bin" | "genesis.lock")
+        ) {
+            continue;
+        }
+        if path.is_dir() {
+            fs::remove_dir_all(path).unwrap();
+        } else {
+            fs::remove_file(path).unwrap();
+        }
+    }
+    assert!(dir.join("identity.bin").exists());
+    fs::write(dir.join("state.json"), r#"{"schema_version":5}"#).unwrap();
 }
 
 #[test]
@@ -291,15 +327,24 @@ fn reconcile_batch_cannot_downgrade_master_state_with_a_later_nonmaster_event() 
 
 #[test]
 fn local_direct_writes_respect_master_authority_for_live_and_retracted_ids() {
-    let (_dir, storage) = open("local-master-write-guard");
+    let (_master_dir, master) = open("local-master-write-master");
+    let (_destination_dir, storage) = open("local-master-write-destination");
+    configure(&storage, vec![peer(&master, 31990, true)], 31991, false);
+    let master_peer_id = master.local_identity().peer_id;
     storage
         .reconcile_state(vec![
-            storage.sign_event(&Event::Node(node("local-protected", &["MASTER"]))),
-            storage.sign_event(&Event::Node(node("local-retracted", &["MASTER"]))),
+            master.sign_event(&Event::Node(node("local-protected", &["MASTER"]))),
+            master.sign_event(&Event::Node(node("local-retracted", &["MASTER"]))),
+            master.sign_event(&Event::NodeRetract {
+                id: "local-retracted".into(),
+                clock: LogicalClock {
+                    time: 2,
+                    peer_id: master_peer_id,
+                },
+                retracted_at: "2026-10-16T00:00:00Z".into(),
+            }),
         ])
         .unwrap();
-    storage.retract_node("local-retracted").unwrap();
-    configure(&storage, Vec::new(), 31991, false);
 
     let before = storage.stable_frontier();
     let error = storage
@@ -577,6 +622,175 @@ fn compacted_master_vectors_survive_nonmaster_relay(schema6: bool) {
 fn compacted_master_vectors_keep_authority_and_schema5_schema6_relay() {
     compacted_master_vectors_survive_nonmaster_relay(false);
     compacted_master_vectors_survive_nonmaster_relay(true);
+}
+
+fn open_legacy_master_journal_with_membership(
+    dir: &Path,
+    signer: &Storage,
+    peer_config: AuthorizedPeerConfig,
+    node_id: &str,
+) -> Result<Storage, String> {
+    prepare_legacy_database(dir);
+    write_legacy_journal_event(
+        dir,
+        &signer.sign_event(&Event::Node(node(node_id, &["MASTER"]))),
+    );
+    Storage::open_with_membership(
+        OpenOptions {
+            path: dir.to_string_lossy().into_owned(),
+            page_cache_mb: Some(16),
+            read_only: Some(false),
+            vector_dim: Some(2),
+            retention: Some("full".into()),
+        },
+        PeerMembershipOptions {
+            local_gossip_addr: "127.0.0.1:31970".into(),
+            local_master_authority: Some(false),
+            peers: vec![peer_config],
+        },
+    )
+    .map_err(|error| error.to_string())
+}
+
+#[test]
+fn membership_open_rejects_legacy_master_event_from_unrostered_signer() {
+    let (_attacker_dir, attacker) = open_current_schema("legacy-unrostered-attacker");
+    let (_trusted_dir, trusted_member) = open_current_schema("legacy-trusted-member");
+    let target = tempdir().unwrap();
+
+    let error = open_legacy_master_journal_with_membership(
+        target.path(),
+        &attacker,
+        peer(&trusted_member, 31971, true),
+        "legacy-unrostered-master",
+    )
+    .err()
+    .expect("unrostered signer should fail startup authorization");
+
+    assert!(error.contains("RECOVERY_AUTH_REQUIRED"));
+}
+
+#[test]
+fn membership_open_rejects_legacy_master_event_from_nonmaster_member() {
+    let (_member_dir, nonmaster_member) = open_current_schema("legacy-nonmaster-member");
+    let target = tempdir().unwrap();
+
+    let error = open_legacy_master_journal_with_membership(
+        target.path(),
+        &nonmaster_member,
+        peer(&nonmaster_member, 31972, false),
+        "legacy-nonmaster-master",
+    )
+    .err()
+    .expect("non-master signer should fail startup authorization");
+
+    assert!(error.contains("RECOVERY_AUTH_REQUIRED"));
+}
+
+#[test]
+fn membership_open_replays_legacy_master_event_from_authorized_member() {
+    let (_master_dir, master_member) = open_current_schema("legacy-authorized-master");
+    let target = tempdir().unwrap();
+
+    let reopened = open_legacy_master_journal_with_membership(
+        target.path(),
+        &master_member,
+        peer(&master_member, 31973, true),
+        "legacy-authorized-master-node",
+    )
+    .expect("authorized historical master event should recover");
+
+    assert!(reopened
+        .node_view("legacy-authorized-master-node")
+        .is_some());
+}
+
+#[test]
+fn late_membership_configuration_preflights_replayed_journal() {
+    let (_attacker_dir, attacker) = open_current_schema("late-membership-attacker");
+    let (_unrelated_dir, unrelated_member) = open_current_schema("late-membership-unrelated");
+    let target = tempdir().unwrap();
+    prepare_legacy_database(target.path());
+    write_legacy_journal_event(
+        target.path(),
+        &attacker.sign_event(&Event::Node(node(
+            "late-membership-untrusted-master",
+            &["MASTER"],
+        ))),
+    );
+
+    let reopened = Storage::open(OpenOptions {
+        path: target.path().to_string_lossy().into_owned(),
+        page_cache_mb: Some(16),
+        read_only: Some(false),
+        vector_dim: Some(2),
+        retention: Some("full".into()),
+    })
+    .unwrap();
+    assert!(reopened
+        .node_view("late-membership-untrusted-master")
+        .is_some());
+
+    let error = reopened
+        .configure_peer_membership(
+            vec![peer(&unrelated_member, 31974, false)],
+            "127.0.0.1:31975",
+            false,
+        )
+        .unwrap_err();
+    assert!(error.to_string().contains("RECOVERY_AUTH_REQUIRED"));
+
+    // Failed validation leaves configuration available for a corrected roster.
+    reopened
+        .configure_peer_membership(vec![peer(&attacker, 31976, true)], "127.0.0.1:31977", false)
+        .expect("authorized historical signer should permit late configuration");
+}
+
+#[test]
+fn late_membership_configuration_preflights_compacted_master_history() {
+    let (_attacker_dir, attacker) = open_current_schema("late-compacted-master");
+    let (_unrelated_dir, unrelated_member) = open_current_schema("late-compacted-unrelated");
+    let target = tempdir().unwrap();
+    prepare_legacy_database(target.path());
+    let options = || OpenOptions {
+        path: target.path().to_string_lossy().into_owned(),
+        page_cache_mb: Some(16),
+        read_only: Some(false),
+        vector_dim: Some(2),
+        retention: Some("full".into()),
+    };
+    let storage = Storage::open_with_membership(
+        options(),
+        PeerMembershipOptions {
+            local_gossip_addr: "127.0.0.1:31978".into(),
+            local_master_authority: Some(false),
+            peers: vec![peer(&attacker, 31979, true)],
+        },
+    )
+    .unwrap();
+    storage
+        .reconcile_state(vec![attacker.sign_event(&Event::Node(node(
+            "late-compacted-master-node",
+            &["MASTER"],
+        )))])
+        .unwrap();
+    storage.compact().unwrap();
+    drop(storage);
+
+    let reopened = Storage::open(options()).unwrap();
+    assert!(reopened.node_view("late-compacted-master-node").is_some());
+    let error = reopened
+        .configure_peer_membership(
+            vec![peer(&unrelated_member, 31980, true)],
+            "127.0.0.1:31981",
+            false,
+        )
+        .unwrap_err();
+    assert!(error.to_string().contains("RECOVERY_AUTH_REQUIRED"));
+
+    reopened
+        .configure_peer_membership(vec![peer(&attacker, 31982, true)], "127.0.0.1:31983", false)
+        .expect("compacted proof should authorize late configuration with the correct roster");
 }
 
 #[test]

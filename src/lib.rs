@@ -1869,6 +1869,12 @@ pub struct PeerMembershipOptions {
     pub peers: Vec<AuthorizedPeerConfig>,
 }
 
+#[derive(Clone, Copy)]
+enum JournalAuthorizationContext {
+    MembershipRecovery,
+    BackupRestore,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AuthenticatedGossipPacket {
     pub version: u32,
@@ -4918,6 +4924,7 @@ pub struct Storage {
     membership_digest: RwLock<String>,
     local_master_authority: AtomicBool,
     peer_membership_configured: AtomicBool,
+    startup_recovery_complete: AtomicBool,
     gossip_bind_addr: RwLock<SocketAddr>,
     gossip_manager_started: AtomicBool,
     pub proposals: DashMap<String, ConsensusProposal>,
@@ -14595,7 +14602,7 @@ impl Storage {
     }
 
     pub fn open(opts: OpenOptions) -> Result<Self> {
-        Self::open_internal(opts, None, None, false)
+        Self::open_internal(opts, None, None, None)
     }
 
     /// Open a database with the operator-pinned membership roster available
@@ -14605,7 +14612,12 @@ impl Storage {
         opts: OpenOptions,
         membership: PeerMembershipOptions,
     ) -> Result<Self> {
-        Self::open_internal(opts, None, Some(membership), false)
+        Self::open_internal(
+            opts,
+            None,
+            Some(membership),
+            Some(JournalAuthorizationContext::MembershipRecovery),
+        )
     }
 
     fn open_schema6_migration(
@@ -14613,14 +14625,14 @@ impl Storage {
         migration_id: String,
         manifest_sha256: String,
     ) -> Result<Self> {
-        Self::open_internal(opts, Some((migration_id, manifest_sha256)), None, false)
+        Self::open_internal(opts, Some((migration_id, manifest_sha256)), None, None)
     }
 
     fn open_internal(
         opts: OpenOptions,
         migration_token: Option<(String, String)>,
         membership: Option<PeerMembershipOptions>,
-        authenticate_journal_before_replay: bool,
+        journal_authorization_context: Option<JournalAuthorizationContext>,
     ) -> Result<Self> {
         let root = PathBuf::from(opts.path.clone());
         let root_was_missing = !root.exists();
@@ -15126,6 +15138,7 @@ impl Storage {
             membership_digest: RwLock::new(String::new()),
             local_master_authority: AtomicBool::new(true),
             peer_membership_configured: AtomicBool::new(false),
+            startup_recovery_complete: AtomicBool::new(false),
             gossip_bind_addr: RwLock::new(SocketAddr::from(([0, 0, 0, 0], 0))),
             gossip_manager_started: AtomicBool::new(false),
             proposals: DashMap::new(),
@@ -15286,8 +15299,15 @@ impl Storage {
             for d in &recovery_definitions {
                 storage.apply_collection_definition(d)?;
             }
-            if authenticate_journal_before_replay {
-                storage.preflight_backup_journal_authorization()?;
+            match journal_authorization_context {
+                Some(JournalAuthorizationContext::MembershipRecovery) => {
+                    storage
+                        .preflight_journal_authorization_with_context("RECOVERY_AUTH_REQUIRED")?;
+                }
+                Some(JournalAuthorizationContext::BackupRestore) => {
+                    storage.preflight_backup_journal_authorization()?;
+                }
+                None => {}
             }
             match (snapshot_loaded, journal_frontier) {
                 // Framed snapshot: replay only frames past the seq frontier.
@@ -15423,6 +15443,9 @@ impl Storage {
             storage.recovery_required.store(true, Ordering::SeqCst);
             return Err(error);
         }
+        storage
+            .startup_recovery_complete
+            .store(true, Ordering::SeqCst);
         Ok(storage)
     }
 
@@ -17663,7 +17686,9 @@ impl Storage {
 
     /// Configure the closed peer roster exactly once, before starting gossip.
     /// Every cluster node must provide the same IDs, public keys, and authority
-    /// roles. Endpoints are numeric SocketAddrs to avoid DNS rebinding.
+    /// roles. Endpoints are numeric SocketAddrs to avoid DNS rebinding. When
+    /// called after startup recovery, retained journal history is preflighted
+    /// against the proposed roster before membership is enabled.
     pub fn configure_peer_membership(
         &self,
         peers: Vec<AuthorizedPeerConfig>,
@@ -17763,13 +17788,11 @@ impl Storage {
             .map_err(|e| Error::from_reason(format!("PEER_MEMBERSHIP_INVALID: {e}")))?;
         let roster_digest = hex::encode(Sha256::digest(roster_bytes));
 
-        self.peer_membership_configured
-            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-            .map_err(|_| {
-                Error::from_reason(
-                    "PEER_MEMBERSHIP_LOCKED: the roster is immutable after configuration",
-                )
-            })?;
+        if self.peer_membership_configured.load(Ordering::SeqCst) {
+            return Err(Error::from_reason(
+                "PEER_MEMBERSHIP_LOCKED: the roster is immutable after configuration",
+            ));
+        }
         for (peer, verifying_key, gossip_addr) in parsed {
             self.authorized_members.insert(
                 peer.peer_id,
@@ -17784,6 +17807,38 @@ impl Storage {
             .store(local_master_authority, Ordering::SeqCst);
         *self.gossip_bind_addr.write() = bind_addr;
         *self.membership_digest.write() = roster_digest;
+
+        // `Storage::open()` recovers without a cluster roster for its local-only
+        // API. If a caller later enables membership, authenticate every retained
+        // event against the proposed roster before allowing gossip to start.
+        // During `open_with_membership`, recovery has not run yet and this same
+        // preflight is performed before replay in `open_internal`.
+        if self.startup_recovery_complete.load(Ordering::SeqCst) {
+            if let Err(error) = self.preflight_journal_authorization_in_source_order(false) {
+                let peer_ids = self
+                    .authorized_members
+                    .iter()
+                    .map(|peer| peer.key().clone())
+                    .collect::<Vec<_>>();
+                for peer_id in peer_ids {
+                    self.authorized_members.remove(&peer_id);
+                }
+                self.local_master_authority.store(true, Ordering::SeqCst);
+                *self.gossip_bind_addr.write() = SocketAddr::from(([0, 0, 0, 0], 0));
+                self.membership_digest.write().clear();
+                return Err(Error::from_reason(format!(
+                    "RECOVERY_AUTH_REQUIRED: {error}"
+                )));
+            }
+        }
+
+        self.peer_membership_configured
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .map_err(|_| {
+                Error::from_reason(
+                    "PEER_MEMBERSHIP_LOCKED: the roster is immutable after configuration",
+                )
+            })?;
         Ok(())
     }
 
@@ -18058,7 +18113,7 @@ impl Storage {
 
     fn compacted_row_revision_schemas(
         &self,
-        signed_events: &[SignedEvent],
+        signed_events: &[&SignedEvent],
     ) -> Result<HashMap<(String, u32), RelationalSchemaPackage>> {
         let mut schemas = HashMap::new();
         {
@@ -19892,17 +19947,18 @@ impl Storage {
         signed_events: &[SignedEvent],
         seed_from_live_state: bool,
     ) -> Result<()> {
+        let signed_event_refs = signed_events.iter().collect::<Vec<_>>();
         self.preflight_reconcile_authorization_with_graph_events(
-            signed_events,
-            signed_events,
+            &signed_event_refs,
+            &signed_event_refs,
             seed_from_live_state,
         )
     }
 
     fn preflight_reconcile_authorization_with_graph_events(
         &self,
-        signed_events: &[SignedEvent],
-        graph_auth_events: &[SignedEvent],
+        signed_events: &[&SignedEvent],
+        graph_auth_events: &[&SignedEvent],
         seed_from_live_state: bool,
     ) -> Result<()> {
         let mut collection_definitions = self
@@ -24719,7 +24775,8 @@ impl Storage {
         // A legacy `open()` with no operator-configured roster is intentionally
         // self-only. It performs no discovery, trusts no heartbeat, and opens
         // no network socket.
-        if storage.authorized_members.is_empty()
+        if !storage.peer_membership_configured.load(Ordering::SeqCst)
+            || storage.authorized_members.is_empty()
             || storage.gossip_manager_started.swap(true, Ordering::SeqCst)
         {
             return;
@@ -27088,7 +27145,7 @@ impl Storage {
                 },
                 None,
                 membership.clone(),
-                true,
+                Some(JournalAuthorizationContext::BackupRestore),
             )?;
             if staging_storage.stable_frontier() != manifest.stable_frontier {
                 return Err(Error::from_reason(
@@ -27117,7 +27174,7 @@ impl Storage {
                 },
                 None,
                 membership.clone(),
-                true,
+                Some(JournalAuthorizationContext::BackupRestore),
             )?;
             let lease = read_only_validation.pin_generation(
                 AccessContext {
@@ -29815,9 +29872,13 @@ impl Storage {
         });
     }
 
-    fn preflight_backup_journal_authorization(&self) -> Result<()> {
+    fn preflight_journal_authorization_with_context(&self, error_prefix: &str) -> Result<()> {
         self.preflight_journal_authorization_in_source_order(false)
-            .map_err(|error| Error::from_reason(format!("BACKUP_AUTH_REQUIRED: {error}")))
+            .map_err(|error| Error::from_reason(format!("{error_prefix}: {error}")))
+    }
+
+    fn preflight_backup_journal_authorization(&self) -> Result<()> {
+        self.preflight_journal_authorization_with_context("BACKUP_AUTH_REQUIRED")
     }
 
     fn preflight_journal_authorization_in_source_order(
@@ -29828,11 +29889,15 @@ impl Storage {
         self.scan_journal_with_origin(None, true, &mut |seq, origin, signed_event| {
             journal_events.push((seq, origin, signed_event));
         });
+        let graph_auth_order = Self::graph_authorization_event_order(&journal_events);
         let signed_events = journal_events
             .iter()
-            .map(|(_, _, signed_event)| signed_event.clone())
+            .map(|(_, _, signed_event)| signed_event)
             .collect::<Vec<_>>();
-        let graph_auth_events = Self::graph_authorization_event_order(&journal_events);
+        let graph_auth_events = graph_auth_order
+            .iter()
+            .map(|index| signed_events[*index])
+            .collect::<Vec<_>>();
         // A loaded snapshot is the final materialized state. Replaying auth
         // from journal start must not use it as the initial state, because a
         // later MASTER promotion would retroactively protect earlier USER
@@ -29848,7 +29913,7 @@ impl Storage {
 
     fn graph_authorization_event_order(
         journal_events: &[(u64, JournalEventOrigin, SignedEvent)],
-    ) -> Vec<SignedEvent> {
+    ) -> Vec<usize> {
         let base_frontier = journal_events
             .iter()
             .filter(|(_, origin, _)| *origin == JournalEventOrigin::Base)
@@ -29870,20 +29935,17 @@ impl Storage {
                             {
                                 transaction.local_frame_seq.unwrap_or(*seq)
                             }
-                            _ => return (1, *seq, order, signed_event.clone()),
+                            _ => return (1, *seq, order),
                         };
                         (0, source_seq)
                     }
                     JournalEventOrigin::Active => (2, *seq),
                 };
-                (phase, source_seq, order, signed_event.clone())
+                (phase, source_seq, order)
             })
             .collect::<Vec<_>>();
-        ordered.sort_by_key(|(phase, seq, order, _)| (*phase, *seq, *order));
-        ordered
-            .into_iter()
-            .map(|(_, _, _, signed_event)| signed_event)
-            .collect()
+        ordered.sort_by_key(|(phase, seq, order)| (*phase, *seq, *order));
+        ordered.into_iter().map(|(_, _, order)| order).collect()
     }
 
     fn apply_replay_event(&self, seq: u64, event: Event) {

@@ -28,6 +28,16 @@ signature and configured source endpoint before dispatch. Event signatures
 remain independently checked at reconciliation, and the event origin may
 differ from an authorized relay.
 
+`openWithMembership` also preflights the retained journal against that roster
+before replaying recovery state. A signer or `MASTER`-role authorization failure
+stops startup with `RECOVERY_AUTH_REQUIRED`. Operators upgrading a multi-node
+database must keep the historical signer and proof material needed to authorize
+its retained journal until a trusted migration no longer depends on it. Plain
+`open()` remains self-only and must not be used to bypass this recovery check
+before starting gossip. If the roster is configured after `open()` through the
+storage API, the retained journal is checked against the proposed roster before
+membership is enabled; failure leaves gossip unavailable.
+
 Compacted `MASTER` nodes and retained node retractions are emitted as current
 single-event projections. Their `SignedEvent.signature` contains a versioned
 proof envelope: the relay signs the projection together with the original

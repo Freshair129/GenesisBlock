@@ -558,7 +558,9 @@ export declare class GenesisDatabase {
   static open(opts: OpenOptions): GenesisDatabase
   /**
    * Open a multi-node instance with an operator-pinned peer roster. Plain
-   * `open()` remains self-only and does not accept discovered members.
+   * `open()` remains self-only and does not accept discovered members. Startup
+   * rejects a retained journal that fails the configured membership or
+   * `masterAuthority` checks with `RECOVERY_AUTH_REQUIRED`.
    */
   static openWithMembership(opts: OpenOptions, membership: PeerMembershipOptions): GenesisDatabase
   localIdentity(): PeerIdentity

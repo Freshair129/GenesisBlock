@@ -16,9 +16,12 @@ Peer-side Axiomatic Guard validation is enforced at shared reconciliation
 ingress. Signers must be roster members, and `MASTER` changes and retractions
 require `masterAuthority` before WAL or memory changes. The accepted
 [peer-membership authorization ADR](adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md)
-defines signed packets, fixed endpoints, and roster-based quorum. Issues #236
-and #237 have implementation and regression-test coverage; exact-head CI and
-merge evidence remain pending.
+defines signed packets, fixed endpoints, and roster-based quorum. Membership-
+membership-aware startup recovery also preflights the retained journal against
+the configured roster before replay. Late storage-API membership configuration
+performs the same check before enabling gossip. Issues #236 and #237 have
+implementation and regression-test coverage; exact-head CI and merge evidence
+remain pending.
 
 ### 2.1 Event Propagation
 - When a `MASTER` or `SPEC` tier node is added, the engine broadcasts a `SyncEvent` to all registered peer addresses.

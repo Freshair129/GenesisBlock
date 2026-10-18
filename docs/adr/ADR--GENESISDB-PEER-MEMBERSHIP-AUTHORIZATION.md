@@ -53,9 +53,22 @@ the electorate is the fixed roster including the local member. A proposal
 commits only with a strict majority of that roster. A singleton roster retains
 the existing local self-vote behavior.
 
-Already durable events remain readable on reopen and WAL replay is not
-retroactively filtered against today's roster. The roster controls new network
-and public reconciliation ingress.
+Multi-node startup applies the same authorization boundary to retained history
+as to new sync ingress. `openWithMembership` installs the operator roster,
+preflights the retained journal in source order, and only then replays it. A
+signature, membership, or `MASTER`-role failure aborts startup with
+`RECOVERY_AUTH_REQUIRED`; no journal events are replayed. Backup restore with
+membership follows the same fail-closed rule.
+
+Plain `open()` remains a self-only recovery path and does not start gossip. If
+membership is configured after startup through `configure_peer_membership`,
+the retained journal is preflighted against that proposed roster before the
+configuration can enable gossip. A failed preflight leaves membership
+unconfigured. Multi-node databases created by pre-roster versions may fail
+closed if retained events or compacted proofs cannot be authorized by the
+current roster. Operators must complete a trusted migration that preserves
+event provenance before retiring a historical signer; opening the database
+self-only and then enabling gossip cannot bypass the recovery check.
 
 The scan was performed at 5d19e7bd895a0794749f0cd87cb14caab350b42b. The
 post-PR-238 mainline review at
