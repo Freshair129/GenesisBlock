@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: 0.1.75b
+version: "0.1.76b"
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-16T12:00:00+07:00,Codex"
+last_update: "2026-10-19T11:27:08+07:00,Codex"
 attributes:
   domain: architecture
   scope: repository
@@ -125,7 +125,7 @@ preflight accounts for JSON syntax, primitive values and escaped UTF-8 strings;
 three lowerer unit tests cover the size boundary. The focused P8 completion
 target passes 10/10. The D7 actor-scoped bridge accepts differential-tested
 zero-hop ID projections (unlabeled or with one plain-ASCII label), one
-unlabeled zero-hop single-property projection, bounded unlabeled one-hop ID
+zero-hop single-property projection (unlabeled or one plain-ASCII label), bounded unlabeled one-hop ID
 projections, and exact-seed depth-one `TRAVERSE` ID projection over one
 physical relation or `ANY` in default/out/in/both directions, through
 `Storage::query_v2`. Property reads preserve missing/explicit-null values and

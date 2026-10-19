@@ -1,8 +1,8 @@
 ---
 doc_id: SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY
-version: "0.2.66b"
+version: "0.2.67b"
 created_at: "2026-09-28T01:25:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-19T11:20:56+07:00,Codex"
+last_update: "2026-10-19T11:27:08+07:00,Codex"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -15,6 +15,26 @@ attributes:
 ---
 
 # P8 typed boundary — approved concrete contract
+
+## D7 labeled property recovery candidate — 2026-10-19
+
+The bounded recovery extends the existing zero-hop single-property form with
+one optional plain-ASCII node label. For example,
+`MATCH (n:Person) RETURN n.prop.score` lowers to the same actor-authorized
+HQL2 property scan with a conjunctive label selector. Missing and explicit
+JSON-null values remain null, duplicate rows retain bag multiplicity, and a
+label with no matching nodes yields no rows. The source snapshot/namespace/P6 boundary
+is unchanged.
+
+Property predicates, ordering, limits, temporal selectors, multiple projected
+fields, non-ASCII labels/keys and other unproven forms remain unsupported.
+The current parser resource reservation and zero-hop ordering guard are retained.
+This scope supersedes the earlier unlabeled-only property description; older
+test totals below remain historical. Fresh differential, authorization,
+parser-boundary, compatibility and build results are recorded in the recovery
+PR. Broad P8/P13 and independent qualification remain open. Existing v1
+transport behavior is stable.
+
 
 ## Status
 
@@ -567,7 +587,7 @@ They never expose unscoped Storage or widen grant semantics.
 
 | Request field | Initial v2 behavior |
 |---|---|
-| language | explicit hql.v2 or query-ir.v2; hql.v1 is accepted only by actor-bearing `Storage::query_v2` after `Namespace(Read)` and namespace-equality checks, and only for D7's differential-tested zero-hop node-ID projection (unlabeled or one plain-ASCII label, optionally with one exact same-alias `.id` string equality), one unlabeled unconstrained zero-hop single-property projection with a plain-ASCII key and no predicate/order/limit/temporal selector, one-hop unlabeled/unconstrained node-ID projection (one-hop may include one endpoint `.id` string equality filter), or exact-seed depth-one `TRAVERSE` ID projection using one plain-ASCII relation or `ANY`, with omitted/out/in/both direction; traversal rejects fuzzy seeds, relation unions, selectors, filters, ordering, limits and other projections. All are lowered into the shared HQL2 pipeline; parser resource/work-limit failures return QUERY_BUDGET_EXCEEDED before legacy AST construction; other valid legacy forms/options return CAPABILITY_UNSUPPORTED; existing v1 endpoints remain unchanged |
+| language | explicit hql.v2 or query-ir.v2; hql.v1 is accepted only by actor-bearing `Storage::query_v2` after `Namespace(Read)` and namespace-equality checks, and only for D7's differential-tested zero-hop node-ID projection (unlabeled or one plain-ASCII label, optionally with one exact same-alias `.id` string equality), one unconstrained zero-hop single-property projection with an optional single plain-ASCII label and a plain-ASCII key and no predicate/order/limit/temporal selector, one-hop unlabeled/unconstrained node-ID projection (one-hop may include one endpoint `.id` string equality filter), or exact-seed depth-one `TRAVERSE` ID projection using one plain-ASCII relation or `ANY`, with omitted/out/in/both direction; traversal rejects fuzzy seeds, relation unions, selectors, filters, ordering, limits and other projections. All are lowered into the shared HQL2 pipeline; parser resource/work-limit failures return QUERY_BUDGET_EXCEEDED before legacy AST construction; other valid legacy forms/options return CAPABILITY_UNSUPPORTED; existing v1 endpoints remain unchanged |
 | explain | omitted means None; textual EXPLAIN/ANALYZE supplies the mode if the envelope is omitted; if both are supplied they must agree, otherwise BIND_ERROR; no mode silently upgrades plan-only to execution |
 | namespace/temporal | textual/envelope values must agree; omitted valid_at is one UTC instant captured under the query guard; omitted transaction selector is the pinned data frontier L; explicit `tx_as_of` selects S with `history_horizon <= S <= L`; every HQL/IR source, hydration path and `Snapshot.tx` uses S without current-state fallback |
 | index_policy | omitted means MergeDelta; initial exact scan does not consume an index and reports not_applicable coverage; explicit Wait/Eventual and Approx requests return CAPABILITY_UNSUPPORTED until implemented |

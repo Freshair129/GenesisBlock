@@ -43,6 +43,9 @@ The initial recovered counter patch passes 42 library unit tests and all 40
 root HQL2 targets (411 passed, 0 failed, 1 existing ignored case). Formatting
 and documentation validation pass (244 files, 0 violations). Strict core
 all-target Clippy passes after the separately documented baseline lint cleanup.
-Subsequent expanded regression, build, default-feature lint and hosted results
-are recorded with the PR; broader G4 qualification remains open. No archived
-test result is counted as a fresh run.
+The final expanded G4 regression passes 547 tests with zero failures and one
+existing ignored parser child entrypoint exercised by its parent, across
+46 test executables (library and 45 integration targets). Strict default/NAPI
+all-target Clippy and both default and standalone-server builds also pass.
+Hosted results are recorded with the PR; broader G4 qualification remains
+open. No archived test result is counted as a fresh run.

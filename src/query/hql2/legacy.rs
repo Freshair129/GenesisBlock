@@ -148,10 +148,15 @@ pub(crate) fn lower_hql_v1(
     let source = match pattern.hops.as_slice() {
         [] if projection.var == alias && clauses.order_by.is_none() => {
             let (label, filter) = if property_projection.is_some() {
-                if pattern.start.label.is_some() || !clauses.where_preds.is_empty() {
+                if !clauses.where_preds.is_empty() {
                     return Err(unsupported());
                 }
-                (String::new(), String::new())
+                let label = match pattern.start.label.as_deref() {
+                    Some(label) if is_plain_identifier(label) => format!(" {label}"),
+                    Some(_) => return Err(unsupported()),
+                    None => String::new(),
+                };
+                (label, String::new())
             } else {
                 let label = match pattern.start.label.as_deref() {
                     Some(label) if is_plain_identifier(label) => format!(" {label}"),
