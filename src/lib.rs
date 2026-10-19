@@ -28749,10 +28749,10 @@ impl Storage {
         for entry in self.nodes.iter() {
             let node = entry.value();
             if node.valid_to.is_none()
-                && !node
+                && node
                     .expires_at
                     .as_ref()
-                    .is_some_and(|expires_at| now > expires_at.as_str())
+                    .is_none_or(|expires_at| now <= expires_at.as_str())
                 && Self::labels_are_master(&node.labels)
             {
                 let mut materialized = node.clone();
@@ -30308,7 +30308,6 @@ impl Storage {
                 });
             }
         }
-        drop(emit);
         if let Some(error) = limit_error {
             return Err(error);
         }
