@@ -41,9 +41,12 @@ flowchart LR
 
 ## Validation
 
-The recovery PR records fresh current-head tests, builds, strict lint and
-documentation checks, including pending or failed states. Historical branch
-results are not counted as fresh acceptance evidence.
+Fresh local validation passes 22 tests across the five HQL1 compatibility
+and G4 diagnostic targets, strict all-target Clippy in core and default/NAPI
+configurations, and both default and standalone-server builds. Documentation
+validation passes with 244 files and zero violations. The recovery PR records
+hosted results separately. Historical branch results are not counted as fresh
+acceptance evidence.
 
 Scoped architecture review (implementer, not independent): label text reaches
 the existing canonical node source only after plain-identifier validation.

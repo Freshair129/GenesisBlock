@@ -29,5 +29,12 @@ gossip-membership and journal-recovery regression tests.
 
 ## Validation
 
-Baseline failure reproduced locally on main and the G4 candidate. Fresh
-post-fix strict lint, build and regression evidence is pending.
+Baseline failure reproduced locally on main and the G4 candidate. After the
+fix, strict all-target Clippy passes in core and default/NAPI configurations,
+and both default and standalone-server builds pass. The final G4 regression
+passes 547 tests with zero failures and one existing ignored parser child
+entrypoint exercised by its parent. This includes the 30 gossip-membership,
+10 journal-format, 4 journal-migration, 2 P4 recovery and 48 REST tests.
+The integrated D7 tree also passes both lint/build configurations and its
+22 focused compatibility/diagnostic tests. Hosted results are recorded in
+the associated recovery PRs; no independent or release qualification is claimed.

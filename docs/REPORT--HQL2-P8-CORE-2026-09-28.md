@@ -33,6 +33,16 @@ parser-boundary, compatibility and build results are recorded in the recovery
 PR. Broad P8/P13 and independent qualification remain open. Existing v1
 transport behavior is stable.
 
+Fresh local recovery validation: the D7 integrated tree passes 22 tests across
+the property-projection, HQL1 adapter, labeled-filter, ordering and G4 contract
+targets. Strict all-target Clippy passes in core and default/NAPI configurations;
+default and standalone-server builds also pass. The final G4 base regression
+passes 547 tests with zero failures and one existing ignored parser child
+entrypoint exercised by its parent. Documentation validation passes with 244
+files and zero violations; formatting, diff checks and version SSOT pass.
+Hosted checks are recorded separately in the recovery PRs; these local results
+do not close broader G4/P8/P13 or independent qualification.
+
 
 ## Authority and base
 
