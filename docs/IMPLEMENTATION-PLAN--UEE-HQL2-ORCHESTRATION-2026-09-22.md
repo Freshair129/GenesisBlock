@@ -1,9 +1,9 @@
 ---
-version: "0.8.78b"
+version: "0.8.79b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-06T06:30:22+07:00,Codex"
+last_update: "2026-10-19T11:27:08+07:00,Codex"
 status: beta
 superseded_by: null
 attributes:
@@ -16,6 +16,26 @@ attributes:
 ---
 
 # UEE-HQL2 Orchestration Plan
+
+## D7 labeled property recovery candidate — 2026-10-19
+
+The bounded recovery extends the existing zero-hop single-property form with
+one optional plain-ASCII node label. For example,
+`MATCH (n:Person) RETURN n.prop.score` lowers to the same actor-authorized
+HQL2 property scan with a conjunctive label selector. Missing and explicit
+JSON-null values remain null, duplicate rows retain bag multiplicity, and a
+label with no matching nodes yields no rows. The source snapshot/namespace/P6 boundary
+is unchanged.
+
+Property predicates, ordering, limits, temporal selectors, multiple projected
+fields, non-ASCII labels/keys and other unproven forms remain unsupported.
+The current parser resource reservation and zero-hop ordering guard are retained.
+This scope supersedes the earlier unlabeled-only property description; older
+test totals below remain historical. Fresh differential, authorization,
+parser-boundary, compatibility and build results are recorded in the recovery
+PR. Broad P8/P13 and independent qualification remain open. Existing v1
+transport behavior is stable.
+
 
 สถานะเอกสารนี้คือ `beta` และเป็น workflow/แผนงานที่ใช้กำกับ execution แบบมี gate
 เท่านั้น P4/P5 ได้รับ owner approval แล้ว และ P6 contract พร้อม architecture correction ได้รับ

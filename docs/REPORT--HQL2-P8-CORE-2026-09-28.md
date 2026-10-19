@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.70b"
+version: "0.1.71b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-19T11:20:56+07:00,Codex"
+last_update: "2026-10-19T11:27:08+07:00,Codex"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -13,6 +13,26 @@ attributes:
 ---
 
 # HQL2 P8 core checkpoint — not full HQL2 completion
+
+## D7 labeled property recovery candidate — 2026-10-19
+
+The bounded recovery extends the existing zero-hop single-property form with
+one optional plain-ASCII node label. For example,
+`MATCH (n:Person) RETURN n.prop.score` lowers to the same actor-authorized
+HQL2 property scan with a conjunctive label selector. Missing and explicit
+JSON-null values remain null, duplicate rows retain bag multiplicity, and a
+label with no matching nodes yields no rows. The source snapshot/namespace/P6 boundary
+is unchanged.
+
+Property predicates, ordering, limits, temporal selectors, multiple projected
+fields, non-ASCII labels/keys and other unproven forms remain unsupported.
+The current parser resource reservation and zero-hop ordering guard are retained.
+This scope supersedes the earlier unlabeled-only property description; older
+test totals below remain historical. Fresh differential, authorization,
+parser-boundary, compatibility and build results are recorded in the recovery
+PR. Broad P8/P13 and independent qualification remain open. Existing v1
+transport behavior is stable.
+
 
 ## Authority and base
 

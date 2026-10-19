@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM
-version: "0.1.14b"
+version: "0.1.15b"
 created_at: "2026-09-30T06:29:47+07:00,ATHER,working-tree"
-last_update: "2026-10-05T06:09:11+07:00,ATHER"
+last_update: "2026-10-19T11:27:08+07:00,Codex"
 status: accepted
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -15,6 +15,26 @@ attributes:
 ---
 
 # HQL2 P8 completion addendum: typed semantics and actor-scoped HQL1 bridge
+
+## D7 labeled property recovery candidate — 2026-10-19
+
+The bounded recovery extends the existing zero-hop single-property form with
+one optional plain-ASCII node label. For example,
+`MATCH (n:Person) RETURN n.prop.score` lowers to the same actor-authorized
+HQL2 property scan with a conjunctive label selector. Missing and explicit
+JSON-null values remain null, duplicate rows retain bag multiplicity, and a
+label with no matching nodes yields no rows. The source snapshot/namespace/P6 boundary
+is unchanged.
+
+Property predicates, ordering, limits, temporal selectors, multiple projected
+fields, non-ASCII labels/keys and other unproven forms remain unsupported.
+The current parser resource reservation and zero-hop ordering guard are retained.
+This scope supersedes the earlier unlabeled-only property description; older
+test totals below remain historical. Fresh differential, authorization,
+parser-boundary, compatibility and build results are recorded in the recovery
+PR. Broad P8/P13 and independent qualification remain open. Existing v1
+transport behavior is stable.
+
 
 ## Status and approval boundary
 
@@ -193,12 +213,12 @@ these P8 decisions alone.
    differential-extension rule, either form may additionally contain exactly
    one exact string-equality predicate `WHERE <same-identifier>.id =
    "<string>"`; for labeled scans, the label and ID predicate are conjunctive.
-   A separate property form accepts only an unlabeled zero-hop scan with one
-   plain-ASCII property key, no predicate/order/limit/temporal selector, and
-   exactly that one projected property. Missing and explicit JSON-null
-   properties project as null, preserving legacy bag multiplicity; labeled,
-   filtered, ordered, limited, temporal and multi-column property forms remain
-   unsupported. The labeled ID scan form is
+   A separate property form accepts a zero-hop scan with zero or one
+   plain-ASCII label, one plain-ASCII property key, no predicate/order/limit/
+   temporal selector, and exactly that one projected property. Missing and
+   explicit JSON-null properties project as null, preserving legacy bag
+   multiplicity; filtered, ordered, limited, temporal and multi-column property
+   forms remain unsupported. The labeled ID scan form is
    `MATCH (<identifier>:<Label>) RETURN <same-identifier>.id`; the unlabeled
    form remains supported. Following the D7 differential-extension rule, the
    verified allowlist also includes one unlabeled, unconstrained hop with
