@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE
-version: "0.1.3b"
+version: "0.1.4b"
 created_at: "2026-10-04T13:08:29+07:00,Codex,2be63a7"
-last_update: "2026-10-06T01:49:20+07:00,ATHER"
+last_update: "2026-10-19T11:20:56+07:00,Codex"
 status: active
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -45,6 +45,36 @@ full per-operator exact-oracle qualification, independent review, fresh hosted
 checks, and device/release qualification remain separate gates.
 Missing or skipped evidence remains `NOT_RUN`; public transport and
 user-database migration are outside this ADR's implementation scope.
+
+## G4 diagnostics recovery candidate — 2026-10-19
+
+The recovery restores the already approved counter vocabulary under the explicit
+v2 core boundary. `ActualCountersV2` uses typed readings containing a unit and
+a measured value or an explicit unknown reason (`not_instrumented`,
+`not_applicable`, or `overflow`). Checked accounting does not turn overflow
+into a saturated measured value. Graph expansions count node and edge expansion
+work units charged by the operator, including repeated expansion work.
+
+ANALYZE emits all contracted readings with complete sampling, a monotonic
+Instant clock source, and operator-execution elapsed scope. Source scans are
+materialized before the execution timer, so their elapsed reading is unknown
+with `not_instrumented`; it does not claim to time source I/O. Accounted budget
+bytes are not a measured operator peak, and remain unknown in diagnostics.
+
+The diagnostic JSON changes from the preliminary optional numeric fields
+(`input_rows`, `output_rows`, `expanded_nodes`, `expanded_edges`, and
+`elapsed_micros`) to the ADR's typed `rows_in`, `rows_out`,
+`graph_expansions`, and `elapsed_ns` readings. Core v2 diagnostic consumers
+must use the typed readings. Plan identity is computed before actual readings;
+normal result rows, request versions, planner version and v1 behavior do not
+change. No new transport route or user-database migration is introduced.
+
+The initial recovered counter patch passed the fresh 40-target HQL2 sweep
+(411 passed, 0 failed, 1 existing ignored case) and 42 library unit tests.
+Strict core all-target Clippy passed after equivalent baseline lint cleanup;
+subsequent verification is recorded in the PR. The broader G4/P8/P13 and
+independent qualification gates remain open; archived branch test totals are
+not fresh acceptance evidence.
 
 ## Parent and peer evidence
 
@@ -426,11 +456,16 @@ an ADR amendment and renewed review.
 |---|---|---|
 | Product authority | Approved | User approval `approve`, 2026-10-04 |
 | Architecture | Accepted; C-3/HIGH | This ADR plus synchronized parent/peer docs |
-| Implementation | Partial / local verification | `ExplainResultV2` plan identity fields, canonical hash and focused contract test |
+| Implementation | Partial / local verification | Plan identity plus recovered typed actual counters, closed JSON tests and fresh focused/root-HQL2 evidence |
 | Independent review | NOT_RUN | Must occur after implementation/verification |
 | Hosted/device/release | NOT_RUN | Outside this documentation slice |
 
 ## Version diff and changelog
+
+Version diff: `0.1.3b -> 0.1.4b` selectively recovers the approved typed
+diagnostic vocabulary, checked counter arithmetic and truthful source timing
+from the archived branch onto current main. The recovery validation above is
+separate from historical evidence and broader G4 qualification.
 
 Version diff: `0.1.2b -> 0.1.3b` reconciles the approved G4 plan-identity
 slice with the P8 typed runtime and records the integrated 42-target HQL2/REST
@@ -440,6 +475,7 @@ and release qualification open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.4b | 2026-10-19 | active | Recover typed measured/unknown counters, explicit units and provenance, overflow distinction and truthful SourceScan timing; retain broader G4 qualification gates | working-tree | Codex |
 | 0.1.3b | 2026-10-06 | active | Reconcile G4 with P8/H2-D11 runtime; integrated HQL2/REST 42-target sweep and strict Clippy in both feature configurations pass; full oracle breadth, independent review and hosted/device/release gates remain open | working-tree | ATHER |
 | 0.1.2b | 2026-10-04 | active | Owner-approved G4 contract; implement stable planner metadata and shared plan hash for `EXPLAIN`/`ANALYZE`, with focused local evidence and remaining G4 gates open | working-tree | ATHER |
 | 0.1.1b | 2026-10-04 | draft | Add the parity-proven HQL1 compatibility adapter to the explicit-v2 shared pipeline while preserving legacy routing and all implementation gates | working-tree | ATHER |

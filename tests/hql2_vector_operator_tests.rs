@@ -1,6 +1,6 @@
 use genesis_block_native::{
     query::hql2::{value::QueryValueV2, QueryOutcomeV2},
-    uee_v2::QueryRequestV2,
+    uee_v2::{ExplainV2, QueryRequestV2},
     AccessContext, NodeInput, OpenOptions, Storage,
 };
 use rusqlite::Connection;
@@ -145,6 +145,54 @@ fn exact_knn_reads_original_vectors_and_drops_missing_candidates() {
     assert_eq!(
         result.semantics.scope,
         genesis_block_native::query::hql2::result::ResultScopeV2::WholeInput
+    );
+}
+
+#[test]
+fn analyze_reports_exact_vector_distance_evaluations_and_budget_errors() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    add_node(&storage, "a", Some(vec![0.1, 0.0]));
+    add_node(&storage, "b", Some(vec![0.2, 0.0]));
+    add_node(&storage, "missing", None);
+    let space_id = space_id(&storage);
+    let rank = json!({
+        "id":"rank","op":"Knn","inputs":["scan"],
+        "config":{"entity":"d","collection":"default","query":{"param":"q"},"k":2,"mode":"exact","as":"hit"}
+    });
+
+    let mut request = ir_request("analyze-exact-knn", &space_id, rank.clone());
+    request.explain = Some(ExplainV2::Analyze);
+    let QueryOutcomeV2::Rows(result) = storage.query_v2(access(), request).unwrap() else {
+        panic!("ANALYZE KNN must execute")
+    };
+    assert_eq!(result.rows.len(), 2);
+    let rank_node = result
+        .explain
+        .unwrap()
+        .plan
+        .into_iter()
+        .find(|node| node.id == "rank")
+        .unwrap();
+    let actual = serde_json::to_value(rank_node.actual.unwrap()).unwrap();
+    assert_eq!(
+        actual["distance_evaluations"]["unit"],
+        "distance_evaluations"
+    );
+    assert_eq!(
+        actual["distance_evaluations"]["measurement"]["status"],
+        "measured"
+    );
+    assert_eq!(actual["distance_evaluations"]["measurement"]["value"], 2);
+
+    let mut limited =
+        serde_json::to_value(ir_request("analyze-exact-knn-budget", &space_id, rank)).unwrap();
+    limited["explain"] = json!("analyze");
+    limited["budget"] = json!({"max_distance_evaluations":1});
+    let limited: QueryRequestV2 = serde_json::from_value(limited).unwrap();
+    assert_eq!(
+        storage.query_v2(access(), limited).unwrap_err().code,
+        "QUERY_BUDGET_EXCEEDED"
     );
 }
 

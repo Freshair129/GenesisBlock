@@ -1094,9 +1094,9 @@ fn query_ir_pattern_field_is_invalid(field: &crate::QueryIrPatternField) -> bool
             !matches!(
                 normalized.as_str(),
                 "id" | "label" | "score" | "depth" | "recorded_at"
-            ) && !normalized
+            ) && normalized
                 .strip_prefix("prop.")
-                .is_some_and(|property| !property.is_empty())
+                .is_none_or(|property| property.is_empty())
         })
 }
 

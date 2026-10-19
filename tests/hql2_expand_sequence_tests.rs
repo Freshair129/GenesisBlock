@@ -308,6 +308,7 @@ fn sequence_budget_exhaustion_returns_no_partial_result() {
         "contract_version":"genesis.api.v2",
         "request_id":"sequence-edge-budget",
         "namespace":"default",
+        "explain":"analyze",
         "budget":{"max_expanded_edges":1},
         "ir":ir(sequence("trail"), false),
         "params":{}
@@ -344,6 +345,12 @@ fn analyze_reports_sequence_graph_work() {
         .find(|node| node.logical_op == genesis_block_native::uee_v2::QueryOpV2::Expand)
         .unwrap();
     let actual = expand.actual.unwrap();
-    assert!(actual.expanded_nodes.unwrap_or_default() > 0);
-    assert!(actual.expanded_edges.unwrap_or_default() > 0);
+    let actual = serde_json::to_value(actual).unwrap();
+    assert_eq!(
+        actual["graph_expansions"]["measurement"]["status"],
+        "measured"
+    );
+    assert!(actual["graph_expansions"]["measurement"]["value"]
+        .as_u64()
+        .is_some_and(|count| count > 0));
 }

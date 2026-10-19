@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.69b"
+version: "0.1.70b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-06T04:46:43+07:00,ATHER"
+last_update: "2026-10-19T11:20:56+07:00,Codex"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -27,6 +27,34 @@ explicit sweep below excludes it; see local RCA `.brain/rca/RCA--HQL2-POWERSHELL
 At that checkpoint there had been no fetch, push, main-branch merge, PR,
 deployment or user database migration.
 Engine version 0.2.6 -> 0.2.9 is inherited from upstream, not a new release here.
+
+## G4 typed diagnostics recovery — 2026-10-19
+
+Candidate source: archived `codex/hql2-execution` commits `ed75e16d` and
+`d385c608`, selectively ported onto main `5eb2fa4`. The plan-identity slice
+already exists; the remaining recovery aligns ANALYZE readings with the
+approved typed units, measured/unknown states, reasons, overflow and clock
+provenance. Source scan elapsed time is explicitly uninstrumented rather than
+misattributed to the post-materialization operator timer. Preliminary numeric
+core-v2 diagnostics change to the ADR's typed readings; callers of those
+preliminary fields must update. Existing rows and v1 contracts are unchanged.
+
+Fresh local recovery evidence: the initial counter patch passed all 40 root
+HQL2 targets (411 passed, 0 failed, 1 existing ignored case) and the 42 library
+unit tests. Strict core all-target Clippy passed after the equivalent baseline
+lint cleanup. The PR records subsequent build, default-feature lint, expanded
+regression and hosted check results separately. Historical results below belong
+to their recorded revisions and do not close broad G4/P8/P13.
+
+Scoped architecture review (implementer, not independent): actual counters are
+attached after deterministic binding/planning; the canonical plan identity does
+not include execution readings. Counter deltas use checked arithmetic, and
+budget failures still return errors before publishing a successful result.
+Source materialization, authorization and the P6 lease remain on their existing
+paths. The diagnostic schema is the deliberate compatibility change described
+above. Three baseline strict-Clippy blockers were reproduced on clean main and
+corrected with equivalent Option predicates and removal of a redundant closure
+drop; their regression evidence is included in the recovery validation.
 
 ## Current integrated-candidate verification — 2026-10-06
 
@@ -144,8 +172,8 @@ release and consumer qualification are not claimed.
   the same validated P6 lease; see the current source-target evidence below.
 - Conservative query-local memory reservations, deadline, result-row/byte and
   collect bounds; exact execution fails on exhaustion, never returns partial
-  aggregates. ANALYZE emits measured row/time counters only; unknown counters,
-  costs and index frontiers remain absent.
+  aggregates. ANALYZE emits typed counter readings with measured values or
+  explicit unknown reasons; costs and unknown index frontiers remain absent.
 - Sequence ID, conjunctive labels and D4 node/edge property predicates bind
   and execute through HQL and typed IR under the same P6 graph snapshot.
   Property values use exact JSON equality; missing values do not match, explicit
@@ -571,6 +599,10 @@ from these local tests.
 The separate U9 backup/restore target passes 7/7; no user database was modified.
 
 ## Version diff
+
+Recovery version diff `0.1.69b -> 0.1.70b`: recover the bounded G4 diagnostic
+schema from the archived branch, with fresh validation recorded above. The
+following table describes the earlier integrated checkpoint.
 
 | Artifact | Before | After |
 |---|---|---|

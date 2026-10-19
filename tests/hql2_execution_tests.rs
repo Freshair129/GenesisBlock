@@ -359,15 +359,20 @@ fn namespace_authorization_precedes_even_malformed_hql_or_ir() {
     )
     .unwrap();
     let before = db.stable_frontier();
-    let mut request = values_request();
-    request.ir = None;
-    request.hql = Some("not a query".into());
-    request.language_version = Some(uee_v2::HqlLanguageVersionV2::HqlV2);
-    assert_eq!(
-        db.query_v2(access(), request).unwrap_err().code,
-        "FORBIDDEN"
-    );
-    assert_eq!(db.stable_frontier(), before);
+    for analyze in [false, true] {
+        let mut request = values_request();
+        request.ir = None;
+        request.hql = Some("not a query".into());
+        request.language_version = Some(uee_v2::HqlLanguageVersionV2::HqlV2);
+        if analyze {
+            request.explain = Some(uee_v2::ExplainV2::Analyze);
+        }
+        assert_eq!(
+            db.query_v2(access(), request).unwrap_err().code,
+            "FORBIDDEN"
+        );
+        assert_eq!(db.stable_frontier(), before);
+    }
 }
 
 #[test]
@@ -432,25 +437,106 @@ fn textual_explain_cannot_be_silently_overridden_by_envelope() {
 fn analyze_reports_measured_rows_and_budget_failures_never_return_partial_rows() {
     let dir = TempDir::new().unwrap();
     let db = open(dir.path());
+
+    let mut explain_request = values_request();
+    explain_request.request_id = "g4-plan-a".into();
+    explain_request.explain = Some(uee_v2::ExplainV2::Plan);
+    let QueryOutcomeV2::Plan(plan_a) = db.query_v2(access(), explain_request).unwrap() else {
+        panic!("EXPLAIN must return a plan")
+    };
+    let mut explain_request = values_request();
+    explain_request.request_id = "g4-plan-b".into();
+    explain_request.explain = Some(uee_v2::ExplainV2::Plan);
+    let QueryOutcomeV2::Plan(plan_b) = db.query_v2(access(), explain_request).unwrap() else {
+        panic!("EXPLAIN must return a plan")
+    };
+    assert_eq!(plan_a.contract_version, "genesis.api.v2");
+    assert_eq!(plan_a.planner_version, "hql2-rule-v1");
+    assert_eq!(plan_a.plan_hash, plan_b.plan_hash);
+    assert_eq!(plan_a.plan_hash.len(), 64);
+    assert!(plan_a
+        .plan_hash
+        .bytes()
+        .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()));
+    assert!(plan_a.plan.iter().all(|node| node.actual.is_none()));
+
     let mut request = values_request();
+    request.request_id = "g4-analyze".into();
     request.explain = Some(uee_v2::ExplainV2::Analyze);
     let QueryOutcomeV2::Rows(result) = db.query_v2(access(), request).unwrap() else {
         panic!()
     };
     let plan = result.explain.unwrap();
-    assert_eq!(plan.plan[0].actual.as_ref().unwrap().output_rows, Some(3));
-    assert!(plan.plan[0]
-        .actual
-        .as_ref()
-        .unwrap()
-        .distance_evaluations
-        .is_none());
+    assert_eq!(plan.contract_version, plan_a.contract_version);
+    assert_eq!(plan.planner_version, plan_a.planner_version);
+    assert_eq!(plan.plan_hash, plan_a.plan_hash);
+    assert!(plan.plan.iter().all(|node| node.actual.is_some()));
+    let actual = serde_json::to_value(plan.plan[0].actual.as_ref().unwrap()).unwrap();
+    assert_eq!(actual.as_object().unwrap().len(), 13);
+    for counter in [
+        "rows_in",
+        "rows_out",
+        "bytes_read",
+        "work_units",
+        "index_probes",
+        "distance_evaluations",
+        "graph_expansions",
+        "memory_peak_bytes",
+        "spill_bytes",
+        "elapsed_ns",
+    ] {
+        assert!(actual.get(counter).is_some(), "missing counter {counter}");
+    }
+    assert_eq!(actual["sampling"], "complete");
+    assert_eq!(actual["clock_source"], "monotonic_instant");
+    assert_eq!(actual["elapsed_scope"], "operator_execution");
+    assert_eq!(actual["rows_in"]["unit"], "rows");
+    assert_eq!(actual["rows_in"]["measurement"]["status"], "measured");
+    assert_eq!(actual["rows_in"]["measurement"]["value"], 0);
+    assert_eq!(actual["rows_out"]["measurement"]["status"], "measured");
+    assert_eq!(actual["rows_out"]["measurement"]["value"], 3);
+    assert_eq!(actual["elapsed_ns"]["unit"], "nanoseconds");
+    assert_eq!(actual["elapsed_ns"]["measurement"]["status"], "measured");
+    assert_eq!(actual["bytes_read"]["measurement"]["status"], "unknown");
+    assert_eq!(
+        actual["bytes_read"]["measurement"]["reason"],
+        "not_instrumented"
+    );
+    assert_eq!(
+        actual["work_units"]["measurement"]["reason"],
+        "not_instrumented"
+    );
+    assert_eq!(
+        actual["memory_peak_bytes"]["measurement"]["reason"],
+        "not_instrumented"
+    );
+    assert_eq!(
+        actual["distance_evaluations"]["measurement"]["status"],
+        "unknown"
+    );
+    assert_eq!(
+        actual["distance_evaluations"]["measurement"]["reason"],
+        "not_applicable"
+    );
+    assert_eq!(
+        actual["index_probes"]["measurement"]["reason"],
+        "not_applicable"
+    );
+    assert_eq!(
+        actual["graph_expansions"]["measurement"]["reason"],
+        "not_applicable"
+    );
+    assert_eq!(
+        actual["spill_bytes"]["measurement"]["reason"],
+        "not_applicable"
+    );
     for budget in [
         json!({"max_result_rows":1}),
         json!({"max_result_bytes":1}),
         json!({"max_memory_bytes":1}),
     ] {
         let mut request = values_request();
+        request.explain = Some(uee_v2::ExplainV2::Analyze);
         request.budget = Some(serde_json::from_value(budget).unwrap());
         assert_eq!(
             db.query_v2(access(), request).unwrap_err().code,

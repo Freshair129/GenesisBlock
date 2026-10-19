@@ -6,6 +6,7 @@ use genesis_block_native::{
 };
 use rusqlite::Connection;
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::path::Path;
 use tempfile::TempDir;
 use uuid::Uuid;
@@ -107,27 +108,11 @@ fn put(
 }
 
 fn database_id(storage: &Storage) -> String {
-    let request = serde_json::from_value(json!({
-        "contract_version":"genesis.api.v2",
-        "request_id":"annotation-database-id",
-        "namespace":"default",
-        "ir":{"contract_version":"query-ir.v2","nodes":[{"id":"v","op":"Values","inputs":[],"config":{"param":"xs","as":"x"}}],"root":"v","parameter_types":{"xs":"List<I64>"}},
-        "params":{"xs":{"type":"List<I64>","value":[]}}
-    }))
-    .unwrap();
-    let genesis_block_native::query::hql2::QueryOutcomeV2::Rows(result) = storage
-        .query_v2(
-            AccessContext {
-                principal: "annotation-test".into(),
-                namespace: "default".into(),
-            },
-            request,
-        )
-        .unwrap()
-    else {
-        panic!("values request must return rows")
-    };
-    result.snapshot.database_id
+    // Fixture metadata follows the P8 identity contract without a timed query.
+    let mut identity = Sha256::new();
+    identity.update(b"genesis.api.v2.database:");
+    identity.update(hex::decode(storage.local_identity().public_key_hex).unwrap());
+    hex::encode(identity.finalize())
 }
 
 #[test]

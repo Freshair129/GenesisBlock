@@ -7,6 +7,7 @@ use genesis_block_native::{
     uee_v2::{ExplainV2, QueryRequestV2},
     AccessContext, EdgeInput, NodeInput, OpenOptions, Storage,
 };
+use rusqlite::Connection;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -327,9 +328,22 @@ fn context_pack_keeps_exact_text_evidence_and_unicode_scalar_offsets() {
     assert_eq!(context["value"]["omitted_refs"][0]["start_scalar"], 2);
     assert_eq!(context["value"]["omitted_refs"][0]["end_scalar"], 3);
 
-    let (mut fixture, batch) = lexical_reference_fixture(&[("doc:context", "é猫😀")]);
+    let (mut fixture, mut batch) = lexical_reference_fixture(&[("doc:context", "é猫😀")]);
     let source_hash = hex::encode(Sha256::digest("é猫😀".as_bytes()));
     fixture.documents[0].source_hash = source_hash.clone();
+    let projection = Connection::open(dir.path().join("projection.sqlite")).unwrap();
+    let (source_database_id, source_id, source_revision): (String, String, String) = projection
+        .query_row(
+            "SELECT database_id, record_id, revision_id FROM hql2_record_revisions
+             WHERE namespace='default' AND kind='node' AND record_id='doc:context' AND tx_to IS NULL",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .unwrap();
+    // The P7 fixture starts with symbolic revisions; bind it to the durable fixture record.
+    fixture.documents[0].revision = source_revision.clone();
+    batch.rows[0].owner_id = source_id.clone();
+    batch.rows[0].revision = source_revision.clone();
     let oracle = rank_reference::pack_context(
         &batch,
         &fixture,
@@ -370,18 +384,20 @@ fn context_pack_keeps_exact_text_evidence_and_unicode_scalar_offsets() {
         actual.omitted_refs[0].end_scalar as usize,
         oracle.omitted_refs[0].end_scalar
     );
-    let QueryOutcomeV2::Rows(source_result) = run(
-        &storage,
-        "context-source-identity",
-        "USE default FROM NODES AS n |> RETURN n AS source",
-    )
-    .unwrap() else {
-        panic!("source identity query must execute")
-    };
-    let QueryValueV2::Entity(source) = &source_result.rows[0]["source"] else {
-        panic!("source identity must be Entity")
-    };
-    assert_eq!(&actual.fragments[0].evidence.source, source);
+    assert_eq!(actual.fragments[0].evidence.source.namespace, "default");
+    assert_eq!(
+        actual.fragments[0].evidence.source.database_id,
+        source_database_id
+    );
+    assert_eq!(actual.fragments[0].evidence.source.id, source_id);
+    assert_eq!(
+        actual.fragments[0].evidence.source.revision,
+        source_revision
+    );
+    assert_eq!(
+        actual.fragments[0].evidence.source.kind,
+        genesis_block_native::uee_v2::RecordKindV2::Node
+    );
     assert_eq!(actual.fragments[0].evidence.source_hash, source_hash);
 
     let QueryOutcomeV2::Rows(typed) = run_ir(
@@ -407,6 +423,55 @@ fn context_pack_keeps_exact_text_evidence_and_unicode_scalar_offsets() {
         panic!("typed ContextPack must execute")
     };
     assert_eq!(typed.rows, result.rows);
+    let QueryValueV2::Context(typed_actual) = &typed.rows[0]["ctx"] else {
+        panic!("typed ContextPack output must be Context")
+    };
+    assert_eq!(typed_actual.rendered_context, oracle.rendered_context);
+    assert_eq!(typed_actual.token_count as usize, oracle.token_count);
+    assert_eq!(typed_actual.token_budget as usize, oracle.token_budget);
+    // The P7 tokenizer argument is a fixture ID; HQL2 exposes the approved content fingerprint.
+    assert_eq!(
+        typed_actual.tokenizer_fingerprint,
+        "f15080fb9ac562aa2b9062478b9a0fec142429b08c5bb099743732b0b62d7d46"
+    );
+    assert_eq!(typed_actual.truncated, oracle.truncated);
+    assert_eq!(typed_actual.truncation_reason, oracle.truncation_reason);
+    assert_eq!(typed_actual.fragments.len(), oracle.fragments.len());
+    for (actual, expected) in typed_actual.fragments.iter().zip(&oracle.fragments) {
+        assert_eq!(actual.text, expected.text);
+        assert_eq!(actual.citation, expected.citation);
+        assert_eq!(actual.evidence.source.database_id, source_database_id);
+        assert_eq!(actual.evidence.source.namespace, "default");
+        assert_eq!(actual.evidence.source.id, expected.evidence.owner_id);
+        assert_eq!(actual.evidence.source.revision, expected.evidence.revision);
+        assert_eq!(
+            actual.evidence.source.kind,
+            genesis_block_native::uee_v2::RecordKindV2::Node
+        );
+        assert_eq!(actual.evidence.source_hash, expected.evidence.source_hash);
+        assert_eq!(
+            actual.evidence.start_scalar as usize,
+            expected.evidence.start_scalar
+        );
+        assert_eq!(
+            actual.evidence.end_scalar as usize,
+            expected.evidence.end_scalar
+        );
+    }
+    assert_eq!(typed_actual.omitted_refs.len(), oracle.omitted_refs.len());
+    for (actual, expected) in typed_actual.omitted_refs.iter().zip(&oracle.omitted_refs) {
+        assert_eq!(actual.source.database_id, source_database_id);
+        assert_eq!(actual.source.namespace, "default");
+        assert_eq!(actual.source.id, expected.owner_id);
+        assert_eq!(actual.source.revision, expected.revision);
+        assert_eq!(
+            actual.source.kind,
+            genesis_block_native::uee_v2::RecordKindV2::Node
+        );
+        assert_eq!(actual.source_hash, expected.source_hash);
+        assert_eq!(actual.start_scalar as usize, expected.start_scalar);
+        assert_eq!(actual.end_scalar as usize, expected.end_scalar);
+    }
 }
 
 #[test]
