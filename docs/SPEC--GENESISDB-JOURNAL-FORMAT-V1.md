@@ -83,6 +83,41 @@ Replaces the landed byte-positional `wal_frontier {bytes, sha256}` (PR #100) as 
 
 On first open at bumped `SCHEMA_VERSION`: (1) verify/produce a durable snapshot at the current frontier; (2) stream-seal the existing `genesis-graph.wal` bytes as segment 0 `kind=legacy_jsonl` (bounded memory; compression deferrable under low storage; **never folded/dropped before that snapshot is verified** ); (3) create fresh `wal/active.gwal` at `first_seq = 1`; (4) write manifest with `tx_epoch_start = 1`. Segment 0 is recovery-only (replayed via the retained JSONL line parser, ≥ 2 releases), not `tx_as_of`-addressable. Lower-version engine opening a migrated DB fails closed: `SCHEMA_VERSION_UNSUPPORTED`.
 
+### 6.1 Membership authorization preflight resource bound
+
+Before constructing the journal-wide event vector required for source-order
+authorization, preflight counts serialized payload bytes after segment
+decompression and the number of top-level JSONL records or valid frames. It
+covers the legacy `genesis-graph.wal`, legacy JSONL segments, framed history and
+base segments, and `wal/active.gwal`; the active overlap at or below a base
+frontier is excluded from authorization event accumulation as in normal
+recovery. Production limits are 64 MiB aggregate payload and 100,000 records,
+matching the existing fail-closed consensus-ledger bounds. A read-only size pass
+checks legacy/active file lengths and each segment's declared uncompressed body
+length before any whole-file read or decompression. It also bounds aggregate
+uncompressed source bytes to the 64 MiB payload cap plus 16 bytes per allowed
+record for frame/line structure. A single sealed-segment read is capped to that
+source allowance plus the fixed 72-byte segment envelope and 1 MiB of LZ4
+container overhead; its declared body length also bounds decompression. This
+admits one maximum-size 64 MiB frame with its framing, while a 128 MiB reader-max
+segment is rejected before its body is read. The scan then counts records and
+exact payload lengths before the authorization vector is allocated. Both
+collection-definition preflight scans use the same bounds and recheck source
+metadata before each pass, so growth after counting is rejected before the
+source is read again.
+
+If either budget is exceeded, preflight fails closed before journal events are
+accumulated. Membership-aware startup returns `RECOVERY_AUTH_REQUIRED` before
+replay. Late membership configuration returns the same error after plain
+single-node `open()` may already have replayed the journal locally; it rolls back
+the staged roster and leaves membership disabled without undoing that local
+state. Membership-aware backup restore returns `BACKUP_AUTH_REQUIRED` before
+publishing the target. The journal is not rewritten. These limits bound source
+input and journal-wide vector growth; they do not claim a measured peak-RSS
+ceiling because JSON deserialization overhead varies by event shape. Oversized
+retained journals require an operator-trusted migration or compaction before
+multi-node recovery.
+
 ## 7. Verify gate (WP-1.2 `verify_command` set)
 
 | Check | Command |
@@ -114,5 +149,6 @@ Implementation revealed four places where draft-1 was over- or under-specified; 
 |---|---|---|
 | draft-3 | 2026-10-16 | PR #239 security-proof compaction benchmark separates required proof overhead from segment compression ratio |
 | draft-4 | 2026-10-16 | PR #239 preflight orders post-base HISTORY and active events after folded base materializations |
+| draft-5 | 2026-10-19 | Bound membership authorization preflight by aggregate uncompressed payload bytes and record count before journal-wide accumulation; retain fail-closed context errors |
 | draft-2 | 2026-08-17 | §8 implementation deviations: seq-cursor supersedes prefix-hash; directory-scanned segments (no manifest list); interim fold-to-base checkpoint; lossless migration without prior snapshot |
 | draft-1 | 2026-08-17 | Initial format spec elaborating accepted ADR--GENESISDB-JOURNAL-HISTORY |

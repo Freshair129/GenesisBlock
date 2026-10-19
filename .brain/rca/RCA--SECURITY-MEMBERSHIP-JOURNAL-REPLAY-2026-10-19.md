@@ -72,10 +72,21 @@ tracked as a separate security boundary.
   non-MASTER signers fail.
 - Keep backup restore and normal multi-node startup on the same authorization
   contract, with context-specific error codes.
-- Preserve one decoded copy of retained events during ordering preflight. The
-  preflight still scales with retained-journal length; a source review identified
-  bounded-memory preflight as a low-severity follow-up for very large
-  full-retention databases. No threshold was measured.
+- Before allocating the journal-wide authorization vector, count aggregate
+  uncompressed event payload bytes and top-level records across legacy JSONL,
+  framed legacy/history/base segments, and the active WAL. Reuse the repository's
+  existing fail-closed 64 MiB / 100,000-record consensus-ledger bounds. Reject
+  oversized file/body metadata before whole-file reads or decompression; allow
+  16 bytes of framing per record, the fixed 72-byte segment envelope, and up to
+  1 MiB of per-segment LZ4 container overhead. Bound decompression by the
+  declared body length, count actual payloads before vector growth, and reject
+  oversized active WAL and legacy JSONL files before reading them. Preserve
+  `RECOVERY_AUTH_REQUIRED` for startup/late configuration and
+  `BACKUP_AUTH_REQUIRED` for restore. Do not claim a peak-RSS bound: event JSON
+  shapes can deserialize to different heap sizes, and no memory amplification
+  benchmark exists. This policy trades multi-node availability for fail-closed
+  bounded input if retained history exceeds the caps; issue #245 tracks the
+  follow-up and its compatibility limit.
 
 ## Outcome
 
@@ -87,3 +98,19 @@ process exceeded 4 GiB working set without reporting progress; full-suite
 execution is not claimed as passing. A fresh independent source-only review
 found no remaining authorization bypass and confirmed one conditional P3
 memory-scaling concern described above. CI and merge remain pending.
+
+Issue #245 resource-bound follow-up: the membership journal preflight now checks
+source metadata, aggregate uncompressed payload bytes, and record count before
+allocating its authorization vectors. Review clarified that late configuration
+follows local-only replay, so an over-budget rejection preserves that local
+state while rolling back the staged roster. Integration review also found that
+the two collection-definition scans inside `preflight_journal` re-read the same
+sources; they now use the same size and exact event-budget checks on every pass,
+including after the initial count pass. Regression tests cover growth beyond
+the file bound and growth in event count while remaining within the byte bound.
+The specs state these lifecycle and recheck rules explicitly. On Windows,
+`cargo test --lib --no-default-features --features bins` passed 40/40, including
+all seven new budget tests; `cargo build --no-default-features --features bins`,
+`cargo check --no-default-features --features mobile`, `cargo fmt --all -- --check`,
+and `git diff --check` passed. The build completed in 3m01s and the mobile check
+in 36.5s. CI and merge remain pending.

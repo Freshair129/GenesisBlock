@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Document Registry"
 doc_id: "DOC-REGISTRY-GENESISBLOCKDB"
 status: draft
-version: "0.5.101+draft"
-updated: "2026-10-16"
+version: "0.5.102+draft"
+updated: "2026-10-19"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 related_issue: 84
@@ -53,7 +53,7 @@ registry row explicitly names them.
 
 | Role | Doc ID | Version | Status | Owner | Path |
 |---|---|---|---|---|---|
-| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.45b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
+| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.46b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
 | Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.75b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
 | Execution DAG guard | `SPEC--EXECUTION-DAG-GUARD-V1` | `0.1.0` | accepted | Sol Decision / Contract and AC | `docs/SPEC--EXECUTION-DAG-GUARD-V1.md` |
 | HQL2 execution decision | `ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY` | `0.1.1b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY.md` |
@@ -124,6 +124,10 @@ The following documents should be created only when implementation work requires
 - third-client namespace conformance report.
 
 ## 9. Changelog
+
+Version diff 0.5.101+draft -> 0.5.102+draft: register the Master Spec journal
+authorization preflight budget, fail-closed recovery, and resource-bound contract
+for issue #245.
 
 Version diff 0.5.100+draft -> 0.5.101+draft: accept the closed-roster and
 authenticated-gossip, role, fixed-quorum, and event-bound vote contracts for
@@ -520,6 +524,7 @@ review and full P8 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 0.5.102+draft | 2026-10-19 | GenesisBlockDB Architecture | Register the `2.3.46b` Master Spec journal authorization preflight budget and fail-closed recovery contract for #245. |
 | 0.5.101+draft | 2026-10-16 | GenesisBlockDB Architecture | Accept the closed peer roster, authenticated gossip, role checks, fixed quorum, and event-bound vote contract; require an explicit local role in multi-node mode; synchronize Master and C4 references for #236 and #237 |
 | 0.5.100+draft | 2026-10-16 | GenesisBlockDB Architecture | Register candidate peer-membership authorization contract and synchronize Master, C4, and P6 versions; no trust policy approved |
 | 0.5.99+draft | 2026-10-10 | GenesisBlockDB Architecture | Register bounded execution DAG guard, independent candidate gates and synthetic pilot contract. |
