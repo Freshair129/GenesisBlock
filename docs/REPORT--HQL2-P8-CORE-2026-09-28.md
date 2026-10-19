@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.72b"
+version: "0.1.73b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-19T22:00:31+07:00,Codex"
+last_update: "2026-10-19T23:12:05+07:00,Codex"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -13,6 +13,77 @@ attributes:
 ---
 
 # HQL2 P8 core checkpoint — not full HQL2 completion
+
+## G4 graph and vector diagnostic qualification — 2026-10-19
+
+The owner approved the graph/vector test-only matrix in the
+[G4 ADR](adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md) and allowed local work
+on the scalar commit `c61e06d` while PR #249 awaits hosted checks. Its merge
+must still precede integration of this slice. The initial focused run passes
+29/29 tests across Sequence and vector targets. Final local regression passes
+153/153 across twelve explicit targets, with zero failures or ignored cases.
+Strict all-target Clippy passes in core and default/NAPI configurations.
+The work covers exact Sequence/Match expansion work and KNN/Original Rerank
+distance counts, empty/duplicate/missing inputs, typed zero versus unknown,
+three-mode result/plan parity and fail-closed budgets. Source materialization
+budget remains separate from actual per-operator readings. G4/P8/P13 and
+independent/device/release qualification remain open.
+
+Six new tests and one strengthened existing assertion add seventeen typed-IR
+fixtures checked through ordinary execution, EXPLAIN and ANALYZE, six successful
+exact-budget requests, twelve deliberate budget errors and two missing-original
+errors. Existing HQL/IR and independent P7 graph/rank differentials also pass
+in the explicit regression; this does not claim all-mode HQL counter coverage.
+
+| Fixture | Expected diagnostic work and result |
+|---|---|
+| Anchored two-step Sequence with parallel R edges | R segment: 3 node pops + 3 edge checks = 6; two S segments: 2 node pops + 3 edge checks each = 10; total 16 work units and 2 rows |
+| Duplicate anchored input bag | Both traversals execute: 32 work units and 4 rows, preserving parallel-edge multiplicity |
+| Optional second-segment miss | First segment 6 plus two unsuccessful segments of 4 = 14 work units; one NULL-extended row |
+| Empty Expand input | Zero measured graph work and zero output rows |
+| Root Sequence Match, with/without SHORTEST | Start a costs 16; b/c/d each cost 4; total 28 in both cases, with 2/1 output rows respectively |
+| Empty root Match | Zero measured graph work and zero rows |
+| KNN/Original Rerank duplicate bags | Two originals produce distances 1 and 4; duplicated input performs four distances and retains four rows |
+| KNN missing originals | Missing candidates still count as input rows, but produce no distance evaluation or output; all-missing input measures zero distances |
+| Empty rank input | Zero measured distances for both KNN and Original Rerank; inapplicable operators keep typed unknown readings |
+| Budget boundaries | Sequence: 18 node-budget units (11 materialization + 7 operator pops) and 9 edge checks succeed; 17/8 fail. Duplicate vector input: 4 candidates/distances succeed; 3 of either fails |
+
+The source materialization's eleven node-budget units are the explicit source
+scan's four examined records plus the graph snapshot's four nodes and three
+edges. They are outside the Sequence operator's counter delta. The fixture
+therefore distinguishes an exact operator reading from the full query budget.
+Unknown byte/work/memory readings, unknown source elapsed time, clock metadata,
+complete results and the shape-based plan identity remain pinned by test checks.
+
+Tested Git blobs:
+
+- `tests/support/hql2_diagnostics.rs`: `4c7775a60065c7b7ca076149d7eb8534aebe58c9`
+- `tests/hql2_expand_sequence_tests.rs`: `a9dda11fede8344af5ce2bb4914fbf6ad67a764f`
+- `tests/hql2_vector_operator_tests.rs`: `04afed164ca6a1aa0ae5ac0a216453e112507edd`
+
+Exact regression command (wrapped arguments form one command):
+
+```text
+cargo test --locked --no-default-features --jobs 2
+  --test hql2_expand_sequence_tests --test hql2_expand_tests
+  --test hql2_vector_operator_tests --test hql2_vector_oracle_differential_tests
+  --test hql2_root_match_oracle_differential_tests --test hql2_graph_oracle_tests
+  --test hql2_rank_oracle_tests --test hql2_pattern_constraint_oracle_tests
+  --test hql2_g4_contract_tests --test hql2_g4_scalar_counter_tests
+  --test hql2_explain_source_tests --test hql2_p8_completion_tests
+cargo clippy --locked --no-default-features --all-targets --jobs 2 -- -D warnings
+cargo clippy --locked --all-targets --jobs 2 -- -D warnings
+```
+
+Scoped architecture review (implementer, not independent): this diff changes
+two integration-test files, one shared test-only diagnostic helper and the
+governing documentation. Production sources and interfaces are unchanged.
+The helper uses the existing Storage/P6 boundary; no oracle enters production,
+and no ACL, source/snapshot, original-vector, error or plan-hash contract changes.
+Manual graph-work enumeration and exact integer vector distances supply the
+expected readings independently of actual counter output. The regression found
+no runtime defect within these cases. Hosted CI, independent review, broader
+operator/frontend breadth and device/release qualification remain separate gates.
 
 ## G4 scalar diagnostic qualification — 2026-10-19
 
@@ -958,6 +1029,7 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.73b | 2026-10-19 | beta | Record approved Sequence/Match and exact KNN/Original Rerank counter verification scope; track source-budget provenance, zero/unknown and mode parity without expanding capabilities | working-tree | Codex |
 | 0.1.72b | 2026-10-19 | beta | Add approved scalar counter qualification scope at main 6195e85 and correct current NAPI exposure; retain historical evidence and broader G4/P8/P13 gates | working-tree | Codex |
 | 0.1.64b | 2026-10-05 | beta | Merge owner-approved G4 stable plan identity with the current D7 and P8-R2/P8-R3 evidence; focused G4/REST verification passes, the full REST rerun remains environment-blocked by OS error 112, and broad G4/P8/P13, transport, hosted and independent-review gates remain open | working-tree | ATHER |
 | 0.1.63b | 2026-10-04 | beta | Extend D7 after labeled-zero-hop match/miss/wrong-label and backslash/Unicode differential; adapter 11/11, ordering 2/2, labeled-filter 2/2; HQL2 394/0/1 across 35 targets and selected P6 peers 45/0/0 across 7; PR #213 code commit: 40 pass, 4 worker failures with unconfirmed cause, 5 skipped, 1 Windows Cargo cancellation at 15-minute job limit; no P6 contract/schema/transport change; broad P8/P13/shared-runtime gates remain open | working-tree | ATHER |

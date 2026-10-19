@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: "0.1.77b"
+version: "0.1.78b"
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-19T22:00:31+07:00,Codex"
+last_update: "2026-10-19T23:12:05+07:00,Codex"
 attributes:
   domain: architecture
   scope: repository
@@ -26,6 +26,12 @@ related_docs:
 ---
 
 # C4--GENESISDB-ARCHITECTURE
+
+The next owner-approved G4 graph/vector diagnostic matrix qualifies charged
+Sequence/Match work and exact KNN/Original Rerank distance counts through the
+existing Storage/P6 runtime. See the [G4 ADR](adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md)
+and [P8 evidence report](REPORT--HQL2-P8-CORE-2026-09-28.md). This test-only
+slice preserves architecture and keeps broader G4/P8/P13 acceptance open.
 
 The owner-approved G4 scalar/multi-input diagnostic qualification is test-only
 under the [G4 ADR](adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md). It compares
@@ -677,6 +683,7 @@ full P8/P13 qualification remains open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.78b | 2026-10-19 | current | Link owner-approved test-only graph/vector diagnostic matrix through the existing Storage/P6 runtime; retain broad G4/P8/P13 gates | working-tree | Codex |
 | 0.1.77b | 2026-10-19 | current | Record approved test-only scalar diagnostic qualification and distinguish additive NAPI exposure from open P13 parity | working-tree | Codex |
 | 0.1.75b | 2026-10-16 | current | Index the accepted closed-roster, authenticated-gossip, MASTER-role, fixed-quorum, and event-bound-vote contract for fixes #236 and #237 | working-tree | Codex |
 | 0.1.72b | 2026-10-06 | current | Record GenesisRAG17 candidate engine source and historical baseline through the worker ADR; preserve TEST-only ownership/access boundaries and keep full integration qualification pending | working-tree | ATHER |

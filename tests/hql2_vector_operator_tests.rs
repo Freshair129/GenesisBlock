@@ -9,6 +9,9 @@ use sha2::{Digest, Sha256};
 use std::path::Path;
 use tempfile::TempDir;
 
+#[path = "support/hql2_diagnostics.rs"]
+mod diagnostics;
+
 fn open(path: &Path) -> Storage {
     Storage::open(OpenOptions {
         path: path.to_string_lossy().into_owned(),
@@ -72,6 +75,184 @@ fn vector_param(space_id: &str) -> Value {
         "space_id":space_id,
         "values":[0.0, 0.0]
     })
+}
+
+fn diagnostic_rank_request(space: &str, op: &str, duplicate: bool, empty: bool) -> QueryRequestV2 {
+    let mut config =
+        json!({"entity":"d","collection":"default","query":{"param":"q"},"k":4,"as":"hit"});
+    if op == "Knn" {
+        config["mode"] = json!("exact");
+    } else {
+        config["fidelity"] = json!("original");
+    }
+    let rank = json!({"id":"rank","op":op,"inputs":["scan"],"config":config});
+    let mut request =
+        serde_json::to_value(ir_request("g4-vector-diagnostics", space, rank)).unwrap();
+    if duplicate || empty {
+        let extra = if empty {
+            json!({"id":"input","op":"Filter","inputs":["scan"],"config":{"predicate":{
+                "binary":"eq","left":{"field":{"alias":"d","path":["id"]}},"right":{"type":"Utf8","literal":"absent"}
+            }}})
+        } else {
+            json!({"id":"input","op":"UnionAll","inputs":["scan","scan"],"config":{}})
+        };
+        request["ir"]["nodes"]
+            .as_array_mut()
+            .unwrap()
+            .insert(1, extra);
+        request["ir"]["nodes"][2]["inputs"] = json!(["input"]);
+    }
+    serde_json::from_value(request).unwrap()
+}
+
+#[test]
+fn exact_rank_diagnostics_count_duplicate_bags_empty_inputs_and_missing_knn_vectors() {
+    for missing in [false, true] {
+        let dir = TempDir::new().unwrap();
+        let storage = open(dir.path());
+        // Integer distances make the expected scores exact and independent of the kernel.
+        add_node(&storage, "a", Some(vec![1.0, 0.0]));
+        add_node(&storage, "b", Some(vec![2.0, 0.0]));
+        if missing {
+            add_node(&storage, "missing", None);
+        }
+        let space = space_id(&storage);
+        for op in ["Knn", "Rerank"] {
+            if op == "Rerank" && missing {
+                continue;
+            }
+            for (duplicate, empty, expected_in, expected_out, distances) in [
+                (false, false, if missing { 3 } else { 2 }, 2, 2),
+                (true, false, if missing { 6 } else { 4 }, 4, 4),
+                (false, true, 0, 0, 0),
+            ] {
+                let result = diagnostics::three_modes(
+                    &storage,
+                    diagnostic_rank_request(&space, op, duplicate, empty),
+                );
+                diagnostics::measured(
+                    &result,
+                    "scan",
+                    "rows_out",
+                    "rows",
+                    if missing { 3 } else { 2 },
+                );
+                diagnostics::measured(&result, "rank", "rows_in", "rows", expected_in);
+                diagnostics::measured(&result, "rank", "rows_out", "rows", expected_out);
+                diagnostics::measured(
+                    &result,
+                    "rank",
+                    "distance_evaluations",
+                    "distance_evaluations",
+                    distances,
+                );
+                let ids: Vec<_> = result
+                    .rows
+                    .iter()
+                    .map(|row| match &row["id"] {
+                        QueryValueV2::Utf8(id) => id.as_str(),
+                        other => panic!("id: {other:?}"),
+                    })
+                    .collect();
+                assert_eq!(
+                    ids,
+                    if empty {
+                        vec![]
+                    } else if duplicate {
+                        vec!["a", "a", "b", "b"]
+                    } else {
+                        vec!["a", "b"]
+                    }
+                );
+                let expected_scores = if empty {
+                    vec![]
+                } else if duplicate {
+                    vec![1.0, 1.0, 4.0, 4.0]
+                } else {
+                    vec![1.0, 4.0]
+                };
+                assert_eq!(
+                    result
+                        .rows
+                        .iter()
+                        .map(|row| row["distance"].clone())
+                        .collect::<Vec<_>>(),
+                    expected_scores
+                        .into_iter()
+                        .map(QueryValueV2::F64)
+                        .collect::<Vec<_>>()
+                );
+            }
+        }
+    }
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    add_node(&storage, "missing", None);
+    let result = diagnostics::three_modes(
+        &storage,
+        diagnostic_rank_request(&space_id(&storage), "Knn", false, false),
+    );
+    diagnostics::measured(&result, "rank", "rows_in", "rows", 1);
+    diagnostics::measured(&result, "rank", "rows_out", "rows", 0);
+    diagnostics::measured(
+        &result,
+        "rank",
+        "distance_evaluations",
+        "distance_evaluations",
+        0,
+    );
+}
+
+#[test]
+fn original_rerank_missing_original_fails_in_normal_and_analyze_modes() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    add_node(&storage, "a", Some(vec![1.0, 0.0]));
+    add_node(&storage, "missing", None);
+    let space = space_id(&storage);
+    for mode in [None, Some(ExplainV2::Analyze)] {
+        let mut request = diagnostic_rank_request(&space, "Rerank", true, false);
+        request.explain = mode;
+        let error = storage.query_v2(access(), request).unwrap_err();
+        assert_eq!(error.code, "EXACT_ORIGINAL_UNAVAILABLE");
+        assert_eq!(error.stage, "execute");
+    }
+}
+
+#[test]
+fn rank_candidate_and_distance_budget_boundaries_count_repeated_candidates() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    add_node(&storage, "a", Some(vec![1.0, 0.0]));
+    add_node(&storage, "b", Some(vec![2.0, 0.0]));
+    let space = space_id(&storage);
+    for op in ["Knn", "Rerank"] {
+        for mode in [None, Some(ExplainV2::Analyze)] {
+            let mut exact = diagnostic_rank_request(&space, op, true, false);
+            exact.explain = mode.clone();
+            exact.budget = Some(
+                serde_json::from_value(
+                    json!({"max_vector_candidates":4,"max_distance_evaluations":4}),
+                )
+                .unwrap(),
+            );
+            assert!(
+                matches!(storage.query_v2(access(),exact).unwrap(),QueryOutcomeV2::Rows(result) if result.rows.len()==4)
+            );
+            for budget in [
+                json!({"max_vector_candidates":3}),
+                json!({"max_distance_evaluations":3}),
+            ] {
+                let mut limited = diagnostic_rank_request(&space, op, true, false);
+                limited.explain = mode.clone();
+                limited.budget = Some(serde_json::from_value(budget).unwrap());
+                assert_eq!(
+                    storage.query_v2(access(), limited).unwrap_err().code,
+                    "QUERY_BUDGET_EXCEEDED"
+                );
+            }
+        }
+    }
 }
 
 fn ir_request(request_id: &str, space_id: &str, rank_op: Value) -> QueryRequestV2 {
