@@ -114,3 +114,50 @@ fn explain_source_plan_does_not_open_data_or_publish_a_snapshot() {
         assert_eq!(after[&name], bytes, "EXPLAIN changed {name}");
     }
 }
+
+#[test]
+fn analyze_does_not_attribute_pre_execution_source_scan_time_to_operator() {
+    let dir = TempDir::new().unwrap();
+    let db = open(dir.path());
+    db.add_node(NodeInput {
+        id: Some("doc:source".into()),
+        labels: vec!["Document".into()],
+        props: Some(json!({"name":"source"})),
+        embedding: None,
+        lang: None,
+        valid_from: None,
+        caused_by: None,
+        ttl: None,
+        collection: None,
+    })
+    .unwrap();
+    let request: QueryRequestV2 = serde_json::from_value(json!({
+        "contract_version":"genesis.api.v2",
+        "request_id":"g4-source-scan-analyze",
+        "namespace":"default",
+        "language_version":"hql.v2",
+        "hql":"USE default FROM NODES Document AS n |> RETURN n",
+        "params":{},
+        "explain":"analyze"
+    }))
+    .unwrap();
+    let QueryOutcomeV2::Rows(result) = db.query_v2(access(), request).unwrap() else {
+        panic!("ANALYZE must return rows")
+    };
+    let plan = result.explain.unwrap();
+    let source_scan = plan
+        .plan
+        .iter()
+        .find(|node| node.physical_op == "AuthorizedNodeScan")
+        .expect("plan contains the authorized node source scan");
+    let actual = serde_json::to_value(source_scan.actual.as_ref().unwrap()).unwrap();
+    assert_eq!(actual["elapsed_ns"]["measurement"]["status"], "unknown");
+    assert_eq!(
+        actual["elapsed_ns"]["measurement"]["reason"],
+        "not_instrumented"
+    );
+    assert_eq!(actual["rows_out"]["measurement"]["status"], "measured");
+    assert!(actual["rows_out"]["measurement"]["value"]
+        .as_u64()
+        .is_some());
+}

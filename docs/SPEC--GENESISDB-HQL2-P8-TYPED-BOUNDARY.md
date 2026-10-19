@@ -1,8 +1,8 @@
 ---
 doc_id: SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY
-version: "0.2.65b"
+version: "0.2.66b"
 created_at: "2026-09-28T01:25:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-06T04:46:43+07:00,ATHER"
+last_update: "2026-10-19T11:20:56+07:00,Codex"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -416,7 +416,9 @@ Executed QueryResultV2 follows the vendored
 request_id, real snapshot, typed columns/rows, semantics, completeness,
 index_frontiers, required nullable cursor, optional explain/error. No timings
 field is added to the closed Blueprint result. Sequence values serialize as
-decimal strings. Unknown counters/frontiers are absent, never invented zeros.
+decimal strings. Unknown frontiers and estimates are absent, never invented
+zeros. G4 actual counters use explicit typed unknown readings with an
+availability reason; measured zero is distinct from unknown.
 
 Separate candidate search, distance fidelity, index coverage, execution
 completeness and candidate-only rerank scope. An explicit TAKE is completion;
@@ -434,6 +436,16 @@ schema_fingerprint: String }` is catalog-only, not a durable snapshot lease.
 `ExplainNodeV2 = { id: String, logical_op: QueryOpV2, physical_op: String,
 inputs: Vec<String>, columns: Vec<ColumnV2>, estimates: Option<EstimateV2>,
 actual: Option<ActualCountersV2> }`. `actual` is omitted for plan-only EXPLAIN.
+For ANALYZE, `ActualCountersV2` follows the G4 ADR: `rows_in`, `rows_out`,
+`bytes_read`, `work_units`, `index_probes`, `distance_evaluations`,
+`graph_expansions`, `memory_peak_bytes`, `spill_bytes`, and `elapsed_ns` each
+carry `{ unit, measurement }`. Measurement is `{ status: "measured", value }`
+or `{ status: "unknown", reason }`; reasons are `not_instrumented`,
+`not_applicable`, and `overflow`. Metadata states complete sampling, a
+monotonic Instant clock and operator-execution elapsed scope. SourceScan time
+is unknown because source materialization precedes the operator timer.
+This replaces preliminary core-v2 numeric diagnostics; consumers must migrate
+the diagnostic field access. Request/envelope versions and v1 stay unchanged.
 Unknown estimates are absent. ANALYZE uses measured execution counters, not
 post-hoc row-count guesses. Plans redact query literals and inaccessible metadata.
 
@@ -896,6 +908,11 @@ separate shape limits. No process-global Pest setting is changed.
   Parser/binder coverage alone does not close the storage-backed runtime gate.
 
 ## Version diff and changelog
+
+Version diff `0.2.65b -> 0.2.66b`: synchronize the recovered G4 typed counter
+readings and provenance contract; distinguish explicit unknown counter readings
+from absent estimates/frontiers. Preliminary diagnostic consumers must use
+the typed fields. Broader P8/P13 qualification remains open.
 
 Version diff `0.2.64b -> 0.2.65b`: synchronize the typed-boundary checkpoint
 with mainline P6 closeout `9821508`; record P6 acceptance 49/49, focused

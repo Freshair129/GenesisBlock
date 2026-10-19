@@ -554,10 +554,9 @@ fn explain_has_no_actuals_execution_has_measured_counters() {
     assert!(plan.explain_nodes().iter().all(|n| n.actual.is_none()));
     let output =
         exec::execute_v2(&plan, &mut exec::ExecutionBudgetV2::new(&None).unwrap()).unwrap();
-    assert_eq!(
-        output.nodes[0].actual.as_ref().unwrap().output_rows,
-        Some(2)
-    );
+    let actual = serde_json::to_value(output.nodes[0].actual.as_ref().unwrap()).unwrap();
+    assert_eq!(actual["rows_out"]["measurement"]["status"], "measured");
+    assert_eq!(actual["rows_out"]["measurement"]["value"], 2);
 }
 #[test]
 fn budgets_error_instead_of_successful_partial_output() {
