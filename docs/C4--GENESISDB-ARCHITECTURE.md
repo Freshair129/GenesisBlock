@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: "0.1.76b"
+version: "0.1.77b"
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-19T11:27:08+07:00,Codex"
+last_update: "2026-10-19T22:00:31+07:00,Codex"
 attributes:
   domain: architecture
   scope: repository
@@ -27,6 +27,18 @@ related_docs:
 
 # C4--GENESISDB-ARCHITECTURE
 
+The owner-approved G4 scalar/multi-input diagnostic qualification is test-only
+under the [G4 ADR](adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md). It compares
+ordinary execution, ANALYZE counters and plan-only EXPLAIN under the existing
+Storage/P6 pipeline. G4 remains partial; fresh evidence is recorded in the
+[P8 checkpoint](REPORT--HQL2-P8-CORE-2026-09-28.md).
+
+Current surface correction: additive Storage `query_v2_contract` and NAPI
+`queryV2Contract` already exist as documented in [API Reference](API_REFERENCE.md).
+Earlier no-public-surface statements below describe the P8/G4 implementation
+slice, not absence of this later NAPI entry point. REST/FFI/SDK/MCP HQL2 parity
+and full P13 acceptance remain separate open gates.
+
 Peer synchronization and consensus use the closed roster and authenticated
 gossip contract in the accepted
 [peer-membership authorization ADR](adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md).
@@ -44,8 +56,9 @@ defines the review boundary for one parity-proven HQL1/HQL2/Query IR v2
 binder, deterministic first planning, plan-only `EXPLAIN` and measured
 read-only `ANALYZE`. The current implementation slice adds stable planner
 metadata and a shared plan hash to `EXPLAIN`/`ANALYZE`; G4 remains partial.
-HQL compatibility, `query-ir.v1`, public transport, persistence and release
-boundaries remain unchanged.
+HQL compatibility, `query-ir.v1`, persistence and release boundaries remain
+unchanged by this G4 slice. The later additive NAPI entry point is recorded
+above; complete HQL2 transport parity remains open.
 The [P8 core checkpoint](REPORT--HQL2-P8-CORE-2026-09-28.md) introduces
 `src/query/hql2/` plus one serialized Storage boundary.
 Core execution now combines scalar kernels, revision-bound Node/Edge/Row/
@@ -664,6 +677,7 @@ full P8/P13 qualification remains open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.77b | 2026-10-19 | current | Record approved test-only scalar diagnostic qualification and distinguish additive NAPI exposure from open P13 parity | working-tree | Codex |
 | 0.1.75b | 2026-10-16 | current | Index the accepted closed-roster, authenticated-gossip, MASTER-role, fixed-quorum, and event-bound-vote contract for fixes #236 and #237 | working-tree | Codex |
 | 0.1.72b | 2026-10-06 | current | Record GenesisRAG17 candidate engine source and historical baseline through the worker ADR; preserve TEST-only ownership/access boundaries and keep full integration qualification pending | working-tree | ATHER |
 | 0.1.71b | 2026-10-06 | current | Reconcile approved G4 plan identity with the later D7/H2-D11 implementation evidence; 39-target HQL2 sweep 404/0/1, while G4/P8 and independent/hosted qualification remain partial | working-tree | ATHER |

@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.46b"
+version: "2.3.47b"
 updated: "2026-10-19"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -26,6 +26,15 @@ related_docs:
 ---
 
 # GenesisBlockDB Technical Architecture and Capability Composition
+
+The owner approved bounded G4 scalar and multi-input diagnostic qualification
+after reviewing main `6195e85`. The [G4 ADR](adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md)
+defines this test-only matrix; the [P8 checkpoint](REPORT--HQL2-P8-CORE-2026-09-28.md)
+records fresh evidence separately from historical results. G4/P8 remain partial.
+The additive Storage/NAPI `query_v2_contract` / `queryV2Contract` surface already
+exists under [API Reference](API_REFERENCE.md); this does not establish P13
+cross-surface parity. No new runtime, schema, migration or transport contract
+is introduced by this qualification slice.
 
 The owner-approved [HQL2 execution boundary](adr/ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY.md)
 adds a staged, explicitly selected v2 query pipeline. Existing HQL, Query IR v1,
@@ -506,6 +515,7 @@ shared-runtime and broad P8/P13 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 2.3.47b | 2026-10-19 | GenesisBlockDB Architecture | Link approved test-only G4 scalar qualification and correct additive NAPI exposure without promoting P8/P13 acceptance |
 | 2.3.46b | 2026-10-19 | GenesisBlockDB Architecture | Bound membership journal-authorization preflight by uncompressed payload bytes and record count before accumulation; preserve fail-closed startup/configuration/restore errors; document memory measurement limit |
 | 2.3.45b | 2026-10-16 | GenesisBlockDB Architecture | Accept closed peer roster, authenticated gossip, MASTER role checks, fixed-roster quorum, and event-bound votes for issues #236 and #237; require explicit multi-node local role and preserve client-owned semantic authority |
 | 2.3.44b | 2026-10-16 | GenesisBlockDB Architecture | Clarify discovery/signature versus membership/authority; link candidate peer authorization ADR; no trust policy, schema, or wire change |

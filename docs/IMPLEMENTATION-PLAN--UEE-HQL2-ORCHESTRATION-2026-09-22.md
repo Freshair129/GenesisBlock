@@ -1,9 +1,9 @@
 ---
-version: "0.8.79b"
+version: "0.8.80b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-19T11:27:08+07:00,Codex"
+last_update: "2026-10-19T22:00:31+07:00,Codex"
 status: beta
 superseded_by: null
 attributes:
@@ -132,6 +132,7 @@ P0 BASELINE (done, read-only)
 | P6 | Generation publication, leases, temporal and ACL visibility | P5 | No mixed snapshot; pinned generation and authorization tests pass |
 | P7 | Exact reference interpreter/oracle and golden fixtures | P6 | NULL/bag/temporal/annotation semantics are executable and reproducible |
 | P8 | HQL1/HQL2/IR lowering to one pipeline plus truthful EXPLAIN/counters and H2-D11-backed source adapters | P7, approved P8, H2-D11 and G4 contracts | Shared binder/runtime; each storage source passes identity, temporal, retention, ACL and exact-oracle gates |
+| G4-SCALAR-VERIFY | Owner-approved scalar/multi-input counter qualification at main `6195e85`; tests and evidence only | Existing G4/P8 contracts and recovered typed counters | Local slice passes: 7 new tests covering 34 positive fixtures and 10 budget errors; 77/77 across ten regression targets and strict core/default Clippy pass; P8 checkpoint records commands/source blob and implementer architecture review; broad G4/P8 closure/P9 and independent/hosted qualification remain gated |
 | P8-R2 | Bounded REST parity verification for existing HQL compatibility and typed Query IR v1 traversal | P8 local kernel; existing P13 boundary | `/v1/query/hql` and `/v1/query/ir` return equal result bags; test-only, no `query_v2` transport or P13 closure |
 | P8-R3 | REST matrix for raw/wrapped HQL bodies and typed HQL/Query IR v1 errors | P8-R2; existing v1 routes | Equal result bags across accepted HQL body shapes; budget/version failures retain typed envelopes; test-only, no public API or P13 closure |
 | P9 | Legal B-tree/annotation paths and planner access reporting | P8 and approved G4 planner boundary | Pushdown/order counterexamples match oracle; plans are truthful |
@@ -1296,6 +1297,7 @@ Version diff `0.8.27b -> 0.8.28b`: implement approved D1-D5, record 9 focused pa
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.8.80b | 2026-10-19 | beta | Add owner-approved G4 scalar/multi-input diagnostic verification before broad P8 closure/P9; preserve staged acceptance dependencies | working-tree | Codex |
 | 0.8.70b | 2026-10-04 | beta | Extend D7 with differential-proven exact same-alias string ID predicate on labeled zero-hop scans; adapter/order/filter 11/11, 2/2, 2/2 including wrong-label and backslash/Unicode cases; HQL2 394/0/1 across 35 targets, selected P6 peers 45/0/0 across 7; PR #213 code commit checks 40 pass, 4 worker failures with unconfirmed cause, 5 skipped, 1 Windows Cargo cancellation at 15-minute job limit; local Windows HQL2 passes 394/0/1; no P6 contract/schema/transport change; broad shared-runtime/P8/P13 gates open | working-tree | ATHER |
 | 0.8.69b | 2026-10-04 | beta | Add test-only HQL/typed-IR ChangeScan P7 differential for five exclusive-after/inclusive-through windows, equal empty bounds and tx_as_of frontiers; History/Change 17/17, HQL2 392/0/1 across 34 targets; PR #210 hosted checks 11 pass, four worker markerless-identity failures, one skipped; no runtime/contract/schema/P6/transport change; broad P8/P13 and review remain open | working-tree | ATHER |
 | 0.8.68b | 2026-10-04 | beta | Reconcile additive G3 exact-oracle, differential/reopen and fixture evidence onto current schema-v6/P8 mainline; retain schema-v6 recovery boundary; hosted checks, independent review and release/deploy evidence remain open | 12cc90fa | Codex |

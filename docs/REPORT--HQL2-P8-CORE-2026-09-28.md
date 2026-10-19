@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.71b"
+version: "0.1.72b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-19T11:27:08+07:00,Codex"
+last_update: "2026-10-19T22:00:31+07:00,Codex"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -13,6 +13,81 @@ attributes:
 ---
 
 # HQL2 P8 core checkpoint — not full HQL2 completion
+
+## G4 scalar diagnostic qualification — 2026-10-19
+
+Audited main: `6195e85943d519a5080cfda8bf17dda6c695a85f` (G4 diagnostics
+and D7 recovery merged). The owner approved the G4 scalar/multi-input counter
+matrix in the [G4 ADR](adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md).
+Fresh local verification passes 77/77 across ten explicit targets, including
+7/7 new scalar diagnostic tests. Historical test counts below are separate
+evidence; broader G4/P8/P13 gates remain open.
+
+The new target has 34 positive fixtures (32 typed-IR and two HQL2), each checked
+through ordinary execution, EXPLAIN and ANALYZE against independent P7 results.
+Ten restrictive-budget requests check memory/output-byte/result-row failures
+in ordinary execution and ANALYZE. Budgets are applied to scalar and aggregate
+requests; output-byte failures reject the completed aggregate result instead
+of publishing a successful partial result. Memory-limit cases may reject during
+preflight and do not prove aggregate execution under memory pressure.
+
+| Diagnostic coverage | Fixture controls |
+|---|---|
+| Filter/Project/Distinct/Sort/Offset/Take | Explicit per-node row counts, duplicate and NULL inputs, empty inputs, TAKE 0 and nonempty output |
+| UnionAll | Both input bags, either/both empty, repeated input edge counted twice |
+| Inner/Left/Semi/Anti Join | Duplicate match bags, NULL nonmatches, either/both empty input; input count includes both sides |
+| Aggregate | All seven scalar aggregate calls; global empty output is one row, grouped empty output is zero rows, NULL groups retain multiplicity |
+| Typed diagnostics | Exact rows, unknown reasons/units, elapsed clock/sampling/scope; EXPLAIN omits actuals and estimates, ANALYZE retains plan identity |
+| Result contract | P7 result equality plus ordinary/ANALYZE columns, rows, semantics and complete status; no timing threshold |
+
+Tested new-file Git blob: `bd92094a53b2a8c30136c0ce0d44fd5af97639ee`.
+Runtime source is unchanged from audited main. Exact local commands:
+
+```text
+cargo test --locked --no-default-features --jobs 2
+  --test hql2_g4_scalar_counter_tests
+  --test hql2_scalar_execution_tests
+  --test hql2_g4_contract_tests
+  --test hql2_explain_source_tests
+  --test hql2_storage_aggregate_oracle_differential_tests
+  --test hql2_storage_join_oracle_differential_tests
+  --test hql2_storage_set_oracle_differential_tests
+  --test hql2_hql_reference_differential_tests
+  --test hql2_storage_hql_join_oracle_differential_tests
+  --test hql2_oracle_tests
+cargo clippy --locked --no-default-features --all-targets --jobs 2 -- -D warnings
+cargo clippy --locked --all-targets --jobs 2 -- -D warnings
+cargo fmt --check
+node scripts/docs-validate.mjs
+git diff --check
+```
+
+The wrapped `cargo test` arguments above form one command. Both strict Clippy
+configurations pass. Validation uses temporary fixture databases only.
+
+Scoped architecture review (implementer, not independent): the diff adds one
+integration-test target and documentation only. It calls the existing
+`Storage::query_v2` boundary, without replacing authorization-before-parse,
+the P6 lease, serialized binding/planning, WAL authority or result publication.
+P7 imports stay in tests, expected counters come from explicit fixtures rather
+than production counter calculations, and plan-shape hashing is unchanged.
+No runtime defect was found within this verification matrix; no runtime patch,
+public API, migration or engine version change is included. Hosted CI,
+independent review, graph/vector counter breadth and device/release gates are
+not established by this local scalar slice.
+
+Surface correction for current main: `Storage::query_v2_contract` and NAPI
+`queryV2Contract(accessJson, requestJson)` already expose the additive typed-v2
+error/success envelope documented in [API Reference](API_REFERENCE.md).
+`index.d.ts` and `__test__/api_error_contract.test.mjs` cover that entry point.
+Statements below that all transports/NAPI remain unchanged describe the earlier
+P8 checkpoint; they do not describe the later additive NAPI surface. No equivalent
+HQL2 REST/FFI/SDK/MCP surface or complete P13 parity is claimed here.
+
+The 190-row obligation ledger remains its original planning baseline with all
+rows `not_run_engine`; neither that baseline nor aggregate regression totals
+constitute an obligation-by-obligation acceptance matrix. This bounded slice
+qualifies scalar diagnostic cases only, without promoting the entire ledger.
 
 ## D7 labeled property recovery candidate — 2026-10-19
 
@@ -213,8 +288,10 @@ release and consumer qualification are not claimed.
   contextual literals; the focused P8 completion target passes 10/10,
   including edge-property filtering before SHORTEST.
 
-These are Rust core changes only. REST/NAPI/FFI/SDK/MCP remain unchanged on
-their existing compatibility contracts; P13 parity is deliberately not claimed.
+The historical implementation checkpoint above covered Rust core changes only.
+Current main also has the separately documented additive NAPI `queryV2Contract`;
+existing compatibility methods retain their contracts. HQL2 REST/FFI/SDK/MCP
+parity and complete P13 acceptance are deliberately not claimed.
 
 The approved P8-R2 verification slice adds one REST transport parity gate for
 the existing compatibility path: `/v1/query/hql` and `/v1/query/ir` execute the
@@ -881,6 +958,7 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.72b | 2026-10-19 | beta | Add approved scalar counter qualification scope at main 6195e85 and correct current NAPI exposure; retain historical evidence and broader G4/P8/P13 gates | working-tree | Codex |
 | 0.1.64b | 2026-10-05 | beta | Merge owner-approved G4 stable plan identity with the current D7 and P8-R2/P8-R3 evidence; focused G4/REST verification passes, the full REST rerun remains environment-blocked by OS error 112, and broad G4/P8/P13, transport, hosted and independent-review gates remain open | working-tree | ATHER |
 | 0.1.63b | 2026-10-04 | beta | Extend D7 after labeled-zero-hop match/miss/wrong-label and backslash/Unicode differential; adapter 11/11, ordering 2/2, labeled-filter 2/2; HQL2 394/0/1 across 35 targets and selected P6 peers 45/0/0 across 7; PR #213 code commit: 40 pass, 4 worker failures with unconfirmed cause, 5 skipped, 1 Windows Cargo cancellation at 15-minute job limit; no P6 contract/schema/transport change; broad P8/P13/shared-runtime gates remain open | working-tree | ATHER |
 | 0.1.62b | 2026-10-04 | beta | Add test-only HQL/typed-IR ChangeScan P7 differential for five exclusive-after/inclusive-through windows and tx_as_of frontiers; History/Change 17/17 and HQL2 392/0/1 across 34 targets; PR #210 hosted checks 11 pass, four worker markerless-identity failures, one skipped; no runtime/contract/schema/P6/transport change; broad P8/P13 and independent review remain open | working-tree | ATHER |

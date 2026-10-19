@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE
-version: "0.1.4b"
+version: "0.1.5b"
 created_at: "2026-10-04T13:08:29+07:00,Codex,2be63a7"
-last_update: "2026-10-19T11:20:56+07:00,Codex"
+last_update: "2026-10-19T22:00:31+07:00,Codex"
 status: active
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -16,6 +16,46 @@ attributes:
 ---
 
 # G4 shared query pipeline, deterministic planner and truthful diagnostics
+
+## Approved scalar counter qualification — 2026-10-19
+
+The owner approved the bounded G4 scalar and multi-input qualification slice
+after the mainline gap review at `6195e85943d519a5080cfda8bf17dda6c695a85f`.
+This is verification work under G4-D06/D07, with no new runtime contract.
+Risk is LOW; complexity remains C-3 for documentation and architecture review.
+
+The acceptance matrix covers Values, Filter, Project, Distinct, Sort, Offset,
+Take, UnionAll, Aggregate and Inner/Left/Semi/Anti Join. Explicit fixture counts
+must pin each node's typed `rows_in` and `rows_out`, including duplicate bags,
+NULLs, empty inputs, TAKE 0 and multi-input fan-in. Multi-input `rows_in`
+counts input rows from each declared input, not predicate comparisons or
+distinct identities. Existing independent P7 oracles remain result authorities.
+
+Ordinary execution and ANALYZE must return equal typed rows, columns, semantics
+and completeness. EXPLAIN must omit actuals and share the shape-based plan
+identity. Non-applicable graph/distance readings and uninstrumented byte/work/
+memory readings retain their explicit unknown reasons. Elapsed readings must
+use measured nonnegative nanoseconds without wall-time thresholds. Budget
+exhaustion in ordinary execution and ANALYZE must return errors without a
+successful partial result. Local verification passes 7/7 tests in the new
+`hql2_g4_scalar_counter_tests` target and 77/77 across ten explicit regression
+targets, with zero failures or ignored cases. Strict all-target Clippy passes
+in core and default/NAPI configurations. The P8 checkpoint records commands,
+the tested source blob and the bounded architecture review.
+
+```text
+explicit v2 request -> existing authorization/binder/planner/P6 lease
+                    -> ordinary rows -----+
+                    -> ANALYZE + counters +--> fixture counts / P7 results
+                    -> EXPLAIN shape -----+    (test-only comparison)
+```
+
+The accepted P8 contract defines `plan_hash` as a plan-shape identity, not a
+semantic query or result-cache key. This slice preserves it. Broader graph/
+vector counter qualification, shared-runtime breadth, independent review and
+P8/P13/device/release acceptance remain open. The existing additive NAPI
+`queryV2Contract` documented in `API_REFERENCE.md` is implemented separately;
+its existence does not close the P13 cross-surface matrix.
 
 ## Status and decision
 
@@ -398,7 +438,7 @@ The serialized plan remains:
 | G4-AST/BIND | Implement v2 source AST/IR decoding and shared typed binder | Implemented in the P8 candidate; binder/type/ACL/limit gates and independent review remain |
 | G4-PLAN | Implement deterministic physical plan and stable identity | `PhysicalPlanV2` and canonical identity are implemented; golden/P7 breadth remains open |
 | G4-EXPLAIN | Implement plan-only diagnostics and unknown-estimate rules | Source-plan test passed 1/1 and the integrated HQL2/REST sweep passed; broader qualification remains open |
-| G4-ANALYZE | Implement read-only measured counters | G4 contract test passed 1/1 for shared plan identity and measured counters; provenance/no-partial qualification remains open |
+| G4-ANALYZE | Implement read-only measured counters | Recovered typed counters and scalar/multi-input qualification pass: 7 new tests, 34 positive fixtures and 10 deliberate budget failures; broader graph/vector provenance/no-partial qualification remains open |
 | G4-PARITY | Differential HQL1 compatibility, HQL2 and Query IR v2 for supported operators | P8 exact-oracle tests cover implemented slices; full operator matrix remains open |
 | G4-VERIFY | Run local gates, reconcile evidence, independent review and final scope audit | Integrated HQL2/REST sweep and strict Clippy passed in both feature configurations; hosted/device/release/review statuses remain separate |
 
@@ -475,6 +515,7 @@ and release qualification open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.5b | 2026-10-19 | active | Owner-approved scalar and multi-input diagnostic qualification; exact fixture counters, P7 result parity and budget-failure matrix; preserve partial G4 and shape-based identity | working-tree | Codex |
 | 0.1.4b | 2026-10-19 | active | Recover typed measured/unknown counters, explicit units and provenance, overflow distinction and truthful SourceScan timing; retain broader G4 qualification gates | working-tree | Codex |
 | 0.1.3b | 2026-10-06 | active | Reconcile G4 with P8/H2-D11 runtime; integrated HQL2/REST 42-target sweep and strict Clippy in both feature configurations pass; full oracle breadth, independent review and hosted/device/release gates remain open | working-tree | ATHER |
 | 0.1.2b | 2026-10-04 | active | Owner-approved G4 contract; implement stable planner metadata and shared plan hash for `EXPLAIN`/`ANALYZE`, with focused local evidence and remaining G4 gates open | working-tree | ATHER |
