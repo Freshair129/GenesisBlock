@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE
-version: "0.1.5b"
+version: "0.1.6b"
 created_at: "2026-10-04T13:08:29+07:00,Codex,2be63a7"
-last_update: "2026-10-19T22:00:31+07:00,Codex"
+last_update: "2026-10-19T23:12:05+07:00,Codex"
 status: active
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -16,6 +16,46 @@ attributes:
 ---
 
 # G4 shared query pipeline, deterministic planner and truthful diagnostics
+
+## Approved graph and vector counter qualification — 2026-10-19
+
+The owner approved the next test-only G4 diagnostic slice and explicitly allowed
+local work on top of `c61e06d` while PR #249 waits for GitHub Actions. Integration
+still follows scalar qualification: merge #249 only after its CI passes, then
+base the graph/vector PR on that mainline result. Risk LOW, complexity C-3.
+
+The matrix pins charged graph work for Sequence Expand (parallel paths,
+duplicate input bags, optional misses and empty inputs) and root Sequence Match,
+including SHORTEST. Manually enumerated fixture steps are the expected counts;
+observed counters must not become the expected values. Graph work counts every
+charged expansion, including repeated work, rather than unique record IDs.
+
+Exact KNN and Original Rerank must expose exact input/output rows and actual
+distance counts for duplicate bags, empty inputs and missing originals under
+their existing skip/fail contracts. Executed empty graph/vector kernels report
+measured zero for applicable work, distinct from unknown/not_applicable on
+other kernels. Ordinary execution, EXPLAIN and ANALYZE must agree on results,
+columns, completeness, semantics and plan-shape identity; typed unknown reasons,
+source timing provenance and clock metadata remain unchanged.
+
+Graph/candidate/distance budget failures must return errors without successful
+partial results in both execution modes. Source/snapshot materialization also
+uses query budget before operator execution; its work must not be misattributed
+to a per-operator delta or ignored when constructing boundary-budget fixtures.
+The initial two-target graph/vector run passes 29/29 tests. Expanded verification
+passes 153/153 across twelve explicit targets, including P7 graph/rank and
+HQL/IR differentials; strict core/default all-target Clippy also passes.
+Seventeen three-mode typed-IR fixtures, six exact-budget successes, twelve
+budget errors and two missing-original errors qualify this bounded slice.
+No production runtime, API, P6, WAL/schema, migration,
+planner/hash or approximation change is authorized by this slice.
+
+```text
+existing Storage/P6 materialization -> existing graph/vector kernel
+                                    -> ordinary rows / ANALYZE readings
+manual fixture work enumeration -----+--> test-only contract comparison
+P7/existing result differential -----+
+```
 
 ## Approved scalar counter qualification — 2026-10-19
 
@@ -515,6 +555,7 @@ and release qualification open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.6b | 2026-10-19 | active | Approve graph/vector counter qualification after scalar integration, allowing local work during the Actions incident; preserve runtime contracts and broader qualification gates | working-tree | Codex |
 | 0.1.5b | 2026-10-19 | active | Owner-approved scalar and multi-input diagnostic qualification; exact fixture counters, P7 result parity and budget-failure matrix; preserve partial G4 and shape-based identity | working-tree | Codex |
 | 0.1.4b | 2026-10-19 | active | Recover typed measured/unknown counters, explicit units and provenance, overflow distinction and truthful SourceScan timing; retain broader G4 qualification gates | working-tree | Codex |
 | 0.1.3b | 2026-10-06 | active | Reconcile G4 with P8/H2-D11 runtime; integrated HQL2/REST 42-target sweep and strict Clippy in both feature configurations pass; full oracle breadth, independent review and hosted/device/release gates remain open | working-tree | ATHER |

@@ -7,6 +7,9 @@ use serde_json::{json, Value};
 use std::path::Path;
 use tempfile::TempDir;
 
+#[path = "support/hql2_diagnostics.rs"]
+mod diagnostics;
+
 fn open(path: &Path) -> Storage {
     Storage::open(OpenOptions {
         path: path.to_string_lossy().into_owned(),
@@ -350,7 +353,140 @@ fn analyze_reports_sequence_graph_work() {
         actual["graph_expansions"]["measurement"]["status"],
         "measured"
     );
-    assert!(actual["graph_expansions"]["measurement"]["value"]
-        .as_u64()
-        .is_some_and(|count| count > 0));
+    // R: three node pops + three edge checks = 6. Each of two S
+    // segments: two node pops + three edge checks = 5. Total 6 + 2*5.
+    assert_eq!(actual["graph_expansions"]["measurement"]["value"], 16);
+}
+
+fn diagnostic_request(logical: Value) -> QueryRequestV2 {
+    serde_json::from_value(json!({"contract_version":"genesis.api.v2",
+        "request_id":"g4-sequence-matrix","namespace":"default","ir":logical,"params":{}}))
+    .unwrap()
+}
+
+#[test]
+fn sequence_diagnostics_count_parallel_duplicate_optional_and_empty_work() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    path_fixture(&storage);
+    for (duplicate, optional, empty, work, inputs, outputs) in [
+        (false, false, false, 16, 1, 2),
+        (true, false, false, 32, 2, 4),
+        (false, true, false, 14, 1, 1),
+        (false, false, true, 0, 0, 0),
+    ] {
+        let mut pattern = sequence("trail");
+        if optional {
+            pattern["steps"][1]["edge"]["relations"] = json!(["MISSING"]);
+        }
+        let mut logical = ir(pattern, optional);
+        if empty {
+            logical["nodes"][1]["config"]["predicate"]["right"]["literal"] = json!("absent");
+        }
+        if duplicate {
+            logical["nodes"].as_array_mut().unwrap().insert(
+                2,
+                json!({"id":"dup","op":"UnionAll","inputs":["anchor","anchor"],"config":{}}),
+            );
+            logical["nodes"][3]["inputs"] = json!(["dup"]);
+        }
+        let result = diagnostics::three_modes(&storage, diagnostic_request(logical));
+        diagnostics::measured(&result, "scan", "rows_in", "rows", 0);
+        diagnostics::measured(&result, "scan", "rows_out", "rows", 4);
+        diagnostics::measured(&result, "expand", "rows_in", "rows", inputs);
+        diagnostics::measured(&result, "expand", "rows_out", "rows", outputs);
+        diagnostics::measured(
+            &result,
+            "expand",
+            "graph_expansions",
+            "graph_expansions",
+            work,
+        );
+        assert_eq!(result.rows.len() as u64, outputs);
+        if optional {
+            assert!(result.rows[0]
+                .values()
+                .all(|value| value == &QueryValueV2::Null));
+        }
+        if !optional && !empty {
+            let mut first_edges: Vec<_> = result
+                .rows
+                .iter()
+                .map(|row| match &row["first_edge"] {
+                    QueryValueV2::Entity(edge) => edge.id.as_str(),
+                    other => panic!("edge: {other:?}"),
+                })
+                .collect();
+            first_edges.sort();
+            assert_eq!(
+                first_edges,
+                if duplicate {
+                    vec!["ab-1", "ab-1", "ab-2", "ab-2"]
+                } else {
+                    vec!["ab-1", "ab-2"]
+                }
+            );
+        }
+    }
+}
+
+#[test]
+fn root_sequence_match_counts_work_before_shortest_deduplication() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    path_fixture(&storage);
+    for shortest in [false, true] {
+        let result = diagnostics::three_modes(&storage, diagnostic_request(root_match(shortest)));
+        // a contributes 16; b, c, d each pop once and inspect three edges.
+        diagnostics::measured(&result, "match", "graph_expansions", "graph_expansions", 28);
+        diagnostics::measured(&result, "match", "rows_in", "rows", 0);
+        diagnostics::measured(
+            &result,
+            "match",
+            "rows_out",
+            "rows",
+            if shortest { 1 } else { 2 },
+        );
+        assert_eq!(
+            result.rows[0]["first_edge"],
+            QueryValueV2::Utf8("ab-1".into())
+        );
+    }
+    let empty_dir = TempDir::new().unwrap();
+    let empty = open(empty_dir.path());
+    let result = diagnostics::three_modes(&empty, diagnostic_request(root_match(false)));
+    diagnostics::measured(&result, "match", "graph_expansions", "graph_expansions", 0);
+    assert!(result.rows.is_empty());
+}
+
+#[test]
+fn sequence_budget_boundaries_include_source_materialization_and_fail_closed() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    path_fixture(&storage);
+    // Source scan examines 4; graph snapshot examines 4 nodes + 3 edges.
+    // The sequence then charges 7 node pops and 9 edge checks: 18 nodes total.
+    for mode in [None, Some(genesis_block_native::uee_v2::ExplainV2::Analyze)] {
+        let mut exact = diagnostic_request(ir(sequence("trail"), false));
+        exact.explain = mode.clone();
+        exact.budget = Some(
+            serde_json::from_value(json!({"max_expanded_nodes":18,"max_expanded_edges":9}))
+                .unwrap(),
+        );
+        assert!(
+            matches!(storage.query_v2(access(),exact).unwrap(),QueryOutcomeV2::Rows(result) if result.rows.len()==2)
+        );
+        for budget in [
+            json!({"max_expanded_nodes":17}),
+            json!({"max_expanded_edges":8}),
+        ] {
+            let mut limited = diagnostic_request(ir(sequence("trail"), false));
+            limited.explain = mode.clone();
+            limited.budget = Some(serde_json::from_value(budget).unwrap());
+            assert_eq!(
+                storage.query_v2(access(), limited).unwrap_err().code,
+                "QUERY_BUDGET_EXCEEDED"
+            );
+        }
+    }
 }
