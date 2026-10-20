@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: "0.1.83b"
+version: "0.1.84b"
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-20T19:20:00+07:00,Codex"
+last_update: "2026-10-20T22:09:00+07:00,Codex"
 attributes:
   domain: architecture
   scope: repository
@@ -24,6 +24,23 @@ related_docs:
   - docs/adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md
   - docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md
 ---
+
+## Approved G4 provenance/completeness qualification - 2026-10-20
+
+Owner approved tests/docs-only qualification at main `d1bc37e` (LOW, C-3).
+The new `hql2_g4_provenance_completeness_tests` target independently checks
+full snapshot, four semantics fields, completeness reason/eligible count,
+index frontiers and cursor for HQL/IR normal and Analyze requests.
+Fixtures cover AnnotationLookup and exact KNN/original Rerank followed by
+parallel-edge Expand and AnnotationLookup; entity/revision and score owner
+references must retain fixture identity. Empty input is checked separately.
+No generic provenance field, truncated-query contract, runtime/API/P6/WAL or
+shape-hash change is introduced. Local runtime passes 141 unique tests across eight targets (focused2/2),
+with zero failed/ignored; core/default strict all-target Clippy and
+format/docs/version/diff checks pass. Hosted qualification is pending; broad
+G4/P8/P13 and independent/device/release gates remain open.
+
+
 
 ## G4 evidence reconciliation - 2026-10-20
 
