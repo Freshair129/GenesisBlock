@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.54b"
+version: "2.3.55b"
 updated: "2026-10-20"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -24,6 +24,24 @@ related_docs:
   - "docs/FLOW--GENESISRAG17-PIPELINE.md"
   - "docs/GENESISRAG17-EXTENSION-MAP.md"
 ---
+
+## Approved G4 annotation-authority composition qualification - 2026-10-21
+
+Owner approved tests/docs-only scope at merged main `e8f1a588` (LOW, C-3).
+PR256 passed all four exact-head workflows including Rust on three OSes;
+its permissive provenance matrix and namespace-denied controls remain valid.
+The next target-local test qualifies enforced Namespace(Read) plus
+Annotation(namespace,Read) in HQL/IR lookup and exact KNN/original Rerank ->
+parallel-edge Expand -> lookup. Policy revisions grant/remove/regrant the
+annotation permission between independent requests, each with a freshly
+published pinned generation. Plan stays catalog-only; empty input behavior
+is qualified separately from nonempty lookup authorization. No eager ACL,
+concurrent revocation, runtime/API/P6/WAL/hash/schema contract is introduced.
+Local154/154 across10 targets, strict core/default all-target Clippy,
+format/docs244/0/version0.2.10/diff gates pass. Hosted qualification pending;
+broad G4/P8/P13, independent/device/release gates remain open.
+
+
 
 ## Approved G4 provenance/completeness qualification - 2026-10-20
 

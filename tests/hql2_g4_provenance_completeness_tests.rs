@@ -330,3 +330,142 @@ fn denied_frontends_never_publish_success_completeness() {
         }
     }
 }
+
+fn set_annotation_policy(db: &Storage, revision: u64, include_annotation: bool) {
+    use genesis_block_native::{
+        AccessAction, AccessGrant, AccessPolicy, AccessPolicyMode, AccessResource, PolicyAdminActor,
+    };
+    let mut grants = vec![
+        AccessGrant {
+            principal: "local-owner".into(),
+            action: AccessAction::ManagePolicy,
+            resource: AccessResource::Namespace("default".into()),
+        },
+        AccessGrant {
+            principal: actor().principal,
+            action: AccessAction::Read,
+            resource: AccessResource::Namespace("default".into()),
+        },
+    ];
+    if include_annotation {
+        grants.push(AccessGrant {
+            principal: actor().principal,
+            action: AccessAction::Read,
+            resource: AccessResource::Annotation("default".into()),
+        });
+    }
+    db.replace_access_policy(
+        PolicyAdminActor {
+            access: AccessContext {
+                principal: "local-owner".into(),
+                namespace: "default".into(),
+            },
+        },
+        revision - 1,
+        AccessPolicy {
+            revision,
+            mode: AccessPolicyMode::Enforced,
+            grants,
+        },
+    )
+    .unwrap();
+}
+
+#[test]
+fn enforced_annotation_grants_and_policy_revisions_qualify_composed_frontends() {
+    for rank in [None, Some("Knn"), Some("Rerank")] {
+        let dir = TempDir::new().unwrap();
+        let db = open(dir.path());
+        add_node(&db, "seed", Some(vec![0.0, 0.0]));
+        add_node(&db, "target", Some(vec![1.0, 0.0]));
+        add_edge(&db, "first", "seed", "target", "R");
+        add_edge(&db, "second", "seed", "target", "R");
+        let id = database_id(&db);
+        let target = frozen_ref(dir.path(), &id, "target");
+        let seed = frozen_ref(dir.path(), &id, "seed");
+        put_annotation(
+            &db,
+            "review:target",
+            vec![target.clone()],
+            vec![seed.clone()],
+        );
+        let annotation=rusqlite::Connection::open(dir.path().join("projection.sqlite")).unwrap().query_row("SELECT revision_id FROM hql2_record_revisions WHERE record_id='review:target' AND kind='annotation' AND tx_to IS NULL",[],|r|r.get::<_,String>(0)).unwrap();
+        let space = space_id_for(&db, "default");
+        for revision in 1..=3 {
+            let include_annotation = revision != 2;
+            set_annotation_policy(&db, revision, include_annotation);
+            let generation = db.publish_generation().unwrap();
+            assert_eq!(generation.acl_revision, revision);
+            for empty in [false, true] {
+                for mut request in requests(&space, rank, empty) {
+                    request.temporal = Some(
+                    serde_json::from_value(
+                        json!({"valid_at":VALID,"tx_as_of":generation.wal_frontier.to_string()}),
+                    )
+                    .unwrap(),
+                );
+                    for mode in [None, Some(ExplainV2::Analyze)] {
+                        request.explain = mode;
+                        let mut plan_request = request.clone();
+                        plan_request.explain = Some(ExplainV2::Plan);
+                        let before_plan = db.stable_frontier();
+                        let QueryOutcomeV2::Plan(plan) =
+                            db.query_v2(actor(), plan_request).unwrap()
+                        else {
+                            panic!("plan")
+                        };
+                        assert!(plan
+                            .plan
+                            .iter()
+                            .all(|node| node.actual.is_none() && node.estimates.is_none()));
+                        assert_eq!(db.stable_frontier(), before_plan);
+                        if !include_annotation && !empty {
+                            let error = db.query_v2(actor(), request.clone()).unwrap_err();
+                            assert_eq!(error.code, "FORBIDDEN");
+                            assert_eq!(error.stage, "authorize");
+                            continue;
+                        }
+                        let QueryOutcomeV2::Rows(result) =
+                            db.query_v2(actor(), request.clone()).unwrap()
+                        else {
+                            panic!("rows")
+                        };
+                        qualify(&result, &generation, &id, rank);
+                        if !empty {
+                            let mut limited = request.clone();
+                            limited.budget = Some(
+                                serde_json::from_value(json!({"max_result_bytes":1})).unwrap(),
+                            );
+                            assert_eq!(
+                                db.query_v2(actor(), limited).unwrap_err().code,
+                                "QUERY_BUDGET_EXCEEDED"
+                            );
+                        }
+
+                        assert_eq!(
+                            result.rows.len(),
+                            if empty {
+                                0
+                            } else if rank.is_some() {
+                                2
+                            } else {
+                                1
+                            }
+                        );
+                        for row in result.rows {
+                            let entity = serde_json::to_value(&row["entity"]).unwrap();
+                            assert_eq!(entity["value"], target["ref"]);
+                            let a = serde_json::to_value(&row["annotation"]).unwrap();
+                            assert_eq!(a["value"]["id"], "review:target");
+                            assert_eq!(a["value"]["revision"], annotation);
+                            if rank.is_some() {
+                                let score = serde_json::to_value(&row["score"]).unwrap();
+                                assert_eq!(score["value"]["owner"], seed["ref"]);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
