@@ -1,7 +1,8 @@
 use genesis_block_native::{
     query::hql2::QueryOutcomeV2,
     uee_v2::{ExplainV2, QueryRequestV2},
-    AccessContext, NodeInput, OpenOptions, Storage,
+    AccessContext, NodeInput, OpenOptions, RelationalColumn, RelationalColumnType,
+    RelationalSchemaPackage, RelationalTable, Storage,
 };
 use serde_json::json;
 use std::{collections::BTreeMap, path::Path};
@@ -157,7 +158,53 @@ fn analyze_does_not_attribute_pre_execution_source_scan_time_to_operator() {
         "not_instrumented"
     );
     assert_eq!(actual["rows_out"]["measurement"]["status"], "measured");
-    assert!(actual["rows_out"]["measurement"]["value"]
-        .as_u64()
-        .is_some());
+    assert_eq!(actual["rows_out"]["measurement"]["value"], 1);
+    assert_eq!(actual["rows_in"]["measurement"]["value"], 0);
+}
+
+#[test]
+fn explain_edge_row_and_annotation_sources_preserve_frontier_and_fixture_files() {
+    let dir = TempDir::new().unwrap();
+    let db = open(dir.path());
+    db.register_relational_schema(RelationalSchemaPackage {
+        namespace: "default".into(),
+        schema_version: 1,
+        previous_version: None,
+        package_id: uuid::Uuid::new_v4().to_string(),
+        schema_hash: String::new(),
+        tables: vec![RelationalTable {
+            name: "records".into(),
+            columns: vec![RelationalColumn::required("id", RelationalColumnType::Text)],
+            primary_key: vec!["id".into()],
+            foreign_keys: vec![],
+            indexes: vec![],
+        }],
+        named_queries: vec![],
+    })
+    .unwrap();
+    for (source, physical) in [
+        ("EDGES LINK", "AuthorizedEdgeScan"),
+        ("TABLE records", "AuthorizedRowScan"),
+        ("ANNOTATIONS", "AuthorizedAnnotationScan"),
+    ] {
+        let frontier = db.stable_frontier();
+        let before = disk_tree(dir.path());
+        let request: QueryRequestV2 = serde_json::from_value(json!({
+            "contract_version":"genesis.api.v2","request_id":"explain-source-matrix",
+            "namespace":"default","language_version":"hql.v2",
+            "hql":format!("USE default FROM {source} AS x |> RETURN x"),"params":{},"explain":"plan"
+        }))
+        .unwrap();
+        let QueryOutcomeV2::Plan(plan) = db.query_v2(access(), request).unwrap() else {
+            panic!("plan")
+        };
+        assert!(plan.plan.iter().any(|node| node.physical_op == physical));
+        assert!(plan
+            .plan
+            .iter()
+            .all(|node| node.actual.is_none() && node.estimates.is_none()));
+        assert_eq!(plan.catalog.observed_frontier, frontier);
+        assert_eq!(db.stable_frontier(), frontier);
+        assert_eq!(disk_tree(dir.path()), before, "{source}");
+    }
 }

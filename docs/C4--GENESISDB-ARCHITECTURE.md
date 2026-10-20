@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: "0.1.78b"
+version: "0.1.79b"
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-19T23:12:05+07:00,Codex"
+last_update: "2026-10-20T04:15:00+07:00,Codex"
 attributes:
   domain: architecture
   scope: repository
@@ -25,7 +25,18 @@ related_docs:
   - docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md
 ---
 
+
 # C4--GENESISDB-ARCHITECTURE
+
+## Approved G4 source and annotation diagnostics - 2026-10-20
+
+The owner approved test-only source/annotation diagnostic qualification on
+main `8b18a2c`: exact rows, empty input, mode parity, actor authority,
+EXPLAIN no-effect and fail-closed budgets under the existing Storage/P6 contract.
+See the G4 ADR and P8 checkpoint for the matrix and validation. PR #249/#250
+hosted checks completed before merge. Broader G4/P8/P13 and independent,
+device/release gates remain open. This slice is LOW risk, C-3.
+
 
 The next owner-approved G4 graph/vector diagnostic matrix qualifies charged
 Sequence/Match work and exact KNN/Original Rerank distance counts through the
@@ -683,6 +694,7 @@ full P8/P13 qualification remains open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.79b | 2026-10-20 | current | Owner-approved source/annotation diagnostics, exact rows and truthful unknowns; reconcile scalar/graph hosted evidence while retaining broader acceptance gates | working-tree | Codex |
 | 0.1.78b | 2026-10-19 | current | Link owner-approved test-only graph/vector diagnostic matrix through the existing Storage/P6 runtime; retain broad G4/P8/P13 gates | working-tree | Codex |
 | 0.1.77b | 2026-10-19 | current | Record approved test-only scalar diagnostic qualification and distinguish additive NAPI exposure from open P13 parity | working-tree | Codex |
 | 0.1.75b | 2026-10-16 | current | Index the accepted closed-roster, authenticated-gossip, MASTER-role, fixed-quorum, and event-bound-vote contract for fixes #236 and #237 | working-tree | Codex |

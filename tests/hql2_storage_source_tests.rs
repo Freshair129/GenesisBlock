@@ -821,6 +821,10 @@ fn label_filtered_scan_charges_payload_before_loading_it() {
         "budget":{"max_memory_bytes":8388608}
     }))
     .unwrap();
-    let error = storage.query_v2(actor(), request).unwrap_err();
-    assert_eq!(error.code, "QUERY_BUDGET_EXCEEDED");
+    for mode in [None, Some(genesis_block_native::uee_v2::ExplainV2::Analyze)] {
+        let mut limited = request.clone();
+        limited.explain = mode;
+        let error = storage.query_v2(actor(), limited).unwrap_err();
+        assert_eq!(error.code, "QUERY_BUDGET_EXCEEDED");
+    }
 }

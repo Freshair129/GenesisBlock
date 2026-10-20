@@ -1,9 +1,9 @@
 ---
-version: "0.8.81b"
+version: "0.8.82b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-19T23:12:05+07:00,Codex"
+last_update: "2026-10-20T04:15:00+07:00,Codex"
 status: beta
 superseded_by: null
 attributes:
@@ -15,7 +15,18 @@ attributes:
   owner: "Boss (Founder / Product Authority)"
 ---
 
+
 # UEE-HQL2 Orchestration Plan
+
+## Approved G4 source and annotation diagnostics - 2026-10-20
+
+The owner approved test-only source/annotation diagnostic qualification on
+main `8b18a2c`: exact rows, empty input, mode parity, actor authority,
+EXPLAIN no-effect and fail-closed budgets under the existing Storage/P6 contract.
+See the G4 ADR and P8 checkpoint for the matrix and validation. PR #249/#250
+hosted checks completed before merge. Broader G4/P8/P13 and independent,
+device/release gates remain open. This slice is LOW risk, C-3.
+
 
 ## D7 labeled property recovery candidate — 2026-10-19
 
@@ -134,6 +145,7 @@ P0 BASELINE (done, read-only)
 | P8 | HQL1/HQL2/IR lowering to one pipeline plus truthful EXPLAIN/counters and H2-D11-backed source adapters | P7, approved P8, H2-D11 and G4 contracts | Shared binder/runtime; each storage source passes identity, temporal, retention, ACL and exact-oracle gates |
 | G4-SCALAR-VERIFY | Owner-approved scalar/multi-input counter qualification at main `6195e85`; tests and evidence only | Existing G4/P8 contracts and recovered typed counters | Local slice passes: 7 new tests covering 34 positive fixtures and 10 budget errors; 77/77 across ten regression targets and strict core/default Clippy pass; P8 checkpoint records commands/source blob and implementer architecture review; broad G4/P8 closure/P9 and independent/hosted qualification remain gated |
 | G4-GRAPH-VECTOR-VERIFY | Owner-approved test-only Sequence/Match and exact KNN/Original Rerank diagnostic matrix; local work may continue atop c61e06d during Actions incident | G4-SCALAR-VERIFY; #249 must merge before this slice is integrated | Local matrix and P7 regression pass 153/153 across twelve targets; strict core/default Clippy passes; 17 three-mode fixtures, 6 exact-budget successes, 12 budget errors and 2 missing-original errors; P8 report records source blobs and implementer review; hosted/independent and broad G4/P8/P13 stay open |
+| G4-SOURCE-ANNOTATION-VERIFY | Owner-approved test-only source rows and annotation mode/counter qualification | Integrated #250 at 8b18a2c and G4/P6 contracts | Exact fixture counters, three-mode parity, EXPLAIN no-effect, actor authority and fail-closed budgets; verification pending |
 | P8-R2 | Bounded REST parity verification for existing HQL compatibility and typed Query IR v1 traversal | P8 local kernel; existing P13 boundary | `/v1/query/hql` and `/v1/query/ir` return equal result bags; test-only, no `query_v2` transport or P13 closure |
 | P8-R3 | REST matrix for raw/wrapped HQL bodies and typed HQL/Query IR v1 errors | P8-R2; existing v1 routes | Equal result bags across accepted HQL body shapes; budget/version failures retain typed envelopes; test-only, no public API or P13 closure |
 | P9 | Legal B-tree/annotation paths and planner access reporting | P8 and approved G4 planner boundary | Pushdown/order counterexamples match oracle; plans are truthful |
@@ -1298,6 +1310,7 @@ Version diff `0.8.27b -> 0.8.28b`: implement approved D1-D5, record 9 focused pa
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.8.82b | 2026-10-20 | beta | Owner-approved source/annotation diagnostics, exact rows and truthful unknowns; reconcile scalar/graph hosted evidence while retaining broader acceptance gates | working-tree | Codex |
 | 0.8.81b | 2026-10-19 | beta | Add approved graph/vector diagnostic qualification after scalar integration, with local work allowed during Actions incident and independent evidence still required | working-tree | Codex |
 | 0.8.80b | 2026-10-19 | beta | Add owner-approved G4 scalar/multi-input diagnostic verification before broad P8 closure/P9; preserve staged acceptance dependencies | working-tree | Codex |
 | 0.8.70b | 2026-10-04 | beta | Extend D7 with differential-proven exact same-alias string ID predicate on labeled zero-hop scans; adapter/order/filter 11/11, 2/2, 2/2 including wrong-label and backslash/Unicode cases; HQL2 394/0/1 across 35 targets, selected P6 peers 45/0/0 across 7; PR #213 code commit checks 40 pass, 4 worker failures with unconfirmed cause, 5 skipped, 1 Windows Cargo cancellation at 15-minute job limit; local Windows HQL2 passes 394/0/1; no P6 contract/schema/transport change; broad shared-runtime/P8/P13 gates open | working-tree | ATHER |
