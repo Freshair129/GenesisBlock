@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE
-version: "0.1.8b"
+version: "0.1.9b"
 created_at: "2026-10-04T13:08:29+07:00,Codex,2be63a7"
-last_update: "2026-10-20T11:46:18+07:00,Codex"
+last_update: "2026-10-20T14:32:33+07:00,Codex"
 status: active
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -18,6 +18,41 @@ attributes:
 
 # G4 shared query pipeline, deterministic planner and truthful diagnostics
 
+## Approved G4 lexical/context qualification - 2026-10-20
+
+The owner approved the bounded tests/docs-only proposal on merged main
+`7c3e5e2`. Risk LOW, complexity C-3. Qualify LexicalMatch/ContextPack exact rows,
+three-mode HQL/IR parity, empty/duplicate inputs, typed unknowns, token/citation
+provenance, capability/budget errors and observed-no-write EXPLAIN. Preserve
+BM25, tokenizer, runtime/API/P6/WAL/schema and planner contracts. ContextPack
+emits one package on empty input; token truncation is a successful package.
+Local qualification passes 170/170 across 14 targets; strict core/default
+all-target Clippy, format/docs/version/diff gates pass. Hosted qualification
+for this lexical/context revision is pending. Broad G4/P8/P13,
+independent/device/release gates remain open.
+
+PR #252 exact head `25f6e4445ad0ceb11471302e0b5ec40b44d451a9` completed
+four successful hosted workflows (15 SUCCESS checks plus one schedule-only
+skip), including Rust on Ubuntu/macOS/Windows, then merged normally as
+`7c3e5e23984e124a4ba480b8f1e22bf218372b0b`. Its local runtime passed 93 unique
+tests across 11 targets. The #251 local NOT_RUN remains historical only.
+
+
+```text
+catalog/profile -> bind/plan -> EXPLAIN (no data execution)
+                        |
+                        +-> P6 visible sources -> lexical/context kernel -> rows/ANALYZE
+fixture + independent P7 rank/context package -----------------------> assertions
+```
+
+The bounded matrix counts candidate input/output bags, including duplicates;
+it does not report BM25 corpus size or physical scans as measured work. Empty
+ContextPack consumes zero rows and emits one package. Source elapsed stays
+unknown while lexical/context kernel elapsed is measured without a timing
+threshold. Unknown byte/work/memory counters retain units and reasons. Token
+truncation retains a successful package; execution-budget failure is an error.
+Normal and ANALYZE pair data errors; catalog-only EXPLAIN keeps bind validation.
+
 ## Approved G4 history/change diagnostic qualification - 2026-10-20
 
 The owner approved the bounded test/documentation matrix on main `a3e2d4d`.
@@ -27,7 +62,7 @@ source timing, HQL/IR result parity and normal/EXPLAIN/ANALYZE plan identity.
 EXPLAIN remains catalog-only; data-dependent errors are compared only between
 normal execution and ANALYZE. No runtime/API/WAL/schema/planner change.
 Risk LOW, complexity C-3. Local qualification passes 93 tests across 11 targets;
-hosted qualification remains pending. G4/P8/P13, lexical/context,
+hosted qualification passed in #252. G4/P8/P13, lexical/context,
 independent review and device/release gates remain open.
 
 PR #251 qualified head `098a71e` completed four successful hosted workflows,
@@ -530,13 +565,13 @@ The serialized plan remains:
 | Stage | Scope | Verification gate |
 |---|---|---|
 | G4-DOC | Approve this ADR and reconcile parent/peer versions | Owner approval and doc validation; completed for this slice |
-| G4-RED | Qualify dispatch, binding, deterministic plans, no-effect EXPLAIN, measured ANALYZE and errors | Scalar, graph/vector and source/annotation slices passed hosted #249/#250/#251; history/change passes local 93/93 across 11 targets, hosted qualification and broader operator/frontend qualification remain open |
+| G4-RED | Qualify dispatch, binding, deterministic plans, no-effect EXPLAIN, measured ANALYZE and errors | Scalar, graph/vector and source/annotation slices passed hosted #249/#250/#251; history/change passed hosted #252; lexical/context qualification is approved, broader operator/frontend qualification remains open |
 | G4-AST/BIND | Implement v2 source AST/IR decoding and shared typed binder | Implemented in the P8 candidate; binder/type/ACL/limit gates and independent review remain |
 | G4-PLAN | Implement deterministic physical plan and stable identity | `PhysicalPlanV2` and canonical identity are implemented; golden/P7 breadth remains open |
-| G4-EXPLAIN | Plan-only diagnostics and truthful unknown-estimate rules | Node/Edge/Row/Annotation frontier/filesystem checks passed in #251; history/change extension passes locally; hosted and independent breadth remain open |
-| G4-ANALYZE | Read-only measured counters | Scoped scalar, graph/vector and source/annotation matrices passed #249/#250/#251; history/change diagnostic qualification passes locally (93/93 across 11 targets), hosted pending; lexical/context and broader provenance/budget matrix remain open |
+| G4-EXPLAIN | Plan-only diagnostics and truthful unknown-estimate rules | Node/Edge/Row/Annotation frontier/filesystem checks passed in #251; history/change extension passed hosted #252; lexical/context extension and independent breadth remain open |
+| G4-ANALYZE | Read-only measured counters | Scoped scalar, graph/vector and source/annotation matrices passed #249/#250/#251; history/change passed hosted #252; lexical/context passes local 170/170 across 14 targets, hosted pending; lexical/context and broader provenance/budget matrix remain open |
 | G4-PARITY | Differential HQL1 compatibility, HQL2 and Query IR v2 for supported operators | P8 exact-oracle tests cover implemented slices; full operator matrix remains open |
-| G4-VERIFY | Local gates, evidence reconciliation, independent review and final scope audit | #249/#250/#251 exact-head PR workflows passed before merge; #251 local runtime remains NOT_RUN (4551). History/change, independent/device/release acceptance remain separate |
+| G4-VERIFY | Local gates, evidence reconciliation, independent review and final scope audit | #249/#250/#251/#252 exact-head PR workflows passed before merge; #251 local runtime remains historically NOT_RUN (4551), #252 local runtime passed. Lexical/context, independent/device/release acceptance remain separate |
 
 File ownership remains serialized: one owner for `src/lib.rs`, one owner for
 `src/query/*`, new tests in new files, and no public transport edits until the
@@ -611,6 +646,7 @@ and release qualification open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.9b | 2026-10-20 | active | Approve test-only lexical/context mode/counter/P7 qualification and reconcile hosted PR252; no runtime contract change | working-tree | Codex |
 | 0.1.8b | 2026-10-20 | active | Approve test-only History/Change diagnostic matrix and reconcile PR251 hosted qualification; preserve runtime contracts and broader acceptance gates | working-tree | Codex |
 | 0.1.7b | 2026-10-20 | active | Owner-approved source/annotation diagnostics, exact rows and truthful unknowns; reconcile scalar/graph hosted evidence while retaining broader acceptance gates | working-tree | Codex |
 | 0.1.6b | 2026-10-19 | active | Approve graph/vector counter qualification after scalar integration, allowing local work during the Actions incident; preserve runtime contracts and broader qualification gates | working-tree | Codex |

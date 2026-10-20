@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.50b"
+version: "2.3.51b"
 updated: "2026-10-20"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -28,6 +28,26 @@ related_docs:
 
 # GenesisBlockDB Technical Architecture and Capability Composition
 
+## Approved G4 lexical/context qualification - 2026-10-20
+
+The owner approved the bounded tests/docs-only proposal on merged main
+`7c3e5e2`. Risk LOW, complexity C-3. Qualify LexicalMatch/ContextPack exact rows,
+three-mode HQL/IR parity, empty/duplicate inputs, typed unknowns, token/citation
+provenance, capability/budget errors and observed-no-write EXPLAIN. Preserve
+BM25, tokenizer, runtime/API/P6/WAL/schema and planner contracts. ContextPack
+emits one package on empty input; token truncation is a successful package.
+Local qualification passes 170/170 across 14 targets; strict core/default
+all-target Clippy, format/docs/version/diff gates pass. Hosted qualification
+for this lexical/context revision is pending. Broad G4/P8/P13,
+independent/device/release gates remain open.
+
+PR #252 exact head `25f6e4445ad0ceb11471302e0b5ec40b44d451a9` completed
+four successful hosted workflows (15 SUCCESS checks plus one schedule-only
+skip), including Rust on Ubuntu/macOS/Windows, then merged normally as
+`7c3e5e23984e124a4ba480b8f1e22bf218372b0b`. Its local runtime passed 93 unique
+tests across 11 targets. The #251 local NOT_RUN remains historical only.
+
+
 ## Approved G4 history/change diagnostic qualification - 2026-10-20
 
 The owner approved the bounded test/documentation matrix on main `a3e2d4d`.
@@ -37,7 +57,7 @@ source timing, HQL/IR result parity and normal/EXPLAIN/ANALYZE plan identity.
 EXPLAIN remains catalog-only; data-dependent errors are compared only between
 normal execution and ANALYZE. No runtime/API/WAL/schema/planner change.
 Risk LOW, complexity C-3. Local qualification passes 93 tests across 11 targets;
-hosted qualification remains pending. G4/P8/P13, lexical/context,
+hosted qualification passed in #252. G4/P8/P13, lexical/context,
 independent review and device/release gates remain open.
 
 PR #251 qualified head `098a71e` completed four successful hosted workflows,
@@ -551,6 +571,7 @@ shared-runtime and broad P8/P13 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 2.3.51b | 2026-10-20 | GenesisBlockDB Architecture | Approve bounded G4 lexical/context diagnostics and reconcile hosted PR252; preserve production contracts and broader gates |
 | 2.3.50b | 2026-10-20 | GenesisBlockDB Architecture | Approve test-only History/Change diagnostic matrix and reconcile PR251 hosted qualification; preserve runtime contracts and broader acceptance gates |
 | 2.3.49b | 2026-10-20 | GenesisBlockDB Architecture | Owner-approved source/annotation diagnostics, exact rows and truthful unknowns; reconcile scalar/graph hosted evidence while retaining broader acceptance gates |
 | 2.3.48b | 2026-10-19 | GenesisBlockDB Architecture | Link graph/vector diagnostic qualification without changing architecture, capabilities or G4/P8/P13 acceptance |

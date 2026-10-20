@@ -1,9 +1,9 @@
 ---
-version: "0.8.83b"
+version: "0.8.84b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-20T11:46:18+07:00,Codex"
+last_update: "2026-10-20T14:32:33+07:00,Codex"
 status: beta
 superseded_by: null
 attributes:
@@ -18,6 +18,26 @@ attributes:
 
 # UEE-HQL2 Orchestration Plan
 
+## Approved G4 lexical/context qualification - 2026-10-20
+
+The owner approved the bounded tests/docs-only proposal on merged main
+`7c3e5e2`. Risk LOW, complexity C-3. Qualify LexicalMatch/ContextPack exact rows,
+three-mode HQL/IR parity, empty/duplicate inputs, typed unknowns, token/citation
+provenance, capability/budget errors and observed-no-write EXPLAIN. Preserve
+BM25, tokenizer, runtime/API/P6/WAL/schema and planner contracts. ContextPack
+emits one package on empty input; token truncation is a successful package.
+Local qualification passes 170/170 across 14 targets; strict core/default
+all-target Clippy, format/docs/version/diff gates pass. Hosted qualification
+for this lexical/context revision is pending. Broad G4/P8/P13,
+independent/device/release gates remain open.
+
+PR #252 exact head `25f6e4445ad0ceb11471302e0b5ec40b44d451a9` completed
+four successful hosted workflows (15 SUCCESS checks plus one schedule-only
+skip), including Rust on Ubuntu/macOS/Windows, then merged normally as
+`7c3e5e23984e124a4ba480b8f1e22bf218372b0b`. Its local runtime passed 93 unique
+tests across 11 targets. The #251 local NOT_RUN remains historical only.
+
+
 ## Approved G4 history/change diagnostic qualification - 2026-10-20
 
 The owner approved the bounded test/documentation matrix on main `a3e2d4d`.
@@ -27,7 +47,7 @@ source timing, HQL/IR result parity and normal/EXPLAIN/ANALYZE plan identity.
 EXPLAIN remains catalog-only; data-dependent errors are compared only between
 normal execution and ANALYZE. No runtime/API/WAL/schema/planner change.
 Risk LOW, complexity C-3. Local qualification passes 93 tests across 11 targets;
-hosted qualification remains pending. G4/P8/P13, lexical/context,
+hosted qualification passed in #252. G4/P8/P13, lexical/context,
 independent review and device/release gates remain open.
 
 PR #251 qualified head `098a71e` completed four successful hosted workflows,
@@ -164,7 +184,8 @@ P0 BASELINE (done, read-only)
 | G4-SCALAR-VERIFY | Owner-approved scalar/multi-input counter qualification at main `6195e85`; tests and evidence only | Existing G4/P8 contracts and recovered typed counters | Local slice passes: 7 new tests covering 34 positive fixtures and 10 budget errors; 77/77 across ten regression targets and strict core/default Clippy pass; P8 checkpoint records commands/source blob and implementer architecture review; broad G4/P8 closure/P9 and independent/hosted qualification remain gated |
 | G4-GRAPH-VECTOR-VERIFY | Owner-approved test-only Sequence/Match and exact KNN/Original Rerank diagnostic matrix; local work may continue atop c61e06d during Actions incident | G4-SCALAR-VERIFY; #249 must merge before this slice is integrated | Local matrix and P7 regression pass 153/153 across twelve targets; strict core/default Clippy passes; 17 three-mode fixtures, 6 exact-budget successes, 12 budget errors and 2 missing-original errors; P8 report records source blobs and implementer review; hosted/independent and broad G4/P8/P13 stay open |
 | G4-SOURCE-ANNOTATION-VERIFY | Owner-approved test-only source rows and annotation mode/counter qualification | Integrated #250 at 8b18a2c and G4/P6 contracts | Exact fixture counters, three-mode parity, EXPLAIN no-effect, actor authority and budgets passed hosted PR251 CI on all three OSes; local runtime NOT_RUN (4551) |
-| G4-HISTORY-CHANGE-VERIFY | Owner-approved tests/docs-only HistoryScan/ChangeScan diagnostic matrix | Integrated PR251 at a3e2d4d and existing G4/P6/H2-D11 contracts | Exact emitted rows, mode/oracle parity, temporal/ACL/floor/budget cases and no-write EXPLAIN; local 93/93 across 11 targets, strict core/default Clippy and docs gates passed; hosted qualification pending |
+| G4-HISTORY-CHANGE-VERIFY | Owner-approved tests/docs-only HistoryScan/ChangeScan diagnostic matrix | Integrated PR251 at a3e2d4d and existing G4/P6/H2-D11 contracts | Exact emitted rows, mode/oracle parity, temporal/ACL/floor/budget cases and no-write EXPLAIN; local 93/93 across 11 targets, strict core/default Clippy and docs gates passed; hosted PR252 passed on all three OSes and merged at 7c3e5e2 |
+| G4-LEXICAL-CONTEXT-VERIFY | Owner-approved tests/docs-only lexical/context diagnostic matrix | Integrated #252 and G4/P8 D2/D3/P6 contracts | Exact rows, mode/P7 parity, provenance/budgets and EXPLAIN no-write; local 170/170 across 14 targets and strict static gates pass; hosted pending |
 | P8-R2 | Bounded REST parity verification for existing HQL compatibility and typed Query IR v1 traversal | P8 local kernel; existing P13 boundary | `/v1/query/hql` and `/v1/query/ir` return equal result bags; test-only, no `query_v2` transport or P13 closure |
 | P8-R3 | REST matrix for raw/wrapped HQL bodies and typed HQL/Query IR v1 errors | P8-R2; existing v1 routes | Equal result bags across accepted HQL body shapes; budget/version failures retain typed envelopes; test-only, no public API or P13 closure |
 | P9 | Legal B-tree/annotation paths and planner access reporting | P8 and approved G4 planner boundary | Pushdown/order counterexamples match oracle; plans are truthful |
@@ -1329,6 +1350,7 @@ Version diff `0.8.27b -> 0.8.28b`: implement approved D1-D5, record 9 focused pa
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.8.84b | 2026-10-20 | beta | Approve test-only lexical/context mode/counter/P7 qualification and reconcile hosted PR252; no runtime contract change | working-tree | Codex |
 | 0.8.83b | 2026-10-20 | beta | Approve test-only History/Change diagnostic matrix and reconcile PR251 hosted qualification; preserve runtime contracts and broader acceptance gates | working-tree | Codex |
 | 0.8.82b | 2026-10-20 | beta | Owner-approved source/annotation diagnostics, exact rows and truthful unknowns; reconcile scalar/graph hosted evidence while retaining broader acceptance gates | working-tree | Codex |
 | 0.8.81b | 2026-10-19 | beta | Add approved graph/vector diagnostic qualification after scalar integration, with local work allowed during Actions incident and independent evidence still required | working-tree | Codex |
