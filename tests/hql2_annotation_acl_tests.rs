@@ -11,6 +11,10 @@ use std::path::Path;
 use tempfile::TempDir;
 use uuid::Uuid;
 
+#[allow(dead_code)]
+#[path = "support/hql2_diagnostics.rs"]
+mod diagnostics;
+
 fn open(path: &Path) -> Storage {
     Storage::open(OpenOptions {
         path: path.to_string_lossy().into_owned(),
@@ -566,12 +570,12 @@ fn annotation_scan_requires_annotation_grant_in_addition_to_namespace_query_gran
         .unwrap_err();
     assert_eq!(error.code, "FORBIDDEN");
 
-    let QueryOutcomeV2::Rows(changes) = storage
-        .query_v2(actor(), change_request("annotation-change-without-grant"))
-        .unwrap()
-    else {
-        panic!("change scan must return rows")
-    };
+    let changes = diagnostics::three_modes_with_access(
+        &storage,
+        actor(),
+        change_request("annotation-change-without-grant"),
+    );
+    diagnostics::history_source_rows(&changes, 0);
     assert!(changes.rows.is_empty());
 
     storage
@@ -592,12 +596,12 @@ fn annotation_scan_requires_annotation_grant_in_addition_to_namespace_query_gran
     };
     assert_eq!(ir_result.rows.len(), 1);
 
-    let QueryOutcomeV2::Rows(changes) = storage
-        .query_v2(actor(), change_request("annotation-change-with-grant"))
-        .unwrap()
-    else {
-        panic!("change scan must return rows")
-    };
+    let changes = diagnostics::three_modes_with_access(
+        &storage,
+        actor(),
+        change_request("annotation-change-with-grant"),
+    );
+    diagnostics::history_source_rows(&changes, 1);
     assert_eq!(changes.rows.len(), 1);
 }
 
@@ -676,9 +680,8 @@ fn change_scan_budget_ignores_annotation_revisions_hidden_by_acl() {
     }))
     .unwrap();
 
-    let QueryOutcomeV2::Rows(changes) = storage.query_v2(actor(), request).unwrap() else {
-        panic!("change scan must return rows")
-    };
+    let changes = diagnostics::three_modes_with_access(&storage, actor(), request);
+    diagnostics::history_source_rows(&changes, 1);
     assert_eq!(changes.rows.len(), 1);
 }
 

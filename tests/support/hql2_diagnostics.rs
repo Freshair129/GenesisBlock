@@ -1,6 +1,6 @@
-//! Test-only checks shared by graph/vector diagnostic fixtures.
+//! Test-only checks shared by source, history, graph and vector diagnostic fixtures.
 use genesis_block_native::{
-    query::hql2::{result::CompletionStatusV2, QueryOutcomeV2, QueryResultV2},
+    query::hql2::{result::CompletionStatusV2, QueryErrorV2, QueryOutcomeV2, QueryResultV2},
     uee_v2::{ExplainV2, QueryOpV2, QueryRequestV2},
     AccessContext, Storage,
 };
@@ -19,6 +19,28 @@ pub fn measured(result: &QueryResultV2, node: &str, field: &str, unit: &str, exp
         json!({"unit":unit,"measurement":{"status":"measured","value":expected}}),
         "{node}.{field}"
     );
+}
+
+/// The expectation must come from fixture setup or an independent oracle.
+// Each integration target compiles this shared module; graph/vector targets do not use this helper.
+#[allow(dead_code)]
+pub fn history_source_rows(result: &QueryResultV2, expected: u64) {
+    let sources: Vec<_> = result
+        .explain
+        .as_ref()
+        .unwrap()
+        .plan
+        .iter()
+        .filter(|node| {
+            matches!(
+                node.logical_op,
+                QueryOpV2::HistoryScan | QueryOpV2::ChangeScan
+            )
+        })
+        .collect();
+    assert_eq!(sources.len(), 1);
+    measured(result, &sources[0].id, "rows_in", "rows", 0);
+    measured(result, &sources[0].id, "rows_out", "rows", expected);
 }
 
 fn reading(result: &QueryResultV2, node: &str) -> Value {
@@ -48,7 +70,28 @@ pub fn three_modes_with_access(
     actor: AccessContext,
     request: QueryRequestV2,
 ) -> QueryResultV2 {
-    let QueryOutcomeV2::Rows(normal) = db.query_v2(actor.clone(), request.clone()).unwrap() else {
+    try_three_modes(db, actor, request).unwrap()
+}
+
+/// Data errors must agree in normal/ANALYZE; plan-only does not open sources.
+pub fn try_three_modes(
+    db: &Storage,
+    actor: AccessContext,
+    request: QueryRequestV2,
+) -> Result<QueryResultV2, QueryErrorV2> {
+    let outcome = match db.query_v2(actor.clone(), request.clone()) {
+        Ok(outcome) => outcome,
+        Err(error) => {
+            let mut analyzed = request;
+            analyzed.explain = Some(ExplainV2::Analyze);
+            let analyze_error = db.query_v2(actor, analyzed).unwrap_err();
+            assert_eq!(analyze_error.code, error.code);
+            assert_eq!(analyze_error.stage, error.stage);
+            assert_eq!(analyze_error.detail, error.detail);
+            return Err(error);
+        }
+    };
+    let QueryOutcomeV2::Rows(normal) = outcome else {
         panic!("normal rows")
     };
     assert!(normal.explain.is_none());
@@ -70,6 +113,16 @@ pub fn three_modes_with_access(
     assert_eq!(normal.columns, analyzed.columns);
     assert_eq!(normal.semantics, analyzed.semantics);
     assert_eq!(normal.completeness, analyzed.completeness);
+    assert_eq!(normal.snapshot.database_id, analyzed.snapshot.database_id);
+    assert_eq!(normal.snapshot.tx, analyzed.snapshot.tx);
+    assert_eq!(
+        normal.snapshot.catalog_generation,
+        analyzed.snapshot.catalog_generation
+    );
+    assert_eq!(
+        normal.snapshot.policy_version,
+        analyzed.snapshot.policy_version
+    );
     assert_eq!(analyzed.completeness.status, CompletionStatusV2::Complete);
     let mut actual_plan = analyzed.explain.clone().unwrap();
     assert_eq!(actual_plan.plan_hash, plan.plan_hash);
@@ -143,5 +196,5 @@ pub fn three_modes_with_access(
         assert_eq!(actual["elapsed_scope"], "operator_execution");
     }
     assert_eq!(actual_plan.plan, plan.plan);
-    analyzed
+    Ok(analyzed)
 }

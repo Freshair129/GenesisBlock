@@ -1,9 +1,9 @@
 ---
-version: "0.8.82b"
+version: "0.8.83b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-20T04:15:00+07:00,Codex"
+last_update: "2026-10-20T11:46:18+07:00,Codex"
 status: beta
 superseded_by: null
 attributes:
@@ -17,6 +17,24 @@ attributes:
 
 
 # UEE-HQL2 Orchestration Plan
+
+## Approved G4 history/change diagnostic qualification - 2026-10-20
+
+The owner approved the bounded test/documentation matrix on main `a3e2d4d`.
+HistoryScan/ChangeScan keep existing P6/H2-D11 source, temporal/floor/ACL and
+budget contracts. Qualify exact emitted rows, empty measured zero, typed unknown
+source timing, HQL/IR result parity and normal/EXPLAIN/ANALYZE plan identity.
+EXPLAIN remains catalog-only; data-dependent errors are compared only between
+normal execution and ANALYZE. No runtime/API/WAL/schema/planner change.
+Risk LOW, complexity C-3. Local qualification passes 93 tests across 11 targets;
+hosted qualification remains pending. G4/P8/P13, lexical/context,
+independent review and device/release gates remain open.
+
+PR #251 qualified head `098a71e` completed four successful hosted workflows,
+15 successful checks and one schedule-only skip before merge as `a3e2d4d`.
+Its three OS Rust suites passed; local runtime was NOT_RUN due to Application
+Control 4551. The failed parent and fixture-grant RCA remain historical evidence.
+
 
 ## Approved G4 source and annotation diagnostics - 2026-10-20
 
@@ -145,7 +163,8 @@ P0 BASELINE (done, read-only)
 | P8 | HQL1/HQL2/IR lowering to one pipeline plus truthful EXPLAIN/counters and H2-D11-backed source adapters | P7, approved P8, H2-D11 and G4 contracts | Shared binder/runtime; each storage source passes identity, temporal, retention, ACL and exact-oracle gates |
 | G4-SCALAR-VERIFY | Owner-approved scalar/multi-input counter qualification at main `6195e85`; tests and evidence only | Existing G4/P8 contracts and recovered typed counters | Local slice passes: 7 new tests covering 34 positive fixtures and 10 budget errors; 77/77 across ten regression targets and strict core/default Clippy pass; P8 checkpoint records commands/source blob and implementer architecture review; broad G4/P8 closure/P9 and independent/hosted qualification remain gated |
 | G4-GRAPH-VECTOR-VERIFY | Owner-approved test-only Sequence/Match and exact KNN/Original Rerank diagnostic matrix; local work may continue atop c61e06d during Actions incident | G4-SCALAR-VERIFY; #249 must merge before this slice is integrated | Local matrix and P7 regression pass 153/153 across twelve targets; strict core/default Clippy passes; 17 three-mode fixtures, 6 exact-budget successes, 12 budget errors and 2 missing-original errors; P8 report records source blobs and implementer review; hosted/independent and broad G4/P8/P13 stay open |
-| G4-SOURCE-ANNOTATION-VERIFY | Owner-approved test-only source rows and annotation mode/counter qualification | Integrated #250 at 8b18a2c and G4/P6 contracts | Exact fixture counters, three-mode parity, EXPLAIN no-effect, actor authority and fail-closed budgets; verification pending |
+| G4-SOURCE-ANNOTATION-VERIFY | Owner-approved test-only source rows and annotation mode/counter qualification | Integrated #250 at 8b18a2c and G4/P6 contracts | Exact fixture counters, three-mode parity, EXPLAIN no-effect, actor authority and budgets passed hosted PR251 CI on all three OSes; local runtime NOT_RUN (4551) |
+| G4-HISTORY-CHANGE-VERIFY | Owner-approved tests/docs-only HistoryScan/ChangeScan diagnostic matrix | Integrated PR251 at a3e2d4d and existing G4/P6/H2-D11 contracts | Exact emitted rows, mode/oracle parity, temporal/ACL/floor/budget cases and no-write EXPLAIN; local 93/93 across 11 targets, strict core/default Clippy and docs gates passed; hosted qualification pending |
 | P8-R2 | Bounded REST parity verification for existing HQL compatibility and typed Query IR v1 traversal | P8 local kernel; existing P13 boundary | `/v1/query/hql` and `/v1/query/ir` return equal result bags; test-only, no `query_v2` transport or P13 closure |
 | P8-R3 | REST matrix for raw/wrapped HQL bodies and typed HQL/Query IR v1 errors | P8-R2; existing v1 routes | Equal result bags across accepted HQL body shapes; budget/version failures retain typed envelopes; test-only, no public API or P13 closure |
 | P9 | Legal B-tree/annotation paths and planner access reporting | P8 and approved G4 planner boundary | Pushdown/order counterexamples match oracle; plans are truthful |
@@ -1310,6 +1329,7 @@ Version diff `0.8.27b -> 0.8.28b`: implement approved D1-D5, record 9 focused pa
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.8.83b | 2026-10-20 | beta | Approve test-only History/Change diagnostic matrix and reconcile PR251 hosted qualification; preserve runtime contracts and broader acceptance gates | working-tree | Codex |
 | 0.8.82b | 2026-10-20 | beta | Owner-approved source/annotation diagnostics, exact rows and truthful unknowns; reconcile scalar/graph hosted evidence while retaining broader acceptance gates | working-tree | Codex |
 | 0.8.81b | 2026-10-19 | beta | Add approved graph/vector diagnostic qualification after scalar integration, with local work allowed during Actions incident and independent evidence still required | working-tree | Codex |
 | 0.8.80b | 2026-10-19 | beta | Add owner-approved G4 scalar/multi-input diagnostic verification before broad P8 closure/P9; preserve staged acceptance dependencies | working-tree | Codex |

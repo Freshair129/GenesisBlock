@@ -208,3 +208,63 @@ fn explain_edge_row_and_annotation_sources_preserve_frontier_and_fixture_files()
         assert_eq!(disk_tree(dir.path()), before, "{source}");
     }
 }
+
+#[test]
+fn explain_history_and_change_sources_do_not_publish_or_write() {
+    let dir = TempDir::new().unwrap();
+    let db = open(dir.path());
+    db.add_node(NodeInput {
+        id: Some("doc:history".into()),
+        labels: vec!["Document".into()],
+        props: None,
+        embedding: None,
+        lang: None,
+        valid_from: None,
+        caused_by: None,
+        ttl: None,
+        collection: None,
+    })
+    .unwrap();
+    let selected = db.stable_frontier();
+    for (source, op, config) in [
+        (
+            "HISTORY NODE \"doc:history\"",
+            "HistoryScan",
+            json!({"kind":"node","id":{"type":"Utf8","literal":"doc:history"},"as":"x"}),
+        ),
+        (
+            "CHANGES SINCE 0",
+            "ChangeScan",
+            json!({"after_seq":"0","as":"x"}),
+        ),
+    ] {
+        let hql:QueryRequestV2=serde_json::from_value(json!({
+            "contract_version":"genesis.api.v2","request_id":"history-plan-hql",
+            "namespace":"default","language_version":"hql.v2",
+            "hql":format!("USE default AT TX {selected} {source} AS x |> RETURN x"),"params":{},"explain":"plan"
+        })).unwrap();
+        let ir:QueryRequestV2=serde_json::from_value(json!({
+            "contract_version":"genesis.api.v2","request_id":"history-plan-ir",
+            "namespace":"default","temporal":{"tx_as_of":selected.to_string()},
+            "ir":{"contract_version":"query-ir.v2","nodes":[{"id":"scan","op":op,"inputs":[],"config":config}],"root":"scan","parameter_types":{}},
+            "params":{},"explain":"plan"
+        })).unwrap();
+        for request in [hql, ir] {
+            let before = disk_tree(dir.path());
+            let frontier = db.stable_frontier();
+            let QueryOutcomeV2::Plan(plan) = db.query_v2(access(), request).unwrap() else {
+                panic!("plan")
+            };
+            assert!(plan
+                .plan
+                .iter()
+                .all(|node| node.actual.is_none() && node.estimates.is_none()));
+            assert!(plan
+                .plan
+                .iter()
+                .any(|node| node.physical_op == format!("Authorized{op}")));
+            assert_eq!(db.stable_frontier(), frontier);
+            assert_eq!(disk_tree(dir.path()), before);
+        }
+    }
+}

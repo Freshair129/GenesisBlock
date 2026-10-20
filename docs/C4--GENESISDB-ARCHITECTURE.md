@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: "0.1.79b"
+version: "0.1.80b"
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-20T04:15:00+07:00,Codex"
+last_update: "2026-10-20T11:46:18+07:00,Codex"
 attributes:
   domain: architecture
   scope: repository
@@ -27,6 +27,24 @@ related_docs:
 
 
 # C4--GENESISDB-ARCHITECTURE
+
+## Approved G4 history/change diagnostic qualification - 2026-10-20
+
+The owner approved the bounded test/documentation matrix on main `a3e2d4d`.
+HistoryScan/ChangeScan keep existing P6/H2-D11 source, temporal/floor/ACL and
+budget contracts. Qualify exact emitted rows, empty measured zero, typed unknown
+source timing, HQL/IR result parity and normal/EXPLAIN/ANALYZE plan identity.
+EXPLAIN remains catalog-only; data-dependent errors are compared only between
+normal execution and ANALYZE. No runtime/API/WAL/schema/planner change.
+Risk LOW, complexity C-3. Local qualification passes 93 tests across 11 targets;
+hosted qualification remains pending. G4/P8/P13, lexical/context,
+independent review and device/release gates remain open.
+
+PR #251 qualified head `098a71e` completed four successful hosted workflows,
+15 successful checks and one schedule-only skip before merge as `a3e2d4d`.
+Its three OS Rust suites passed; local runtime was NOT_RUN due to Application
+Control 4551. The failed parent and fixture-grant RCA remain historical evidence.
+
 
 ## Approved G4 source and annotation diagnostics - 2026-10-20
 
@@ -694,6 +712,7 @@ full P8/P13 qualification remains open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.80b | 2026-10-20 | current | Approve test-only History/Change diagnostic matrix and reconcile PR251 hosted qualification; preserve runtime contracts and broader acceptance gates | working-tree | Codex |
 | 0.1.79b | 2026-10-20 | current | Owner-approved source/annotation diagnostics, exact rows and truthful unknowns; reconcile scalar/graph hosted evidence while retaining broader acceptance gates | working-tree | Codex |
 | 0.1.78b | 2026-10-19 | current | Link owner-approved test-only graph/vector diagnostic matrix through the existing Storage/P6 runtime; retain broad G4/P8/P13 gates | working-tree | Codex |
 | 0.1.77b | 2026-10-19 | current | Record approved test-only scalar diagnostic qualification and distinguish additive NAPI exposure from open P13 parity | working-tree | Codex |
