@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Document Registry"
 doc_id: "DOC-REGISTRY-GENESISBLOCKDB"
 status: draft
-version: "0.5.109+draft"
+version: "0.5.110+draft"
 updated: "2026-10-20"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -21,6 +21,24 @@ related_docs:
 
 # GenesisBlockDB Document Registry
 
+## Approved G4 plan identity/golden qualification - 2026-10-20
+
+Owner approved tests/docs-only qualification on main `24d7eed`; LOW risk, C-3.
+Independently specify canonical shape/hash goldens, JSON map-order stability,
+parameter values versus shape, controlled node/operator/input/column changes,
+and per-request normal/EXPLAIN/ANALYZE parity. Keep the existing shape hash,
+planner/runtime/API/P6/WAL/schema contracts. Equal hashes do not imply equal
+semantics or authorization. Local qualification passes 221/221 across 18 targets;
+strict core/default Clippy, format/docs/version/diff gates pass; hosted pending;
+broad G4/P8/P13 and independent/device/release acceptance remain open.
+
+PR #253 exact head `768b56a28678904e505bf0a88e149480a0dd561c` completed
+four successful PR workflows (15 SUCCESS checks plus one schedule-only skip),
+including Rust Ubuntu/macOS/Windows, before normal merge as
+`24d7eeddac7fad3503df5d53c282105ce93f0196`. Its local runtime passed 170 tests
+across 14 targets; earlier fixture failures/RCA remain historical evidence.
+
+
 ## Approved G4 lexical/context qualification - 2026-10-20
 
 The owner approved the bounded tests/docs-only proposal on merged main
@@ -31,7 +49,7 @@ BM25, tokenizer, runtime/API/P6/WAL/schema and planner contracts. ContextPack
 emits one package on empty input; token truncation is a successful package.
 Local qualification passes 170/170 across 14 targets; strict core/default
 all-target Clippy, format/docs/version/diff gates pass. Hosted qualification
-for this lexical/context revision is pending. Broad G4/P8/P13,
+for the lexical/context revision passed in #253. Broad G4/P8/P13,
 independent/device/release gates remain open.
 
 PR #252 exact head `25f6e4445ad0ceb11471302e0b5ec40b44d451a9` completed
@@ -102,17 +120,17 @@ registry row explicitly names them.
 
 | Role | Doc ID | Version | Status | Owner | Path |
 |---|---|---|---|---|---|
-| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.51b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
-| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.81b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
+| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.52b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
+| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.82b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
 | Execution DAG guard | `SPEC--EXECUTION-DAG-GUARD-V1` | `0.1.0` | accepted | Sol Decision / Contract and AC | `docs/SPEC--EXECUTION-DAG-GUARD-V1.md` |
 | HQL2 execution decision | `ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY` | `0.1.1b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY.md` |
-| HQL2 G4 shared-pipeline contract | `ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE` | `0.1.9b` | active | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md` |
+| HQL2 G4 shared-pipeline contract | `ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE` | `0.1.10b` | active | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md` |
 | HQL2 P8 completion addendum | `ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM` | `0.1.15b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md` |
 | HQL2 Sequence pattern constraints | `ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS` | `0.2.1b` | beta | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS.md` |
 | HQL2 durable revisions and annotations | `ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS` | `0.8.27b` | beta | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS.md` |
-| UEE-HQL2 orchestration plan | `IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22` | `0.8.84b` | beta | Boss (Founder / Product Authority) | `docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md` |
+| UEE-HQL2 orchestration plan | `IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22` | `0.8.85b` | beta | Boss (Founder / Product Authority) | `docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md` |
 | HQL2 typed P8 boundary | `SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY` | `0.2.67b` | beta | Boss (Founder / Product Authority) | `docs/SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY.md` |
-| HQL2 P8 core checkpoint | `REPORT--HQL2-P8-CORE-2026-09-28` | `0.1.76b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P8-CORE-2026-09-28.md` |
+| HQL2 P8 core checkpoint | `REPORT--HQL2-P8-CORE-2026-09-28` | `0.1.77b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P8-CORE-2026-09-28.md` |
 | HQL2 P7 bounded oracle evidence | `REPORT--HQL2-P7-ORACLE-2026-09-28` | `0.1.12b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P7-ORACLE-2026-09-28.md` |
 | Commit correctness | `SPEC--WAVE-A-COMMIT-CORRECTNESS` | `0.1.0b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-A-COMMIT-CORRECTNESS.md` |
 | Durable collections and edge history | `SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY` | `0.1.2b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY.md` |
@@ -573,6 +591,7 @@ review and full P8 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 0.5.110+draft | 2026-10-20 | GenesisBlockDB Architecture | Approve bounded G4 identity/golden qualification and reconcile hosted PR253; preserve production contracts and broad gates |
 | 0.5.109+draft | 2026-10-20 | GenesisBlockDB Architecture | Approve bounded G4 lexical/context diagnostics and reconcile hosted PR252; preserve production contracts and broader gates |
 | 0.5.106+draft | 2026-10-19 | GenesisBlockDB Architecture | Synchronize the approved graph/vector counter verification scope across G4, P8, plan, C4 and Master Spec |
 | 0.5.105+draft | 2026-10-19 | GenesisBlockDB Architecture | Synchronize approved G4 scalar diagnostic qualification across the ADR, P8 report, plan, C4 and Master Spec; retain partial acceptance |
