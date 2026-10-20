@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE
-version: "0.1.12b"
+version: "0.1.13b"
 created_at: "2026-10-04T13:08:29+07:00,Codex,2be63a7"
-last_update: "2026-10-20T22:09:00+07:00,Codex"
+last_update: "2026-10-21T00:20:00+07:00,Codex"
 status: active
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -14,6 +14,24 @@ attributes:
   risk: HIGH
   amends: ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY
 ---
+
+## Approved G4 annotation-authority composition qualification - 2026-10-21
+
+Owner approved tests/docs-only scope at merged main `e8f1a588` (LOW, C-3).
+PR256 passed all four exact-head workflows including Rust on three OSes;
+its permissive provenance matrix and namespace-denied controls remain valid.
+The next target-local test qualifies enforced Namespace(Read) plus
+Annotation(namespace,Read) in HQL/IR lookup and exact KNN/original Rerank ->
+parallel-edge Expand -> lookup. Policy revisions grant/remove/regrant the
+annotation permission between independent requests, each with a freshly
+published pinned generation. Plan stays catalog-only; empty input behavior
+is qualified separately from nonempty lookup authorization. No eager ACL,
+concurrent revocation, runtime/API/P6/WAL/hash/schema contract is introduced.
+Local154/154 across10 targets, strict core/default all-target Clippy,
+format/docs244/0/version0.2.10/diff gates pass. Hosted qualification pending;
+broad G4/P8/P13, independent/device/release gates remain open.
+
+
 
 ## Approved G4 provenance/completeness qualification - 2026-10-20
 

@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.79b"
+version: "0.1.80b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-20T22:09:00+07:00,Codex"
+last_update: "2026-10-21T00:20:00+07:00,Codex"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -11,6 +11,24 @@ attributes:
   risk: HIGH
   complexity: C-3
 ---
+
+## Approved G4 annotation-authority composition qualification - 2026-10-21
+
+Owner approved tests/docs-only scope at merged main `e8f1a588` (LOW, C-3).
+PR256 passed all four exact-head workflows including Rust on three OSes;
+its permissive provenance matrix and namespace-denied controls remain valid.
+The next target-local test qualifies enforced Namespace(Read) plus
+Annotation(namespace,Read) in HQL/IR lookup and exact KNN/original Rerank ->
+parallel-edge Expand -> lookup. Policy revisions grant/remove/regrant the
+annotation permission between independent requests, each with a freshly
+published pinned generation. Plan stays catalog-only; empty input behavior
+is qualified separately from nonempty lookup authorization. No eager ACL,
+concurrent revocation, runtime/API/P6/WAL/hash/schema contract is introduced.
+Local154/154 across10 targets, strict core/default all-target Clippy,
+format/docs244/0/version0.2.10/diff gates pass. Hosted qualification pending;
+broad G4/P8/P13, independent/device/release gates remain open.
+
+
 
 ## Approved G4 provenance/completeness qualification - 2026-10-20
 
@@ -1570,3 +1588,70 @@ expansion. Shared helpers and production code are unchanged. This is not
 independent architecture acceptance. Per-annotation enforced-policy composition,
 all operator/frontend permutations and device/release remain open. Namespace
 denial and existing ACL regressions are evidence at their stated scope only.
+
+### Enforced annotation authority fixture architecture
+
+```mermaid
+flowchart LR
+  P[Enforced policy revision] --> G[Fresh published generation]
+  G --> H[HQL request]
+  G --> I[Typed IR request]
+  H --> B[Shared bind / plan / P6]
+  I --> B
+  B --> L[Nonempty AnnotationLookup]
+  L --> A[Namespace and Annotation grants]
+  B --> E[Empty pipeline does not invoke lookup]
+  B --> X[Catalog-only Plan]
+```
+
+The new `enforced_annotation_grants_and_policy_revisions_qualify_composed_frontends`
+fixture in `tests/hql2_g4_provenance_completeness_tests.rs` independently checks
+policy revision1 with annotation read, revision2 without annotation read and
+revision3 restored. The policy administrator retains ManagePolicy and the
+reader retains Namespace(Read). This is namespace-scoped Annotation authority,
+not a new per-record ACL. Each revision captures a new generation after policy
+administration; no stale-lease/concurrent revocation behavior is asserted.
+
+The proposed matrix contains72 catalog-only Plan requests and72 execution
+attempts across3 pipelines,3 policy revisions,2 input cases,2 frontends and2
+execution modes. Expected execution cells:60 successes,12 nonempty annotation
+denials;24 successful-nonempty budget errors are additional requests. Existing
+permissive and absent-namespace tests remain unchanged. Empty namespace-only
+execution is examined as an existing adapter invocation boundary; any conflict
+with the approved contract requires a separate RCA/proposal.
+
+
+Focused result:3/3 passed on first run. The new enforced-policy fixture confirms
+60 successful metadata/ownership cells,12 nonempty annotation denials and24
+additional output-budget errors. All72 Plan requests return no actuals or
+estimates and preserve the pre-plan frontier. Namespace-only empty execution
+returns an empty complete result because the data lookup adapter is never
+invoked; this does not grant access to any annotation. Plan authorization stays
+at the catalog boundary. No runtime contradiction or fixture failure was found,
+so no RCA/fix was required. Broader ACL permutations remain separate.
+
+Scoped implementer architecture review: the fixture uses current engine policy
+administration and newly published generations between independent requests;
+it does not mutate an issued lease or test concurrent policy revocation.
+Captured GenerationInfo supplies expected policy revision and snapshot fields.
+The current Annotation resource is namespace-scoped, not per-record authority.
+No production permission model, result contract or plan identity changes.
+Independent architecture acceptance remains NOT_RUN.
+
+
+Enforced-authority runtime regression passes154/154 unique tests across10
+targets with zero failed/ignored: annotation ACL12, lookup7, source7, sequence11,
+explain-source5, provenance/completeness3, oracle29, pipeline25, rank37,
+vector18. Focused3 is included, not double-counted. Command:
+`cargo test --locked --no-default-features --jobs 2` with explicit `--test`
+selectors for `hql2_g4_provenance_completeness_tests`,
+`hql2_annotation_lookup_tests`, `hql2_annotation_acl_tests`,
+`hql2_annotation_source_tests`, `hql2_vector_operator_tests`,
+`hql2_expand_sequence_tests`, `hql2_pipeline_oracle_tests`,
+`hql2_rank_oracle_tests`, `hql2_oracle_tests`, `hql2_explain_source_tests`.
+
+Static qualification passes `cargo clippy --locked --no-default-features
+--all-targets --jobs 2 -- -D warnings` and its default-feature counterpart,
+`cargo fmt --check`, `npm run docs:validate` (244 files/0 violations),
+`npm run version:check` (0.2.10) and diff checks. Hosted exact-head CI remains
+pending; no independent/device/release acceptance is inferred.
