@@ -40,13 +40,21 @@ fn reading(result: &QueryResultV2, node: &str) -> Value {
 
 /// Execute one fixture through the unchanged Storage/P6 boundary in all modes.
 pub fn three_modes(db: &Storage, request: QueryRequestV2) -> QueryResultV2 {
-    let QueryOutcomeV2::Rows(normal) = db.query_v2(access(), request.clone()).unwrap() else {
+    three_modes_with_access(db, access(), request)
+}
+
+pub fn three_modes_with_access(
+    db: &Storage,
+    actor: AccessContext,
+    request: QueryRequestV2,
+) -> QueryResultV2 {
+    let QueryOutcomeV2::Rows(normal) = db.query_v2(actor.clone(), request.clone()).unwrap() else {
         panic!("normal rows")
     };
     assert!(normal.explain.is_none());
     let mut plan_request = request.clone();
     plan_request.explain = Some(ExplainV2::Plan);
-    let QueryOutcomeV2::Plan(plan) = db.query_v2(access(), plan_request).unwrap() else {
+    let QueryOutcomeV2::Plan(plan) = db.query_v2(actor.clone(), plan_request).unwrap() else {
         panic!("plan")
     };
     assert!(plan
@@ -55,7 +63,7 @@ pub fn three_modes(db: &Storage, request: QueryRequestV2) -> QueryResultV2 {
         .all(|n| n.actual.is_none() && n.estimates.is_none()));
     let mut analyze_request = request;
     analyze_request.explain = Some(ExplainV2::Analyze);
-    let QueryOutcomeV2::Rows(analyzed) = db.query_v2(access(), analyze_request).unwrap() else {
+    let QueryOutcomeV2::Rows(analyzed) = db.query_v2(actor, analyze_request).unwrap() else {
         panic!("analyze rows")
     };
     assert_eq!(normal.rows, analyzed.rows);

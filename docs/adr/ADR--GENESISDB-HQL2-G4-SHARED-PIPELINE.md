@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE
-version: "0.1.6b"
+version: "0.1.7b"
 created_at: "2026-10-04T13:08:29+07:00,Codex,2be63a7"
-last_update: "2026-10-19T23:12:05+07:00,Codex"
+last_update: "2026-10-20T04:15:00+07:00,Codex"
 status: active
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -15,7 +15,37 @@ attributes:
   amends: ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY
 ---
 
+
 # G4 shared query pipeline, deterministic planner and truthful diagnostics
+
+## Approved G4 source and annotation diagnostics - 2026-10-20
+
+The owner approved this bounded test/documentation slice at main
+`8b18a2c24ac1dfab5bb87036661a80de8973bdca`. Risk LOW, complexity C-3.
+PR #249 and #250 each completed four successful hosted PR workflows, with
+15 successful checks and one schedule-only conditional skip, before merge.
+G4/P8/P13, independent review and device/release acceptance remain open.
+
+Qualify exact source rows for Node/Edge/Row/Annotation, including empty output;
+compare ordinary execution, EXPLAIN and ANALYZE with fixture/P7 semantic bags.
+Source rows_out describes emitted rows, not physical scan effort. Source
+elapsed remains unknown/not_instrumented because materialization precedes
+kernel execution. Bytes/work/memory unknowns must never become measured zero.
+AnnotationLookup covers required/optional matches and misses, duplicate and
+empty bags, existing frozen/live references and explicit actor authority.
+Extend EXPLAIN no-effect checks and normal/ANALYZE source/payload/output-budget
+errors. The test-only matrix must preserve one P6 lease, typed metadata and
+shape identity. No runtime/API/WAL/schema/planner change is authorized.
+
+```text
+authorized catalog -> bind/plan -> EXPLAIN (no data execution)
+                         |
+                         +-> P6 lease -> source batches -> kernels -> rows/ANALYZE
+fixture/P7 bag expectations -----------------------------------------> assertions
+```
+
+Validation for this slice is pending until the checkpoint below records it.
+History/change, lexical/context and broader frontend matrices remain separate.
 
 ## Approved graph and vector counter qualification — 2026-10-19
 
@@ -555,6 +585,7 @@ and release qualification open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.7b | 2026-10-20 | active | Owner-approved source/annotation diagnostics, exact rows and truthful unknowns; reconcile scalar/graph hosted evidence while retaining broader acceptance gates | working-tree | Codex |
 | 0.1.6b | 2026-10-19 | active | Approve graph/vector counter qualification after scalar integration, allowing local work during the Actions incident; preserve runtime contracts and broader qualification gates | working-tree | Codex |
 | 0.1.5b | 2026-10-19 | active | Owner-approved scalar and multi-input diagnostic qualification; exact fixture counters, P7 result parity and budget-failure matrix; preserve partial G4 and shape-based identity | working-tree | Codex |
 | 0.1.4b | 2026-10-19 | active | Recover typed measured/unknown counters, explicit units and provenance, overflow distinction and truthful SourceScan timing; retain broader G4 qualification gates | working-tree | Codex |

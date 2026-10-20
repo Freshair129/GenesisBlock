@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.73b"
+version: "0.1.74b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-19T23:12:05+07:00,Codex"
+last_update: "2026-10-20T09:42:16+07:00,Codex"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -12,7 +12,90 @@ attributes:
   complexity: C-3
 ---
 
+
 # HQL2 P8 core checkpoint — not full HQL2 completion
+
+## Approved G4 source and annotation diagnostics - 2026-10-20
+
+The owner approved test-only source/annotation diagnostic qualification on
+main `8b18a2c`: exact rows, empty input, mode parity, actor authority,
+EXPLAIN no-effect and fail-closed budgets under the existing Storage/P6 contract.
+See the G4 ADR and P8 checkpoint for the matrix and validation. PR #249/#250
+hosted checks completed before merge. Broader G4/P8/P13 and independent,
+device/release gates remain open. This slice is LOW risk, C-3.
+
+
+## G4 source/annotation verification checkpoint - 2026-10-20
+
+The implemented test slice adds five tests: three source/counter/authority
+cases, one exact AnnotationLookup/P7 matrix and one EXPLAIN source matrix.
+Sixteen HQL/IR source fixtures cover Node/Edge/Row/Annotation with nonempty and
+empty output; the fixture counts are 2/1/2/1 and zero respectively. Sources
+have no upstream rows, so rows_in is zero; this does not describe the physical
+scan effort. AnnotationLookup expects two source rows (four with duplicate
+inputs), one required match or two optional outputs (doubled for duplicates).
+Two empty lookup cases report measured zero. Existing frozen/live target and
+P7 fixtures now execute in all three modes under their explicit actor.
+
+Actor tests grant one reader namespace plus explicit Annotation(Read) authority
+and reject an untrusted reader in normal,
+EXPLAIN and ANALYZE for both AnnotationScan and AnnotationLookup. This is an
+authority fixture, not a complete per-resource ACL matrix. Eight deliberate
+normal/ANALYZE budget rejections cover source-node work, result rows/bytes and
+the existing large source payload fixture. EXPLAIN compares fixture frontier
+and filesystem bytes for Edge/Row/Annotation; lock/shared-memory exceptions
+retain the existing size-only check. The existing Node test is preserved.
+
+Local runtime validation is **NOT_RUN**: an earlier focused four-target
+command completed compilation/linking, then Windows Application Control rejected the
+first test executable before any tests ran (`os error 4551`). No local runtime
+pass is claimed and the host policy was not changed. Hosted CI must execute
+the actual suites before merge. Strict core/default Clippy, formatting,
+documentation and version results are recorded separately in delivery evidence.
+
+Commands from the repository root:
+
+```text
+cargo test --locked --no-default-features --jobs 2 --test hql2_g4_source_counter_tests --test hql2_annotation_lookup_tests --test hql2_explain_source_tests --test hql2_storage_source_tests
+cargo clippy --locked --no-default-features --all-targets --jobs 2 -- -D warnings
+cargo clippy --locked --all-targets --jobs 2 -- -D warnings
+cargo fmt --check
+npm run docs:validate
+npm run version:check
+```
+
+Scoped implementer architecture review: production source and public contracts
+are untouched. The shared test helper delegates its old default principal to
+an explicit AccessContext variant; it does not bypass Storage authorization.
+Fixture counts follow setup/P7 bags, not observed diagnostic values. Source
+timing remains unknown because source batches are materialized before kernels;
+lookup output multiplicity is not presented as a measured cache/probe count.
+EXPLAIN filesystem invariance proves no observed fixture writes, while the
+existing early return before pin_generation supplies static path evidence;
+it is not new instrumentation of every possible read. No runtime defect or
+full G4/P8/P13 acceptance is asserted. This is not an independent review.
+
+Final local static gates: strict all-target Clippy passed for core and default/NAPI; formatting, documentation (244 files, zero violations), version 0.2.10 and diff checks passed. Runtime tests remain NOT_RUN locally; hosted CI is pending. Final test blobs:
+
+- tests/hql2_g4_source_counter_tests.rs : 29f0f200ae07ea3121386c59b0e1236537cfc822
+- tests/hql2_annotation_lookup_tests.rs : ddcb4703d50c75e56368371e68d52f0e02c0747c
+- tests/hql2_explain_source_tests.rs : bc7dbc7504c0c5a6cb3b8ca91178dab1d76777e1
+- tests/hql2_storage_source_tests.rs : 2535ece83e3b05c67cd9b39f5cb6c8c842c26403
+- tests/support/hql2_diagnostics.rs : c4407aa2e349363b9f55fa0b421d8e155753924f
+
+### Hosted fixture correction - 2026-10-20
+
+At parent head `17f4569`, macOS job 118419562108 failed only the new actor
+fixture in the source-counter target; the exact source-row and budget tests
+passed (2/3 in that target). The fixture omitted the explicit Annotation(Read)
+grant required by the existing P6/runtime contract. See
+[fixture RCA](../.brain/rca/2026-10-20-g4-annotation-fixture-grant.md).
+The corrected fixture grants both namespace and annotation read to the allowed
+reader. A namespace-only reader is denied data execution in normal/ANALYZE;
+its catalog-only EXPLAIN may return a plan without actuals. The completely
+untrusted reader remains denied in all modes. Production code and exact result
+assertions are unchanged. Fresh CI on the amended head is required; the failed
+parent run is not acceptance. Local runtime remains NOT_RUN under host policy.
 
 ## G4 graph and vector diagnostic qualification — 2026-10-19
 
@@ -1029,6 +1112,7 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.74b | 2026-10-20 | beta | Owner-approved source/annotation diagnostics, exact rows and truthful unknowns; reconcile scalar/graph hosted evidence while retaining broader acceptance gates | working-tree | Codex |
 | 0.1.73b | 2026-10-19 | beta | Record approved Sequence/Match and exact KNN/Original Rerank counter verification scope; track source-budget provenance, zero/unknown and mode parity without expanding capabilities | working-tree | Codex |
 | 0.1.72b | 2026-10-19 | beta | Add approved scalar counter qualification scope at main 6195e85 and correct current NAPI exposure; retain historical evidence and broader G4/P8/P13 gates | working-tree | Codex |
 | 0.1.64b | 2026-10-05 | beta | Merge owner-approved G4 stable plan identity with the current D7 and P8-R2/P8-R3 evidence; focused G4/REST verification passes, the full REST rerun remains environment-blocked by OS error 112, and broad G4/P8/P13, transport, hosted and independent-review gates remain open | working-tree | ATHER |

@@ -9,6 +9,10 @@ mod p7;
 use std::path::Path;
 use tempfile::TempDir;
 
+#[allow(dead_code)]
+#[path = "support/hql2_diagnostics.rs"]
+mod diagnostics;
+
 fn open(path: &Path) -> Storage {
     Storage::open(OpenOptions {
         path: path.to_string_lossy().into_owned(),
@@ -129,22 +133,19 @@ fn put_annotation(
         .unwrap();
 }
 
-fn lookup(
-    storage: &Storage,
-    duplicate_input: bool,
-) -> genesis_block_native::query::hql2::QueryResultV2 {
+fn lookup_request(duplicate_input: bool, optional: bool, label: &str) -> QueryRequestV2 {
     let mut nodes = vec![json!({
         "id":"documents",
         "op":"NodeScan",
         "inputs":[],
-        "config":{"as":"d","label":"Document"}
+        "config":{"as":"d","label":label}
     })];
     let input = if duplicate_input {
         nodes.push(json!({
             "id":"documents_again",
             "op":"NodeScan",
             "inputs":[],
-            "config":{"as":"d","label":"Document"}
+            "config":{"as":"d","label":label}
         }));
         nodes.push(json!({
             "id":"duplicate_paths",
@@ -160,7 +161,7 @@ fn lookup(
         "id":"lookup",
         "op":"AnnotationLookup",
         "inputs":[input],
-        "config":{"target":"d","as":"a","optional":true}
+        "config":{"target":"d","as":"a","optional":optional}
     }));
     nodes.push(json!({
         "id":"project",
@@ -172,7 +173,7 @@ fn lookup(
             {"as":"annotation_id","expression":{"field":{"alias":"a","path":["id"]}}}
         ]}
     }));
-    let request: QueryRequestV2 = serde_json::from_value(json!({
+    serde_json::from_value(json!({
         "contract_version":"genesis.api.v2",
         "request_id":"annotation-lookup",
         "namespace":"default",
@@ -184,11 +185,18 @@ fn lookup(
         },
         "params":{}
     }))
-    .unwrap();
-    let QueryOutcomeV2::Rows(result) = storage.query_v2(actor(), request).unwrap() else {
-        panic!("annotation lookup must return rows")
-    };
-    result
+    .unwrap()
+}
+
+fn lookup(
+    storage: &Storage,
+    duplicate_input: bool,
+) -> genesis_block_native::query::hql2::QueryResultV2 {
+    diagnostics::three_modes_with_access(
+        storage,
+        actor(),
+        lookup_request(duplicate_input, true, "Document"),
+    )
 }
 
 fn hql_lookup(
@@ -207,10 +215,7 @@ fn hql_lookup(
         "params":{}
     }))
     .unwrap();
-    let QueryOutcomeV2::Rows(result) = storage.query_v2(actor(), request).unwrap() else {
-        panic!("HQL annotation lookup must return rows")
-    };
-    result
+    diagnostics::three_modes_with_access(storage, actor(), request)
 }
 
 fn p7_entity(kind: p7::graph::Kind, id: &str, revision: &str) -> p7::graph::EntityRef {
@@ -639,4 +644,83 @@ fn live_annotation_target_resolves_at_the_query_snapshot() {
             )
         ])
     );
+}
+
+#[test]
+fn lookup_diagnostic_counters_preserve_p7_bags_and_empty_inputs() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    add_node(&storage, "doc:target");
+    add_node(&storage, "doc:evidence");
+    let database_id = database_id(&storage);
+    let target_ref = frozen_ref(dir.path(), &database_id, "doc:target");
+    let revision = target_ref["ref"]["revision"].as_str().unwrap().to_owned();
+    put_annotation(
+        &storage,
+        "review:one",
+        vec![target_ref],
+        vec![frozen_ref(dir.path(), &database_id, "doc:evidence")],
+    );
+    let environment = p7_environment(&revision);
+    for duplicate in [false, true] {
+        let expected = p7_ids(&p7::execute(&environment, &p7_lookup_plan(duplicate)).unwrap());
+        for optional in [false, true] {
+            let result = diagnostics::three_modes_with_access(
+                &storage,
+                actor(),
+                lookup_request(duplicate, optional, "Document"),
+            );
+            let input = if duplicate { 4 } else { 2 };
+            let output = if optional { input } else { input / 2 };
+            diagnostics::measured(&result, "lookup", "rows_in", "rows", input);
+            diagnostics::measured(&result, "lookup", "rows_out", "rows", output);
+            let expected: Vec<_> = expected
+                .iter()
+                .filter(|(_, a)| optional || a.is_some())
+                .cloned()
+                .collect();
+            assert_eq!(
+                storage_ids(&result, "document_id", "annotation_id"),
+                expected
+            );
+        }
+    }
+    for optional in [false, true] {
+        let result = hql_lookup(&storage, optional);
+        let lookup = result
+            .explain
+            .as_ref()
+            .unwrap()
+            .plan
+            .iter()
+            .find(|node| node.physical_op == "AuthorizedAnnotationLookup")
+            .unwrap();
+        diagnostics::measured(&result, &lookup.id, "rows_in", "rows", 2);
+        diagnostics::measured(
+            &result,
+            &lookup.id,
+            "rows_out",
+            "rows",
+            if optional { 2 } else { 1 },
+        );
+        let expected = p7_ids(&p7::execute(&environment, &p7_lookup_plan(false)).unwrap());
+        let expected: Vec<_> = expected
+            .into_iter()
+            .filter(|(_, a)| optional || a.is_some())
+            .collect();
+        assert_eq!(
+            storage_ids(&result, "document_id", "annotation_id"),
+            expected
+        );
+    }
+    for optional in [false, true] {
+        let result = diagnostics::three_modes_with_access(
+            &storage,
+            actor(),
+            lookup_request(false, optional, "Absent"),
+        );
+        diagnostics::measured(&result, "lookup", "rows_in", "rows", 0);
+        diagnostics::measured(&result, "lookup", "rows_out", "rows", 0);
+        assert!(result.rows.is_empty());
+    }
 }

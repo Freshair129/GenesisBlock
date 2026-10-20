@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.48b"
-updated: "2026-10-19"
+version: "2.3.49b"
+updated: "2026-10-20"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 related_issue: 84
@@ -25,7 +25,18 @@ related_docs:
   - "docs/GENESISRAG17-EXTENSION-MAP.md"
 ---
 
+
 # GenesisBlockDB Technical Architecture and Capability Composition
+
+## Approved G4 source and annotation diagnostics - 2026-10-20
+
+The owner approved test-only source/annotation diagnostic qualification on
+main `8b18a2c`: exact rows, empty input, mode parity, actor authority,
+EXPLAIN no-effect and fail-closed budgets under the existing Storage/P6 contract.
+See the G4 ADR and P8 checkpoint for the matrix and validation. PR #249/#250
+hosted checks completed before merge. Broader G4/P8/P13 and independent,
+device/release gates remain open. This slice is LOW risk, C-3.
+
 
 The owner-approved G4 graph/vector diagnostic qualification follows scalar
 qualification under the existing [G4 contract](adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md).
@@ -522,6 +533,7 @@ shared-runtime and broad P8/P13 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 2.3.49b | 2026-10-20 | GenesisBlockDB Architecture | Owner-approved source/annotation diagnostics, exact rows and truthful unknowns; reconcile scalar/graph hosted evidence while retaining broader acceptance gates |
 | 2.3.48b | 2026-10-19 | GenesisBlockDB Architecture | Link graph/vector diagnostic qualification without changing architecture, capabilities or G4/P8/P13 acceptance |
 | 2.3.47b | 2026-10-19 | GenesisBlockDB Architecture | Link approved test-only G4 scalar qualification and correct additive NAPI exposure without promoting P8/P13 acceptance |
 | 2.3.46b | 2026-10-19 | GenesisBlockDB Architecture | Bound membership journal-authorization preflight by uncompressed payload bytes and record count before accumulation; preserve fail-closed startup/configuration/restore errors; document memory measurement limit |
