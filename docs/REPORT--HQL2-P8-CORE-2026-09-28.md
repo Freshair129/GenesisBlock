@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.78b"
+version: "0.1.79b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-20T19:20:00+07:00,Codex"
+last_update: "2026-10-20T22:09:00+07:00,Codex"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -11,6 +11,23 @@ attributes:
   risk: HIGH
   complexity: C-3
 ---
+
+## Approved G4 provenance/completeness qualification - 2026-10-20
+
+Owner approved tests/docs-only qualification at main `d1bc37e` (LOW, C-3).
+The new `hql2_g4_provenance_completeness_tests` target independently checks
+full snapshot, four semantics fields, completeness reason/eligible count,
+index frontiers and cursor for HQL/IR normal and Analyze requests.
+Fixtures cover AnnotationLookup and exact KNN/original Rerank followed by
+parallel-edge Expand and AnnotationLookup; entity/revision and score owner
+references must retain fixture identity. Empty input is checked separately.
+No generic provenance field, truncated-query contract, runtime/API/P6/WAL or
+shape-hash change is introduced. Local runtime passes 141 unique tests across eight targets (focused2/2),
+with zero failed/ignored; core/default strict all-target Clippy and
+format/docs/version/diff checks pass. Hosted qualification is pending; broad
+G4/P8/P13 and independent/device/release gates remain open.
+
+
 
 ## G4 evidence reconciliation - 2026-10-20
 
@@ -1501,3 +1518,55 @@ with a source/test audit and concrete fixtures before requesting a test scope.
 This is missing evidence, not a demonstrated runtime defect. P9 optimization,
 P10 composition breadth, P11 index lifecycle, P12 resources and P13 surface
 parity remain separately gated. No new runtime work is authorized here.
+
+### Provenance/completeness fixture architecture
+
+```mermaid
+flowchart LR
+  F[Fixture records and revisions] --> G[Published generation and pinned selectors]
+  G --> H[HQL request]
+  G --> I[Typed IR request]
+  H --> P[Existing binder / planner / P6 read boundary]
+  I --> P
+  P --> R[Normal and Analyze responses]
+  E[Independent expected tuple and fixture refs] --> A[Target-local assertions]
+  R --> A
+```
+
+Target-local assertions compare each response to the captured published
+GenerationInfo and database/record lineage, not only HQL versus IR or normal
+versus Analyze. Three pipeline variants times two empty/nonempty variants times
+two frontends times two modes give 24 positive executions inside one Rust test;
+12 nonempty output-byte budget failures must return typed errors. Parallel graph
+edges deliberately repeat the same target/revision and original score owner.
+The positive fixture uses permissive authority. A second focused test checks
+namespace-denied HQL/IR normal/Analyze requests return FORBIDDEN at authorize
+without advancing the frontier (four negative requests). Existing annotation
+ACL regression is included separately; this does not claim a complete
+enforced-policy composition matrix. Independent review and full operator/frontend acceptance remain open.
+
+### Provenance/completeness validation and scoped review
+
+Local regression: annotation ACL12, lookup7, sequence11, oracle29,
+pipeline25, rank37, vector18 and final focused2 =141 unique tests. The first
+140-test sweep contained focused1; final focused2 replaces it rather than adding
+both runs. All passed with zero failed/ignored. No fixture failure or runtime
+contradiction was observed; no RCA/fix was needed.
+
+Commands: `cargo test --locked --no-default-features --jobs 2` with explicit
+`--test` targets `hql2_g4_provenance_completeness_tests`,
+`hql2_annotation_lookup_tests`, `hql2_annotation_acl_tests`,
+`hql2_vector_operator_tests`, `hql2_expand_sequence_tests`,
+`hql2_pipeline_oracle_tests`, `hql2_rank_oracle_tests`, `hql2_oracle_tests`;
+final focused target rerun after adding the namespace-denied test.
+Strict `cargo clippy --locked --all-targets --jobs 2 -- -D warnings` and
+its `--no-default-features` counterpart pass. Format, docs244/0,
+version0.2.10 and diff checks pass.
+
+Scoped implementer architecture review: target-only assertions preserve the
+existing P6 generation/selectors and read authority; expected references are
+captured from fixture revisions, and score ownership stays at seed after graph
+expansion. Shared helpers and production code are unchanged. This is not
+independent architecture acceptance. Per-annotation enforced-policy composition,
+all operator/frontend permutations and device/release remain open. Namespace
+denial and existing ACL regressions are evidence at their stated scope only.
