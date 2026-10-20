@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.49b"
+version: "2.3.50b"
 updated: "2026-10-20"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -27,6 +27,24 @@ related_docs:
 
 
 # GenesisBlockDB Technical Architecture and Capability Composition
+
+## Approved G4 history/change diagnostic qualification - 2026-10-20
+
+The owner approved the bounded test/documentation matrix on main `a3e2d4d`.
+HistoryScan/ChangeScan keep existing P6/H2-D11 source, temporal/floor/ACL and
+budget contracts. Qualify exact emitted rows, empty measured zero, typed unknown
+source timing, HQL/IR result parity and normal/EXPLAIN/ANALYZE plan identity.
+EXPLAIN remains catalog-only; data-dependent errors are compared only between
+normal execution and ANALYZE. No runtime/API/WAL/schema/planner change.
+Risk LOW, complexity C-3. Local qualification passes 93 tests across 11 targets;
+hosted qualification remains pending. G4/P8/P13, lexical/context,
+independent review and device/release gates remain open.
+
+PR #251 qualified head `098a71e` completed four successful hosted workflows,
+15 successful checks and one schedule-only skip before merge as `a3e2d4d`.
+Its three OS Rust suites passed; local runtime was NOT_RUN due to Application
+Control 4551. The failed parent and fixture-grant RCA remain historical evidence.
+
 
 ## Approved G4 source and annotation diagnostics - 2026-10-20
 
@@ -533,6 +551,7 @@ shared-runtime and broad P8/P13 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 2.3.50b | 2026-10-20 | GenesisBlockDB Architecture | Approve test-only History/Change diagnostic matrix and reconcile PR251 hosted qualification; preserve runtime contracts and broader acceptance gates |
 | 2.3.49b | 2026-10-20 | GenesisBlockDB Architecture | Owner-approved source/annotation diagnostics, exact rows and truthful unknowns; reconcile scalar/graph hosted evidence while retaining broader acceptance gates |
 | 2.3.48b | 2026-10-19 | GenesisBlockDB Architecture | Link graph/vector diagnostic qualification without changing architecture, capabilities or G4/P8/P13 acceptance |
 | 2.3.47b | 2026-10-19 | GenesisBlockDB Architecture | Link approved test-only G4 scalar qualification and correct additive NAPI exposure without promoting P8/P13 acceptance |

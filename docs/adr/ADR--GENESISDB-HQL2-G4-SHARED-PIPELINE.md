@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE
-version: "0.1.7b"
+version: "0.1.8b"
 created_at: "2026-10-04T13:08:29+07:00,Codex,2be63a7"
-last_update: "2026-10-20T04:15:00+07:00,Codex"
+last_update: "2026-10-20T11:46:18+07:00,Codex"
 status: active
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -17,6 +17,31 @@ attributes:
 
 
 # G4 shared query pipeline, deterministic planner and truthful diagnostics
+
+## Approved G4 history/change diagnostic qualification - 2026-10-20
+
+The owner approved the bounded test/documentation matrix on main `a3e2d4d`.
+HistoryScan/ChangeScan keep existing P6/H2-D11 source, temporal/floor/ACL and
+budget contracts. Qualify exact emitted rows, empty measured zero, typed unknown
+source timing, HQL/IR result parity and normal/EXPLAIN/ANALYZE plan identity.
+EXPLAIN remains catalog-only; data-dependent errors are compared only between
+normal execution and ANALYZE. No runtime/API/WAL/schema/planner change.
+Risk LOW, complexity C-3. Local qualification passes 93 tests across 11 targets;
+hosted qualification remains pending. G4/P8/P13, lexical/context,
+independent review and device/release gates remain open.
+
+PR #251 qualified head `098a71e` completed four successful hosted workflows,
+15 successful checks and one schedule-only skip before merge as `a3e2d4d`.
+Its three OS Rust suites passed; local runtime was NOT_RUN due to Application
+Control 4551. The failed parent and fixture-grant RCA remain historical evidence.
+
+
+```text
+catalog -> bind/plan -> EXPLAIN (no data execution)
+              |
+              +-> P6 lease -> history/change batches -> SourceScan -> rows/ANALYZE
+fixture revision log + independent P7 windows ---------------------> assertions
+```
 
 ## Approved G4 source and annotation diagnostics - 2026-10-20
 
@@ -44,8 +69,9 @@ authorized catalog -> bind/plan -> EXPLAIN (no data execution)
 fixture/P7 bag expectations -----------------------------------------> assertions
 ```
 
-Validation for this slice is pending until the checkpoint below records it.
-History/change, lexical/context and broader frontend matrices remain separate.
+Source/annotation hosted qualification is recorded in the P8 checkpoint at #251.
+The history/change extension passes locally; lexical/context and broader frontend
+matrices remain separate. No broader acceptance is inferred.
 
 ## Approved graph and vector counter qualification — 2026-10-19
 
@@ -504,13 +530,13 @@ The serialized plan remains:
 | Stage | Scope | Verification gate |
 |---|---|---|
 | G4-DOC | Approve this ADR and reconcile parent/peer versions | Owner approval and doc validation; completed for this slice |
-| G4-RED | Add tests for dispatch, closed binding, deterministic plans, no-effect `EXPLAIN`, measured `ANALYZE` and fail-closed errors | Integrated 42-target HQL2/REST sweep passed; G4 plan-identity/counter contract and source-plan tests passed; broader qualification remains open |
+| G4-RED | Qualify dispatch, binding, deterministic plans, no-effect EXPLAIN, measured ANALYZE and errors | Scalar, graph/vector and source/annotation slices passed hosted #249/#250/#251; history/change passes local 93/93 across 11 targets, hosted qualification and broader operator/frontend qualification remain open |
 | G4-AST/BIND | Implement v2 source AST/IR decoding and shared typed binder | Implemented in the P8 candidate; binder/type/ACL/limit gates and independent review remain |
 | G4-PLAN | Implement deterministic physical plan and stable identity | `PhysicalPlanV2` and canonical identity are implemented; golden/P7 breadth remains open |
-| G4-EXPLAIN | Implement plan-only diagnostics and unknown-estimate rules | Source-plan test passed 1/1 and the integrated HQL2/REST sweep passed; broader qualification remains open |
-| G4-ANALYZE | Implement read-only measured counters | Recovered typed counters and scalar/multi-input qualification pass: 7 new tests, 34 positive fixtures and 10 deliberate budget failures; broader graph/vector provenance/no-partial qualification remains open |
+| G4-EXPLAIN | Plan-only diagnostics and truthful unknown-estimate rules | Node/Edge/Row/Annotation frontier/filesystem checks passed in #251; history/change extension passes locally; hosted and independent breadth remain open |
+| G4-ANALYZE | Read-only measured counters | Scoped scalar, graph/vector and source/annotation matrices passed #249/#250/#251; history/change diagnostic qualification passes locally (93/93 across 11 targets), hosted pending; lexical/context and broader provenance/budget matrix remain open |
 | G4-PARITY | Differential HQL1 compatibility, HQL2 and Query IR v2 for supported operators | P8 exact-oracle tests cover implemented slices; full operator matrix remains open |
-| G4-VERIFY | Run local gates, reconcile evidence, independent review and final scope audit | Integrated HQL2/REST sweep and strict Clippy passed in both feature configurations; hosted/device/release/review statuses remain separate |
+| G4-VERIFY | Local gates, evidence reconciliation, independent review and final scope audit | #249/#250/#251 exact-head PR workflows passed before merge; #251 local runtime remains NOT_RUN (4551). History/change, independent/device/release acceptance remain separate |
 
 File ownership remains serialized: one owner for `src/lib.rs`, one owner for
 `src/query/*`, new tests in new files, and no public transport edits until the
@@ -585,6 +611,7 @@ and release qualification open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.8b | 2026-10-20 | active | Approve test-only History/Change diagnostic matrix and reconcile PR251 hosted qualification; preserve runtime contracts and broader acceptance gates | working-tree | Codex |
 | 0.1.7b | 2026-10-20 | active | Owner-approved source/annotation diagnostics, exact rows and truthful unknowns; reconcile scalar/graph hosted evidence while retaining broader acceptance gates | working-tree | Codex |
 | 0.1.6b | 2026-10-19 | active | Approve graph/vector counter qualification after scalar integration, allowing local work during the Actions incident; preserve runtime contracts and broader qualification gates | working-tree | Codex |
 | 0.1.5b | 2026-10-19 | active | Owner-approved scalar and multi-input diagnostic qualification; exact fixture counters, P7 result parity and budget-failure matrix; preserve partial G4 and shape-based identity | working-tree | Codex |

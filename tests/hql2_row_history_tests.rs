@@ -1,5 +1,5 @@
 use genesis_block_native::{
-    query::hql2::{value::QueryValueV2, QueryOutcomeV2, QueryResultV2},
+    query::hql2::{value::QueryValueV2, QueryResultV2},
     uee_v2::QueryRequestV2,
     AccessContext, OpenOptions, RelationalColumn, RelationalColumnType, RelationalMutationBatch,
     RelationalMutationKind, RelationalRowMutation, RelationalSchemaPackage, RelationalTable,
@@ -15,6 +15,10 @@ use std::{
 };
 use tempfile::TempDir;
 use uuid::Uuid;
+
+#[allow(dead_code)]
+#[path = "support/hql2_diagnostics.rs"]
+mod diagnostics;
 
 fn open(path: &Path) -> Storage {
     Storage::open(OpenOptions {
@@ -39,10 +43,7 @@ fn execute(
     request: Value,
 ) -> Result<QueryResultV2, genesis_block_native::query::hql2::QueryErrorV2> {
     let request: QueryRequestV2 = serde_json::from_value(request).unwrap();
-    match storage.query_v2(actor(), request)? {
-        QueryOutcomeV2::Rows(result) => Ok(result),
-        QueryOutcomeV2::Plan(_) => panic!("query must return rows"),
-    }
+    diagnostics::try_three_modes(storage, actor(), request)
 }
 
 fn field(alias: &str, path: &[&str]) -> Value {
@@ -176,6 +177,8 @@ fn hql_and_ir_history_and_change_scans_read_exact_row_revisions() {
 
     assert_eq!(history_hql.columns, history_ir.columns);
     assert_eq!(history_hql.rows, history_ir.rows);
+    diagnostics::history_source_rows(&history_hql, 2);
+    diagnostics::history_source_rows(&history_ir, 2);
     assert_eq!(history_hql.rows.len(), 2);
     assert_eq!(
         history_hql.rows[0]["title"],
@@ -325,6 +328,8 @@ fn hql_and_ir_history_and_change_scans_read_exact_row_revisions() {
 
     assert_eq!(changes_hql.columns, changes_ir.columns);
     assert_eq!(changes_hql.rows, changes_ir.rows);
+    diagnostics::history_source_rows(&changes_hql, 2);
+    diagnostics::history_source_rows(&changes_ir, 2);
     assert_eq!(changes_hql.rows.len(), 2);
     assert_eq!(
         changes_hql.rows[0]["operation"],

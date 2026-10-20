@@ -18,6 +18,10 @@ use std::{
 use tempfile::TempDir;
 use uuid::Uuid;
 
+#[allow(dead_code)]
+#[path = "support/hql2_diagnostics.rs"]
+mod diagnostics;
+
 fn open(path: &Path) -> Storage {
     Storage::open(OpenOptions {
         path: path.to_string_lossy().into_owned(),
@@ -50,10 +54,7 @@ fn run_hql(
         "params":{}
     }))
     .unwrap();
-    match storage.query_v2(access(), request)? {
-        QueryOutcomeV2::Rows(result) => Ok(result),
-        QueryOutcomeV2::Plan(_) => panic!("read query must return rows"),
-    }
+    diagnostics::try_three_modes(storage, access(), request)
 }
 
 fn run_hql_with_budget(
@@ -72,10 +73,7 @@ fn run_hql_with_budget(
         "budget":budget
     }))
     .unwrap();
-    match storage.query_v2(access(), request)? {
-        QueryOutcomeV2::Rows(result) => Ok(result),
-        QueryOutcomeV2::Plan(_) => panic!("read query must return rows"),
-    }
+    diagnostics::try_three_modes(storage, access(), request)
 }
 
 fn run_ir_history_source(
@@ -109,10 +107,7 @@ fn run_ir_history_source(
         "params":{}
     }))
     .unwrap();
-    match storage.query_v2(access(), request)? {
-        QueryOutcomeV2::Rows(result) => Ok(result),
-        QueryOutcomeV2::Plan(_) => panic!("read query must return rows"),
-    }
+    diagnostics::try_three_modes(storage, access(), request)
 }
 
 fn run_ir_node_scan(
@@ -134,10 +129,7 @@ fn run_ir_node_scan(
         "params":{}
     }))
     .unwrap();
-    match storage.query_v2(access(), request)? {
-        QueryOutcomeV2::Rows(result) => Ok(result),
-        QueryOutcomeV2::Plan(_) => panic!("read query must return rows"),
-    }
+    diagnostics::try_three_modes(storage, access(), request)
 }
 
 fn run_ir_history(storage: &Storage, request_id: &str, valid_at: &str) -> QueryResultV2 {
@@ -163,10 +155,7 @@ fn run_ir_changes(storage: &Storage, request_id: &str, after_seq: u64) -> QueryR
         "params":{}
     }))
     .unwrap();
-    match storage.query_v2(access(), request).unwrap() {
-        QueryOutcomeV2::Rows(result) => result,
-        QueryOutcomeV2::Plan(_) => panic!("read query must return rows"),
-    }
+    diagnostics::three_modes_with_access(storage, access(), request)
 }
 
 fn database_id(storage: &Storage) -> String {
@@ -426,6 +415,7 @@ fn history_scan_reads_closed_revisions_and_hydrates_the_exact_revision() {
     )
     .expect("HistoryScan should enumerate retained closed revisions");
 
+    diagnostics::history_source_rows(&result, 2);
     assert_eq!(result.rows.len(), 2);
     let first = &result.rows[0];
     let second = &result.rows[1];
@@ -555,6 +545,8 @@ fn history_scan_reads_closed_revisions_and_hydrates_the_exact_revision() {
     let p7_result =
         p7_graph::execute(&p7_catalog, &p7_view, &p7_plan, p7_graph::Limits::default()).unwrap();
     assert_eq!(hql_typed.rows.len(), p7_result.rows.len());
+    diagnostics::history_source_rows(&hql_typed, p7_result.rows.len() as u64);
+    diagnostics::history_source_rows(&ir_typed, p7_result.rows.len() as u64);
     for (actual, expected) in hql_typed.rows.iter().zip(&p7_result.rows) {
         let p7_graph::Binding::Entity(entity) = &expected["h"] else {
             panic!("P7 HistoryScan binds node revision identities")
@@ -803,6 +795,8 @@ fn history_scan_matches_p7_for_edge_revisions_and_endpoint_acl() {
     let p7_result =
         p7_graph::execute(&p7_catalog, &p7_view, &p7_plan, p7_graph::Limits::default()).unwrap();
     assert_eq!(hql_result.rows.len(), p7_result.rows.len());
+    diagnostics::history_source_rows(&hql_result, p7_result.rows.len() as u64);
+    diagnostics::history_source_rows(&ir_result, p7_result.rows.len() as u64);
     for (actual, expected) in hql_result.rows.iter().zip(&p7_result.rows) {
         let p7_graph::Binding::Entity(entity) = &expected["h"] else {
             panic!("P7 HistoryScan binds edge revision identities")
@@ -898,6 +892,8 @@ fn transaction_time_uses_one_selected_frontier_for_sources_hydration_and_snapsho
     assert_eq!(history_hql_result.snapshot.tx, selected_tx_text);
     assert_eq!(history_ir_result.snapshot.tx, selected_tx_text);
     assert_eq!(history_hql_result.rows, history_ir_result.rows);
+    diagnostics::history_source_rows(&history_hql_result, 1);
+    diagnostics::history_source_rows(&history_ir_result, 1);
     assert_eq!(history_hql_result.rows.len(), 1);
 
     let changes_hql =
@@ -917,11 +913,10 @@ fn transaction_time_uses_one_selected_frontier_for_sources_hydration_and_snapsho
         "params":{}
     }))
     .unwrap();
-    let QueryOutcomeV2::Rows(changes_ir_result) =
-        storage.query_v2(access(), changes_ir_request).unwrap()
-    else {
-        panic!("read query must return rows");
-    };
+    let changes_ir_result =
+        diagnostics::three_modes_with_access(&storage, access(), changes_ir_request);
+    diagnostics::history_source_rows(&changes_hql_result, 0);
+    diagnostics::history_source_rows(&changes_ir_result, 0);
     assert_eq!(changes_hql_result.snapshot.tx, selected_tx_text);
     assert_eq!(changes_ir_result.snapshot.tx, selected_tx_text);
     assert_eq!(changes_hql_result.columns, changes_ir_result.columns);
@@ -1136,6 +1131,8 @@ fn history_scan_reads_vector_revisions_with_hql_ir_and_p7_parity() {
     let p7_result =
         p7_graph::execute(&p7_catalog, &p7_view, &p7_plan, p7_graph::Limits::default()).unwrap();
     assert_eq!(hql_result.rows.len(), p7_result.rows.len());
+    diagnostics::history_source_rows(&hql_result, p7_result.rows.len() as u64);
+    diagnostics::history_source_rows(&ir_result, p7_result.rows.len() as u64);
     let database_id = tagged(&hql_result.rows[0], "h")["value"]["subject"]["database_id"]
         .as_str()
         .unwrap()
@@ -1248,6 +1245,7 @@ fn change_scan_emits_ordered_revision_events_with_typed_sequences_and_operations
     let result = run_hql(&storage, "change-events", &query)
         .expect("ChangeScan should emit retained revisions after the cursor");
 
+    diagnostics::history_source_rows(&result, 4);
     assert_eq!(result.rows.len(), 4);
     let operations: Vec<_> = result
         .rows
@@ -1632,6 +1630,7 @@ fn change_scan_matches_p7_for_edge_row_vector_and_annotation_revisions() {
         p7_graph::Limits::default(),
     )
     .unwrap();
+    diagnostics::history_source_rows(&actual, 7);
     assert_eq!(actual.rows.len(), 7);
     assert_eq!(actual.rows.len(), p7.rows.len());
     for (actual, expected) in actual.rows.iter().zip(&p7.rows) {
@@ -2086,9 +2085,7 @@ fn change_scan_matches_p7_for_exclusive_after_inclusive_through_windows() {
             "params":{}
         }))
         .unwrap();
-        let QueryOutcomeV2::Rows(ir) = storage.query_v2(access(), ir_request).unwrap() else {
-            panic!("read query must return rows");
-        };
+        let ir = diagnostics::three_modes_with_access(&storage, access(), ir_request);
         assert_eq!(hql.snapshot.tx, through.to_string());
         assert_eq!(ir.snapshot.tx, through.to_string());
         assert_eq!(hql.columns, ir.columns);
@@ -2144,6 +2141,16 @@ fn change_scan_matches_p7_for_exclusive_after_inclusive_through_windows() {
             );
             *expected_bag.entry(key).or_insert(0) += 1;
         }
+        let expected_rows = match name {
+            "correction" => 2,
+            "insert-through-correction" => 3,
+            "empty-equal-bounds" => 0,
+            _ => 1,
+        };
+        let oracle_rows = expected_bag.values().sum::<u64>();
+        assert_eq!(oracle_rows, expected_rows, "fixture window {name}");
+        diagnostics::history_source_rows(&hql, oracle_rows);
+        diagnostics::history_source_rows(&ir, oracle_rows);
         assert_eq!(result_bag(&hql), expected_bag, "HQL window {name}");
         assert_eq!(result_bag(&ir), expected_bag, "typed-IR window {name}");
     }
@@ -2318,4 +2325,63 @@ fn explain_plan_tx_as_of_obeys_generation_frontier_without_publishing_or_writing
         "Plan accepted publication-receipt tx_as_of: {}",
         accepted_receipt.join(", ")
     );
+}
+
+#[test]
+fn empty_history_sources_report_measured_zero_in_both_frontends() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    add_node(&storage);
+    let selected = storage.stable_frontier();
+    let hql = run_hql(
+        &storage,
+        "empty-history-hql",
+        &format!("USE default AT TX {selected} AT VALID \"2020-01-01T00:00:00Z\" HISTORY NODE \"missing\" AS h |> RETURN h"),
+    )
+    .unwrap();
+    let ir = run_ir_history_source(
+        &storage,
+        "empty-history-ir",
+        "2020-01-01T00:00:00Z",
+        "node",
+        "missing",
+        Some(&selected.to_string()),
+    )
+    .unwrap();
+    assert!(hql.rows.is_empty());
+    assert_eq!(hql.rows, ir.rows);
+    assert_eq!(hql.columns, ir.columns);
+    diagnostics::history_source_rows(&hql, 0);
+    diagnostics::history_source_rows(&ir, 0);
+}
+
+#[test]
+fn history_and_changes_output_budgets_fail_in_normal_and_analyze() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    let after = storage.stable_frontier();
+    add_node(&storage);
+    storage
+        .supersede_node(
+            "history:one".into(),
+            Some(json!({"title":"replacement"})),
+            None,
+        )
+        .unwrap();
+    let through = storage.stable_frontier();
+    // Insert emits one revision; supersede emits the closed old revision and
+    // a new-node revision. History of the original ID has two entries at 2020.
+    for (hql, expected_rows) in [
+        (format!("USE default AT TX {through} AT VALID \"2020-01-01T00:00:00Z\" HISTORY NODE \"history:one\" AS h |> RETURN h"), 2),
+        (format!("USE default AT TX {through} CHANGES SINCE {after} AS c |> RETURN c"), 3),
+    ] {
+        let baseline = run_hql(&storage, "history-budget-baseline", &hql).unwrap();
+        diagnostics::history_source_rows(&baseline, expected_rows);
+        for budget in [json!({"max_result_rows":1}), json!({"max_result_bytes":1})] {
+            // run_hql_with_budget verifies the same typed error in normal/ANALYZE.
+            let error =
+                run_hql_with_budget(&storage, "history-output-budget", &hql, budget).unwrap_err();
+            assert_eq!(error.code, "QUERY_BUDGET_EXCEEDED");
+        }
+    }
 }

@@ -15,6 +15,10 @@ use std::{
 use tempfile::TempDir;
 use uuid::Uuid;
 
+#[allow(dead_code)]
+#[path = "support/hql2_diagnostics.rs"]
+mod diagnostics;
+
 fn open(path: &Path) -> Storage {
     Storage::open(OpenOptions {
         path: path.to_string_lossy().into_owned(),
@@ -146,9 +150,7 @@ fn annotation_history_scan_matches_p7_for_wal_revision_and_reference_acl() {
         "params":{}
     }))
     .unwrap();
-    let QueryOutcomeV2::Rows(hql_result) = storage.query_v2(actor(), hql_request).unwrap() else {
-        panic!("HQL history query must return rows")
-    };
+    let hql_result = diagnostics::three_modes_with_access(&storage, actor(), hql_request);
     let ir_request: QueryRequestV2 = serde_json::from_value(json!({
         "contract_version":"genesis.api.v2",
         "request_id":"annotation-history-p7-ir",
@@ -168,9 +170,7 @@ fn annotation_history_scan_matches_p7_for_wal_revision_and_reference_acl() {
         "params":{}
     }))
     .unwrap();
-    let QueryOutcomeV2::Rows(ir_result) = storage.query_v2(actor(), ir_request).unwrap() else {
-        panic!("typed IR history query must return rows")
-    };
+    let ir_result = diagnostics::three_modes_with_access(&storage, actor(), ir_request);
     assert_eq!(hql_result.columns, ir_result.columns);
     assert_eq!(hql_result.rows, ir_result.rows);
 
@@ -305,6 +305,8 @@ fn annotation_history_scan_matches_p7_for_wal_revision_and_reference_acl() {
     let p7_result =
         p7_graph::execute(&p7_catalog, &p7_view, &p7_plan, p7_graph::Limits::default()).unwrap();
     assert_eq!(hql_result.rows.len(), p7_result.rows.len());
+    diagnostics::history_source_rows(&hql_result, 1);
+    diagnostics::history_source_rows(&ir_result, 1);
     for (actual, expected) in hql_result.rows.iter().zip(&p7_result.rows) {
         let p7_graph::Binding::Entity(entity) = &expected["h"] else {
             panic!("P7 HistoryScan binds annotation revision identities")

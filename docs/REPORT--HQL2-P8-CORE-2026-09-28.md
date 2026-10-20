@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.74b"
+version: "0.1.75b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-20T09:42:16+07:00,Codex"
+last_update: "2026-10-20T11:46:18+07:00,Codex"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -14,6 +14,100 @@ attributes:
 
 
 # HQL2 P8 core checkpoint — not full HQL2 completion
+
+## Approved G4 history/change diagnostic qualification - 2026-10-20
+
+The owner approved the bounded test/documentation matrix on main `a3e2d4d`.
+HistoryScan/ChangeScan keep existing P6/H2-D11 source, temporal/floor/ACL and
+budget contracts. Qualify exact emitted rows, empty measured zero, typed unknown
+source timing, HQL/IR result parity and normal/EXPLAIN/ANALYZE plan identity.
+EXPLAIN remains catalog-only; data-dependent errors are compared only between
+normal execution and ANALYZE. No runtime/API/WAL/schema/planner change.
+Risk LOW, complexity C-3. Local qualification passes 93 tests across 11 targets;
+hosted qualification remains pending. G4/P8/P13, lexical/context,
+independent review and device/release gates remain open.
+
+PR #251 qualified head `098a71e` completed four successful hosted workflows,
+15 successful checks and one schedule-only skip before merge as `a3e2d4d`.
+Its three OS Rust suites passed; local runtime was NOT_RUN due to Application
+Control 4551. The failed parent and fixture-grant RCA remain historical evidence.
+
+
+## G4 history/change qualification checkpoint - 2026-10-20
+
+This test-only slice adds three tests and strengthens existing History/Change,
+Row history, Annotation history/ACL and EXPLAIN fixtures. The shared test helper
+compares normal/EXPLAIN/ANALYZE results and typed metadata, including the same
+database, transaction frontier, generation and policy epoch for normal/ANALYZE;
+expected source counts
+come from fixture mutations or independent P7 output bags, never observations.
+For data errors it compares code/stage/detail in normal and ANALYZE and does
+not require plan-only source execution or source-dependent failure.
+
+- Node/Edge/Row/Vector/Annotation History sources retain P7 result/revision
+  comparisons and now pin exact rows_in=0 and emitted rows_out. Row history
+  and changes each use the fixture's two revisions. Annotation history has one.
+- Five P7 transaction windows retain exclusive-after/inclusive-through bags;
+  exact event counts are 1/2/3/1/0. Selected-transaction equal bounds and a missing
+  History ID explicitly check measured zero. Source timing remains unknown.
+- Existing floor, cursor, capability and source-budget failures exercise both
+  normal and ANALYZE. A new output-budget fixture checks two History entries
+  of the original Node ID at valid-time 2020 and three Change events (one insert,
+  closed old revision and new-node revision) against row/byte caps.
+- Annotation ACL fixtures preserve zero changes without Annotation(Read), one
+  with that grant, and pre-budget omission of hidden annotation revisions.
+  These are scoped existing visibility controls, not a complete ACL matrix.
+- Four new HQL/IR plan-only requests cover History and Change source shapes,
+  checking actuals/estimates absent and frontier/fixture files unchanged. The
+  existing lock/shared-memory size exceptions are preserved. This proves
+  observed no writes, not instrumentation of every read or full persistence UAT.
+
+The initial local focused run executed on this host and exposed a test-only
+window expectation error: supersede contributes two revision events, not one.
+The corrected manual counts are checked against independent P7 multiplicities;
+see [window expectation RCA](../.brain/rca/2026-10-20-g4-change-window-expectation.md).
+Final local qualification: **93 passed, zero failed/ignored across 11 targets**.
+The ten-target sweep passed 86/86; final History/Change (21/21) was rerun after
+aligning the empty HQL valid-time selector with IR, and AnnotationLookup added
+7/7. History reruns are not double-counted. All shared-helper callers passed.
+Strict core/default all-target Clippy, formatting, documentation validation
+(244 files, zero violations), version 0.2.10 and diff checks passed.
+Current local runtime executed normally without any host-policy change; the
+previous #251 Application Control blocker remains historical evidence only.
+Hosted qualification for this new history/change revision is pending. Broad
+G4/P8/P13 and independent/device/release gates remain open.
+
+Exact final test blobs:
+
+| Path | Git blob |
+| --- | --- |
+| tests/support/hql2_diagnostics.rs | `3baf5fa0c0259507b18f5db286d8ca6f2b0df98d` |
+| tests/hql2_history_change_tests.rs | `c79ff6baa509fbed81ecd3489c4c06ad4fd11e9e` |
+| tests/hql2_row_history_tests.rs | `a166697e8e5dbd6da552cfda9a7415d770087be8` |
+| tests/hql2_annotation_source_tests.rs | `c00296459ce19eb25e8930e0ced6a90ecd70d515` |
+| tests/hql2_annotation_acl_tests.rs | `3537a93da060bc20c352365062bfbd44e32891d0` |
+| tests/hql2_explain_source_tests.rs | `1bd7c0de8c3345b14862da460e5ff3af7a7d0ba5` |
+
+Scoped implementer architecture review: all production source/API/persistence
+contracts are unchanged. Source materialization still precedes SourceScan
+execution; emitted rows do not claim physical scan effort. Test helper default
+wrappers retain their previous signature and explicit actors still pass through
+Storage authorization. The Result variant strengthens paired error assertions;
+plan-only success is not conflated with data authority. Only the history-row
+assertion helper allows unused code in other integration targets that share
+this module. This scoped review is not independent acceptance.
+
+Executed final validation commands (the initial focused failure remains in RCA/evidence):
+
+```text
+cargo test --locked --no-default-features --jobs 2 --test hql2_annotation_acl_tests --test hql2_annotation_source_tests --test hql2_expand_sequence_tests --test hql2_explain_source_tests --test hql2_g4_contract_tests --test hql2_g4_scalar_counter_tests --test hql2_g4_source_counter_tests --test hql2_history_change_tests --test hql2_row_history_tests --test hql2_vector_operator_tests
+cargo test --locked --no-default-features --jobs 2 --test hql2_history_change_tests --test hql2_annotation_lookup_tests
+cargo clippy --locked --no-default-features --all-targets --jobs 2 -- -D warnings
+cargo clippy --locked --all-targets --jobs 2 -- -D warnings
+cargo fmt --check
+npm run docs:validate
+npm run version:check
+```
 
 ## Approved G4 source and annotation diagnostics - 2026-10-20
 
@@ -1112,6 +1206,7 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.75b | 2026-10-20 | beta | Approve test-only History/Change diagnostic matrix and reconcile PR251 hosted qualification; preserve runtime contracts and broader acceptance gates | working-tree | Codex |
 | 0.1.74b | 2026-10-20 | beta | Owner-approved source/annotation diagnostics, exact rows and truthful unknowns; reconcile scalar/graph hosted evidence while retaining broader acceptance gates | working-tree | Codex |
 | 0.1.73b | 2026-10-19 | beta | Record approved Sequence/Match and exact KNN/Original Rerank counter verification scope; track source-budget provenance, zero/unknown and mode parity without expanding capabilities | working-tree | Codex |
 | 0.1.72b | 2026-10-19 | beta | Add approved scalar counter qualification scope at main 6195e85 and correct current NAPI exposure; retain historical evidence and broader G4/P8/P13 gates | working-tree | Codex |
