@@ -237,6 +237,16 @@ fn source_diagnostics_respect_explicit_actor_authority() {
                     resource: AccessResource::Namespace("default".into()),
                 },
                 AccessGrant {
+                    principal: "source-reader".into(),
+                    action: AccessAction::Read,
+                    resource: AccessResource::Annotation("default".into()),
+                },
+                AccessGrant {
+                    principal: "namespace-only-reader".into(),
+                    action: AccessAction::Read,
+                    resource: AccessResource::Namespace("default".into()),
+                },
+                AccessGrant {
                     principal: "local-owner".into(),
                     action: AccessAction::ManagePolicy,
                     resource: AccessResource::Namespace("default".into()),
@@ -266,6 +276,25 @@ fn source_diagnostics_respect_explicit_actor_authority() {
     diagnostics::measured(&result, &lookup_node.id, "rows_in", "rows", 2);
     diagnostics::measured(&result, &lookup_node.id, "rows_out", "rows", 2);
     for original in [original, lookup] {
+        // Namespace access permits planning; annotation data requires its own grant.
+        let mut plan_only = original.clone();
+        plan_only.explain = Some(ExplainV2::Plan);
+        let QueryOutcomeV2::Plan(plan) = db
+            .query_v2(actor("namespace-only-reader"), plan_only)
+            .unwrap()
+        else {
+            panic!("catalog-only plan")
+        };
+        assert!(plan.plan.iter().all(|node| node.actual.is_none()));
+        for mode in [None, Some(ExplainV2::Analyze)] {
+            let mut denied = original.clone();
+            denied.explain = mode;
+            let error = db
+                .query_v2(actor("namespace-only-reader"), denied)
+                .unwrap_err();
+            assert_eq!(error.code, "FORBIDDEN");
+            assert_eq!(error.stage, "authorize");
+        }
         for mode in [None, Some(ExplainV2::Plan), Some(ExplainV2::Analyze)] {
             let mut denied = original.clone();
             denied.explain = mode;

@@ -2,7 +2,7 @@
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
 version: "0.1.74b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-20T09:22:28+07:00,Codex"
+last_update: "2026-10-20T09:42:16+07:00,Codex"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -37,7 +37,8 @@ inputs), one required match or two optional outputs (doubled for duplicates).
 Two empty lookup cases report measured zero. Existing frozen/live target and
 P7 fixtures now execute in all three modes under their explicit actor.
 
-Actor tests grant one reader namespace authority and reject another in normal,
+Actor tests grant one reader namespace plus explicit Annotation(Read) authority
+and reject an untrusted reader in normal,
 EXPLAIN and ANALYZE for both AnnotationScan and AnnotationLookup. This is an
 authority fixture, not a complete per-resource ACL matrix. Eight deliberate
 normal/ANALYZE budget rejections cover source-node work, result rows/bytes and
@@ -76,11 +77,25 @@ full G4/P8/P13 acceptance is asserted. This is not an independent review.
 
 Final local static gates: strict all-target Clippy passed for core and default/NAPI; formatting, documentation (244 files, zero violations), version 0.2.10 and diff checks passed. Runtime tests remain NOT_RUN locally; hosted CI is pending. Final test blobs:
 
-- tests/hql2_g4_source_counter_tests.rs : 38376415d70752f59aada459b7fbb838a8bfb714
+- tests/hql2_g4_source_counter_tests.rs : 29f0f200ae07ea3121386c59b0e1236537cfc822
 - tests/hql2_annotation_lookup_tests.rs : ddcb4703d50c75e56368371e68d52f0e02c0747c
 - tests/hql2_explain_source_tests.rs : bc7dbc7504c0c5a6cb3b8ca91178dab1d76777e1
 - tests/hql2_storage_source_tests.rs : 2535ece83e3b05c67cd9b39f5cb6c8c842c26403
 - tests/support/hql2_diagnostics.rs : c4407aa2e349363b9f55fa0b421d8e155753924f
+
+### Hosted fixture correction - 2026-10-20
+
+At parent head `17f4569`, macOS job 118419562108 failed only the new actor
+fixture in the source-counter target; the exact source-row and budget tests
+passed (2/3 in that target). The fixture omitted the explicit Annotation(Read)
+grant required by the existing P6/runtime contract. See
+[fixture RCA](../.brain/rca/2026-10-20-g4-annotation-fixture-grant.md).
+The corrected fixture grants both namespace and annotation read to the allowed
+reader. A namespace-only reader is denied data execution in normal/ANALYZE;
+its catalog-only EXPLAIN may return a plan without actuals. The completely
+untrusted reader remains denied in all modes. Production code and exact result
+assertions are unchanged. Fresh CI on the amended head is required; the failed
+parent run is not acceptance. Local runtime remains NOT_RUN under host policy.
 
 ## G4 graph and vector diagnostic qualification — 2026-10-19
 
