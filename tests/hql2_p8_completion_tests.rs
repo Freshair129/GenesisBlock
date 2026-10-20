@@ -1,3 +1,7 @@
+#[allow(dead_code)]
+#[path = "support/hql2_diagnostics.rs"]
+mod diagnostics;
+
 #[path = "support/hql2_rank_reference.rs"]
 #[allow(dead_code)]
 mod rank_reference;
@@ -116,7 +120,7 @@ fn request_with_memory_budget(id: &str, hql: &str, max_memory_bytes: u64) -> Que
 }
 
 fn run(storage: &Storage, id: &str, hql: &str) -> Result<QueryOutcomeV2, QueryErrorV2> {
-    storage.query_v2(access(), request(id, hql))
+    diagnostics::try_three_modes(storage, access(), request(id, hql)).map(QueryOutcomeV2::Rows)
 }
 
 fn run_with_params(
@@ -125,7 +129,8 @@ fn run_with_params(
     hql: &str,
     params: Value,
 ) -> Result<QueryOutcomeV2, QueryErrorV2> {
-    storage.query_v2(access(), request_with_params(id, hql, params))
+    diagnostics::try_three_modes(storage, access(), request_with_params(id, hql, params))
+        .map(QueryOutcomeV2::Rows)
 }
 
 fn run_ir(storage: &Storage, id: &str, ir: Value) -> Result<QueryOutcomeV2, QueryErrorV2> {
@@ -146,7 +151,7 @@ fn run_ir_with_params(
         "ir":ir
     }))
     .unwrap();
-    storage.query_v2(access(), request)
+    diagnostics::try_three_modes(storage, access(), request).map(QueryOutcomeV2::Rows)
 }
 
 fn add_node(storage: &Storage, id: &str, props: Value) {
@@ -519,9 +524,8 @@ fn lexical_and_context_memory_budget_failures_return_no_partial_rows() {
             Ok(QueryOutcomeV2::Plan(_))
         ));
 
-        let error = storage
-            .query_v2(
-                access(),
+        let error = diagnostics::try_three_modes(
+                &storage, access(),
                 request_with_memory_budget(&format!("{id}-execute"), hql, 6 * 1024 * 1024),
             )
             .unwrap_err();
@@ -833,4 +837,328 @@ fn ambiguous_null_and_heterogeneous_lists_reject_while_empty_list_is_contextual(
         nested_error.code == "BIND_ERROR" || nested_error.code == "HQL_PARSE_ERROR",
         "deep JSON literal must fail closed: {nested_error:?}"
     );
+}
+
+/// Independent fixture counts, not observed diagnostics, define the expectation.
+fn operator_rows(
+    result: &genesis_block_native::query::hql2::QueryResultV2,
+    op: genesis_block_native::uee_v2::QueryOpV2,
+    input: u64,
+    output: u64,
+) {
+    let nodes: Vec<_> = result
+        .explain
+        .as_ref()
+        .unwrap()
+        .plan
+        .iter()
+        .filter(|n| n.logical_op == op)
+        .collect();
+    assert_eq!(nodes.len(), 1);
+    diagnostics::measured(result, &nodes[0].id, "rows_in", "rows", input);
+    diagnostics::measured(result, &nodes[0].id, "rows_out", "rows", output);
+}
+
+fn fixture_tx(storage: &Storage) -> Option<u64> {
+    let generation = storage.publish_generation().unwrap();
+    (generation.wal_frontier >= generation.history_horizon).then_some(generation.wal_frontier)
+}
+
+fn text_ir_request(
+    selected: Option<u64>,
+    op: &str,
+    config: Value,
+    duplicate: bool,
+) -> QueryRequestV2 {
+    let mut nodes = vec![json!({"id":"scan","op":"NodeScan","inputs":[],"config":{"as":"n"}})];
+    let input = if duplicate {
+        nodes.push(json!({"id":"twice","op":"UnionAll","inputs":["scan","scan"],"config":{}}));
+        "twice"
+    } else {
+        "scan"
+    };
+    nodes.push(json!({"id":"ordered","op":"Sort","inputs":[input],"config":{"keys":[{"expression":{"field":{"alias":"n","path":["id"]}},"direction":"asc","nulls":"last"}]}}));
+    nodes.push(json!({"id":"text","op":op,"inputs":["ordered"],"config":config}));
+    serde_json::from_value(
+        json!({"contract_version":"genesis.api.v2","request_id":"g4-text-ir","namespace":"default",
+        "temporal":selected.map(|tx|json!({"tx_as_of":tx.to_string()})),"params":{},
+        "ir":{"contract_version":"query-ir.v2","nodes":nodes,"root":"text","parameter_types":{}}}),
+    )
+    .unwrap()
+}
+
+fn text_hql_request(selected: Option<u64>, suffix: &str, duplicate: bool) -> QueryRequestV2 {
+    let source = if duplicate {
+        "UNION ALL { FROM NODES AS n |> RETURN n } { FROM NODES AS n |> RETURN n }"
+    } else {
+        "FROM NODES AS n"
+    };
+    let selector = selected
+        .map(|tx| format!(" AT TX {tx}"))
+        .unwrap_or_default();
+    request(
+        "g4-text-hql",
+        &format!("USE default{selector} {source} |> ORDER BY n.id ASC NULLS LAST |> {suffix}"),
+    )
+}
+
+fn lexical_config(query: &str, k: u32, profile: &str) -> Value {
+    json!({"entity":"n","field":"body","index":profile,"query":{"literal":query,"type":"Utf8"},"k":k,"as":"score"})
+}
+fn context_config(tokens: u32, tokenizer: &str) -> Value {
+    json!({"text":{"call":"prop","args":[{"field":{"alias":"n","path":[]}},{"literal":"body","type":"Utf8"}]},"evidence":{"field":{"alias":"n","path":[]}},"tokens":tokens,"tokenizer":tokenizer,"as":"ctx"})
+}
+
+#[test]
+fn lexical_diagnostics_match_p7_for_empty_duplicate_nonmatch_and_top_zero() {
+    use genesis_block_native::uee_v2::QueryOpV2;
+    for populated in [false, true] {
+        let dir = TempDir::new().unwrap();
+        let db = open(dir.path());
+        if populated {
+            add_node(&db, "doc:a", json!({"body":"red\u{2003}red blue"}));
+            add_node(&db, "doc:b", json!({"body":"red\u{2003}red blue"}));
+            add_node(&db, "doc:c", json!({"body":""}));
+            add_node(&db, "doc:missing", json!({"title":"absent text"}));
+        }
+        let selected = fixture_tx(&db);
+        for (query, k, duplicate, expected) in [
+            ("red", 10, false, 2),
+            ("red", 10, true, 4),
+            ("green", 10, false, 0),
+            ("", 10, false, 0),
+            ("red", 0, false, 0),
+        ] {
+            let expected = if populated { expected } else { 0 };
+            let suffix=format!("LEXICAL n FIELD body QUERY {} USING INDEX `unicode-whitespace-bm25-v1` TOP {k} AS score |> RETURN n, score",serde_json::to_string(query).unwrap());
+            let hql = diagnostics::three_modes_with_access(
+                &db,
+                access(),
+                text_hql_request(selected, &suffix, duplicate),
+            );
+            let ir = diagnostics::three_modes_with_access(
+                &db,
+                access(),
+                text_ir_request(
+                    selected,
+                    "LexicalMatch",
+                    lexical_config(query, k, "unicode-whitespace-bm25-v1"),
+                    duplicate,
+                ),
+            );
+            assert_eq!(hql.columns, ir.columns);
+            assert_eq!(hql.rows, ir.rows);
+            let input = if populated {
+                if duplicate {
+                    8
+                } else {
+                    4
+                }
+            } else {
+                0
+            };
+            operator_rows(&hql, QueryOpV2::LexicalMatch, input, expected);
+            operator_rows(&ir, QueryOpV2::LexicalMatch, input, expected);
+            let texts: Vec<_> = if populated {
+                vec![
+                    ("doc:a", "red\u{2003}red blue"),
+                    ("doc:b", "red\u{2003}red blue"),
+                    ("doc:c", ""),
+                ]
+            } else {
+                vec![]
+            };
+            let (fixture, mut batch) = lexical_reference_fixture(&texts);
+            if duplicate {
+                batch.rows.extend(batch.rows.clone());
+                // P7 keys identify occurrences, not distinct owners.
+                for (index, row) in batch.rows.iter_mut().enumerate() {
+                    row.row_key = format!("{}:{index:03}", row.owner_id);
+                }
+            }
+            let oracle = rank_reference::lexical_rank(
+                batch,
+                &fixture,
+                &rank_reference::LexicalRequest {
+                    analyzer_fingerprint: "unicode-whitespace-bm25-v1".into(),
+                    terms: if query.is_empty() {
+                        vec![]
+                    } else {
+                        vec![query.into()]
+                    },
+                    k1: 1.2,
+                    b: 0.75,
+                    top: k as usize,
+                    source: "lexical".into(),
+                },
+            )
+            .unwrap();
+            assert_eq!(oracle.rows.len() as u64, expected);
+            for (row, expected) in hql.rows.iter().zip(&oracle.rows) {
+                let QueryValueV2::Entity(owner) = &row["n"] else {
+                    panic!("entity")
+                };
+                let QueryValueV2::Score(score) = &row["score"] else {
+                    panic!("score")
+                };
+                assert_eq!(owner.id, expected.owner_id);
+                assert!((score.value - expected.hit.as_ref().unwrap().value).abs() < 1e-12);
+            }
+        }
+    }
+}
+
+#[test]
+fn context_diagnostics_preserve_p7_packages_for_empty_duplicate_and_token_limits() {
+    use genesis_block_native::uee_v2::QueryOpV2;
+    for populated in [false, true] {
+        let dir = TempDir::new().unwrap();
+        let db = open(dir.path());
+        if populated {
+            add_node(&db, "doc:context", json!({"body":"é猫😀"}));
+        }
+        let selected = fixture_tx(&db);
+        let texts: Vec<_> = if populated {
+            vec![("doc:context", "é猫😀")]
+        } else {
+            vec![]
+        };
+        let (mut fixture, mut batch) = lexical_reference_fixture(&texts);
+        if populated {
+            let projection = Connection::open(dir.path().join("projection.sqlite")).unwrap();
+            let revision:String=projection.query_row("SELECT revision_id FROM hql2_record_revisions WHERE namespace='default' AND kind='node' AND record_id='doc:context' AND tx_to IS NULL",[],|row|row.get(0)).unwrap();
+            fixture.documents[0].revision = revision.clone();
+            fixture.documents[0].source_hash = hex::encode(Sha256::digest("é猫😀".as_bytes()));
+            batch.rows[0].revision = revision;
+        }
+        for duplicate in [false, true] {
+            let mut batch = batch.clone();
+            if duplicate {
+                batch.rows.extend(batch.rows.clone());
+                // P7 keys identify occurrences, not distinct owners.
+                for (index, row) in batch.rows.iter_mut().enumerate() {
+                    row.row_key = format!("{}:{index:03}", row.owner_id);
+                }
+            }
+            for tokens in [0, 3, 5, 6, 7, 13, 20] {
+                let suffix=format!("PACK CONTEXT TEXT prop(n, \"body\") EVIDENCE n TOKENS {tokens} TOKENIZER \"unicode-scalar-v1\" AS ctx |> RETURN ctx");
+                let hql = diagnostics::three_modes_with_access(
+                    &db,
+                    access(),
+                    text_hql_request(selected, &suffix, duplicate),
+                );
+                let ir = diagnostics::three_modes_with_access(
+                    &db,
+                    access(),
+                    text_ir_request(
+                        selected,
+                        "ContextPack",
+                        context_config(tokens, "unicode-scalar-v1"),
+                        duplicate,
+                    ),
+                );
+                assert_eq!(hql.rows, ir.rows);
+                assert_eq!(hql.columns, ir.columns);
+                let input = if populated {
+                    if duplicate {
+                        2
+                    } else {
+                        1
+                    }
+                } else {
+                    0
+                };
+                operator_rows(&hql, QueryOpV2::ContextPack, input, 1);
+                operator_rows(&ir, QueryOpV2::ContextPack, input, 1);
+                let oracle = rank_reference::pack_context(
+                    &batch,
+                    &fixture,
+                    &rank_reference::TokenizerRegistry {
+                        entries: BTreeMap::from([(
+                            "unicode-scalar-v1".into(),
+                            rank_reference::FixtureTokenizer::UnicodeScalarV1,
+                        )]),
+                    },
+                    "unicode-scalar-v1",
+                    tokens as usize,
+                )
+                .unwrap();
+                let QueryValueV2::Context(actual) = &hql.rows[0]["ctx"] else {
+                    panic!("Context")
+                };
+                assert_eq!(actual.rendered_context, oracle.rendered_context);
+                assert_eq!(actual.token_count as usize, oracle.token_count);
+                assert_eq!(actual.token_budget as usize, oracle.token_budget);
+                assert_eq!(
+                    actual.tokenizer_fingerprint,
+                    "f15080fb9ac562aa2b9062478b9a0fec142429b08c5bb099743732b0b62d7d46"
+                );
+                assert_eq!(actual.truncated, oracle.truncated);
+                assert_eq!(actual.truncation_reason, oracle.truncation_reason);
+                assert_eq!(actual.fragments.len(), oracle.fragments.len());
+                assert_eq!(actual.omitted_refs.len(), oracle.omitted_refs.len());
+                for (a, e) in actual.fragments.iter().zip(&oracle.fragments) {
+                    assert_eq!(a.text, e.text);
+                    assert_eq!(a.citation, e.citation);
+                    assert_eq!(a.evidence.source.id, e.evidence.owner_id);
+                    assert_eq!(a.evidence.source.revision, e.evidence.revision);
+                    assert_eq!(a.evidence.source_hash, e.evidence.source_hash);
+                    assert_eq!(a.evidence.start_scalar as usize, e.evidence.start_scalar);
+                    assert_eq!(a.evidence.end_scalar as usize, e.evidence.end_scalar);
+                }
+                for (a, e) in actual.omitted_refs.iter().zip(&oracle.omitted_refs) {
+                    assert_eq!(a.source.id, e.owner_id);
+                    assert_eq!(a.source.revision, e.revision);
+                    assert_eq!(a.source_hash, e.source_hash);
+                    assert_eq!(a.start_scalar as usize, e.start_scalar);
+                    assert_eq!(a.end_scalar as usize, e.end_scalar);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn text_diagnostics_preserve_capability_errors_in_all_modes_and_frontends() {
+    let dir = TempDir::new().unwrap();
+    let db = open(dir.path());
+    let selected = fixture_tx(&db);
+    for (op,config,suffix,reason) in [
+        ("LexicalMatch",lexical_config("red",0,"unknown-v1"),"LEXICAL n FIELD body QUERY \"red\" USING INDEX `unknown-v1` TOP 0 AS score |> RETURN n, score","unknown_analyzer"),
+        ("ContextPack",context_config(0,"unknown-v1"),"PACK CONTEXT TEXT prop(n, \"body\") EVIDENCE n TOKENS 0 TOKENIZER \"unknown-v1\" AS ctx |> RETURN ctx","unknown_tokenizer")
+    ] {
+        let mut errors=vec![];
+        for request in [text_hql_request(selected,suffix,false),text_ir_request(selected,op,config,false)] {
+            for mode in [None,Some(ExplainV2::Plan),Some(ExplainV2::Analyze)] {
+                let mut request=request.clone();request.explain=mode;
+                let error=db.query_v2(access(),request).unwrap_err();
+                assert_eq!(error.code,"CAPABILITY_UNSUPPORTED");assert_eq!(error.stage,"bind");assert_eq!(error.detail.as_ref().unwrap()["reason"],reason);errors.push(error);
+            }
+        }
+        assert!(errors.iter().all(|e|e.code==errors[0].code && e.stage==errors[0].stage && e.detail==errors[0].detail));
+    }
+}
+
+#[test]
+fn text_output_budgets_fail_without_partial_packages_in_normal_and_analyze() {
+    let dir = TempDir::new().unwrap();
+    let db = open(dir.path());
+    for id in ["doc:a", "doc:b"] {
+        add_node(&db, id, json!({"body":"red"}));
+    }
+    let selected = fixture_tx(&db);
+    for (op,config,suffix) in [
+        ("LexicalMatch",lexical_config("red",10,"unicode-whitespace-bm25-v1"),"LEXICAL n FIELD body QUERY \"red\" USING INDEX `unicode-whitespace-bm25-v1` TOP 10 AS score |> RETURN n, score"),
+        ("ContextPack",context_config(20,"unicode-scalar-v1"),"PACK CONTEXT TEXT prop(n, \"body\") EVIDENCE n TOKENS 20 TOKENIZER \"unicode-scalar-v1\" AS ctx |> RETURN ctx")
+    ] {
+        for mut request in [text_hql_request(selected,suffix,false),text_ir_request(selected,op,config,false)] {
+            let mut budgets=vec![json!({"max_result_bytes":1}),json!({"max_memory_bytes":1})];
+            if op=="LexicalMatch" {budgets.push(json!({"max_result_rows":1}));}
+            for budget in budgets {
+                request.budget=Some(serde_json::from_value(budget).unwrap());
+                let error=diagnostics::try_three_modes(&db,access(),request.clone()).unwrap_err();
+                assert_eq!(error.code,"QUERY_BUDGET_EXCEEDED");
+            }
+        }
+    }
 }

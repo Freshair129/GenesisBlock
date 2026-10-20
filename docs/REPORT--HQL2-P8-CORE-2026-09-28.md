@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.75b"
+version: "0.1.76b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-20T11:46:18+07:00,Codex"
+last_update: "2026-10-20T14:32:33+07:00,Codex"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -15,6 +15,87 @@ attributes:
 
 # HQL2 P8 core checkpoint — not full HQL2 completion
 
+## Approved G4 lexical/context qualification - 2026-10-20
+
+The owner approved the bounded tests/docs-only proposal on merged main
+`7c3e5e2`. Risk LOW, complexity C-3. Qualify LexicalMatch/ContextPack exact rows,
+three-mode HQL/IR parity, empty/duplicate inputs, typed unknowns, token/citation
+provenance, capability/budget errors and observed-no-write EXPLAIN. Preserve
+BM25, tokenizer, runtime/API/P6/WAL/schema and planner contracts. ContextPack
+emits one package on empty input; token truncation is a successful package.
+Local qualification passes 170/170 across 14 targets; strict core/default
+all-target Clippy, format/docs/version/diff gates pass. Hosted qualification
+for this lexical/context revision is pending. Broad G4/P8/P13,
+independent/device/release gates remain open.
+
+PR #252 exact head `25f6e4445ad0ceb11471302e0b5ec40b44d451a9` completed
+four successful hosted workflows (15 SUCCESS checks plus one schedule-only
+skip), including Rust on Ubuntu/macOS/Windows, then merged normally as
+`7c3e5e23984e124a4ba480b8f1e22bf218372b0b`. Its local runtime passed 93 unique
+tests across 11 targets. The #251 local NOT_RUN remains historical only.
+
+
+## G4 lexical/context checkpoint - 2026-10-20
+
+The test-only slice extends the existing completion and EXPLAIN targets.
+Existing HQL/IR P7 BM25 tie/score and context hash/offset/evidence assertions
+remain. Existing successful reads now use the shared three-mode helper; errors
+pair normal/ANALYZE. Four new matrix tests cover 10 lexical fixtures (20 HQL/IR
+requests), 28 context fixtures (56 HQL/IR requests), 12 unknown-profile mode/
+frontend failures and 10 paired request-memory/output row/byte budget failures.
+These are fixture/request counts, not a whole-HQL2 acceptance count. Existing
+memory regression also pairs normal/ANALYZE while retaining plan-only success.
+A fifth new test adds four HQL/IR EXPLAIN frontier/filesystem invariance requests.
+
+Lexical fixtures retain missing text as a nonmatch, visible empty text in corpus,
+P7 score tolerance and deterministic tie order. Context fixtures bind independent
+P7 symbolic revisions to fixture SQLite revision IDs and hash exact UTF-8 bytes;
+they cover full, partial, omitted, duplicate, empty and citation-overhead token boundaries.
+Context rows_in=0/rows_out=1 on empty input is intentionally distinct from
+Lexical rows_out=0. Unknown counters remain unknown; emitted rows are not corpus
+scan/work counters. Source elapsed remains unknown; kernel elapsed has no
+wall-clock threshold. Plan identities are compared within each request, not
+across different frontend shapes. The first focused run passed EXPLAIN5/5 and completion11/14, exposing invalid
+new fixture transaction selectors. After query publication stable_frontier can
+be a receipt beyond covered wal_frontier; empty tx0 is below the retained horizon.
+See [fixture frontier RCA](../.brain/rca/2026-10-20-g4-text-fixture-frontier.md).
+The correction captures one published generation's covered data frontier before
+both frontend requests; an empty generation with no selectable tx omits the
+explicit selector in both. Semantic/counter/error expectations remain intact.
+The second focused run passed EXPLAIN5/5 and completion12/14; two new duplicate
+P7 batches reused occurrence row keys. The same RCA records the correction:
+deterministic unique row keys preserve repeated owners and bag multiplicity.
+Existing 6MiB memory cases retain their execute-stage source/payload regression;
+the new 1-byte memory cases check request-budget failure without attributing
+a specific operator stage. Final local regression passes **170/170 across 14 targets**, zero failed/ignored.
+Strict core/default all-target Clippy, formatting, docs (244 files/0 violations),
+version 0.2.10 and diff checks pass. Hosted exact-head qualification is pending.
+
+Scoped implementer architecture review: no production module or public config
+changes. Existing shared helper signatures and counter definitions are reused.
+The binder's registered profiles and P6 lease/selective text hydration retain
+authority; no fallback profile or unpinned lookup is added. Independent P7
+results remain the semantic oracle, with manually enumerated counts rather
+than observed counters. EXPLAIN disk checks retain existing lock/shared-memory
+exceptions and prove observed no writes only. This review is not independent
+G4/P8/P13 acceptance. Broader/device/release gates remain open.
+
+Final source identities and commands for the approved lexical/context slice:
+
+| Test source | Git blob |
+| --- | --- |
+| tests/hql2_p8_completion_tests.rs | `a796d83372eb70c7014f80b35eae00436ce6350e` |
+| tests/hql2_explain_source_tests.rs | `6684c08c4a7caeddb80fefed28a0447507bcc767` |
+
+```text
+cargo clippy --locked --no-default-features --all-targets --jobs 2 -- -D warnings
+cargo clippy --locked --all-targets --jobs 2 -- -D warnings
+cargo test --locked --no-default-features --jobs 2 --test hql2_p8_completion_tests --test hql2_explain_source_tests --test hql2_annotation_acl_tests --test hql2_annotation_lookup_tests --test hql2_annotation_source_tests --test hql2_expand_sequence_tests --test hql2_g4_contract_tests --test hql2_g4_scalar_counter_tests --test hql2_g4_source_counter_tests --test hql2_history_change_tests --test hql2_row_history_tests --test hql2_vector_operator_tests --test hql2_rank_oracle_tests --test hql2_pipeline_oracle_tests
+cargo fmt --check
+npm run docs:validate
+npm run version:check
+```
+
 ## Approved G4 history/change diagnostic qualification - 2026-10-20
 
 The owner approved the bounded test/documentation matrix on main `a3e2d4d`.
@@ -24,7 +105,7 @@ source timing, HQL/IR result parity and normal/EXPLAIN/ANALYZE plan identity.
 EXPLAIN remains catalog-only; data-dependent errors are compared only between
 normal execution and ANALYZE. No runtime/API/WAL/schema/planner change.
 Risk LOW, complexity C-3. Local qualification passes 93 tests across 11 targets;
-hosted qualification remains pending. G4/P8/P13, lexical/context,
+hosted qualification passed in #252. G4/P8/P13, lexical/context,
 independent review and device/release gates remain open.
 
 PR #251 qualified head `098a71e` completed four successful hosted workflows,
@@ -74,7 +155,7 @@ Strict core/default all-target Clippy, formatting, documentation validation
 (244 files, zero violations), version 0.2.10 and diff checks passed.
 Current local runtime executed normally without any host-policy change; the
 previous #251 Application Control blocker remains historical evidence only.
-Hosted qualification for this new history/change revision is pending. Broad
+Hosted qualification for history/change passed in #252. Broad
 G4/P8/P13 and independent/device/release gates remain open.
 
 Exact final test blobs:
@@ -1206,6 +1287,7 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.76b | 2026-10-20 | beta | Approve test-only lexical/context mode/counter/P7 qualification and reconcile hosted PR252; no runtime contract change | working-tree | Codex |
 | 0.1.75b | 2026-10-20 | beta | Approve test-only History/Change diagnostic matrix and reconcile PR251 hosted qualification; preserve runtime contracts and broader acceptance gates | working-tree | Codex |
 | 0.1.74b | 2026-10-20 | beta | Owner-approved source/annotation diagnostics, exact rows and truthful unknowns; reconcile scalar/graph hosted evidence while retaining broader acceptance gates | working-tree | Codex |
 | 0.1.73b | 2026-10-19 | beta | Record approved Sequence/Match and exact KNN/Original Rerank counter verification scope; track source-budget provenance, zero/unknown and mode parity without expanding capabilities | working-tree | Codex |

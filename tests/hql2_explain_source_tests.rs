@@ -268,3 +268,36 @@ fn explain_history_and_change_sources_do_not_publish_or_write() {
         }
     }
 }
+
+#[test]
+fn explain_lexical_and_context_do_not_publish_or_write() {
+    let dir = TempDir::new().unwrap();
+    let db = open(dir.path());
+    db.add_node(NodeInput {
+        id: Some("doc:text".into()),
+        labels: vec!["Document".into()],
+        props: Some(json!({"body":"red é猫😀"})),
+        embedding: None,
+        lang: None,
+        valid_from: None,
+        caused_by: None,
+        ttl: None,
+        collection: None,
+    })
+    .unwrap();
+    let selected = db.stable_frontier();
+    for (op,physical,suffix,config) in [
+        ("LexicalMatch","ExactLexicalScan","LEXICAL n FIELD body QUERY \"red\" USING INDEX `unicode-whitespace-bm25-v1` TOP 1 AS score |> RETURN n, score",json!({"entity":"n","field":"body","index":"unicode-whitespace-bm25-v1","query":{"literal":"red","type":"Utf8"},"k":1,"as":"score"})),
+        ("ContextPack","ContextPack","PACK CONTEXT TEXT prop(n, \"body\") EVIDENCE n TOKENS 5 TOKENIZER \"unicode-scalar-v1\" AS ctx |> RETURN ctx",json!({"text":{"call":"prop","args":[{"field":{"alias":"n","path":[]}},{"literal":"body","type":"Utf8"}]},"evidence":{"field":{"alias":"n","path":[]}},"tokens":5,"tokenizer":"unicode-scalar-v1","as":"ctx"}))
+    ] {
+        let hql:QueryRequestV2=serde_json::from_value(json!({"contract_version":"genesis.api.v2","request_id":"text-plan-hql","namespace":"default","language_version":"hql.v2","hql":format!("USE default AT TX {selected} FROM NODES AS n |> {suffix}"),"params":{},"explain":"plan"})).unwrap();
+        let ir:QueryRequestV2=serde_json::from_value(json!({"contract_version":"genesis.api.v2","request_id":"text-plan-ir","namespace":"default","temporal":{"tx_as_of":selected.to_string()},"ir":{"contract_version":"query-ir.v2","nodes":[{"id":"scan","op":"NodeScan","inputs":[],"config":{"as":"n"}},{"id":"text","op":op,"inputs":["scan"],"config":config}],"root":"text","parameter_types":{}},"params":{},"explain":"plan"})).unwrap();
+        for request in [hql,ir] {
+            let files=disk_tree(dir.path());let frontier=db.stable_frontier();
+            let QueryOutcomeV2::Plan(plan)=db.query_v2(access(),request).unwrap() else {panic!("plan")};
+            assert!(plan.plan.iter().any(|n|n.physical_op==physical));
+            assert!(plan.plan.iter().all(|n|n.actual.is_none() && n.estimates.is_none()));
+            assert_eq!(db.stable_frontier(),frontier);assert_eq!(disk_tree(dir.path()),files);
+        }
+    }
+}
