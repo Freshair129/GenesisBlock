@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE
-version: "0.1.9b"
+version: "0.1.10b"
 created_at: "2026-10-04T13:08:29+07:00,Codex,2be63a7"
-last_update: "2026-10-20T14:32:33+07:00,Codex"
+last_update: "2026-10-20T16:39:49+07:00,Codex"
 status: active
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -18,6 +18,31 @@ attributes:
 
 # G4 shared query pipeline, deterministic planner and truthful diagnostics
 
+## Approved G4 plan identity/golden qualification - 2026-10-20
+
+Owner approved tests/docs-only qualification on main `24d7eed`; LOW risk, C-3.
+Independently specify canonical shape/hash goldens, JSON map-order stability,
+parameter values versus shape, controlled node/operator/input/column changes,
+and per-request normal/EXPLAIN/ANALYZE parity. Keep the existing shape hash,
+planner/runtime/API/P6/WAL/schema contracts. Equal hashes do not imply equal
+semantics or authorization. Local qualification passes 221/221 across 18 targets;
+strict core/default Clippy, format/docs/version/diff gates pass; hosted pending;
+broad G4/P8/P13 and independent/device/release acceptance remain open.
+
+PR #253 exact head `768b56a28678904e505bf0a88e149480a0dd561c` completed
+four successful PR workflows (15 SUCCESS checks plus one schedule-only skip),
+including Rust Ubuntu/macOS/Windows, before normal merge as
+`24d7eeddac7fad3503df5d53c282105ce93f0196`. Its local runtime passed 170 tests
+across 14 targets; earlier fixture failures/RCA remain historical evidence.
+
+
+```text
+HQL/IR -> typed bind -> explain shape -> canonical identity -> SHA256
+                           |                   |
+                           +-> Plan/Analyze ---+-> independent golden assertions
+fixture/P7 rows -------------------------------> semantic assertions
+```
+
 ## Approved G4 lexical/context qualification - 2026-10-20
 
 The owner approved the bounded tests/docs-only proposal on merged main
@@ -28,7 +53,7 @@ BM25, tokenizer, runtime/API/P6/WAL/schema and planner contracts. ContextPack
 emits one package on empty input; token truncation is a successful package.
 Local qualification passes 170/170 across 14 targets; strict core/default
 all-target Clippy, format/docs/version/diff gates pass. Hosted qualification
-for this lexical/context revision is pending. Broad G4/P8/P13,
+for the lexical/context revision passed in #253. Broad G4/P8/P13,
 independent/device/release gates remain open.
 
 PR #252 exact head `25f6e4445ad0ceb11471302e0b5ec40b44d451a9` completed
@@ -567,11 +592,11 @@ The serialized plan remains:
 | G4-DOC | Approve this ADR and reconcile parent/peer versions | Owner approval and doc validation; completed for this slice |
 | G4-RED | Qualify dispatch, binding, deterministic plans, no-effect EXPLAIN, measured ANALYZE and errors | Scalar, graph/vector and source/annotation slices passed hosted #249/#250/#251; history/change passed hosted #252; lexical/context qualification is approved, broader operator/frontend qualification remains open |
 | G4-AST/BIND | Implement v2 source AST/IR decoding and shared typed binder | Implemented in the P8 candidate; binder/type/ACL/limit gates and independent review remain |
-| G4-PLAN | Implement deterministic physical plan and stable identity | `PhysicalPlanV2` and canonical identity are implemented; golden/P7 breadth remains open |
+| G4-PLAN | Implement deterministic physical plan and stable identity | `PhysicalPlanV2` and canonical identity are implemented; bounded golden/identity qualification passes local221/221 across18 targets; hosted pending; broader P7 and independent review remain open |
 | G4-EXPLAIN | Plan-only diagnostics and truthful unknown-estimate rules | Node/Edge/Row/Annotation frontier/filesystem checks passed in #251; history/change extension passed hosted #252; lexical/context extension and independent breadth remain open |
 | G4-ANALYZE | Read-only measured counters | Scoped scalar, graph/vector and source/annotation matrices passed #249/#250/#251; history/change passed hosted #252; lexical/context passes local 170/170 across 14 targets, hosted pending; lexical/context and broader provenance/budget matrix remain open |
 | G4-PARITY | Differential HQL1 compatibility, HQL2 and Query IR v2 for supported operators | P8 exact-oracle tests cover implemented slices; full operator matrix remains open |
-| G4-VERIFY | Local gates, evidence reconciliation, independent review and final scope audit | #249/#250/#251/#252 exact-head PR workflows passed before merge; #251 local runtime remains historically NOT_RUN (4551), #252 local runtime passed. Lexical/context, independent/device/release acceptance remain separate |
+| G4-VERIFY | Local gates, evidence reconciliation, independent review and final scope audit | #249/#250/#251/#252/#253 exact-head PR workflows passed before merge; #251 local runtime remains historically NOT_RUN (4551), #252 local runtime passed. Lexical/context passed hosted #253; identity/golden, independent/device/release acceptance remain separate |
 
 File ownership remains serialized: one owner for `src/lib.rs`, one owner for
 `src/query/*`, new tests in new files, and no public transport edits until the
@@ -646,6 +671,7 @@ and release qualification open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.10b | 2026-10-20 | active | Approve tests-only G4 identity/golden matrix and reconcile hosted PR253 | working-tree | Codex |
 | 0.1.9b | 2026-10-20 | active | Approve test-only lexical/context mode/counter/P7 qualification and reconcile hosted PR252; no runtime contract change | working-tree | Codex |
 | 0.1.8b | 2026-10-20 | active | Approve test-only History/Change diagnostic matrix and reconcile PR251 hosted qualification; preserve runtime contracts and broader acceptance gates | working-tree | Codex |
 | 0.1.7b | 2026-10-20 | active | Owner-approved source/annotation diagnostics, exact rows and truthful unknowns; reconcile scalar/graph hosted evidence while retaining broader acceptance gates | working-tree | Codex |

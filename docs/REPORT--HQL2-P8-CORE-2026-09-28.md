@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.76b"
+version: "0.1.77b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-20T14:32:33+07:00,Codex"
+last_update: "2026-10-20T16:39:49+07:00,Codex"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -15,6 +15,79 @@ attributes:
 
 # HQL2 P8 core checkpoint — not full HQL2 completion
 
+## Approved G4 plan identity/golden qualification - 2026-10-20
+
+Owner approved tests/docs-only qualification on main `24d7eed`; LOW risk, C-3.
+Independently specify canonical shape/hash goldens, JSON map-order stability,
+parameter values versus shape, controlled node/operator/input/column changes,
+and per-request normal/EXPLAIN/ANALYZE parity. Keep the existing shape hash,
+planner/runtime/API/P6/WAL/schema contracts. Equal hashes do not imply equal
+semantics or authorization. Local qualification passes 221/221 across 18 targets;
+strict core/default Clippy, format/docs/version/diff gates pass; hosted pending;
+broad G4/P8/P13 and independent/device/release acceptance remain open.
+
+PR #253 exact head `768b56a28678904e505bf0a88e149480a0dd561c` completed
+four successful PR workflows (15 SUCCESS checks plus one schedule-only skip),
+including Rust Ubuntu/macOS/Windows, before normal merge as
+`24d7eeddac7fad3503df5d53c282105ce93f0196`. Its local runtime passed 170 tests
+across 14 targets; earlier fixture failures/RCA remain historical evidence.
+
+
+## G4 identity/golden checkpoint - 2026-10-20
+
+A focused test-only target independently declares canonical identity structs and
+manually specified nodes/ordered inputs/typed columns/root. It does not call
+production plan construction, hash functions or serialize an observed plan to
+create expected data. The Values golden also has a precomputed fixed SHA256
+(`e0e22fe4309b250eb1d59be18b9baa07c84a707cbcf12396907426f58b88ba20`)
+from the documented domain prefix and independently written canonical JSON.
+
+Six tests cover changed parameter values with unchanged shape, raw JSON map
+insertion order, controlled node/column/type/nullability/operator/root changes,
+ordered and repeated UnionAll inputs, identical HQL/IR lowering shapes plus a
+legitimate different shape, and empty authorized NodeScan/ExactLexicalScan.
+Expected rows are independently enumerated fixture bags, including duplicate,
+empty and order-sensitive cases. Existing P7 scalar/set regressions remain
+separate semantic evidence. Shared three-mode checks retain plan-only absent
+actuals/estimates and typed unknown counters. A plan-only lexical request also
+checks unchanged frontier; existing filesystem no-write tests stay in regression.
+No generated production plan is used as its own oracle. Focused golden target
+passes 6/6; expanded regression passes **221/221 across 18 targets**, zero
+failed/ignored. Strict core/default all-target Clippy, formatting, docs244/0,
+version0.2.10 and diff checks pass. Hosted exact-head qualification is pending. There are 19 three-mode fixture requests plus one extra plan-only
+frontier check; repeated runs will not be double-counted in final test totals.
+The immutable test source blob is `ad123076a94bcea25caad48026c8ca17563cd83d`.
+
+Canonical fixed Values input (UTF-8, no trailing newline) after the domain prefix
+`genesis.hql2.plan.v2:`:
+
+```json
+{"planner_version":"hql2-rule-v1","root":"v","plan":[{"id":"v","logical_op":"Values","physical_op":"Values","inputs":[],"columns":[{"name":"x","type":"I64","nullable":false}]}]}
+```
+
+Commands:
+
+```text
+cargo clippy --locked --no-default-features --all-targets --jobs 2 -- -D warnings
+cargo clippy --locked --all-targets --jobs 2 -- -D warnings
+cargo test --locked --no-default-features --jobs 2 --test hql2_g4_plan_identity_tests
+cargo test --locked --no-default-features --jobs 2 --test hql2_g4_plan_identity_tests --test hql2_execution_tests --test hql2_storage_set_oracle_differential_tests --test hql2_oracle_tests --test hql2_p8_completion_tests --test hql2_explain_source_tests --test hql2_annotation_acl_tests --test hql2_annotation_lookup_tests --test hql2_annotation_source_tests --test hql2_expand_sequence_tests --test hql2_g4_contract_tests --test hql2_g4_scalar_counter_tests --test hql2_g4_source_counter_tests --test hql2_history_change_tests --test hql2_row_history_tests --test hql2_vector_operator_tests --test hql2_rank_oracle_tests --test hql2_pipeline_oracle_tests
+cargo fmt --check
+npm run docs:validate
+npm run version:check
+```
+
+Scoped implementer architecture review: the only new Rust module is an
+integration test. No hash domain, production serializer, planner version,
+canonical fields, operator execution, P6 authority or public schema is changed.
+The test duplicates the canonical *contract* independently and compares observed
+shape against manually declared goldens. Parameter values can change rows without
+changing shape; shape is not a semantic cache key or authority. JSON objects are
+reordered in raw input strings; node arrays/input edges are not treated as
+unordered maps. HQL/IR hash equality is asserted only for matching known IDs and
+physical shape. This is scoped implementer review, not independent acceptance.
+Broader G4/P8/P13 and device/release gates remain open.
+
 ## Approved G4 lexical/context qualification - 2026-10-20
 
 The owner approved the bounded tests/docs-only proposal on merged main
@@ -25,7 +98,7 @@ BM25, tokenizer, runtime/API/P6/WAL/schema and planner contracts. ContextPack
 emits one package on empty input; token truncation is a successful package.
 Local qualification passes 170/170 across 14 targets; strict core/default
 all-target Clippy, format/docs/version/diff gates pass. Hosted qualification
-for this lexical/context revision is pending. Broad G4/P8/P13,
+for the lexical/context revision passed in #253. Broad G4/P8/P13,
 independent/device/release gates remain open.
 
 PR #252 exact head `25f6e4445ad0ceb11471302e0b5ec40b44d451a9` completed
@@ -1287,6 +1360,7 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.77b | 2026-10-20 | beta | Approve tests-only G4 identity/golden matrix and reconcile hosted PR253 | working-tree | Codex |
 | 0.1.76b | 2026-10-20 | beta | Approve test-only lexical/context mode/counter/P7 qualification and reconcile hosted PR252; no runtime contract change | working-tree | Codex |
 | 0.1.75b | 2026-10-20 | beta | Approve test-only History/Change diagnostic matrix and reconcile PR251 hosted qualification; preserve runtime contracts and broader acceptance gates | working-tree | Codex |
 | 0.1.74b | 2026-10-20 | beta | Owner-approved source/annotation diagnostics, exact rows and truthful unknowns; reconcile scalar/graph hosted evidence while retaining broader acceptance gates | working-tree | Codex |

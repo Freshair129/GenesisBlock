@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.51b"
+version: "2.3.52b"
 updated: "2026-10-20"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -28,6 +28,24 @@ related_docs:
 
 # GenesisBlockDB Technical Architecture and Capability Composition
 
+## Approved G4 plan identity/golden qualification - 2026-10-20
+
+Owner approved tests/docs-only qualification on main `24d7eed`; LOW risk, C-3.
+Independently specify canonical shape/hash goldens, JSON map-order stability,
+parameter values versus shape, controlled node/operator/input/column changes,
+and per-request normal/EXPLAIN/ANALYZE parity. Keep the existing shape hash,
+planner/runtime/API/P6/WAL/schema contracts. Equal hashes do not imply equal
+semantics or authorization. Local qualification passes 221/221 across 18 targets;
+strict core/default Clippy, format/docs/version/diff gates pass; hosted pending;
+broad G4/P8/P13 and independent/device/release acceptance remain open.
+
+PR #253 exact head `768b56a28678904e505bf0a88e149480a0dd561c` completed
+four successful PR workflows (15 SUCCESS checks plus one schedule-only skip),
+including Rust Ubuntu/macOS/Windows, before normal merge as
+`24d7eeddac7fad3503df5d53c282105ce93f0196`. Its local runtime passed 170 tests
+across 14 targets; earlier fixture failures/RCA remain historical evidence.
+
+
 ## Approved G4 lexical/context qualification - 2026-10-20
 
 The owner approved the bounded tests/docs-only proposal on merged main
@@ -38,7 +56,7 @@ BM25, tokenizer, runtime/API/P6/WAL/schema and planner contracts. ContextPack
 emits one package on empty input; token truncation is a successful package.
 Local qualification passes 170/170 across 14 targets; strict core/default
 all-target Clippy, format/docs/version/diff gates pass. Hosted qualification
-for this lexical/context revision is pending. Broad G4/P8/P13,
+for the lexical/context revision passed in #253. Broad G4/P8/P13,
 independent/device/release gates remain open.
 
 PR #252 exact head `25f6e4445ad0ceb11471302e0b5ec40b44d451a9` completed
@@ -571,6 +589,7 @@ shared-runtime and broad P8/P13 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 2.3.52b | 2026-10-20 | GenesisBlockDB Architecture | Approve bounded G4 identity/golden qualification and reconcile hosted PR253; preserve production contracts and broad gates |
 | 2.3.51b | 2026-10-20 | GenesisBlockDB Architecture | Approve bounded G4 lexical/context diagnostics and reconcile hosted PR252; preserve production contracts and broader gates |
 | 2.3.50b | 2026-10-20 | GenesisBlockDB Architecture | Approve test-only History/Change diagnostic matrix and reconcile PR251 hosted qualification; preserve runtime contracts and broader acceptance gates |
 | 2.3.49b | 2026-10-20 | GenesisBlockDB Architecture | Owner-approved source/annotation diagnostics, exact rows and truthful unknowns; reconcile scalar/graph hosted evidence while retaining broader acceptance gates |
