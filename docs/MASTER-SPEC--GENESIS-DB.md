@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.52b"
+version: "2.3.53b"
 updated: "2026-10-20"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -25,6 +25,25 @@ related_docs:
   - "docs/GENESISRAG17-EXTENSION-MAP.md"
 ---
 
+## G4 evidence reconciliation - 2026-10-20
+
+Owner-approved documentation-only reconciliation at main `919814f`.
+PR #249/#250/#251/#252/#253/#254 are merged bounded qualification slices.
+For #254, exact head `7c57bda39be64233ef1dfa8122b0cd47b296eee0`
+passed all four triggered PR workflows (Tests `39403874324`, Security
+`39403874024`, Performance `39403874196`, worker `39403874412`), with
+15 successful checks and one schedule-only advisory skip; Ubuntu, Windows
+and macOS Rust suites succeeded before merge `919814f7954659bed2c23a9bdc2777e2d067ddf1`.
+Local identity qualification remains 221 unique tests across 18 targets.
+Historical NOT_RUN evidence (including #251 local Application Control) is
+preserved; later hosted success does not retroactively execute a blocked local run.
+
+The acceptance matrix in the [P8 report](REPORT--HQL2-P8-CORE-2026-09-28.md#g4-acceptance-evidence-matrix)
+separates bounded evidence from missing acceptance. G4/P8 remains PARTIAL;
+independent review, device/release and P9-P13 gates are not closed.
+
+
+
 
 # GenesisBlockDB Technical Architecture and Capability Composition
 
@@ -36,7 +55,7 @@ parameter values versus shape, controlled node/operator/input/column changes,
 and per-request normal/EXPLAIN/ANALYZE parity. Keep the existing shape hash,
 planner/runtime/API/P6/WAL/schema contracts. Equal hashes do not imply equal
 semantics or authorization. Local qualification passes 221/221 across 18 targets;
-strict core/default Clippy, format/docs/version/diff gates pass; hosted pending;
+strict core/default Clippy, format/docs/version/diff gates pass; hosted passed in #254;
 broad G4/P8/P13 and independent/device/release acceptance remain open.
 
 PR #253 exact head `768b56a28678904e505bf0a88e149480a0dd561c` completed

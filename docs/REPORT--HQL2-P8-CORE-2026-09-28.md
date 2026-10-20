@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.77b"
+version: "0.1.78b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-20T16:39:49+07:00,Codex"
+last_update: "2026-10-20T19:20:00+07:00,Codex"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -11,6 +11,25 @@ attributes:
   risk: HIGH
   complexity: C-3
 ---
+
+## G4 evidence reconciliation - 2026-10-20
+
+Owner-approved documentation-only reconciliation at main `919814f`.
+PR #249/#250/#251/#252/#253/#254 are merged bounded qualification slices.
+For #254, exact head `7c57bda39be64233ef1dfa8122b0cd47b296eee0`
+passed all four triggered PR workflows (Tests `39403874324`, Security
+`39403874024`, Performance `39403874196`, worker `39403874412`), with
+15 successful checks and one schedule-only advisory skip; Ubuntu, Windows
+and macOS Rust suites succeeded before merge `919814f7954659bed2c23a9bdc2777e2d067ddf1`.
+Local identity qualification remains 221 unique tests across 18 targets.
+Historical NOT_RUN evidence (including #251 local Application Control) is
+preserved; later hosted success does not retroactively execute a blocked local run.
+
+The acceptance matrix in the [P8 report](REPORT--HQL2-P8-CORE-2026-09-28.md#g4-acceptance-evidence-matrix)
+separates bounded evidence from missing acceptance. G4/P8 remains PARTIAL;
+independent review, device/release and P9-P13 gates are not closed.
+
+
 
 
 # HQL2 P8 core checkpoint — not full HQL2 completion
@@ -23,7 +42,7 @@ parameter values versus shape, controlled node/operator/input/column changes,
 and per-request normal/EXPLAIN/ANALYZE parity. Keep the existing shape hash,
 planner/runtime/API/P6/WAL/schema contracts. Equal hashes do not imply equal
 semantics or authorization. Local qualification passes 221/221 across 18 targets;
-strict core/default Clippy, format/docs/version/diff gates pass; hosted pending;
+strict core/default Clippy, format/docs/version/diff gates pass; hosted passed in #254;
 broad G4/P8/P13 and independent/device/release acceptance remain open.
 
 PR #253 exact head `768b56a28678904e505bf0a88e149480a0dd561c` completed
@@ -1430,3 +1449,55 @@ P8 and release gates.
 | 0.1.2b | 2026-09-29 | beta | Record FieldIdV2/ExecBatchV2 selective hydration, dynamic-name regression and 188 passing tests across 18 HQL2/P6 targets; retain remaining P8 gates | working-tree | ATHER |
 | 0.1.1b | 2026-09-29 | beta | Record four lease-bound source scans, annotation reference ACL, budgeted payload access and nullable identity/property results; keep selective hydration and full P8/HQL2 acceptance open | working-tree | ATHER |
 | 0.1.0b | 2026-09-28 | beta | Record approved integration, reviewed scalar/core checkpoint, full-run failure and green targeted corrections; retain incomplete P8/HQL2 gates | working-tree | ATHER |
+
+## G4 acceptance evidence matrix
+
+Baseline: merged main `919814f`. This is a source audit of existing tests,
+not a new test run. COVERED means the named fixture assertion is present
+and included in its recorded slice validation; PARTIAL means the full
+operator/frontend/acceptance cross-product is not established. NOT_RUN means
+no acceptance evidence was obtained in this audit. N/A requires an explicit
+semantic reason, never an assumption from an empty fixture.
+
+| Bound operator family | Frontend evidence | Semantic evidence | Diagnostic/authority evidence | Full acceptance |
+|---|---|---|---|---|
+| Values, Filter, Project, Distinct, Sort, Offset, Take | IR fixtures; HQL scalar fixture | COVERED for enumerated bags/NULL/order: `hql2_g4_scalar_counter_tests.rs` functions `scalar_pipeline_counts_duplicates_null_filtering_and_empty_inputs`, `projection_distinct_sort_offset_take_preserve_nulls_and_nonempty_results`, `hql_frontend_reports_the_same_scalar_contract_for_null_bags_and_empty_input` | Counter/budget fixtures in same target; shape goldens in `hql2_g4_plan_identity_tests.rs` | PARTIAL: not every expression/type/frontend combination |
+| UnionAll, Join, Aggregate | Typed IR matrix; selected HQL composition | COVERED fixture bags/empty/groups: scalar target `union_all_counts_both_inputs_including_repeated_input_edges`, `all_join_kinds_count_input_bags_even_when_one_side_is_empty`, `aggregate_counts_global_empty_and_nullable_groups` | Shared-mode counter checks and `analyze_budget_failures_never_publish_partial_scalar_or_aggregate_results` | PARTIAL: exhaustive HQL/IR mode and error cross-product not established |
+| SourceScan: Node/Edge/Row/Annotation | HQL and IR | `hql2_g4_source_counter_tests.rs::source_rows_are_exact_in_hql_ir_and_all_diagnostic_modes_including_empty` | `source_diagnostics_respect_explicit_actor_authority`; `hql2_explain_source_tests.rs::explain_edge_row_and_annotation_sources_preserve_frontier_and_fixture_files` | PARTIAL: source counter equality is not alone independent semantic-oracle acceptance |
+| HistoryScan, ChangeScan | HQL and IR | Independent P7 cases in `hql2_history_change_tests.rs::history_scan_matches_p7_for_edge_revisions_and_endpoint_acl`, `change_scan_matches_p7_for_edge_row_vector_and_annotation_revisions`, `change_scan_matches_p7_for_exclusive_after_inclusive_through_windows` | Same target floor/frontier/zero/budget tests; EXPLAIN filesystem fixture in explain-source target | PARTIAL: selected families/windows, not every temporal/ACL permutation |
+| MatchCompact, MatchSequence, Expand, ExpandSequence | Selected HQL/IR graph fixtures | `hql2_pipeline_oracle_tests.rs::match_shortest_binds_endpoint_pairs_and_chooses_one_parallel_path`; `hql2_expand_sequence_tests.rs::sequence_diagnostics_count_parallel_duplicate_optional_and_empty_work` | Sequence budget boundaries and graph counters | PARTIAL: graph grammar/path/authority cross-product not established |
+| AnnotationLookup | Selected typed/HQL lookup fixtures | `hql2_annotation_lookup_tests.rs::lookup_diagnostic_counters_preserve_p7_bags_and_empty_inputs` | Annotation ACL target and source/lookup counters | PARTIAL: lookup provenance/authority cross-product requires explicit mapping |
+| VectorRank: exact KNN, original Rerank | HQL/IR exact KNN parity; typed rank matrix | `hql2_vector_operator_tests.rs::hql_and_ir_exact_knn_have_identical_results`; independent P7 rank/pipeline targets | `exact_rank_diagnostics_count_duplicate_bags_empty_inputs_and_missing_knn_vectors`, candidate/distance budgets, original-vector failure | PARTIAL: approximate candidate coverage is rejected; not supported acceptance |
+| LexicalMatch, ContextPack | Both frontends in completion fixtures | `hql2_p8_completion_tests.rs::lexical_diagnostics_match_p7_for_empty_duplicate_nonmatch_and_top_zero`, `context_diagnostics_preserve_p7_packages_for_empty_duplicate_and_token_limits` | Capability/error/output budgets; explain-source no-write fixture | PARTIAL: exact lexical/context fixtures do not establish persisted index lifecycle |
+
+References above are repository test filenames and exact function names,
+so renames must update this matrix. `bind.rs::Kernel` enumerates executable
+kernels; source families and vector modes are mapped through typed binding,
+not counted as additional independent executors. Reserved `Knn`/`Rerank`
+variants are not evidence of a second supported implementation.
+
+### Cross-cutting acceptance and next gap
+
+- Shape identity: COVERED for six independently specified golden fixtures in
+  `hql2_g4_plan_identity_tests.rs`; equal shape hashes do not imply equal
+  semantic queries, authorization or cache validity.
+- Normal/Plan/Analyze parity: COVERED for fixtures using
+  `tests/support/hql2_diagnostics.rs`; this is self-consistency evidence unless
+  separately paired with P7 or explicit expected rows. It is not an independent oracle.
+- EXPLAIN no writes: COVERED for observed fixture files/frontiers in
+  `hql2_explain_source_tests.rs`; no claim of universal internal instrumentation.
+- P6 authority: source actor controls and temporal/floor tests provide bounded
+  evidence. Per-operator provenance/completeness metadata across every
+  frontend remains PARTIAL, not inferred from row equality.
+- Independent acceptance review: NOT_RUN by this documentation author.
+  Scoped implementer architecture review checks consistency of this matrix,
+  the G4 ADR criteria and execution/P6 boundaries; it does not sign off independence.
+- Device/release/public-surface qualification: NOT_RUN in this slice. P13 is
+  separate; no transport or release claim follows from core tests.
+
+Next bounded candidate: map and qualify provenance/completeness metadata for
+AnnotationLookup and graph/vector composition under both frontends, beginning
+with a source/test audit and concrete fixtures before requesting a test scope.
+This is missing evidence, not a demonstrated runtime defect. P9 optimization,
+P10 composition breadth, P11 index lifecycle, P12 resources and P13 surface
+parity remain separately gated. No new runtime work is authorized here.
