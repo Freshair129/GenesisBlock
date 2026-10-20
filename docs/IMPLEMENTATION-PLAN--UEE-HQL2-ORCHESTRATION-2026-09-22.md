@@ -1,9 +1,9 @@
 ---
-version: "0.8.85b"
+version: "0.8.86b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-20T16:39:49+07:00,Codex"
+last_update: "2026-10-20T19:20:00+07:00,Codex"
 status: beta
 superseded_by: null
 attributes:
@@ -14,6 +14,25 @@ attributes:
   risk: "HIGH"
   owner: "Boss (Founder / Product Authority)"
 ---
+
+## G4 evidence reconciliation - 2026-10-20
+
+Owner-approved documentation-only reconciliation at main `919814f`.
+PR #249/#250/#251/#252/#253/#254 are merged bounded qualification slices.
+For #254, exact head `7c57bda39be64233ef1dfa8122b0cd47b296eee0`
+passed all four triggered PR workflows (Tests `39403874324`, Security
+`39403874024`, Performance `39403874196`, worker `39403874412`), with
+15 successful checks and one schedule-only advisory skip; Ubuntu, Windows
+and macOS Rust suites succeeded before merge `919814f7954659bed2c23a9bdc2777e2d067ddf1`.
+Local identity qualification remains 221 unique tests across 18 targets.
+Historical NOT_RUN evidence (including #251 local Application Control) is
+preserved; later hosted success does not retroactively execute a blocked local run.
+
+The acceptance matrix in the [P8 report](REPORT--HQL2-P8-CORE-2026-09-28.md#g4-acceptance-evidence-matrix)
+separates bounded evidence from missing acceptance. G4/P8 remains PARTIAL;
+independent review, device/release and P9-P13 gates are not closed.
+
+
 
 
 # UEE-HQL2 Orchestration Plan
@@ -26,7 +45,7 @@ parameter values versus shape, controlled node/operator/input/column changes,
 and per-request normal/EXPLAIN/ANALYZE parity. Keep the existing shape hash,
 planner/runtime/API/P6/WAL/schema contracts. Equal hashes do not imply equal
 semantics or authorization. Local qualification passes 221/221 across 18 targets;
-strict core/default Clippy, format/docs/version/diff gates pass; hosted pending;
+strict core/default Clippy, format/docs/version/diff gates pass; hosted passed in #254;
 broad G4/P8/P13 and independent/device/release acceptance remain open.
 
 PR #253 exact head `768b56a28678904e505bf0a88e149480a0dd561c` completed
@@ -204,7 +223,7 @@ P0 BASELINE (done, read-only)
 | G4-SOURCE-ANNOTATION-VERIFY | Owner-approved test-only source rows and annotation mode/counter qualification | Integrated #250 at 8b18a2c and G4/P6 contracts | Exact fixture counters, three-mode parity, EXPLAIN no-effect, actor authority and budgets passed hosted PR251 CI on all three OSes; local runtime NOT_RUN (4551) |
 | G4-HISTORY-CHANGE-VERIFY | Owner-approved tests/docs-only HistoryScan/ChangeScan diagnostic matrix | Integrated PR251 at a3e2d4d and existing G4/P6/H2-D11 contracts | Exact emitted rows, mode/oracle parity, temporal/ACL/floor/budget cases and no-write EXPLAIN; local 93/93 across 11 targets, strict core/default Clippy and docs gates passed; hosted PR252 passed on all three OSes and merged at 7c3e5e2 |
 | G4-LEXICAL-CONTEXT-VERIFY | Owner-approved tests/docs-only lexical/context diagnostic matrix | Integrated #252 and G4/P8 D2/D3/P6 contracts | Exact rows, mode/P7 parity, provenance/budgets and EXPLAIN no-write; local 170/170 across 14 targets and strict static gates pass; hosted PR253 passed on all three OSes and merged at 24d7eed |
-| G4-PLAN-IDENTITY-VERIFY | Owner-approved tests/docs-only golden/shape identity qualification | Integrated #253 and G4 D03/D04/D06/D07 | Independent expected shapes/hashes, mode parity and shape/value boundaries; local221/221 across18 targets and strict static gates pass; hosted pending |
+| G4-PLAN-IDENTITY-VERIFY | Owner-approved tests/docs-only golden/shape identity qualification | Integrated #253 and G4 D03/D04/D06/D07 | Independent expected shapes/hashes, mode parity and shape/value boundaries; local221/221 across18 targets and strict static gates pass; hosted passed in #254 |
 | P8-R2 | Bounded REST parity verification for existing HQL compatibility and typed Query IR v1 traversal | P8 local kernel; existing P13 boundary | `/v1/query/hql` and `/v1/query/ir` return equal result bags; test-only, no `query_v2` transport or P13 closure |
 | P8-R3 | REST matrix for raw/wrapped HQL bodies and typed HQL/Query IR v1 errors | P8-R2; existing v1 routes | Equal result bags across accepted HQL body shapes; budget/version failures retain typed envelopes; test-only, no public API or P13 closure |
 | P9 | Legal B-tree/annotation paths and planner access reporting | P8 and approved G4 planner boundary | Pushdown/order counterexamples match oracle; plans are truthful |

@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE
-version: "0.1.10b"
+version: "0.1.11b"
 created_at: "2026-10-04T13:08:29+07:00,Codex,2be63a7"
-last_update: "2026-10-20T16:39:49+07:00,Codex"
+last_update: "2026-10-20T19:20:00+07:00,Codex"
 status: active
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -15,6 +15,25 @@ attributes:
   amends: ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY
 ---
 
+## G4 evidence reconciliation - 2026-10-20
+
+Owner-approved documentation-only reconciliation at main `919814f`.
+PR #249/#250/#251/#252/#253/#254 are merged bounded qualification slices.
+For #254, exact head `7c57bda39be64233ef1dfa8122b0cd47b296eee0`
+passed all four triggered PR workflows (Tests `39403874324`, Security
+`39403874024`, Performance `39403874196`, worker `39403874412`), with
+15 successful checks and one schedule-only advisory skip; Ubuntu, Windows
+and macOS Rust suites succeeded before merge `919814f7954659bed2c23a9bdc2777e2d067ddf1`.
+Local identity qualification remains 221 unique tests across 18 targets.
+Historical NOT_RUN evidence (including #251 local Application Control) is
+preserved; later hosted success does not retroactively execute a blocked local run.
+
+The acceptance matrix in the [P8 report](../REPORT--HQL2-P8-CORE-2026-09-28.md#g4-acceptance-evidence-matrix)
+separates bounded evidence from missing acceptance. G4/P8 remains PARTIAL;
+independent review, device/release and P9-P13 gates are not closed.
+
+
+
 
 # G4 shared query pipeline, deterministic planner and truthful diagnostics
 
@@ -26,7 +45,7 @@ parameter values versus shape, controlled node/operator/input/column changes,
 and per-request normal/EXPLAIN/ANALYZE parity. Keep the existing shape hash,
 planner/runtime/API/P6/WAL/schema contracts. Equal hashes do not imply equal
 semantics or authorization. Local qualification passes 221/221 across 18 targets;
-strict core/default Clippy, format/docs/version/diff gates pass; hosted pending;
+strict core/default Clippy, format/docs/version/diff gates pass; hosted passed in #254;
 broad G4/P8/P13 and independent/device/release acceptance remain open.
 
 PR #253 exact head `768b56a28678904e505bf0a88e149480a0dd561c` completed
@@ -592,9 +611,9 @@ The serialized plan remains:
 | G4-DOC | Approve this ADR and reconcile parent/peer versions | Owner approval and doc validation; completed for this slice |
 | G4-RED | Qualify dispatch, binding, deterministic plans, no-effect EXPLAIN, measured ANALYZE and errors | Scalar, graph/vector and source/annotation slices passed hosted #249/#250/#251; history/change passed hosted #252; lexical/context qualification is approved, broader operator/frontend qualification remains open |
 | G4-AST/BIND | Implement v2 source AST/IR decoding and shared typed binder | Implemented in the P8 candidate; binder/type/ACL/limit gates and independent review remain |
-| G4-PLAN | Implement deterministic physical plan and stable identity | `PhysicalPlanV2` and canonical identity are implemented; bounded golden/identity qualification passes local221/221 across18 targets; hosted pending; broader P7 and independent review remain open |
+| G4-PLAN | Implement deterministic physical plan and stable identity | `PhysicalPlanV2` and canonical identity are implemented; bounded golden/identity qualification passes local221/221 across18 targets; hosted passed in #254; broader P7 and independent review remain open |
 | G4-EXPLAIN | Plan-only diagnostics and truthful unknown-estimate rules | Node/Edge/Row/Annotation frontier/filesystem checks passed in #251; history/change extension passed hosted #252; lexical/context extension and independent breadth remain open |
-| G4-ANALYZE | Read-only measured counters | Scoped scalar, graph/vector and source/annotation matrices passed #249/#250/#251; history/change passed hosted #252; lexical/context passes local 170/170 across 14 targets, hosted pending; lexical/context and broader provenance/budget matrix remain open |
+| G4-ANALYZE | Read-only measured counters | Scoped scalar, graph/vector and source/annotation matrices passed #249/#250/#251; history/change passed hosted #252; lexical/context passes local 170/170 across 14 targets, hosted passed in #253; lexical/context and broader provenance/budget matrix remain open |
 | G4-PARITY | Differential HQL1 compatibility, HQL2 and Query IR v2 for supported operators | P8 exact-oracle tests cover implemented slices; full operator matrix remains open |
 | G4-VERIFY | Local gates, evidence reconciliation, independent review and final scope audit | #249/#250/#251/#252/#253 exact-head PR workflows passed before merge; #251 local runtime remains historically NOT_RUN (4551), #252 local runtime passed. Lexical/context passed hosted #253; identity/golden, independent/device/release acceptance remain separate |
 
