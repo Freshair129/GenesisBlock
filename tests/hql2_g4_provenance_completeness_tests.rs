@@ -5,7 +5,7 @@ use genesis_block_native::{
 };
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use std::path::Path;
+use std::{collections::BTreeMap, path::Path};
 use tempfile::TempDir;
 fn open(path: &Path) -> Storage {
     Storage::open(OpenOptions {
@@ -149,6 +149,56 @@ fn add_edge(storage: &Storage, id: &str, from: &str, to: &str, rel: &str) {
         .unwrap();
 }
 
+fn disk_tree(path: &Path) -> BTreeMap<String, Vec<u8>> {
+    fn visit(root: &Path, path: &Path, out: &mut BTreeMap<String, Vec<u8>>) {
+        for entry in std::fs::read_dir(path).unwrap() {
+            let path = entry.unwrap().path();
+            if path
+                .file_name()
+                .is_some_and(|name| name == "genesis.lock" || name == "projection.sqlite-shm")
+            {
+                out.insert(
+                    format!("{}:size", path.file_name().unwrap().to_string_lossy()),
+                    std::fs::metadata(&path)
+                        .unwrap()
+                        .len()
+                        .to_le_bytes()
+                        .to_vec(),
+                );
+                continue;
+            }
+            if path.is_dir() {
+                visit(root, &path, out);
+            } else {
+                out.insert(
+                    path.strip_prefix(root).unwrap().to_string_lossy().into(),
+                    std::fs::read(&path)
+                        .unwrap_or_else(|error| panic!("read {}: {error}", path.display())),
+                );
+            }
+        }
+    }
+
+    let mut out = BTreeMap::new();
+    visit(path, path, &mut out);
+    out
+}
+
+fn state(db: &Storage, path: &Path) -> (u64, BTreeMap<String, Vec<u8>>) {
+    (db.stable_frontier(), disk_tree(path))
+}
+fn assert_state(db: &Storage, path: &Path, before: &(u64, BTreeMap<String, Vec<u8>>)) {
+    assert_eq!(
+        db.stable_frontier(),
+        before.0,
+        "query changed durable frontier"
+    );
+    assert_eq!(disk_tree(path), before.1, "query changed fixture files");
+}
+fn expected_annotation(database: &str, revision: &str) -> Value {
+    json!({"database_id":database,"namespace":"default","kind":"annotation","id":"review:target","revision":revision})
+}
+
 const VALID: &str = "2026-10-03T00:00:00Z";
 fn field(alias: &str) -> Value {
     json!({"field":{"alias":alias,"path":[]}})
@@ -260,10 +310,10 @@ fn paired_frontends_preserve_exact_metadata_and_revision_ownership() {
                         let mut limited = request.clone();
                         limited.budget =
                             Some(serde_json::from_value(json!({"max_result_bytes":1})).unwrap());
-                        assert_eq!(
-                            db.query_v2(actor(), limited).unwrap_err().code,
-                            "QUERY_BUDGET_EXCEEDED"
-                        );
+                        let before_budget = state(&db, dir.path());
+                        let error = db.query_v2(actor(), limited).unwrap_err();
+                        assert_state(&db, dir.path(), &before_budget);
+                        assert_eq!(error.code, "QUERY_BUDGET_EXCEEDED");
                     }
 
                     assert_eq!(
@@ -280,8 +330,7 @@ fn paired_frontends_preserve_exact_metadata_and_revision_ownership() {
                         let entity = serde_json::to_value(&row["entity"]).unwrap();
                         assert_eq!(entity["value"], target["ref"]);
                         let a = serde_json::to_value(&row["annotation"]).unwrap();
-                        assert_eq!(a["value"]["id"], "review:target");
-                        assert_eq!(a["value"]["revision"], annotation);
+                        assert_eq!(a["value"], expected_annotation(&id, &annotation));
                         if rank.is_some() {
                             let score = serde_json::to_value(&row["score"]).unwrap();
                             assert_eq!(score["value"]["owner"], seed["ref"]);
@@ -408,7 +457,7 @@ fn enforced_annotation_grants_and_policy_revisions_qualify_composed_frontends() 
                         request.explain = mode;
                         let mut plan_request = request.clone();
                         plan_request.explain = Some(ExplainV2::Plan);
-                        let before_plan = db.stable_frontier();
+                        let before_plan = state(&db, dir.path());
                         let QueryOutcomeV2::Plan(plan) =
                             db.query_v2(actor(), plan_request).unwrap()
                         else {
@@ -418,9 +467,11 @@ fn enforced_annotation_grants_and_policy_revisions_qualify_composed_frontends() 
                             .plan
                             .iter()
                             .all(|node| node.actual.is_none() && node.estimates.is_none()));
-                        assert_eq!(db.stable_frontier(), before_plan);
+                        assert_state(&db, dir.path(), &before_plan);
                         if !include_annotation && !empty {
+                            let before_denial = state(&db, dir.path());
                             let error = db.query_v2(actor(), request.clone()).unwrap_err();
+                            assert_state(&db, dir.path(), &before_denial);
                             assert_eq!(error.code, "FORBIDDEN");
                             assert_eq!(error.stage, "authorize");
                             continue;
@@ -436,10 +487,10 @@ fn enforced_annotation_grants_and_policy_revisions_qualify_composed_frontends() 
                             limited.budget = Some(
                                 serde_json::from_value(json!({"max_result_bytes":1})).unwrap(),
                             );
-                            assert_eq!(
-                                db.query_v2(actor(), limited).unwrap_err().code,
-                                "QUERY_BUDGET_EXCEEDED"
-                            );
+                            let before_budget = state(&db, dir.path());
+                            let error = db.query_v2(actor(), limited).unwrap_err();
+                            assert_state(&db, dir.path(), &before_budget);
+                            assert_eq!(error.code, "QUERY_BUDGET_EXCEEDED");
                         }
 
                         assert_eq!(
@@ -456,8 +507,7 @@ fn enforced_annotation_grants_and_policy_revisions_qualify_composed_frontends() 
                             let entity = serde_json::to_value(&row["entity"]).unwrap();
                             assert_eq!(entity["value"], target["ref"]);
                             let a = serde_json::to_value(&row["annotation"]).unwrap();
-                            assert_eq!(a["value"]["id"], "review:target");
-                            assert_eq!(a["value"]["revision"], annotation);
+                            assert_eq!(a["value"], expected_annotation(&id, &annotation));
                             if rank.is_some() {
                                 let score = serde_json::to_value(&row["score"]).unwrap();
                                 assert_eq!(score["value"]["owner"], seed["ref"]);
@@ -467,5 +517,42 @@ fn enforced_annotation_grants_and_policy_revisions_qualify_composed_frontends() 
                 }
             }
         }
+    }
+}
+
+#[test]
+fn composed_plan_before_first_query_does_not_publish_or_write() {
+    for rank in [None, Some("Knn"), Some("Rerank")] {
+        let dir = TempDir::new().unwrap();
+        let db = open(dir.path());
+        add_node(&db, "seed", Some(vec![0.0, 0.0]));
+        add_node(&db, "target", Some(vec![1.0, 0.0]));
+        add_edge(&db, "first", "seed", "target", "R");
+        db.flush_index();
+        let space = space_id_for(&db, "default");
+        // No database_id(), query_v2(), or publish_generation() warmup.
+        let before = state(&db, dir.path());
+        for empty in [false, true] {
+            for mut request in requests(&space, rank, empty) {
+                request.explain = Some(ExplainV2::Plan);
+                let QueryOutcomeV2::Plan(plan) = db.query_v2(actor(), request).unwrap() else {
+                    panic!("plan")
+                };
+                assert!(plan
+                    .plan
+                    .iter()
+                    .all(|node| node.actual.is_none() && node.estimates.is_none()));
+                assert_state(&db, dir.path(), &before);
+            }
+        }
+    }
+}
+#[test]
+fn annotation_reference_expectation_includes_every_identity_component() {
+    let expected = expected_annotation("fixture-db", "fixture-revision");
+    for key in ["database_id", "namespace", "kind", "id", "revision"] {
+        let mut changed = expected.clone();
+        changed[key] = json!("wrong");
+        assert_ne!(changed, expected, "identity comparison missed {key}");
     }
 }
