@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.80b"
+version: "0.1.81b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-21T00:20:00+07:00,Codex"
+last_update: "2026-10-22T00:00:00+07:00,Codex"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -11,6 +11,37 @@ attributes:
   risk: HIGH
   complexity: C-3
 ---
+
+## Approved G4 composed-query state/identity qualification - 2026-10-22
+
+Owner approved tests/docs-only scope at main `2832ad42` (LOW, C-3).
+The fresh read-only review of PR256/257 found no Critical/Important defect
+and three Minor evidence improvements: full annotation identity, direct
+composed-path state guards and dated hosted-evidence reconciliation.
+The focused test target now compares all annotation reference fields and
+captures frontier/fixture-file state around composed Plan, annotation denial
+and budget-error requests; a separate Plan control runs before any query or
+explicit generation publication. Lock/shared-memory bookkeeping uses only
+the existing size comparison; no new byte-comparison exclusions are added.
+Local156/156 across10 targets and strict core/default all-target Clippy,
+format/docs/version/diff gates pass; hosted qualification remains pending.
+No runtime/API/P6/WAL/hash/schema/ACL model changes.
+Broad G4/P8/P13 and independent runtime/device/release acceptance stay open.
+
+### Current hosted evidence reconciliation
+
+PR256 head `3395e75e408163be7ad961070c1dfcf677db70e8` merged as
+`e8f1a58815eac36e45c887f3c73f4d23e3c28d5b`; PR257 head
+`c73ec15b35087c6d5540fa97635c89e9dedd11bd` merged as
+`2832ad421e1260d57475c330f2bf9cc2e48eab7f`. Each had four successful
+exact-head workflows and 15 SUCCESS checks plus one schedule-only skip.
+PR257 macOS runner-acquisition cancellations in attempts1/2 were retained;
+Tests run `39467118959` succeeded on retry3 before merge. PR256 Tests run
+`39448311999` succeeded before merge. Earlier pending/NOT_RUN entries are
+historical checkpoints, not current CI failures or retroactive local execution.
+This source/evidence review covers only the bounded PR256/257 increment;
+it is not whole-G4 independent runtime acceptance.
+
 
 ## Approved G4 annotation-authority composition qualification - 2026-10-21
 
@@ -1655,3 +1686,48 @@ Static qualification passes `cargo clippy --locked --no-default-features
 `cargo fmt --check`, `npm run docs:validate` (244 files/0 violations),
 `npm run version:check` (0.2.10) and diff checks. Hosted exact-head CI remains
 pending; no independent/device/release acceptance is inferred.
+
+### Direct composed-query state/identity evidence (2026-10-22)
+
+| Obligation | Direct assertion in focused target | Boundary |
+|---|---|---|
+| Annotation identity | Both positive loops compare complete serialized reference to fixture database/namespace/kind/id/revision | Fixture revision read from stored lineage; entity/score-owner checks retained |
+| Composed Plan | Existing72 Plan requests compare frontier and fixture files | Published policy generations1/2/3, both frontends and empty/nonempty |
+| Plan without warmup | New12 Plan requests compare pre-query state after fixture writes/index flush | No database_id(), query_v2() or explicit publish_generation() before capture |
+| Budget error no writes | Existing36 nonempty output-byte budget errors capture state directly before failed request | Current generation already published by fixture setup; no claim that arbitrary unpinned query setup cannot publish |
+| Annotation denial no writes | Existing12 nonempty missing-annotation-grant errors compare durable state | Namespace grant retained; no eager empty-input ACL rule introduced |
+
+The state guard compares the stable frontier, file set and bytes of fixture
+files. It reuses existing `hql2_explain_source_tests.rs::disk_tree` rules:
+`genesis.lock` and `projection.sqlite-shm` are compared by size only, so their
+internal bookkeeping bytes are not qualified. No additional exclusions or
+query warmup are used for the unpublished Plan control. This is observed file
+and frontier preservation, not instrumentation proving no internal operator
+was called. Empty input, namespace-denied controls and independent P7 checks
+remain intact.
+
+Focused5/5 passed on the first run; no fixture failure or runtime contradiction
+required RCA. Tests-only qualification adds no artificial failing production
+change. Combined/static gates pass; fresh whole-branch review is recorded separately
+in the evidence artifacts.
+
+```mermaid
+flowchart LR
+  F[Fixture writes and authority] --> S[Capture frontier and durable files]
+  S --> Q[Composed Plan or typed error request]
+  Q --> C[Compare frontier / file set / bytes]
+  A[Stored annotation lineage] --> R[Full returned reference equality]
+  Q --> R
+```
+
+
+Runtime qualification:156/156 unique tests across10 targets, zero failed/ignored.
+Focused5 is included, not added again: ACL12, lookup7, annotation-source7,
+sequence11, explain-source5, state/identity5, oracle29, pipeline25, rank37,
+vector18. Command: `cargo test --locked --no-default-features --jobs 2` with
+explicit targets `hql2_g4_provenance_completeness_tests`,
+`hql2_annotation_lookup_tests`, `hql2_annotation_acl_tests`,
+`hql2_annotation_source_tests`, `hql2_vector_operator_tests`,
+`hql2_expand_sequence_tests`, `hql2_pipeline_oracle_tests`,
+`hql2_rank_oracle_tests`, `hql2_oracle_tests`, `hql2_explain_source_tests`.
+No fixture failure or runtime contradiction was observed; no RCA/fix needed.

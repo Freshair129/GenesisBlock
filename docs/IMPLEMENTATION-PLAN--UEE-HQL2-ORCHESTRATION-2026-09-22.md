@@ -1,9 +1,9 @@
 ---
-version: "0.8.88b"
+version: "0.8.89b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-21T00:20:00+07:00,Codex"
+last_update: "2026-10-22T00:00:00+07:00,Codex"
 status: beta
 superseded_by: null
 attributes:
@@ -14,6 +14,37 @@ attributes:
   risk: "HIGH"
   owner: "Boss (Founder / Product Authority)"
 ---
+
+## Approved G4 composed-query state/identity qualification - 2026-10-22
+
+Owner approved tests/docs-only scope at main `2832ad42` (LOW, C-3).
+The fresh read-only review of PR256/257 found no Critical/Important defect
+and three Minor evidence improvements: full annotation identity, direct
+composed-path state guards and dated hosted-evidence reconciliation.
+The focused test target now compares all annotation reference fields and
+captures frontier/fixture-file state around composed Plan, annotation denial
+and budget-error requests; a separate Plan control runs before any query or
+explicit generation publication. Lock/shared-memory bookkeeping uses only
+the existing size comparison; no new byte-comparison exclusions are added.
+Local156/156 across10 targets and strict core/default all-target Clippy,
+format/docs/version/diff gates pass; hosted qualification remains pending.
+No runtime/API/P6/WAL/hash/schema/ACL model changes.
+Broad G4/P8/P13 and independent runtime/device/release acceptance stay open.
+
+### Current hosted evidence reconciliation
+
+PR256 head `3395e75e408163be7ad961070c1dfcf677db70e8` merged as
+`e8f1a58815eac36e45c887f3c73f4d23e3c28d5b`; PR257 head
+`c73ec15b35087c6d5540fa97635c89e9dedd11bd` merged as
+`2832ad421e1260d57475c330f2bf9cc2e48eab7f`. Each had four successful
+exact-head workflows and 15 SUCCESS checks plus one schedule-only skip.
+PR257 macOS runner-acquisition cancellations in attempts1/2 were retained;
+Tests run `39467118959` succeeded on retry3 before merge. PR256 Tests run
+`39448311999` succeeded before merge. Earlier pending/NOT_RUN entries are
+historical checkpoints, not current CI failures or retroactive local execution.
+This source/evidence review covers only the bounded PR256/257 increment;
+it is not whole-G4 independent runtime acceptance.
+
 
 ## Approved G4 annotation-authority composition qualification - 2026-10-21
 
