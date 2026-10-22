@@ -4,8 +4,9 @@ mod reference;
 
 use genesis_block_native::{
     query::hql2::{value::QueryValueV2 as V, QueryOutcomeV2},
-    uee_v2::QueryRequestV2,
-    AccessContext, NodeInput, OpenOptions, RelationalColumn, RelationalColumnType,
+    uee_v2::{ExplainV2, QueryOpV2, QueryRequestV2},
+    AccessAction, AccessContext, AccessGrant, AccessPolicy, AccessPolicyMode, AccessResource,
+    NodeInput, OpenOptions, PolicyAdminActor, RelationalColumn, RelationalColumnType,
     RelationalMutationKind, RelationalRowMutation, RelationalSchemaPackage, RelationalTable,
     Storage,
 };
@@ -173,10 +174,7 @@ fn sorted_rows(rows: Vec<BTreeMap<String, V>>) -> Vec<String> {
     rows
 }
 
-#[test]
-fn storage_hql_join_kinds_match_typed_ir_and_independent_p7() {
-    let directory = TempDir::new().unwrap();
-    let storage = open(directory.path());
+fn populate_join(storage: &Storage, left: &[JoinKey], right: &[JoinKey]) {
     storage
         .register_relational_schema(RelationalSchemaPackage {
             namespace: "default".into(),
@@ -203,19 +201,6 @@ fn storage_hql_join_kinds_match_typed_ir_and_independent_p7() {
         })
         .unwrap();
 
-    let left = [
-        JoinKey::Number(1),
-        JoinKey::Number(1),
-        JoinKey::Missing,
-        JoinKey::Number(2),
-        JoinKey::JsonNull,
-    ];
-    let right = [
-        JoinKey::Number(1),
-        JoinKey::Number(1),
-        JoinKey::JsonNull,
-        JoinKey::Number(99),
-    ];
     for (index, key) in left.iter().enumerate() {
         let props = match key {
             JoinKey::Number(value) => json!({"k":value}),
@@ -257,6 +242,26 @@ fn storage_hql_join_kinds_match_typed_ir_and_independent_p7() {
                 .collect(),
         )
         .unwrap();
+}
+
+#[test]
+fn storage_hql_join_kinds_match_typed_ir_and_independent_p7() {
+    let directory = TempDir::new().unwrap();
+    let storage = open(directory.path());
+    let left = [
+        JoinKey::Number(1),
+        JoinKey::Number(1),
+        JoinKey::Missing,
+        JoinKey::Number(2),
+        JoinKey::JsonNull,
+    ];
+    let right = [
+        JoinKey::Number(1),
+        JoinKey::Number(1),
+        JoinKey::JsonNull,
+        JoinKey::Number(99),
+    ];
+    populate_join(&storage, &left, &right);
 
     for (index, query) in [
         "USE default FROM NODES JoinKey AS n |> RETURN prop(n, \"k\") AS k",
@@ -360,5 +365,288 @@ fn storage_hql_join_kinds_match_typed_ir_and_independent_p7() {
             )
             .unwrap_err();
         assert_eq!(error.code, "BIND_ERROR", "{kind} must hide right scope");
+    }
+}
+
+fn disk_tree(path: &Path) -> BTreeMap<String, Vec<u8>> {
+    fn visit(root: &Path, path: &Path, out: &mut BTreeMap<String, Vec<u8>>) {
+        for entry in std::fs::read_dir(path).unwrap() {
+            let path = entry.unwrap().path();
+            if path
+                .file_name()
+                .is_some_and(|name| name == "genesis.lock" || name == "projection.sqlite-shm")
+            {
+                out.insert(
+                    format!("{}:size", path.file_name().unwrap().to_string_lossy()),
+                    std::fs::metadata(&path)
+                        .unwrap()
+                        .len()
+                        .to_le_bytes()
+                        .to_vec(),
+                );
+                continue;
+            }
+            if path.is_dir() {
+                visit(root, &path, out);
+            } else {
+                out.insert(
+                    path.strip_prefix(root).unwrap().to_string_lossy().into(),
+                    std::fs::read(&path)
+                        .unwrap_or_else(|error| panic!("read {}: {error}", path.display())),
+                );
+            }
+        }
+    }
+
+    let mut out = BTreeMap::new();
+    visit(path, path, &mut out);
+    out
+}
+
+fn state(db: &Storage, path: &Path) -> (u64, BTreeMap<String, Vec<u8>>) {
+    (db.stable_frontier(), disk_tree(path))
+}
+fn assert_state(db: &Storage, path: &Path, before: &(u64, BTreeMap<String, Vec<u8>>)) {
+    assert_eq!(
+        db.stable_frontier(),
+        before.0,
+        "query changed durable frontier"
+    );
+    assert_eq!(disk_tree(path), before.1, "query changed fixture files");
+}
+
+fn join_policy(storage: &Storage) {
+    storage
+        .replace_access_policy(
+            PolicyAdminActor {
+                access: AccessContext {
+                    principal: "local-owner".into(),
+                    namespace: "default".into(),
+                },
+            },
+            0,
+            AccessPolicy {
+                revision: 1,
+                mode: AccessPolicyMode::Enforced,
+                grants: vec![
+                    AccessGrant {
+                        principal: "reader".into(),
+                        action: AccessAction::Read,
+                        resource: AccessResource::Namespace("default".into()),
+                    },
+                    AccessGrant {
+                        principal: "local-owner".into(),
+                        action: AccessAction::ManagePolicy,
+                        resource: AccessResource::Namespace("default".into()),
+                    },
+                ],
+            },
+        )
+        .unwrap();
+}
+
+#[test]
+fn storage_join_diagnostics_preserve_p7_bags_counters_authority_and_state() {
+    let full_left = [
+        JoinKey::Number(1),
+        JoinKey::Number(1),
+        JoinKey::Missing,
+        JoinKey::Number(2),
+        JoinKey::JsonNull,
+    ];
+    let full_right = [
+        JoinKey::Number(1),
+        JoinKey::Number(1),
+        JoinKey::JsonNull,
+        JoinKey::Number(99),
+    ];
+    // Literal outputs are hand-derived, independently cross-checked by P7.
+    for (left, right, outputs) in [
+        (&full_left[..], &full_right[..], [5, 7, 3, 2]),
+        (&[][..], &full_right[..], [0, 0, 0, 0]),
+        (&full_left[..], &[][..], [0, 5, 0, 5]),
+        (&[][..], &[][..], [0, 0, 0, 0]),
+    ] {
+        let directory = TempDir::new().unwrap();
+        let storage = open(directory.path());
+        populate_join(&storage, left, right);
+        join_policy(&storage);
+        // All allowed/denied Plan requests precede any query execution or explicit
+        // publication in this fixture. Capturing state does not publish a generation.
+        let before_plan = state(&storage, directory.path());
+        let mut cases = Vec::new();
+        for (index, (kind, oracle)) in [
+            ("inner", reference::JoinKind::Inner),
+            ("left", reference::JoinKind::Left),
+            ("semi", reference::JoinKind::Semi),
+            ("anti", reference::JoinKind::Anti),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let expected = sorted_rows(expected_rows(left, right, oracle));
+            assert_eq!(expected.len(), outputs[index]);
+            for mut request in [
+                hql_request("join-diagnostic-hql", kind),
+                typed_ir_request("join-diagnostic-ir", kind),
+            ] {
+                request.temporal = Some(
+                    serde_json::from_value(json!({"valid_at":"2026-10-23T00:00:00Z"})).unwrap(),
+                );
+                let mut planned = request.clone();
+                planned.explain = Some(ExplainV2::Plan);
+                let QueryOutcomeV2::Plan(plan) =
+                    storage.query_v2(access(), planned.clone()).unwrap()
+                else {
+                    panic!("Plan")
+                };
+                assert!(plan
+                    .plan
+                    .iter()
+                    .all(|node| node.actual.is_none() && node.estimates.is_none()));
+                assert_state(&storage, directory.path(), &before_plan);
+                let denied = AccessContext {
+                    principal: "no-namespace".into(),
+                    namespace: "default".into(),
+                };
+                let error = storage.query_v2(denied, planned).unwrap_err();
+                assert_eq!(error.code, "FORBIDDEN");
+                assert_eq!(error.stage, "authorize");
+                assert_state(&storage, directory.path(), &before_plan);
+                cases.push((request, plan, expected.clone(), outputs[index] as u64));
+            }
+        }
+        // Execution may legitimately publish lazily; establish that boundary once
+        // before guarding normal/Analyze errors, never before the Plan control.
+        storage.publish_generation().unwrap();
+        for (request, plan, expected, output_count) in cases {
+            let QueryOutcomeV2::Rows(normal) = storage.query_v2(access(), request.clone()).unwrap()
+            else {
+                panic!("rows")
+            };
+            assert!(normal.explain.is_none());
+            assert_eq!(sorted_rows(normal.rows.clone()), expected);
+            let mut analyzed_request = request.clone();
+            analyzed_request.explain = Some(ExplainV2::Analyze);
+            let QueryOutcomeV2::Rows(analyzed) =
+                storage.query_v2(access(), analyzed_request).unwrap()
+            else {
+                panic!("Analyze")
+            };
+            assert_eq!(sorted_rows(analyzed.rows.clone()), expected);
+            assert_eq!(analyzed.columns, normal.columns);
+            assert_eq!(analyzed.semantics, normal.semantics);
+            assert_eq!(analyzed.snapshot, normal.snapshot);
+            assert_eq!(analyzed.completeness, normal.completeness);
+            assert_eq!(analyzed.index_frontiers, normal.index_frontiers);
+            assert_eq!(analyzed.cursor, normal.cursor);
+            let mut actual = analyzed.explain.unwrap();
+            assert_eq!(actual.plan_hash, plan.plan_hash);
+            assert_eq!(actual.planner_version, plan.planner_version);
+            assert_eq!(actual.plan.len(), 4);
+            for (op, input, output) in [
+                (QueryOpV2::NodeScan, 0, left.len() as u64),
+                (QueryOpV2::RowScan, 0, right.len() as u64),
+                (
+                    QueryOpV2::Join,
+                    (left.len() + right.len()) as u64,
+                    output_count,
+                ),
+                (QueryOpV2::Project, output_count, output_count),
+            ] {
+                let nodes: Vec<_> = actual
+                    .plan
+                    .iter_mut()
+                    .filter(|node| node.logical_op == op)
+                    .collect();
+                assert_eq!(nodes.len(), 1, "one {op:?}");
+                let node = nodes.into_iter().next().unwrap();
+                let counters = serde_json::to_value(node.actual.take().unwrap()).unwrap();
+                for (name, count) in [("rows_in", input), ("rows_out", output)] {
+                    assert_eq!(
+                        counters[name],
+                        json!({"unit":"rows","measurement":{"status":"measured","value":count}})
+                    );
+                }
+                for (name, unit, reason) in [
+                    ("bytes_read", "bytes", "not_instrumented"),
+                    ("work_units", "work_units", "not_instrumented"),
+                    ("memory_peak_bytes", "bytes", "not_instrumented"),
+                    ("index_probes", "index_probes", "not_applicable"),
+                    (
+                        "distance_evaluations",
+                        "distance_evaluations",
+                        "not_applicable",
+                    ),
+                    ("graph_expansions", "graph_expansions", "not_applicable"),
+                    ("spill_bytes", "bytes", "not_applicable"),
+                ] {
+                    assert_eq!(
+                        counters[name],
+                        json!({"unit":unit,"measurement":{"status":"unknown","reason":reason}})
+                    );
+                }
+                assert_eq!(counters["elapsed_ns"]["unit"], "nanoseconds");
+                if matches!(op, QueryOpV2::NodeScan | QueryOpV2::RowScan) {
+                    assert_eq!(
+                        counters["elapsed_ns"]["measurement"],
+                        json!({"status":"unknown","reason":"not_instrumented"})
+                    );
+                    assert_eq!(counters["elapsed_scope"], "operator_execution");
+                } else {
+                    assert_eq!(counters["elapsed_ns"]["measurement"]["status"], "measured");
+                    assert!(counters["elapsed_ns"]["measurement"]["value"]
+                        .as_u64()
+                        .is_some());
+                    assert_eq!(counters["elapsed_scope"], "operator_execution");
+                }
+                assert_eq!(counters["clock_source"], "monotonic_instant");
+                assert_eq!(counters["sampling"], "complete");
+            }
+            assert_eq!(actual.plan, plan.plan);
+            for mode in [None, Some(ExplainV2::Analyze)] {
+                let mut denied = request.clone();
+                denied.explain = mode.clone();
+                let before = state(&storage, directory.path());
+                let error = storage
+                    .query_v2(
+                        AccessContext {
+                            principal: "no-namespace".into(),
+                            namespace: "default".into(),
+                        },
+                        denied,
+                    )
+                    .unwrap_err();
+                assert_eq!(error.code, "FORBIDDEN");
+                assert_eq!(error.stage, "authorize");
+                assert_state(&storage, directory.path(), &before);
+                let mut limited = request.clone();
+                limited.explain = mode;
+                limited.budget =
+                    Some(serde_json::from_value(json!({"max_result_bytes":1})).unwrap());
+                let before = state(&storage, directory.path());
+                let error = storage.query_v2(access(), limited.clone()).unwrap_err();
+                assert_eq!(error.code, "QUERY_BUDGET_EXCEEDED");
+                assert_state(&storage, directory.path(), &before);
+                if output_count == 0 {
+                    // The Storage boundary budgets the complete envelope, not only [].
+                    limited.budget =
+                        Some(serde_json::from_value(json!({"max_result_bytes":2})).unwrap());
+                    let error = storage.query_v2(access(), limited.clone()).unwrap_err();
+                    assert_eq!(error.code, "QUERY_BUDGET_EXCEEDED");
+                    assert_eq!(error.detail.unwrap()["reason"], "output_limit");
+                    assert_state(&storage, directory.path(), &before);
+                    limited.budget =
+                        Some(serde_json::from_value(json!({"max_result_bytes":1048576})).unwrap());
+                    let QueryOutcomeV2::Rows(empty) = storage.query_v2(access(), limited).unwrap()
+                    else {
+                        panic!("empty rows")
+                    };
+                    assert!(empty.rows.is_empty());
+                    assert_eq!(empty.completeness, normal.completeness);
+                    assert_state(&storage, directory.path(), &before);
+                }
+            }
+        }
     }
 }

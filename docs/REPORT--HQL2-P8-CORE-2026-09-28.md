@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.81b"
+version: "0.1.82b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-22T00:00:00+07:00,Codex"
+last_update: "2026-10-23T00:00:00+07:00,Codex"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -11,6 +11,32 @@ attributes:
   risk: HIGH
   complexity: C-3
 ---
+
+## Approved G4 storage-backed Join diagnostic qualification - 2026-10-23
+
+Owner approved tests/docs-only scope at merged main `e2be296` (LOW, C-3),
+extending the existing HQL/IR NodeScan/RowScan Join P7 differential target.
+The paired matrix qualifies Inner/Left/Semi/Anti with duplicate keys,
+missing-property SQL NULL, JSON null and left/right/both-empty inputs.
+Normal and Analyze result bags have independent P7 expectations; counters
+are specified from fixture cardinalities, not inferred from reported actuals.
+Plan precedes query execution/publication in each fixture and preserves
+observed frontier/file state. Error guards use an explicitly published
+generation; lock/shared-memory contents retain the established size-only
+comparison. This is observation, not internal operator instrumentation.
+Local runtime passes78/78 unique tests across8 targets (focused2 included);
+strict core/default all-target Clippy and formatting pass; docs244/0 and
+version0.2.10 checks pass. Hosted qualification is pending.
+No runtime/planner/API/P6/WAL/hash/schema/ACL model changes. UnionAll,
+Aggregate and broad G4/P8/P13, independent runtime/device/release gates remain open.
+
+PR258 head `5e5dd30121bd0fd50324421b4fffcd401e0b19ec` merged as
+`e2be296e2e2ae2cf3320b19d24220d096b4ff345` after four successful
+exact-head workflows and 15 SUCCESS checks plus one schedule-only skip.
+Tests run `39787302554` passed Ubuntu, Windows and macOS. Merged tree equals
+tested tree `29f05366e2229f722110c60e51bfeff4b482aeb5`; this equality
+is not a post-merge test rerun. Historical pending/NOT_RUN records remain
+historical checkpoints, not retroactively executed acceptance.
 
 ## Approved G4 composed-query state/identity qualification - 2026-10-22
 
@@ -1731,3 +1757,103 @@ explicit targets `hql2_g4_provenance_completeness_tests`,
 `hql2_expand_sequence_tests`, `hql2_pipeline_oracle_tests`,
 `hql2_rank_oracle_tests`, `hql2_oracle_tests`, `hql2_explain_source_tests`.
 No fixture failure or runtime contradiction was observed; no RCA/fix needed.
+
+### Join fixture authoring RCA — 2026-10-23
+
+Symptom/evidence: first compile returned E0382 because the new test moved
+Option<ExplainV2> twice (focused-initial.log); no runtime tests ran there.
+After cloning that value, focused-runtime-initial.log recorded1 pass/1 failure:
+normal/Analyze snapshots had equal database/tx/generation/policy but different
+valid_at values, because the fixture omitted a temporal selector.
+Source query/hql2/exec.rs chooses current valid time when omitted; result.rs
+CounterElapsedScopeV2 has only OperatorExecution. Source elapsed readings are
+unknown/not_instrumented, not a separate invented elapsed scope.
+Root cause: test author assumed implicit time stability and invented a scope
+label rather than consulting the closed enum. No runtime defect established.
+Detection gap: initial new fixture did not pin time, and preflight omitted the
+closed scope enum. Prevention/correction: clone the reused mode, set the same
+explicit valid_at on all new paired requests before Plan, retain full snapshot
+equality, and assert operator_execution for all nodes while source elapsed
+readings remain unknown. No production changes or weaker assertion.
+RCA location ruling: user approved at most seven existing files; keep this RCA
+in the existing P8 report plus external evidence rather than adding an eighth
+.brain/rca file. This overrides only R6 file placement, not evidence-first analysis.
+
+
+## G4 storage-backed Join diagnostic architecture and acceptance
+
+```mermaid
+flowchart LR
+  F[Node and table fixture bags] --> H[HQL Join lowering]
+  F --> I[Typed IR Join]
+  F --> P7[Independent P7 bag oracle]
+  H --> B[Shared binder and plan]
+  I --> B
+  B --> P[Plan before publication]
+  B --> R[Published P6 normal and Analyze execution]
+  R --> C[Fixture-derived counters and P7 rows]
+  P --> S[Observed frontier and file guards]
+  R --> E[Namespace denial and output-budget controls]
+  E --> S
+```
+
+The existing target `hql2_storage_hql_join_oracle_differential_tests.rs`
+retains its original result-bag, bare JOIN default and Semi/Anti right-scope
+rejection checks. New function
+`storage_join_diagnostics_preserve_p7_bags_counters_authority_and_state`
+qualifies the following paired HQL/IR fixtures in each of Inner/Left/Semi/Anti:
+
+| Left/right input sizes | Hand-specified Join output sizes in kind order | Independent semantics |
+|---|---|---|
+| 5 / 4 | 5 / 7 / 3 / 2 | Parallel key multiplicity, missing-property SQL NULL and JSON null distinct |
+| 0 / 4 | 0 / 0 / 0 / 0 | No left rows |
+| 5 / 0 | 0 / 5 / 0 / 5 | Left null extension and Anti left preservation |
+| 0 / 0 | 0 / 0 / 0 / 0 | Measured zero, not unknown |
+
+NodeScan and RowScan have rows_in0 and rows_out equal to fixture cardinality;
+Join rows_in is the sum of both input bags; Project rows_in/out equal the
+independent Join output size. P7 is an independent semantic oracle;
+normal/Analyze equality of snapshot, columns, semantics, completeness,
+index_frontiers and cursor is mode consistency only. It does not independently
+qualify all provenance metadata. Fixed valid_at is shared before planning.
+
+All32 allowed Plan requests and32 namespace-denied Plan controls precede
+execution/publication in their four fixtures. Allowed normal/Analyze requests
+have64 independent P7 bag comparisons. There are64 further namespace-denied
+normal/Analyze requests. A max_result_bytes1 budget yields64 errors, including
+empty results. Another40 empty requests reject a2-byte limit because the full
+result envelope is counted;40 positive empty controls use an explicit1MiB limit. Plan hash/shape comparison is within the same request;
+no cross-frontend equal hash, result equivalence or authority claim follows.
+
+Before/after frontier/file guards surround Plan and each denial/budget result;
+execution-error fixtures are already explicitly published. The existing size-only
+comparison for genesis.lock/projection.sqlite-shm is retained; other files are
+compared by bytes and file set. No inference of universal internal execution
+absence or transient-write prevention is made. Missing estimates remain absent;
+source elapsed time remains typed unknown/not_instrumented; Join/Project elapsed
+readings are measured nanoseconds with no speed threshold. All nodes retain
+operator_execution as the closed scope label; no source timing is fabricated.
+
+Local runtime passes78/78 unique tests across8 explicit targets, with no
+failed/ignored tests; focused2/2 is included, not double-counted. Strict
+core/default all-target Clippy, formatting, docs244/0, version0.2.10 and diff
+checks pass; hosted checks pending. UnionAll/Aggregate and
+other operator/frontends, full independent runtime, P9-P13, public surfaces,
+physical devices and release acceptance remain separate open gates.
+### Join empty-output byte-budget fixture RCA — 2026-10-23
+
+Symptom: focused-final.log retained1 pass/1 failure at the new empty-result
+max_result_bytes2 success expectation; runtime returned execute/output_limit.
+Evidence: exec.rs serializes root rows before its inner budget check, while
+src/lib.rs8728 invokes hql2_check_output on the complete QueryResultV2;
+lib.rs30806-30836 counts the whole serialized result envelope, not only [].
+Root cause: fixture author inspected only the inner executor and overlooked
+Storage boundary serialization. Empty root rows do not imply a two-byte result.
+Detection gap: preflight did not trace the entire Storage result boundary.
+Correction: retain1-byte error checks for every case, assert2-byte errors also
+for empty results, and use an explicit1MiB limit as a positive empty control.
+Keep P7 empty bags, state guards and real output_limit errors; no runtime change
+or assertion weakening. Prevention: inspect both executor and Storage budget
+checks before defining numeric output-byte boundaries; full-envelope size and
+Analyze readings are not asserted as a fixed universal threshold.
+The approved seven-file RCA placement ruling above remains applicable.
