@@ -1,9 +1,9 @@
 ---
-version: "0.8.89b"
+version: "0.8.90b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-22T00:00:00+07:00,Codex"
+last_update: "2026-10-23T00:00:00+07:00,Codex"
 status: beta
 superseded_by: null
 attributes:
@@ -14,6 +14,32 @@ attributes:
   risk: "HIGH"
   owner: "Boss (Founder / Product Authority)"
 ---
+
+## Approved G4 storage-backed Join diagnostic qualification - 2026-10-23
+
+Owner approved tests/docs-only scope at merged main `e2be296` (LOW, C-3),
+extending the existing HQL/IR NodeScan/RowScan Join P7 differential target.
+The paired matrix qualifies Inner/Left/Semi/Anti with duplicate keys,
+missing-property SQL NULL, JSON null and left/right/both-empty inputs.
+Normal and Analyze result bags have independent P7 expectations; counters
+are specified from fixture cardinalities, not inferred from reported actuals.
+Plan precedes query execution/publication in each fixture and preserves
+observed frontier/file state. Error guards use an explicitly published
+generation; lock/shared-memory contents retain the established size-only
+comparison. This is observation, not internal operator instrumentation.
+Local runtime passes78/78 unique tests across8 targets (focused2 included);
+strict core/default all-target Clippy and formatting pass; docs244/0 and
+version0.2.10 checks pass. Hosted qualification is pending.
+No runtime/planner/API/P6/WAL/hash/schema/ACL model changes. UnionAll,
+Aggregate and broad G4/P8/P13, independent runtime/device/release gates remain open.
+
+PR258 head `5e5dd30121bd0fd50324421b4fffcd401e0b19ec` merged as
+`e2be296e2e2ae2cf3320b19d24220d096b4ff345` after four successful
+exact-head workflows and 15 SUCCESS checks plus one schedule-only skip.
+Tests run `39787302554` passed Ubuntu, Windows and macOS. Merged tree equals
+tested tree `29f05366e2229f722110c60e51bfeff4b482aeb5`; this equality
+is not a post-merge test rerun. Historical pending/NOT_RUN records remain
+historical checkpoints, not retroactively executed acceptance.
 
 ## Approved G4 composed-query state/identity qualification - 2026-10-22
 
