@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.59b"
+version: "2.3.60b"
 updated: "2026-10-23"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -24,6 +24,64 @@ related_docs:
   - "docs/FLOW--GENESISRAG17-PIPELINE.md"
   - "docs/GENESISRAG17-EXTENSION-MAP.md"
 ---
+
+## Approved G4 scalar frontend diagnostics - 2026-10-23
+
+Owner approved the seven-existing-file tests/docs-only slice at merged main
+`564f28f` (LOW, C-3). The existing scalar-counter target adds paired HQL/IR
+normal/Plan/Analyze fixtures through Values/Filter/Project/Distinct/Sort/
+Offset/Take/final Project. Independent P7 and literal ordered rows qualify
+SQL-NULL filtering, duplicates, empty/all-filtered inputs, offset beyond the
+result and TAKE0; actual rows are not sorted by the test. Surviving-NULL sorting
+remains covered separately by the preserved nullable scalar regression.
+Eight-node rows_in/out are independent fixture cardinalities, located by
+lineage and logical kind rather than generated IDs. Typed unknown measurements,
+measured zero and monotonic elapsed provenance remain distinct.
+
+Allowed and denied Plan controls precede first query execution/publication.
+Normal/Analyze denial and byte-budget controls follow explicit generation
+publication. Frontier/file observations include the established lock/shm
+size-only exceptions; they do not prove universal transient/internal-write
+absence or ordinary nonempty successful execution state. Metadata mode equality
+is consistency, not independent full provenance. Same-request shape/hash
+identity does not imply cross-frontend equal hashes or authority.
+
+```text
+Values -> Filter -> Project(y) -> Distinct -> Sort -> Offset -> Take -> Project(return)
+HQL/IR -> bind/plan -> Plan before publication -> observed frontier/files
+                  -> normal/Analyze after publication -> rows/counters/errors
+independent P7 + literal ordered rows -----------------> selected assertions
+```
+
+Final author runtime passes103/103 unique tests across11 targets, zero failed/
+ignored; final scalar target8/8 is included once. Selected matrix152 requests=
+62 successes+42 namespace denials+48 budget errors,124 observed state guards.
+Source blob `69cd92dfe249ea3d9954bb243539b831a700dd37`; prior seven scalar test/helper
+bodies are unchanged. Strict core/default all-target Clippy, formatting, docs244/0,
+version0.2.10 and diff checks pass. Independent source/evidence/architecture
+review is recorded separately; no reviewer runtime rerun is claimed.
+Hosted qualification is NOT_RUN for this
+candidate until complete exact-head CI is observed.
+
+Seven existing tests/docs files only; no runtime/planner/API/P6/WAL/hash/schema/
+ACL/index/grammar/shared-oracle changes. Broad G4/P8/P9-P13, exhaustive types/
+order/composition, independent runtime/provenance, performance/device/release
+gates remain open.
+
+### Integrated PR261 evidence reconciliation
+
+PR261 merged as `564f28f6a1c3951701e1158a822c103493c4d7e7` after all four
+exact-head workflows completed successfully: Tests39949504050,
+Security39949504060, performance39949504095 and worker39949504118.
+The full rollup was15 SUCCESS and1 genuinely schedule-only advisory SKIPPED;
+applicable Rust suites on Ubuntu/macOS/Windows succeeded. Author local87/87
+unique tests across10 targets, focused2 included once, and fresh source/evidence/
+architecture review0 Critical/0 Important/0 Minor remain distinct evidence.
+Fetched main tree equals reviewed tree `8bccf46d4a4a6bd900c024aefef0aa2fd35175d3`;
+this parity is not a new runtime rerun. Earlier candidate NOT_RUN/pending lines
+below are historical checkpoints superseded for PR261 by this reconciliation.
+
+
 
 ## Approved G4 UnionAll frontend diagnostics - 2026-10-23
 

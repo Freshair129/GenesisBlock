@@ -1,5 +1,5 @@
 ---
-version: "0.8.92b"
+version: "0.8.93b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
@@ -14,6 +14,64 @@ attributes:
   risk: "HIGH"
   owner: "Boss (Founder / Product Authority)"
 ---
+
+## Approved G4 scalar frontend diagnostics - 2026-10-23
+
+Owner approved the seven-existing-file tests/docs-only slice at merged main
+`564f28f` (LOW, C-3). The existing scalar-counter target adds paired HQL/IR
+normal/Plan/Analyze fixtures through Values/Filter/Project/Distinct/Sort/
+Offset/Take/final Project. Independent P7 and literal ordered rows qualify
+SQL-NULL filtering, duplicates, empty/all-filtered inputs, offset beyond the
+result and TAKE0; actual rows are not sorted by the test. Surviving-NULL sorting
+remains covered separately by the preserved nullable scalar regression.
+Eight-node rows_in/out are independent fixture cardinalities, located by
+lineage and logical kind rather than generated IDs. Typed unknown measurements,
+measured zero and monotonic elapsed provenance remain distinct.
+
+Allowed and denied Plan controls precede first query execution/publication.
+Normal/Analyze denial and byte-budget controls follow explicit generation
+publication. Frontier/file observations include the established lock/shm
+size-only exceptions; they do not prove universal transient/internal-write
+absence or ordinary nonempty successful execution state. Metadata mode equality
+is consistency, not independent full provenance. Same-request shape/hash
+identity does not imply cross-frontend equal hashes or authority.
+
+```text
+Values -> Filter -> Project(y) -> Distinct -> Sort -> Offset -> Take -> Project(return)
+HQL/IR -> bind/plan -> Plan before publication -> observed frontier/files
+                  -> normal/Analyze after publication -> rows/counters/errors
+independent P7 + literal ordered rows -----------------> selected assertions
+```
+
+Final author runtime passes103/103 unique tests across11 targets, zero failed/
+ignored; final scalar target8/8 is included once. Selected matrix152 requests=
+62 successes+42 namespace denials+48 budget errors,124 observed state guards.
+Source blob `69cd92dfe249ea3d9954bb243539b831a700dd37`; prior seven scalar test/helper
+bodies are unchanged. Strict core/default all-target Clippy, formatting, docs244/0,
+version0.2.10 and diff checks pass. Independent source/evidence/architecture
+review is recorded separately; no reviewer runtime rerun is claimed.
+Hosted qualification is NOT_RUN for this
+candidate until complete exact-head CI is observed.
+
+Seven existing tests/docs files only; no runtime/planner/API/P6/WAL/hash/schema/
+ACL/index/grammar/shared-oracle changes. Broad G4/P8/P9-P13, exhaustive types/
+order/composition, independent runtime/provenance, performance/device/release
+gates remain open.
+
+### Integrated PR261 evidence reconciliation
+
+PR261 merged as `564f28f6a1c3951701e1158a822c103493c4d7e7` after all four
+exact-head workflows completed successfully: Tests39949504050,
+Security39949504060, performance39949504095 and worker39949504118.
+The full rollup was15 SUCCESS and1 genuinely schedule-only advisory SKIPPED;
+applicable Rust suites on Ubuntu/macOS/Windows succeeded. Author local87/87
+unique tests across10 targets, focused2 included once, and fresh source/evidence/
+architecture review0 Critical/0 Important/0 Minor remain distinct evidence.
+Fetched main tree equals reviewed tree `8bccf46d4a4a6bd900c024aefef0aa2fd35175d3`;
+this parity is not a new runtime rerun. Earlier candidate NOT_RUN/pending lines
+below are historical checkpoints superseded for PR261 by this reconciliation.
+
+
 
 ## Approved G4 UnionAll frontend diagnostics - 2026-10-23
 
@@ -393,7 +451,8 @@ P0 BASELINE (done, read-only)
 | G4-HISTORY-CHANGE-VERIFY | Owner-approved tests/docs-only HistoryScan/ChangeScan diagnostic matrix | Integrated PR251 at a3e2d4d and existing G4/P6/H2-D11 contracts | Exact emitted rows, mode/oracle parity, temporal/ACL/floor/budget cases and no-write EXPLAIN; local 93/93 across 11 targets, strict core/default Clippy and docs gates passed; hosted PR252 passed on all three OSes and merged at 7c3e5e2 |
 | G4-LEXICAL-CONTEXT-VERIFY | Owner-approved tests/docs-only lexical/context diagnostic matrix | Integrated #252 and G4/P8 D2/D3/P6 contracts | Exact rows, mode/P7 parity, provenance/budgets and EXPLAIN no-write; local 170/170 across 14 targets and strict static gates pass; hosted PR253 passed on all three OSes and merged at 24d7eed |
 | G4-PLAN-IDENTITY-VERIFY | Owner-approved tests/docs-only golden/shape identity qualification | Integrated #253 and G4 D03/D04/D06/D07 | Independent expected shapes/hashes, mode parity and shape/value boundaries; local221/221 across18 targets and strict static gates pass; hosted passed in #254 |
-| G4-UNION-VERIFY | Owner-approved tests/docs-only paired UnionAll diagnostics at main6cf46f9; preserve existing169-pair oracle | Existing G4/P6/P7 and integrated PR260 | Selected bags/NULL/empty inputs, per-node counters, Plan-before-publication state, namespace and complete-envelope byte budgets; local87/87 across10 targets and strict static gates pass; hosted pending; broad G4/P8/P9-P13 remains partial |
+| G4-SCALAR-FRONTEND-VERIFY | Owner-approved paired full scalar pipeline diagnostics at main564f28f | Existing G4/P6/P7, PR261 integrated | Selected eight-node counters, P7/literal order, authority/state/byte controls; qualification recorded above; broad gates partial |
+| G4-UNION-VERIFY | Owner-approved tests/docs-only paired UnionAll diagnostics at main6cf46f9; preserve existing169-pair oracle | Existing G4/P6/P7 and integrated PR260 | Selected bags/NULL/empty inputs, per-node counters, Plan-before-publication state, namespace and complete-envelope byte budgets; local87/87 across10 targets and strict static gates pass; hosted passed in PR261; broad G4/P8/P9-P13 remains partial |
 | P8-R2 | Bounded REST parity verification for existing HQL compatibility and typed Query IR v1 traversal | P8 local kernel; existing P13 boundary | `/v1/query/hql` and `/v1/query/ir` return equal result bags; test-only, no `query_v2` transport or P13 closure |
 | P8-R3 | REST matrix for raw/wrapped HQL bodies and typed HQL/Query IR v1 errors | P8-R2; existing v1 routes | Equal result bags across accepted HQL body shapes; budget/version failures retain typed envelopes; test-only, no public API or P13 closure |
 | P9 | Legal B-tree/annotation paths and planner access reporting | P8 and approved G4 planner boundary | Pushdown/order counterexamples match oracle; plans are truthful |
