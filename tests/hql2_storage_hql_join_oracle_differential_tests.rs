@@ -471,6 +471,9 @@ fn storage_join_diagnostics_preserve_p7_bags_counters_authority_and_state() {
         let storage = open(directory.path());
         populate_join(&storage, left, right);
         join_policy(&storage);
+        // Row revisions use insertion time. Pin once after setup, then reuse in
+        // every mode/frontend so the fixture cannot outlive a calendar literal.
+        let valid_at = chrono::Utc::now().to_rfc3339();
         // All allowed/denied Plan requests precede any query execution or explicit
         // publication in this fixture. Capturing state does not publish a generation.
         let before_plan = state(&storage, directory.path());
@@ -490,9 +493,8 @@ fn storage_join_diagnostics_preserve_p7_bags_counters_authority_and_state() {
                 hql_request("join-diagnostic-hql", kind),
                 typed_ir_request("join-diagnostic-ir", kind),
             ] {
-                request.temporal = Some(
-                    serde_json::from_value(json!({"valid_at":"2026-10-23T00:00:00Z"})).unwrap(),
-                );
+                request.temporal =
+                    Some(serde_json::from_value(json!({"valid_at":valid_at})).unwrap());
                 let mut planned = request.clone();
                 planned.explain = Some(ExplainV2::Plan);
                 let QueryOutcomeV2::Plan(plan) =

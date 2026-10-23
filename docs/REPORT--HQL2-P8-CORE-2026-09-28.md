@@ -1,6 +1,6 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.82b"
+version: "0.1.83b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
 last_update: "2026-10-23T00:00:00+07:00,Codex"
 status: beta
@@ -11,6 +11,45 @@ attributes:
   risk: HIGH
   complexity: C-3
 ---
+
+## Approved G4 Aggregate frontend diagnostics - 2026-10-23
+
+Owner approved tests/docs-only qualification at merged main `1821da9`
+(LOW, C-3). The existing 121-bag normal HQL/IR/P7 oracle is retained.
+The added selected matrix pairs HQL/IR global and grouped Aggregate through
+Storage: empty input, all NULL, repeated positive values and repeated signed
+values. All seven existing aggregate functions are checked against independent
+P7 bags; global emits one row even on empty input, grouped outputs are
+hand-specified as 0/1/3/3. Values/Aggregate/Project row counters are fixture
+cardinalities; other counters keep typed unknowns and explicit units.
+Plan requests precede execution/publication; denied and output-budget controls
+preserve observed frontier/file state after explicit publication. Lock and
+SQLite shared-memory bookkeeping remain size-only; no universal internal or
+transient-write claim is made. Snapshot/metadata mode equality is consistency,
+not independent provenance acceptance. Same-request plan identity never
+implies cross-frontend semantic equality or access authority.
+Local runtime passes79/79 unique tests across8 targets, zero failed/ignored;
+focused2/2 is included once. Owner explicitly expanded the limit to eight
+existing files for the pre-existing Join fixture date correction: capture one
+valid_at after setup and reuse before Plan, retaining every row/counter/state
+assertion. The original regression failure and RCA remain recorded below.
+Strict core/default all-target Clippy, formatting, docs244/0, version0.2.10 and
+diff checks pass. Hosted qualification is NOT_RUN for this candidate.
+No production/runtime/planner/API/P6/WAL/hash/schema/ACL changes. Broader
+operator breadth, G4/P8/P13, independent runtime/device/release gates stay open.
+
+PR259 head `83e35fd6274f8d0982c3f3f071e8c739a7f57365` merged as
+`1821da9b89dd7b418ac7b507d2a510c2b799d36e` after four successful
+exact-head workflows and 15 SUCCESS checks plus one schedule-only skip.
+Tests `39826465866`, Security `39826465863`, worker `39826465865`,
+performance `39826466200` completed successfully, including Rust Ubuntu,
+Windows and macOS. Merged tree `00ac16259742eb2fe6473bc097cc70c6d22bb2cc`
+equals the tested tree; this is not a fresh post-merge runtime rerun.
+Earlier pending statements below are historical checkpoints. The deferred
+Minor Join temporal RCA pointer is corrected in the P8 report to
+`query/hql2/request.rs::normalize`; raw historical logs are retained.
+
+
 
 ## Approved G4 storage-backed Join diagnostic qualification - 2026-10-23
 
@@ -1765,7 +1804,8 @@ Option<ExplainV2> twice (focused-initial.log); no runtime tests ran there.
 After cloning that value, focused-runtime-initial.log recorded1 pass/1 failure:
 normal/Analyze snapshots had equal database/tx/generation/policy but different
 valid_at values, because the fixture omitted a temporal selector.
-Source query/hql2/exec.rs chooses current valid time when omitted; result.rs
+Source query/hql2/request.rs::normalize (line181) chooses current valid time
+when omitted via valid_at.unwrap_or(now); result.rs
 CounterElapsedScopeV2 has only OperatorExecution. Source elapsed readings are
 unknown/not_instrumented, not a separate invented elapsed scope.
 Root cause: test author assumed implicit time stability and invented a scope
@@ -1857,3 +1897,77 @@ or assertion weakening. Prevention: inspect both executor and Storage budget
 checks before defining numeric output-byte boundaries; full-envelope size and
 Analyze readings are not asserted as a fixed universal threshold.
 The approved seven-file RCA placement ruling above remains applicable.
+
+## G4 Aggregate diagnostic architecture and acceptance
+
+```mermaid
+flowchart LR
+  F[Nullable fixture bags] --> H[HQL global or grouped AGG]
+  F --> I[Typed IR Aggregate and Project]
+  H --> B[Shared binder and planner]
+  I --> B
+  B --> P[Plan before publication]
+  B --> E[Published P6 normal and Analyze]
+  F --> O[Independent P7 aggregates]
+  O --> R[Bag equality and literal counts]
+  E --> R
+  P --> S[Observed frontier and fixture files]
+  E --> A[Namespace and full-envelope budget errors]
+  A --> S
+```
+
+Target: `tests/hql2_storage_aggregate_oracle_differential_tests.rs`, new test
+`storage_aggregate_diagnostics_preserve_p7_groups_counters_authority_and_state`.
+Original `storage_hql_and_ir_aggregates_match_independent_p7_for_nullable_bags`
+retains all121 bags. Selected inputs below are additional diagnostic evidence.
+
+| Input | Global output | Grouped output | Independent checks |
+|---|---|---|---|
+| [] | 1 | 0 | Empty global aggregates versus zero groups |
+| [NULL,NULL] | 1 | 1 | count_all differs from count; NULL grouping |
+| [1,1,NULL,2] | 1 | 3 | Repeated members and NULL group |
+| [-1,2,-1,NULL] | 1 | 3 | Signed sum/avg/min/max and collect multiplicity |
+
+Each checks count_all/count/sum/avg/min/max/collect against P7. Bags are sorted
+only at the row level; collected list order and duplicate members remain intact.
+Values rows_in0/out=input length; Aggregate rows_in=input length/out=literal
+output count; Project rows_in/out=output count. All three scalar operators have
+measured elapsed nanoseconds without speed assertions, operator_execution scope,
+monotonic_instant clock and complete sampling. Bytes/work/memory remain unknown
+not_instrumented; index/distance/graph/spill remain unknown not_applicable.
+No estimates or actuals appear in Plan; removing actuals from Analyze recovers
+same-request Plan shape/hash. Fixed valid_at is applied before planning.
+
+Matrix:16 allowed Plan +32 normal/Analyze P7 successes +4 positive empty finite
+budget controls =52 successes;48 namespace denials across all three modes;
+32 one-byte output errors +4 empty grouped two-byte envelope errors =36 budget
+errors. Total136 requests. Before/after observed state guards cover allowed and
+denied Plan, execution denials/budget errors and positive empty controls.
+Normal/Analyze column/snapshot/semantics/completeness/frontier/cursor comparisons
+are mode consistency only. Error fixtures publish explicitly before execution;
+Plan controls precede query execution or explicit publication. The complete
+Storage output envelope counts toward byte budgets, not merely `[]`; positive
+empty controls use a finite1MiB allowance. No new universal byte threshold is
+inferred. Permission uses enforced Namespace(Read); denied principal has none.
+RCA placement remains the approved existing-file exception, not permission
+to skip analysis or silently change production behavior.
+
+### Aggregate byte-budget fixture RCA - 2026-10-23
+
+Symptom: focused-initial.log, 1 pass / 1 failure; new test expected output_limit but received query_limit at the one-byte control.
+Evidence: exec.rs::quota line44 emits execute/query_limit. ExecutionBudgetV2::check_output at188 invokes it on row/byte excess; executor serializes root rows then checks at2769. Storage::hql2_check_output at lib.rs30806 counts the full envelope and maps serialization failure to output_limit. A one-byte allowance cannot hold even [], so executor rejection precedes the envelope.
+Root cause: fixture asserted the later Storage error reason for an earlier executor limit. No runtime/contract defect established.
+Detection gap: source preflight read the whole-envelope serializer without following the inner budget error constructor.
+Correction: one-byte controls assert execute/query_limit exactly; two-byte empty grouped controls still assert output_limit exactly, finite1MiB positives and independent P7/state assertions stay intact.
+Prevention: trace both check_output callers and constructors before assigning stage/reason expectations. Tests-only correction; seven-existing-file RCA placement retained.
+
+### Existing Join temporal fixture expiry - approved correction
+
+Status: owner approved eighth existing file; fixture-only correction applied, final regression79/79 across8 targets passes.
+Symptom/evidence: runtime.log has 77 passed/1 failed in seven targets, stopping before typed-IR join. Existing storage_join_diagnostics_preserve_p7_bags_counters_authority_and_state failed line528 with [] versus five P7 rows. New Aggregate target2/2 passed. Separate typed-join.log1/1 passed.
+Root cause: Join requests hardcode valid_at2026-10-23T00:00:00Z in the diagnostic request loop. This host run occurred2026-10-23T04:07Z. Node fixtures are backdated to September but relational row revisions use current insertion time: lib.rs::prepare_relational_row_revisions_tx12037 and append_row_upsert12168 assign valid_from:now. Therefore the fixed query selects a point before right-row insertion. The previously green fixture depended on running before its chosen future date.
+Detection gap: previous validation/CI occurred before the pinned date; no date-independent setup clock was shared.
+Proposed minimal correction: in the existing Join diagnostic test capture chrono::Utc::now().to_rfc3339() once after populate_join/policy and before any Plan/publication, and reuse this valid_at for every request in that fixture. Keep full snapshot equality, all literal/P7 rows, actual counters, budgets, ACL errors and state guards unchanged. No runtime/API/temporal semantics change.
+Acceptance: existing failing test becomes green, full approved eight-target regression green, strict core/default Clippy/fmt/docs/version/diff, fresh whole-branch review and full exact-head hosted CI. No test exclusion or weaker assertions. Owner explicitly approved the eight-file maximum before this correction. RCA stays in existing P8 plus this external evidence; no ninth file added.
+
+Source scan confirmation: lib.rs::hql2_scan31543 applies valid_from<=valid_at and valid_to bounds to hql2_record_revisions; prepare_relational_row_revisions_tx12144 captures Utc::now(), then12168 assigns row valid_from.

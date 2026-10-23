@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.57b"
+version: "2.3.58b"
 updated: "2026-10-23"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -24,6 +24,45 @@ related_docs:
   - "docs/FLOW--GENESISRAG17-PIPELINE.md"
   - "docs/GENESISRAG17-EXTENSION-MAP.md"
 ---
+
+## Approved G4 Aggregate frontend diagnostics - 2026-10-23
+
+Owner approved tests/docs-only qualification at merged main `1821da9`
+(LOW, C-3). The existing 121-bag normal HQL/IR/P7 oracle is retained.
+The added selected matrix pairs HQL/IR global and grouped Aggregate through
+Storage: empty input, all NULL, repeated positive values and repeated signed
+values. All seven existing aggregate functions are checked against independent
+P7 bags; global emits one row even on empty input, grouped outputs are
+hand-specified as 0/1/3/3. Values/Aggregate/Project row counters are fixture
+cardinalities; other counters keep typed unknowns and explicit units.
+Plan requests precede execution/publication; denied and output-budget controls
+preserve observed frontier/file state after explicit publication. Lock and
+SQLite shared-memory bookkeeping remain size-only; no universal internal or
+transient-write claim is made. Snapshot/metadata mode equality is consistency,
+not independent provenance acceptance. Same-request plan identity never
+implies cross-frontend semantic equality or access authority.
+Local runtime passes79/79 unique tests across8 targets, zero failed/ignored;
+focused2/2 is included once. Owner explicitly expanded the limit to eight
+existing files for the pre-existing Join fixture date correction: capture one
+valid_at after setup and reuse before Plan, retaining every row/counter/state
+assertion. The original regression failure and RCA remain recorded below.
+Strict core/default all-target Clippy, formatting, docs244/0, version0.2.10 and
+diff checks pass. Hosted qualification is NOT_RUN for this candidate.
+No production/runtime/planner/API/P6/WAL/hash/schema/ACL changes. Broader
+operator breadth, G4/P8/P13, independent runtime/device/release gates stay open.
+
+PR259 head `83e35fd6274f8d0982c3f3f071e8c739a7f57365` merged as
+`1821da9b89dd7b418ac7b507d2a510c2b799d36e` after four successful
+exact-head workflows and 15 SUCCESS checks plus one schedule-only skip.
+Tests `39826465866`, Security `39826465863`, worker `39826465865`,
+performance `39826466200` completed successfully, including Rust Ubuntu,
+Windows and macOS. Merged tree `00ac16259742eb2fe6473bc097cc70c6d22bb2cc`
+equals the tested tree; this is not a fresh post-merge runtime rerun.
+Earlier pending statements below are historical checkpoints. The deferred
+Minor Join temporal RCA pointer is corrected in the P8 report to
+`query/hql2/request.rs::normalize`; raw historical logs are retained.
+
+
 
 ## Approved G4 storage-backed Join diagnostic qualification - 2026-10-23
 
