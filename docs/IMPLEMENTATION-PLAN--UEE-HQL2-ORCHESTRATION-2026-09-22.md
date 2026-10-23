@@ -1,5 +1,5 @@
 ---
-version: "0.8.94b"
+version: "0.8.95b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
@@ -14,6 +14,57 @@ attributes:
   risk: "HIGH"
   owner: "Boss (Founder / Product Authority)"
 ---
+
+## Approved G4/P8 broad host qualification - 2026-10-24
+
+Owner approved a six-existing-document evidence consolidation (LOW, C-3),
+including existing HQL2/P6/compatibility regressions, one fresh whole-scope
+source/evidence/architecture review and normal PR delivery after complete CI.
+No test/production/runtime/API/P6/WAL/hash/schema/ACL/stream or surface contract
+changes are admitted. Host first; owner reports physical devices unavailable.
+
+Current baseline is PR263 merged main `0a5db778e533152d20fdbd8be7dfcc0e03c4fc4b`
+with reviewed source tree `ed2ba0fcf3d802f0c5e2f66a66c3a817c774ee56`.
+The P8 report's **Current G4/P8 broad host qualification ledger** maps all eight
+G4 criteria, all 19 executable `Kernel` variants, six `BoundSourceV2` partitions,
+exact-KNN/Original-Rerank modes and independently expected versus self-consistent
+metadata. Every kernel has selected test evidence and explicit residuals; no
+whole type/frontend/mode/temporal/ACL/budget cross-product is claimed.
+
+Author HQL2 run:455 passed/0 failed/1 ignored across44 root integration targets,
+locked no-default-features/jobs2/serial. The ignored parser child is explicitly
+invoked twice by its passing parent (default/detailed diagnostics);455 excludes
+those child invocations. Initial recursive count49 included support helpers.
+Separate P6/Query IR v1/REST/schema compatibility run:145 passed/0 failed/
+0 ignored in11 targets. Combined author execution600 passed/0 failed/1 ignored
+in55 targets;600 distinct target/test pairs are not600 independent semantic
+obligations. Strict core/default all-target Clippy, fmt/docs244/0/version0.2.10/
+diff checks pass. This candidate's fresh review/hosted checks remain PENDING.
+Author execution, source review and independent runtime reproduction are
+separate; reviewer runtime/device/release are NOT_RUN.
+
+PR263's four workflows completed success with15 SUCCESS+1 genuine schedule-only
+advisory skip, including actual Rust Ubuntu/macOS/Windows suites, before normal
+merge at0a5db77. Reviewed-tree parity was verified, not a runtime rerun. Historical
+candidate pending statements below remain dated checkpoints. This candidate
+needs its own exact-head hosted qualification.
+
+```text
+G4/P8 finite ledger + host regressions -> independent whole-scope review
+P8 -> P9 -> P10 -> P11 -> P12 -> P13 surfaces + P14 recovery
+  -> P15 security -> P16 host/device/release/traceability
+```
+
+Broad G4/P8 remains PARTIAL. Missing selected proof is MISSING_EVIDENCE;
+unsupported v2 stream and future surface/planner behavior need separate
+contract approval, not implied test coverage. Existing storage indexes and
+core/additive NAPI v2 are not absent merely because broader P9/P13 remain open.
+Physical device availability blocks device execution; simulator/emulator/host
+results do not replace it. Release publication is not a verification dry run.
+
+Canonical ledger: [current P8 acceptance partitions](REPORT--HQL2-P8-CORE-2026-09-28.md#current-g4p8-broad-host-qualification-ledger---2026-10-24).
+
+Version transition: `0.8.94b` -> `0.8.95b`; broad qualification evidence/navigation only.
 
 ## Approved G4 checked arithmetic frontend diagnostics - 2026-10-24
 
