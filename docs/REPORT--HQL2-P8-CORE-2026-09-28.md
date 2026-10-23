@@ -1,6 +1,6 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.83b"
+version: "0.1.84b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
 last_update: "2026-10-23T00:00:00+07:00,Codex"
 status: beta
@@ -11,6 +11,44 @@ attributes:
   risk: HIGH
   complexity: C-3
 ---
+
+## Approved G4 UnionAll frontend diagnostics - 2026-10-23
+
+Owner approved tests/docs-only qualification at merged main `6cf46f9`
+(LOW, C-3), extending the existing Storage set-oracle target. The169-pair
+normal HQL/IR/P7 semantic oracle is preserved. New selected fixtures compare
+both frontends through Values/branch Projects/UnionAll/Sort/final Project,
+with independent P7 and literal ordered rows, including duplicates, NULL and
+left/right/both-empty inputs. Per-node rows are fixture cardinalities; measured
+zero and typed unknown remain distinct. Generated IDs and cross-frontend equal
+hashes are not acceptance requirements. Existing repeated IR edge counter and
+golden regressions are retained.
+Plan controls precede query execution/publication. Execution denial and byte
+budget controls use an explicitly published generation; frontier/files are
+observed before/after, with only established lock/shared-memory size comparisons.
+No universal internal/transient-write claim follows. Metadata mode equality is
+consistency, not independent full provenance acceptance. The complete result
+envelope counts toward byte limits, including empty results.
+Local runtime passes87/87 unique tests across10 targets, zero failed/ignored;
+focused2/2 is included once. Strict core/default all-target Clippy, formatting,
+docs244/0, version0.2.10 and diff checks pass. Hosted qualification is NOT_RUN for
+this candidate. Seven existing tests/docs files only; no runtime/planner/API/
+P6/WAL/hash/schema/ACL/index/grammar changes. Broader type/composition,
+G4/P8/P9-P13, independent runtime/device/release gates remain open.
+
+PR260 reviewed head `ca7f88402b0bca9c8058164a1ee2492f5e078b29` merged as
+`6cf46f90a0b57b081f7d0d3d08833422fbcffe7c` after four successful exact-head
+workflows and15 SUCCESS checks plus one genuine schedule-only skip. Tests
+`39899519869`, Security `39899519859`, worker `39899519995` and performance
+`39899519858` succeeded, with actual Rust Ubuntu/macOS/Windows steps successful.
+PR260 local79/79 across8 targets and strict static gates passed; its fresh
+whole-branch source/evidence review found Critical0/Important0/Minor0 and did
+not rerun runtime suites. Merged tree `edb4047a0ebeecdcf8d4951cafd24f48b755dde5`
+equals the reviewed/tested tree, not a new post-merge runtime run. Earlier
+hosted NOT_RUN/pending entries below are dated pre-CI checkpoints; historical
+fixture failures/RCAs remain preserved, not current uncorrected failures.
+
+
 
 ## Approved G4 Aggregate frontend diagnostics - 2026-10-23
 
@@ -1971,3 +2009,78 @@ Proposed minimal correction: in the existing Join diagnostic test capture chrono
 Acceptance: existing failing test becomes green, full approved eight-target regression green, strict core/default Clippy/fmt/docs/version/diff, fresh whole-branch review and full exact-head hosted CI. No test exclusion or weaker assertions. Owner explicitly approved the eight-file maximum before this correction. RCA stays in existing P8 plus this external evidence; no ninth file added.
 
 Source scan confirmation: lib.rs::hql2_scan31543 applies valid_from<=valid_at and valid_to bounds to hql2_record_revisions; prepare_relational_row_revisions_tx12144 captures Utc::now(), then12168 assigns row valid_from.
+
+## G4 UnionAll diagnostic architecture and acceptance overlay
+
+This current overlay supplements, rather than silently rewrites, the historical
+919814f matrix above. Join gained the selected HQL/IR diagnostic/state/error
+matrix in #259 and a date-independent fixture selector correction in #260.
+Aggregate gained paired global/grouped seven-function diagnostics and controls
+in #260. Both increments passed their scoped hosted/local gates. UnionAll already
+has169 normal HQL/IR P7 bag pairs, IR counter fixtures including repeated edges,
+and independent ordered/repeated-edge plan goldens; the new scope fills the
+selected paired frontend diagnostic/state/error gap, not a missing runtime.
+
+```mermaid
+flowchart LR
+  L[Left nullable bag] --> H[HQL two RETURN branches]
+  R[Right nullable bag] --> H
+  L --> I[Typed IR branch Projects]
+  R --> I
+  H --> B[Shared binder and planner]
+  I --> B
+  B --> P[Plan before publication]
+  B --> E[Published P6 normal and Analyze]
+  L --> O[Independent P7 UnionAll and Sort]
+  R --> O
+  O --> C[Literal ordered rows and branch counters]
+  E --> C
+  P --> S[Observed frontier and files]
+  E --> A[Namespace and output budget controls]
+  A --> S
+```
+
+Target: `tests/hql2_storage_set_oracle_differential_tests.rs`, new test
+`storage_union_all_diagnostics_preserve_p7_bags_counters_authority_and_state`.
+Original `storage_hql_and_ir_union_all_match_p7_for_nullable_bag_pairs` remains
+unchanged in acceptance:169 pairs,338 normal requests.
+
+| Left | Right | Literal ASC NULLS LAST output | Count |
+|---|---|---|---|
+| [1,NULL,1] | [NULL,2] | [1,1,2,NULL,NULL] | 5 |
+| [] | [2] | [2] | 1 |
+| [NULL] | [] | [NULL] | 1 |
+| [] | [] | [] | 0 |
+
+Normal and Analyze must match both P7 and literal ordered rows without sorting
+the actual result in the assertion. Each diagnostic plan contains2 Values,
+2 branch Projects,1 UnionAll,1 Sort and1 final Project. Root/input lineage and
+logical kinds locate nodes rather than generated IDs. Values rows_in0/out=L/R;
+branch Project rows_in/out=L/R; UnionAll rows_in/out=N; Sort/final Project
+rows_in/out=N. Totals come from literal fixture outputs and N=L+R, not counters.
+All seven scalar nodes report measured rows and elapsed nanoseconds, with
+monotonic_instant/complete/operator_execution provenance and no speed threshold.
+Bytes/work/memory remain typed unknown/not_instrumented; index/distance/graph/
+spill remain unknown/not_applicable, preserving exact units.
+
+Selected matrix:8 allowed Plan+16 normal/Analyze+4 finite empty positives=28
+successes;24 namespace denials;16 one-byte+4 empty two-byte errors=20 budget
+errors;72 requests and56 observed state guards. Plan controls precede execution
+or explicit publication in each fixture; error controls use an explicitly
+published generation. One-byte root serialization fails execute/query_limit;
+two-byte empty envelope fails execute/output_limit; finite1MiB allows empty
+results. All errors retain typed failure and no successful partial rows.
+No actuals/estimates appear in Plan; clearing Analyze actuals restores the
+same-request plan shape/hash. Full snapshot/columns/semantics/completeness/
+index_frontiers/cursor mode equality remains consistency evidence only.
+Lock/shm contents retain established size-only comparison; remaining file set/
+bytes and frontier observations do not imply universal transient-write absence.
+Enforced Namespace(Read) positives and no-namespace negatives cover all modes.
+
+Local runtime passes87/87 unique tests across10 targets, zero failed/ignored;
+focused2/2 is included once. Strict core/default all-target Clippy, formatting,
+docs244/0, version0.2.10 and diff checks pass. No production behavior changes or broad
+G4/P8/P9-P13, independent runtime/device/release acceptance follow from this
+selected overlay. Any fixture-only failure requires evidence-first RCA in this
+existing report plus external evidence under the approved seven-file limit;
+a true runtime/contract defect needs separate owner scope approval.
