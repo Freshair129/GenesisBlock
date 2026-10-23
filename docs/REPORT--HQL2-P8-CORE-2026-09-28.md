@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.85b"
+version: "0.1.86b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-23T00:00:00+07:00,Codex"
+last_update: "2026-10-24T00:00:00+07:00,Codex"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -11,6 +11,89 @@ attributes:
   risk: HIGH
   complexity: C-3
 ---
+
+## Approved G4 checked arithmetic frontend diagnostics - 2026-10-24
+
+Owner approved the seven-existing-file tests/docs-only slice at merged main
+`2ec5b2e` (LOW, C-3). The existing scalar-counter target adds paired HQL/IR
+normal/Plan/Analyze fixtures for checked I64 Add/Div/Rem, preserving all eight
+existing tests and the independent shared P7 interpreter. Nine positive cases
+compare P7 AND literal ordered rows (no sorting of actual results): duplicate/
+NULL bags, signed truncating division/remainder, empty input and all-NULL input
+with rhs0. Five error cases independently check P7 INTEGER_OVERFLOW or
+DIVISION_BY_ZERO and existing Storage BIND_ERROR/execute with the precise
+integer_overflow/division_by_zero detail reason. The emitted error envelope is
+qualified as existing behavior; no new error taxonomy is introduced.
+
+The two-node Values/Project lineage has literal fixture row counts, measured
+zero, typed unknown availability and monotonic elapsed provenance. Allowed and
+denied Plan controls precede first execution/publication, including numeric
+operands that fail at execution. Plan catalog policy revision1 and captured
+pre-Plan frontier are asserted explicitly. Execution denial and arithmetic Err
+controls follow explicit generation publication and observe stable frontier/
+file set/bytes; established lock/shm size-only exceptions remain. Earlier valid
+or NULL rows in failing fixtures never become a successful partial result.
+Metadata mode equality is consistency only; no independent complete schema/
+provenance claim or universal internal/transient-write absence follows.
+
+```text
+HQL / typed IR -> bind/plan -> Plan before publication -> catalog/state controls
+                          -> publish fixture generation once
+                          -> normal / Analyze -> checked rows or typed Err
+independent P7 + literal rows / P7 error ----------> selected assertions
+frontier/files around Plan/denial/arithmetic Err -> observed state boundary
+```
+
+Final author runtime passes105/105 unique tests across11 targets, zero failed/
+ignored; scalar10/10 includes the focused run once. First focused run passed,
+with no fixture correction or RCA. Selected matrix168 requests=64 successes+
+84 namespace denials+20 arithmetic errors,132 observed state guards. Source
+blob `95b2b49e1a18bd7c85594cc52eb01e859e434646`; original eight scalar tests/helpers/
+imports unchanged. Strict core/default all-target Clippy, formatting, docs244/0,
+version0.2.10 and diff checks pass. Fresh source/evidence/architecture review is
+retained separately; no reviewer runtime rerun is claimed. Hosted qualification
+is NOT_RUN for this candidate
+until all exact-head CI is observed.
+
+Seven existing tests/docs files only; no runtime/planner/API/P6/WAL/hash/schema/
+ACL/index/grammar/shared-oracle changes. F64/nonfinite/signed-zero, exhaustive
+numeric/type/order/composition, broad G4/P8/P9-P13 and independent runtime/
+provenance/performance/device/release gates remain open. Ordinary successful
+execution state is outside the selected guarded controls.
+
+### Checked arithmetic qualification commands/evidence
+
+```text
+cargo test --locked --no-default-features --jobs 2 --test hql2_g4_scalar_counter_tests --test hql2_storage_set_oracle_differential_tests --test hql2_storage_aggregate_oracle_differential_tests --test hql2_scalar_execution_tests --test hql2_oracle_tests --test hql2_storage_hql_join_oracle_differential_tests --test hql2_storage_join_oracle_differential_tests --test hql2_explain_source_tests --test hql2_g4_contract_tests --test hql2_g4_plan_identity_tests --test hql2_execution_tests
+cargo clippy --locked --no-default-features --all-targets --jobs 2 -- -D warnings
+cargo clippy --locked --all-targets --jobs 2 -- -D warnings
+cargo fmt --check
+npm run docs:validate
+npm run version:check
+```
+
+External evidence folder:
+`D:/GenesisBlock_Dev/local-cleanup-backups/20261019T030925Z-genesisblock/branch-review/g4-checked-arithmetic-diagnostics-qualification`.
+Raw focused/final runtime and static logs, original-source preservation, unique
+names, hashes and whole-branch source/evidence/architecture review are retained.
+Reviewer runtime reproduction is not claimed without actual execution.
+
+### Integrated PR262 evidence reconciliation
+
+PR262 merged as `2ec5b2e6d6b2f325407dd1bc9f84d5cdc02634b9` after four exact-head
+workflows succeeded: Tests39981972283, Security39981972270,
+performance39981972408 and worker39981972332. Full rollup15 SUCCESS+1 genuine
+schedule-only advisory SKIPPED; actual Rust Ubuntu/Windows/macOS suites passed.
+Author local103/103 unique tests across11 targets, scalar8 included once, and
+strict static gates passed. Fresh whole-branch source/evidence/architecture
+review initially found1 Important missing Plan catalog-stamp assertion; fixture
+expectations were added, full qualification rerun and same-reviewer confirmation
+reported0 unresolved Critical/Important/Minor. No reviewer runtime rerun.
+Fetched merged tree `186d58f2784c01c074c960fcaad965e8c5d3a907` equals reviewed tree;
+parity is not new runtime execution. Candidate NOT_RUN/pending statements for
+PR262 below are dated checkpoints superseded by this reconciliation.
+
+
 
 ## Approved G4 scalar frontend diagnostics - 2026-10-23
 

@@ -982,3 +982,307 @@ fn scalar_frontends_preserve_p7_pipeline_counters_authority_and_state() {
         }
     }
 }
+
+fn arithmetic_request(
+    input: &[Option<i64>],
+    op: &str,
+    rhs: i64,
+    hql: bool,
+    valid_at: &str,
+) -> QueryRequestV2 {
+    let mut req = request(
+        vec![
+            values("v", "xs", "x"),
+            node(
+                "p",
+                "Project",
+                &["v"],
+                json!({"fields":[{"expression":{"binary":op,"left":field("x"),"right":{"param":"rhs"}},"as":"y"}]}),
+            ),
+        ],
+        "p",
+        json!({"xs":parameter(input),"rhs":{"type":"I64","value":rhs.to_string()}}),
+    );
+    req.temporal = Some(serde_json::from_value(json!({"valid_at":valid_at})).unwrap());
+    if hql {
+        req.ir = None;
+        req.language_version = Some(HqlLanguageVersionV2::HqlV2);
+        let symbol = match op {
+            "add" => "+",
+            "div" => "/",
+            "rem" => "%",
+            _ => panic!("fixture operator"),
+        };
+        req.hql = Some(format!("VALUES $xs AS x |> RETURN x {symbol} $rhs AS y"));
+    }
+    req
+}
+
+/// Two-node cardinalities are literal fixture sizes; IDs only locate lineage.
+fn assert_arithmetic_counters(
+    plan: &mut genesis_block_native::query::hql2::ExplainResultV2,
+    size: u64,
+) {
+    assert_eq!(plan.plan.len(), 2);
+    let root = plan.plan.iter().find(|n| n.id == plan.root).unwrap();
+    assert_eq!(root.logical_op, QueryOpV2::Project);
+    assert_eq!(root.inputs.len(), 1);
+    let source = plan.plan.iter().find(|n| n.id == root.inputs[0]).unwrap();
+    assert_eq!(source.logical_op, QueryOpV2::Values);
+    assert!(source.inputs.is_empty());
+    let counts = [(source.id.clone(), 0, size), (root.id.clone(), size, size)];
+    assert_ne!(counts[0].0, counts[1].0);
+    for (id, input, output) in counts {
+        let n = plan.plan.iter_mut().find(|n| n.id == id).unwrap();
+        let actual = serde_json::to_value(n.actual.take().unwrap()).unwrap();
+        for (name, count) in [("rows_in", input), ("rows_out", output)] {
+            assert_eq!(
+                actual[name],
+                json!({"unit":"rows","measurement":{"status":"measured","value":count}})
+            );
+        }
+        for (name, unit, reason) in [
+            ("bytes_read", "bytes", "not_instrumented"),
+            ("work_units", "work_units", "not_instrumented"),
+            ("memory_peak_bytes", "bytes", "not_instrumented"),
+            ("index_probes", "index_probes", "not_applicable"),
+            (
+                "distance_evaluations",
+                "distance_evaluations",
+                "not_applicable",
+            ),
+            ("graph_expansions", "graph_expansions", "not_applicable"),
+            ("spill_bytes", "bytes", "not_applicable"),
+        ] {
+            assert_eq!(
+                actual[name],
+                json!({"unit":unit,"measurement":{"status":"unknown","reason":reason}})
+            );
+        }
+        assert_eq!(actual["elapsed_ns"]["unit"], "nanoseconds");
+        assert_eq!(actual["elapsed_ns"]["measurement"]["status"], "measured");
+        assert!(actual["elapsed_ns"]["measurement"]["value"]
+            .as_u64()
+            .is_some());
+        assert_eq!(actual["clock_source"], "monotonic_instant");
+        assert_eq!(actual["sampling"], "complete");
+        assert_eq!(actual["elapsed_scope"], "operator_execution");
+    }
+}
+
+fn qualify_arithmetic_frontends(
+    input: &[Option<i64>],
+    op: &str,
+    rhs: i64,
+    expected: Result<Vec<Option<i64>>, (&str, &str)>,
+) {
+    let lhs = Box::new(E::Field("x".into()));
+    let rhs_expr = Box::new(E::Literal(R::I64(rhs)));
+    let expression = match op {
+        "add" => E::Add(lhs, rhs_expr),
+        "div" => E::Div(lhs, rhs_expr),
+        "rem" => E::Rem(lhs, rhs_expr),
+        _ => panic!("fixture operator"),
+    };
+    let oracle = reference::execute(&P::Project(
+        Box::new(p7_values("x", input)),
+        vec![("y".into(), expression)],
+    ));
+    let expected_rows = match &expected {
+        Ok(values) => {
+            let literal: Vec<BTreeMap<String, V>> = values
+                .iter()
+                .map(|v| BTreeMap::from([("y".into(), v.map(V::I64).unwrap_or(V::Null))]))
+                .collect();
+            let p7: Vec<BTreeMap<String, V>> = oracle
+                .unwrap()
+                .iter()
+                .map(|row| row.iter().map(|(k, v)| (k.clone(), from_p7(v))).collect())
+                .collect();
+            assert_eq!(
+                p7, literal,
+                "independent P7 and literal ordered arithmetic rows"
+            );
+            Some(literal)
+        }
+        Err((p7_reason, _)) => {
+            assert_eq!(oracle.unwrap_err(), *p7_reason);
+            None
+        }
+    };
+    let directory = TempDir::new().unwrap();
+    let storage = open(&directory);
+    scalar_policy(&storage);
+    let before_plan = state(&storage, directory.path());
+    let valid_at = chrono::Utc::now().to_rfc3339();
+    let mut cases = Vec::new();
+    // Error operands are well typed: planning must not evaluate arithmetic.
+    for hql in [false, true] {
+        let request = arithmetic_request(input, op, rhs, hql, &valid_at);
+        let mut planned = request.clone();
+        planned.explain = Some(ExplainV2::Plan);
+        let QueryOutcomeV2::Plan(plan) = storage.query_v2(access(), planned.clone()).unwrap()
+        else {
+            panic!("Plan must not execute arithmetic")
+        };
+        assert_eq!(plan.catalog.policy_revision, 1);
+        assert_eq!(plan.catalog.observed_frontier, before_plan.0);
+        assert_eq!(plan.plan.len(), 2);
+        assert!(plan
+            .plan
+            .iter()
+            .all(|n| n.actual.is_none() && n.estimates.is_none()));
+        assert_state(&storage, directory.path(), &before_plan);
+        let error = storage
+            .query_v2(
+                AccessContext {
+                    principal: "no-namespace".into(),
+                    namespace: "default".into(),
+                },
+                planned,
+            )
+            .unwrap_err();
+        assert_eq!(error.code, "FORBIDDEN");
+        assert_eq!(error.stage, "authorize");
+        assert_state(&storage, directory.path(), &before_plan);
+        cases.push((request, plan));
+    }
+    // Lazy pinning may publish; establish the generation before guarding errors.
+    storage.publish_generation().unwrap();
+    for (request, plan) in cases {
+        if let Some(rows) = &expected_rows {
+            let QueryOutcomeV2::Rows(normal) = storage.query_v2(access(), request.clone()).unwrap()
+            else {
+                panic!("normal rows")
+            };
+            assert!(normal.explain.is_none());
+            assert_eq!(&normal.rows, rows);
+            let mut analyzed = request.clone();
+            analyzed.explain = Some(ExplainV2::Analyze);
+            let QueryOutcomeV2::Rows(analyzed) = storage.query_v2(access(), analyzed).unwrap()
+            else {
+                panic!("Analyze rows")
+            };
+            assert_eq!(&analyzed.rows, rows);
+            assert_eq!(analyzed.columns, normal.columns);
+            assert_eq!(analyzed.snapshot, normal.snapshot);
+            assert_eq!(analyzed.semantics, normal.semantics);
+            assert_eq!(analyzed.completeness, normal.completeness);
+            assert_eq!(
+                normal.completeness.status,
+                genesis_block_native::query::hql2::result::CompletionStatusV2::Complete
+            );
+            assert_eq!(analyzed.index_frontiers, normal.index_frontiers);
+            assert_eq!(analyzed.cursor, normal.cursor);
+            let mut actual = analyzed.explain.unwrap();
+            assert_eq!(actual.plan_hash, plan.plan_hash);
+            assert_eq!(actual.planner_version, plan.planner_version);
+            assert_arithmetic_counters(&mut actual, input.len() as u64);
+            assert_eq!(actual.plan, plan.plan);
+        } else {
+            let (_, reason) = expected.as_ref().unwrap_err();
+            for mode in [None, Some(ExplainV2::Analyze)] {
+                let mut failing = request.clone();
+                failing.explain = mode;
+                let before = state(&storage, directory.path());
+                let error = storage.query_v2(access(), failing).unwrap_err();
+                // Current published code/stage/reason: no new error taxonomy.
+                assert_eq!(error.code, "BIND_ERROR");
+                assert_eq!(error.stage, "execute");
+                assert_eq!(error.detail.unwrap()["reason"], *reason);
+                assert_state(&storage, directory.path(), &before);
+            }
+        }
+        // Authorization wins even when a numeric operand would fail execution.
+        for mode in [None, Some(ExplainV2::Analyze)] {
+            let mut denied = request.clone();
+            denied.explain = mode;
+            let before = state(&storage, directory.path());
+            let error = storage
+                .query_v2(
+                    AccessContext {
+                        principal: "no-namespace".into(),
+                        namespace: "default".into(),
+                    },
+                    denied,
+                )
+                .unwrap_err();
+            assert_eq!(error.code, "FORBIDDEN");
+            assert_eq!(error.stage, "authorize");
+            assert_state(&storage, directory.path(), &before);
+        }
+    }
+}
+
+#[test]
+fn checked_arithmetic_frontends_match_p7_and_diagnostics() {
+    for (op, rhs, input, expected) in [
+        (
+            "add",
+            3,
+            vec![Some(-2), None, Some(0), Some(2), Some(2)],
+            vec![Some(1), None, Some(3), Some(5), Some(5)],
+        ),
+        (
+            "div",
+            4,
+            vec![Some(-7), None, Some(0), Some(7), Some(7)],
+            vec![Some(-1), None, Some(0), Some(1), Some(1)],
+        ),
+        (
+            "rem",
+            4,
+            vec![Some(-7), None, Some(0), Some(7), Some(7)],
+            vec![Some(-3), None, Some(0), Some(3), Some(3)],
+        ),
+    ] {
+        qualify_arithmetic_frontends(&input, op, rhs, Ok(expected));
+    }
+    for op in ["add", "div", "rem"] {
+        qualify_arithmetic_frontends(&[], op, 0, Ok(vec![]));
+        qualify_arithmetic_frontends(&[None, None], op, 0, Ok(vec![None, None]));
+    }
+}
+
+#[test]
+fn checked_arithmetic_frontends_fail_closed_without_observed_state_change() {
+    for (op, input, rhs, p7_reason, reason) in [
+        (
+            "add",
+            vec![Some(1), Some(i64::MAX)],
+            1,
+            "INTEGER_OVERFLOW",
+            "integer_overflow",
+        ),
+        (
+            "div",
+            vec![Some(7), Some(i64::MIN)],
+            -1,
+            "INTEGER_OVERFLOW",
+            "integer_overflow",
+        ),
+        (
+            "rem",
+            vec![Some(7), Some(i64::MIN)],
+            -1,
+            "INTEGER_OVERFLOW",
+            "integer_overflow",
+        ),
+        (
+            "div",
+            vec![None, Some(7)],
+            0,
+            "DIVISION_BY_ZERO",
+            "division_by_zero",
+        ),
+        (
+            "rem",
+            vec![None, Some(7)],
+            0,
+            "DIVISION_BY_ZERO",
+            "division_by_zero",
+        ),
+    ] {
+        qualify_arithmetic_frontends(&input, op, rhs, Err((p7_reason, reason)));
+    }
+}

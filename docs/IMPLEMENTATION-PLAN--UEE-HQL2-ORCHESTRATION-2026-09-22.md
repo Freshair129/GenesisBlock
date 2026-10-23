@@ -1,9 +1,9 @@
 ---
-version: "0.8.93b"
+version: "0.8.94b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-23T00:00:00+07:00,Codex"
+last_update: "2026-10-24T00:00:00+07:00,Codex"
 status: beta
 superseded_by: null
 attributes:
@@ -14,6 +14,72 @@ attributes:
   risk: "HIGH"
   owner: "Boss (Founder / Product Authority)"
 ---
+
+## Approved G4 checked arithmetic frontend diagnostics - 2026-10-24
+
+Owner approved the seven-existing-file tests/docs-only slice at merged main
+`2ec5b2e` (LOW, C-3). The existing scalar-counter target adds paired HQL/IR
+normal/Plan/Analyze fixtures for checked I64 Add/Div/Rem, preserving all eight
+existing tests and the independent shared P7 interpreter. Nine positive cases
+compare P7 AND literal ordered rows (no sorting of actual results): duplicate/
+NULL bags, signed truncating division/remainder, empty input and all-NULL input
+with rhs0. Five error cases independently check P7 INTEGER_OVERFLOW or
+DIVISION_BY_ZERO and existing Storage BIND_ERROR/execute with the precise
+integer_overflow/division_by_zero detail reason. The emitted error envelope is
+qualified as existing behavior; no new error taxonomy is introduced.
+
+The two-node Values/Project lineage has literal fixture row counts, measured
+zero, typed unknown availability and monotonic elapsed provenance. Allowed and
+denied Plan controls precede first execution/publication, including numeric
+operands that fail at execution. Plan catalog policy revision1 and captured
+pre-Plan frontier are asserted explicitly. Execution denial and arithmetic Err
+controls follow explicit generation publication and observe stable frontier/
+file set/bytes; established lock/shm size-only exceptions remain. Earlier valid
+or NULL rows in failing fixtures never become a successful partial result.
+Metadata mode equality is consistency only; no independent complete schema/
+provenance claim or universal internal/transient-write absence follows.
+
+```text
+HQL / typed IR -> bind/plan -> Plan before publication -> catalog/state controls
+                          -> publish fixture generation once
+                          -> normal / Analyze -> checked rows or typed Err
+independent P7 + literal rows / P7 error ----------> selected assertions
+frontier/files around Plan/denial/arithmetic Err -> observed state boundary
+```
+
+Final author runtime passes105/105 unique tests across11 targets, zero failed/
+ignored; scalar10/10 includes the focused run once. First focused run passed,
+with no fixture correction or RCA. Selected matrix168 requests=64 successes+
+84 namespace denials+20 arithmetic errors,132 observed state guards. Source
+blob `95b2b49e1a18bd7c85594cc52eb01e859e434646`; original eight scalar tests/helpers/
+imports unchanged. Strict core/default all-target Clippy, formatting, docs244/0,
+version0.2.10 and diff checks pass. Fresh source/evidence/architecture review is
+retained separately; no reviewer runtime rerun is claimed. Hosted qualification
+is NOT_RUN for this candidate
+until all exact-head CI is observed.
+
+Seven existing tests/docs files only; no runtime/planner/API/P6/WAL/hash/schema/
+ACL/index/grammar/shared-oracle changes. F64/nonfinite/signed-zero, exhaustive
+numeric/type/order/composition, broad G4/P8/P9-P13 and independent runtime/
+provenance/performance/device/release gates remain open. Ordinary successful
+execution state is outside the selected guarded controls.
+
+### Integrated PR262 evidence reconciliation
+
+PR262 merged as `2ec5b2e6d6b2f325407dd1bc9f84d5cdc02634b9` after four exact-head
+workflows succeeded: Tests39981972283, Security39981972270,
+performance39981972408 and worker39981972332. Full rollup15 SUCCESS+1 genuine
+schedule-only advisory SKIPPED; actual Rust Ubuntu/Windows/macOS suites passed.
+Author local103/103 unique tests across11 targets, scalar8 included once, and
+strict static gates passed. Fresh whole-branch source/evidence/architecture
+review initially found1 Important missing Plan catalog-stamp assertion; fixture
+expectations were added, full qualification rerun and same-reviewer confirmation
+reported0 unresolved Critical/Important/Minor. No reviewer runtime rerun.
+Fetched merged tree `186d58f2784c01c074c960fcaad965e8c5d3a907` equals reviewed tree;
+parity is not new runtime execution. Candidate NOT_RUN/pending statements for
+PR262 below are dated checkpoints superseded by this reconciliation.
+
+
 
 ## Approved G4 scalar frontend diagnostics - 2026-10-23
 
@@ -451,6 +517,7 @@ P0 BASELINE (done, read-only)
 | G4-HISTORY-CHANGE-VERIFY | Owner-approved tests/docs-only HistoryScan/ChangeScan diagnostic matrix | Integrated PR251 at a3e2d4d and existing G4/P6/H2-D11 contracts | Exact emitted rows, mode/oracle parity, temporal/ACL/floor/budget cases and no-write EXPLAIN; local 93/93 across 11 targets, strict core/default Clippy and docs gates passed; hosted PR252 passed on all three OSes and merged at 7c3e5e2 |
 | G4-LEXICAL-CONTEXT-VERIFY | Owner-approved tests/docs-only lexical/context diagnostic matrix | Integrated #252 and G4/P8 D2/D3/P6 contracts | Exact rows, mode/P7 parity, provenance/budgets and EXPLAIN no-write; local 170/170 across 14 targets and strict static gates pass; hosted PR253 passed on all three OSes and merged at 24d7eed |
 | G4-PLAN-IDENTITY-VERIFY | Owner-approved tests/docs-only golden/shape identity qualification | Integrated #253 and G4 D03/D04/D06/D07 | Independent expected shapes/hashes, mode parity and shape/value boundaries; local221/221 across18 targets and strict static gates pass; hosted passed in #254 |
+| G4-CHECKED-ARITHMETIC-VERIFY | Owner-approved paired I64 Add/Div/Rem diagnostics at main2ec5b2e | Existing G4/P6/P7 and integrated PR262 | Selected P7/literal rows/errors, two-node counters, Plan catalog authority and observed error-state controls; current qualification above, broad gates partial |
 | G4-SCALAR-FRONTEND-VERIFY | Owner-approved paired full scalar pipeline diagnostics at main564f28f | Existing G4/P6/P7, PR261 integrated | Selected eight-node counters, P7/literal order, authority/state/byte controls; qualification recorded above; broad gates partial |
 | G4-UNION-VERIFY | Owner-approved tests/docs-only paired UnionAll diagnostics at main6cf46f9; preserve existing169-pair oracle | Existing G4/P6/P7 and integrated PR260 | Selected bags/NULL/empty inputs, per-node counters, Plan-before-publication state, namespace and complete-envelope byte budgets; local87/87 across10 targets and strict static gates pass; hosted passed in PR261; broad G4/P8/P9-P13 remains partial |
 | P8-R2 | Bounded REST parity verification for existing HQL compatibility and typed Query IR v1 traversal | P8 local kernel; existing P13 boundary | `/v1/query/hql` and `/v1/query/ir` return equal result bags; test-only, no `query_v2` transport or P13 closure |
