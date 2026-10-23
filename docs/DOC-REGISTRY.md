@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Document Registry"
 doc_id: "DOC-REGISTRY-GENESISBLOCKDB"
 status: draft
-version: "0.5.118+draft"
-updated: "2026-10-23"
+version: "0.5.119+draft"
+updated: "2026-10-24"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 related_issue: 84
@@ -17,6 +17,72 @@ related_docs:
   - "docs/SPEC--GENESISDB-P6-PEER-LOCALITY-ADDENDUM.md"
   - "docs/adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md"
 ---
+
+## Approved G4 checked arithmetic frontend diagnostics - 2026-10-24
+
+Owner approved the seven-existing-file tests/docs-only slice at merged main
+`2ec5b2e` (LOW, C-3). The existing scalar-counter target adds paired HQL/IR
+normal/Plan/Analyze fixtures for checked I64 Add/Div/Rem, preserving all eight
+existing tests and the independent shared P7 interpreter. Nine positive cases
+compare P7 AND literal ordered rows (no sorting of actual results): duplicate/
+NULL bags, signed truncating division/remainder, empty input and all-NULL input
+with rhs0. Five error cases independently check P7 INTEGER_OVERFLOW or
+DIVISION_BY_ZERO and existing Storage BIND_ERROR/execute with the precise
+integer_overflow/division_by_zero detail reason. The emitted error envelope is
+qualified as existing behavior; no new error taxonomy is introduced.
+
+The two-node Values/Project lineage has literal fixture row counts, measured
+zero, typed unknown availability and monotonic elapsed provenance. Allowed and
+denied Plan controls precede first execution/publication, including numeric
+operands that fail at execution. Plan catalog policy revision1 and captured
+pre-Plan frontier are asserted explicitly. Execution denial and arithmetic Err
+controls follow explicit generation publication and observe stable frontier/
+file set/bytes; established lock/shm size-only exceptions remain. Earlier valid
+or NULL rows in failing fixtures never become a successful partial result.
+Metadata mode equality is consistency only; no independent complete schema/
+provenance claim or universal internal/transient-write absence follows.
+
+```text
+HQL / typed IR -> bind/plan -> Plan before publication -> catalog/state controls
+                          -> publish fixture generation once
+                          -> normal / Analyze -> checked rows or typed Err
+independent P7 + literal rows / P7 error ----------> selected assertions
+frontier/files around Plan/denial/arithmetic Err -> observed state boundary
+```
+
+Final author runtime passes105/105 unique tests across11 targets, zero failed/
+ignored; scalar10/10 includes the focused run once. First focused run passed,
+with no fixture correction or RCA. Selected matrix168 requests=64 successes+
+84 namespace denials+20 arithmetic errors,132 observed state guards. Source
+blob `95b2b49e1a18bd7c85594cc52eb01e859e434646`; original eight scalar tests/helpers/
+imports unchanged. Strict core/default all-target Clippy, formatting, docs244/0,
+version0.2.10 and diff checks pass. Fresh source/evidence/architecture review is
+retained separately; no reviewer runtime rerun is claimed. Hosted qualification
+is NOT_RUN for this candidate
+until all exact-head CI is observed.
+
+Seven existing tests/docs files only; no runtime/planner/API/P6/WAL/hash/schema/
+ACL/index/grammar/shared-oracle changes. F64/nonfinite/signed-zero, exhaustive
+numeric/type/order/composition, broad G4/P8/P9-P13 and independent runtime/
+provenance/performance/device/release gates remain open. Ordinary successful
+execution state is outside the selected guarded controls.
+
+### Integrated PR262 evidence reconciliation
+
+PR262 merged as `2ec5b2e6d6b2f325407dd1bc9f84d5cdc02634b9` after four exact-head
+workflows succeeded: Tests39981972283, Security39981972270,
+performance39981972408 and worker39981972332. Full rollup15 SUCCESS+1 genuine
+schedule-only advisory SKIPPED; actual Rust Ubuntu/Windows/macOS suites passed.
+Author local103/103 unique tests across11 targets, scalar8 included once, and
+strict static gates passed. Fresh whole-branch source/evidence/architecture
+review initially found1 Important missing Plan catalog-stamp assertion; fixture
+expectations were added, full qualification rerun and same-reviewer confirmation
+reported0 unresolved Critical/Important/Minor. No reviewer runtime rerun.
+Fetched merged tree `186d58f2784c01c074c960fcaad965e8c5d3a907` equals reviewed tree;
+parity is not new runtime execution. Candidate NOT_RUN/pending statements for
+PR262 below are dated checkpoints superseded by this reconciliation.
+
+
 
 ## Approved G4 scalar frontend diagnostics - 2026-10-23
 
@@ -280,17 +346,17 @@ registry row explicitly names them.
 
 | Role | Doc ID | Version | Status | Owner | Path |
 |---|---|---|---|---|---|
-| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.60b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
-| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.90b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
+| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.61b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
+| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.91b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
 | Execution DAG guard | `SPEC--EXECUTION-DAG-GUARD-V1` | `0.1.0` | accepted | Sol Decision / Contract and AC | `docs/SPEC--EXECUTION-DAG-GUARD-V1.md` |
 | HQL2 execution decision | `ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY` | `0.1.1b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY.md` |
-| HQL2 G4 shared-pipeline contract | `ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE` | `0.1.18b` | active | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md` |
+| HQL2 G4 shared-pipeline contract | `ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE` | `0.1.19b` | active | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md` |
 | HQL2 P8 completion addendum | `ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM` | `0.1.15b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md` |
 | HQL2 Sequence pattern constraints | `ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS` | `0.2.1b` | beta | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS.md` |
 | HQL2 durable revisions and annotations | `ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS` | `0.8.27b` | beta | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS.md` |
-| UEE-HQL2 orchestration plan | `IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22` | `0.8.93b` | beta | Boss (Founder / Product Authority) | `docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md` |
+| UEE-HQL2 orchestration plan | `IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22` | `0.8.94b` | beta | Boss (Founder / Product Authority) | `docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md` |
 | HQL2 typed P8 boundary | `SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY` | `0.2.67b` | beta | Boss (Founder / Product Authority) | `docs/SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY.md` |
-| HQL2 P8 core checkpoint | `REPORT--HQL2-P8-CORE-2026-09-28` | `0.1.85b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P8-CORE-2026-09-28.md` |
+| HQL2 P8 core checkpoint | `REPORT--HQL2-P8-CORE-2026-09-28` | `0.1.86b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P8-CORE-2026-09-28.md` |
 | HQL2 P7 bounded oracle evidence | `REPORT--HQL2-P7-ORACLE-2026-09-28` | `0.1.12b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P7-ORACLE-2026-09-28.md` |
 | Commit correctness | `SPEC--WAVE-A-COMMIT-CORRECTNESS` | `0.1.0b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-A-COMMIT-CORRECTNESS.md` |
 | Durable collections and edge history | `SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY` | `0.1.2b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY.md` |
