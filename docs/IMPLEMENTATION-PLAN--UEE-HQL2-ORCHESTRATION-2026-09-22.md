@@ -1,5 +1,5 @@
 ---
-version: "0.8.91b"
+version: "0.8.92b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
@@ -14,6 +14,44 @@ attributes:
   risk: "HIGH"
   owner: "Boss (Founder / Product Authority)"
 ---
+
+## Approved G4 UnionAll frontend diagnostics - 2026-10-23
+
+Owner approved tests/docs-only qualification at merged main `6cf46f9`
+(LOW, C-3), extending the existing Storage set-oracle target. The169-pair
+normal HQL/IR/P7 semantic oracle is preserved. New selected fixtures compare
+both frontends through Values/branch Projects/UnionAll/Sort/final Project,
+with independent P7 and literal ordered rows, including duplicates, NULL and
+left/right/both-empty inputs. Per-node rows are fixture cardinalities; measured
+zero and typed unknown remain distinct. Generated IDs and cross-frontend equal
+hashes are not acceptance requirements. Existing repeated IR edge counter and
+golden regressions are retained.
+Plan controls precede query execution/publication. Execution denial and byte
+budget controls use an explicitly published generation; frontier/files are
+observed before/after, with only established lock/shared-memory size comparisons.
+No universal internal/transient-write claim follows. Metadata mode equality is
+consistency, not independent full provenance acceptance. The complete result
+envelope counts toward byte limits, including empty results.
+Local runtime passes87/87 unique tests across10 targets, zero failed/ignored;
+focused2/2 is included once. Strict core/default all-target Clippy, formatting,
+docs244/0, version0.2.10 and diff checks pass. Hosted qualification is NOT_RUN for
+this candidate. Seven existing tests/docs files only; no runtime/planner/API/
+P6/WAL/hash/schema/ACL/index/grammar changes. Broader type/composition,
+G4/P8/P9-P13, independent runtime/device/release gates remain open.
+
+PR260 reviewed head `ca7f88402b0bca9c8058164a1ee2492f5e078b29` merged as
+`6cf46f90a0b57b081f7d0d3d08833422fbcffe7c` after four successful exact-head
+workflows and15 SUCCESS checks plus one genuine schedule-only skip. Tests
+`39899519869`, Security `39899519859`, worker `39899519995` and performance
+`39899519858` succeeded, with actual Rust Ubuntu/macOS/Windows steps successful.
+PR260 local79/79 across8 targets and strict static gates passed; its fresh
+whole-branch source/evidence review found Critical0/Important0/Minor0 and did
+not rerun runtime suites. Merged tree `edb4047a0ebeecdcf8d4951cafd24f48b755dde5`
+equals the reviewed/tested tree, not a new post-merge runtime run. Earlier
+hosted NOT_RUN/pending entries below are dated pre-CI checkpoints; historical
+fixture failures/RCAs remain preserved, not current uncorrected failures.
+
+
 
 ## Approved G4 Aggregate frontend diagnostics - 2026-10-23
 
@@ -355,6 +393,7 @@ P0 BASELINE (done, read-only)
 | G4-HISTORY-CHANGE-VERIFY | Owner-approved tests/docs-only HistoryScan/ChangeScan diagnostic matrix | Integrated PR251 at a3e2d4d and existing G4/P6/H2-D11 contracts | Exact emitted rows, mode/oracle parity, temporal/ACL/floor/budget cases and no-write EXPLAIN; local 93/93 across 11 targets, strict core/default Clippy and docs gates passed; hosted PR252 passed on all three OSes and merged at 7c3e5e2 |
 | G4-LEXICAL-CONTEXT-VERIFY | Owner-approved tests/docs-only lexical/context diagnostic matrix | Integrated #252 and G4/P8 D2/D3/P6 contracts | Exact rows, mode/P7 parity, provenance/budgets and EXPLAIN no-write; local 170/170 across 14 targets and strict static gates pass; hosted PR253 passed on all three OSes and merged at 24d7eed |
 | G4-PLAN-IDENTITY-VERIFY | Owner-approved tests/docs-only golden/shape identity qualification | Integrated #253 and G4 D03/D04/D06/D07 | Independent expected shapes/hashes, mode parity and shape/value boundaries; local221/221 across18 targets and strict static gates pass; hosted passed in #254 |
+| G4-UNION-VERIFY | Owner-approved tests/docs-only paired UnionAll diagnostics at main6cf46f9; preserve existing169-pair oracle | Existing G4/P6/P7 and integrated PR260 | Selected bags/NULL/empty inputs, per-node counters, Plan-before-publication state, namespace and complete-envelope byte budgets; local87/87 across10 targets and strict static gates pass; hosted pending; broad G4/P8/P9-P13 remains partial |
 | P8-R2 | Bounded REST parity verification for existing HQL compatibility and typed Query IR v1 traversal | P8 local kernel; existing P13 boundary | `/v1/query/hql` and `/v1/query/ir` return equal result bags; test-only, no `query_v2` transport or P13 closure |
 | P8-R3 | REST matrix for raw/wrapped HQL bodies and typed HQL/Query IR v1 errors | P8-R2; existing v1 routes | Equal result bags across accepted HQL body shapes; budget/version failures retain typed envelopes; test-only, no public API or P13 closure |
 | P9 | Legal B-tree/annotation paths and planner access reporting | P8 and approved G4 planner boundary | Pushdown/order counterexamples match oracle; plans are truthful |

@@ -4,7 +4,7 @@ mod reference;
 
 use genesis_block_native::{
     query::hql2::{value::QueryValueV2 as V, QueryOutcomeV2},
-    uee_v2::{HqlLanguageVersionV2, QueryIrV2, QueryRequestV2},
+    uee_v2::{ExplainV2, HqlLanguageVersionV2, QueryIrV2, QueryOpV2, QueryRequestV2},
     *,
 };
 use serde_json::{json, Value};
@@ -184,5 +184,330 @@ fn storage_hql_and_ir_union_all_match_p7_for_nullable_bag_pairs() {
             hql_result.rows, ir_result.rows,
             "HQL/IR differ at case {case}"
         );
+    }
+}
+
+fn diagnostic_request(left: &[Option<i64>], right: &[Option<i64>], hql: bool) -> QueryRequestV2 {
+    let mut req = request("g4-union-diagnostics".into(), left, right);
+    let mut ir = serde_json::to_value(req.ir.take().unwrap()).unwrap();
+    let mut nodes = ir["nodes"].as_array().unwrap().clone();
+    let field = json!({"expression":{"field":{"alias":"x","path":[]}},"as":"x"});
+    let project = |id: &str, input: &str| json!({"id":id,"op":"Project","inputs":[input],"config":{"fields":[field]}});
+    nodes[2]["inputs"] = json!(["lp", "rp"]);
+    ir["nodes"] = json!([
+        nodes[0],
+        nodes[1],
+        project("lp", "l"),
+        project("rp", "r"),
+        nodes[2],
+        nodes[3],
+        project("p", "s")
+    ]);
+    ir["root"] = json!("p");
+    req.ir = Some(serde_json::from_value(ir).unwrap());
+    if hql {
+        req.ir = None;
+        req.language_version = Some(HqlLanguageVersionV2::HqlV2);
+        req.hql = Some("UNION ALL { VALUES $left AS x |> RETURN x } { VALUES $right AS x |> RETURN x } |> ORDER BY x ASC NULLS LAST |> RETURN x".into());
+    }
+    // Parameter Values do not depend on record insertion time. Reuse per mode.
+    req.temporal =
+        Some(serde_json::from_value(json!({"valid_at":"2026-10-23T00:00:00Z"})).unwrap());
+    req
+}
+
+/// Locate each branch by input lineage, not generated HQL node IDs.
+fn expected_counts(
+    plan: &genesis_block_native::query::hql2::ExplainResultV2,
+    left: u64,
+    right: u64,
+    total: u64,
+) -> Vec<(String, QueryOpV2, u64, u64)> {
+    let find = |id: &str| plan.plan.iter().find(|node| node.id == id).unwrap();
+    let root = find(&plan.root);
+    assert_eq!(root.logical_op, QueryOpV2::Project);
+    assert_eq!(root.inputs.len(), 1);
+    let sort = find(&root.inputs[0]);
+    assert_eq!(sort.logical_op, QueryOpV2::Sort);
+    assert_eq!(sort.inputs.len(), 1);
+    let union = find(&sort.inputs[0]);
+    assert_eq!(union.logical_op, QueryOpV2::UnionAll);
+    assert_eq!(union.inputs.len(), 2);
+    let mut counts = vec![
+        (root.id.clone(), QueryOpV2::Project, total, total),
+        (sort.id.clone(), QueryOpV2::Sort, total, total),
+        (union.id.clone(), QueryOpV2::UnionAll, total, total),
+    ];
+    for (id, size) in union.inputs.iter().zip([left, right]) {
+        let branch = find(id);
+        assert_eq!(branch.logical_op, QueryOpV2::Project);
+        assert_eq!(branch.inputs.len(), 1);
+        let source = find(&branch.inputs[0]);
+        assert_eq!(source.logical_op, QueryOpV2::Values);
+        assert!(source.inputs.is_empty());
+        counts.push((branch.id.clone(), QueryOpV2::Project, size, size));
+        counts.push((source.id.clone(), QueryOpV2::Values, 0, size));
+    }
+    assert_eq!(plan.plan.len(), 7);
+    assert_eq!(
+        counts
+            .iter()
+            .map(|(id, _, _, _)| id)
+            .collect::<std::collections::BTreeSet<_>>()
+            .len(),
+        7
+    );
+    counts
+}
+
+fn disk_tree(path: &Path) -> BTreeMap<String, Vec<u8>> {
+    fn visit(root: &Path, path: &Path, out: &mut BTreeMap<String, Vec<u8>>) {
+        for entry in std::fs::read_dir(path).unwrap() {
+            let path = entry.unwrap().path();
+            if path
+                .file_name()
+                .is_some_and(|name| name == "genesis.lock" || name == "projection.sqlite-shm")
+            {
+                out.insert(
+                    format!("{}:size", path.file_name().unwrap().to_string_lossy()),
+                    std::fs::metadata(&path)
+                        .unwrap()
+                        .len()
+                        .to_le_bytes()
+                        .to_vec(),
+                );
+                continue;
+            }
+            if path.is_dir() {
+                visit(root, &path, out);
+            } else {
+                out.insert(
+                    path.strip_prefix(root).unwrap().to_string_lossy().into(),
+                    std::fs::read(&path)
+                        .unwrap_or_else(|error| panic!("read {}: {error}", path.display())),
+                );
+            }
+        }
+    }
+
+    let mut out = BTreeMap::new();
+    visit(path, path, &mut out);
+    out
+}
+
+fn state(db: &Storage, path: &Path) -> (u64, BTreeMap<String, Vec<u8>>) {
+    (db.stable_frontier(), disk_tree(path))
+}
+fn assert_state(db: &Storage, path: &Path, before: &(u64, BTreeMap<String, Vec<u8>>)) {
+    assert_eq!(
+        db.stable_frontier(),
+        before.0,
+        "query changed durable frontier"
+    );
+    assert_eq!(disk_tree(path), before.1, "query changed fixture files");
+}
+
+fn union_policy(storage: &Storage) {
+    storage
+        .replace_access_policy(
+            PolicyAdminActor {
+                access: AccessContext {
+                    principal: "local-owner".into(),
+                    namespace: "default".into(),
+                },
+            },
+            0,
+            AccessPolicy {
+                revision: 1,
+                mode: AccessPolicyMode::Enforced,
+                grants: vec![
+                    AccessGrant {
+                        principal: "reader".into(),
+                        action: AccessAction::Read,
+                        resource: AccessResource::Namespace("default".into()),
+                    },
+                    AccessGrant {
+                        principal: "local-owner".into(),
+                        action: AccessAction::ManagePolicy,
+                        resource: AccessResource::Namespace("default".into()),
+                    },
+                ],
+            },
+        )
+        .unwrap();
+}
+
+/// Catches duplicate/NULL loss, empty/branch counter drift, Sort order loss,
+/// Plan publication and unauthorized/budgeted partial success.
+#[test]
+fn storage_union_all_diagnostics_preserve_p7_bags_counters_authority_and_state() {
+    for (left, right, literal) in [
+        (
+            vec![Some(1), None, Some(1)],
+            vec![None, Some(2)],
+            vec![V::I64(1), V::I64(1), V::I64(2), V::Null, V::Null],
+        ),
+        (vec![], vec![Some(2)], vec![V::I64(2)]),
+        (vec![None], vec![], vec![V::Null]),
+        (vec![], vec![], vec![]),
+    ] {
+        let output_count = literal.len() as u64;
+        let expected: Vec<_> = literal
+            .into_iter()
+            .map(|v| BTreeMap::from([("x".into(), v)]))
+            .collect();
+        assert_eq!(
+            expected_rows(&left, &right),
+            expected,
+            "independent P7 and literal ordered rows"
+        );
+        let directory = TempDir::new().unwrap();
+        let storage = open(directory.path());
+        union_policy(&storage);
+        let before_plan = state(&storage, directory.path());
+        let mut cases = Vec::new();
+        // Both frontends' allowed/denied Plan controls precede any query execution
+        // or explicit publication; observing files/frontier does not publish.
+        for hql in [false, true] {
+            let request = diagnostic_request(&left, &right, hql);
+            let mut planned = request.clone();
+            planned.explain = Some(ExplainV2::Plan);
+            let QueryOutcomeV2::Plan(plan) = storage.query_v2(access(), planned.clone()).unwrap()
+            else {
+                panic!("Plan")
+            };
+            assert!(plan
+                .plan
+                .iter()
+                .all(|node| node.actual.is_none() && node.estimates.is_none()));
+            assert_state(&storage, directory.path(), &before_plan);
+            let error = storage
+                .query_v2(
+                    AccessContext {
+                        principal: "no-namespace".into(),
+                        namespace: "default".into(),
+                    },
+                    planned,
+                )
+                .unwrap_err();
+            assert_eq!(error.code, "FORBIDDEN");
+            assert_eq!(error.stage, "authorize");
+            assert_state(&storage, directory.path(), &before_plan);
+            cases.push((request, plan));
+        }
+        // Execution may legitimately publish lazily; establish that boundary once
+        // before guarding normal/Analyze errors, never before the Plan control.
+        storage.publish_generation().unwrap();
+        for (request, plan) in cases {
+            let QueryOutcomeV2::Rows(normal) = storage.query_v2(access(), request.clone()).unwrap()
+            else {
+                panic!("rows")
+            };
+            assert!(normal.explain.is_none());
+            assert_eq!(normal.rows, expected);
+            let mut analyzed_request = request.clone();
+            analyzed_request.explain = Some(ExplainV2::Analyze);
+            let QueryOutcomeV2::Rows(analyzed) =
+                storage.query_v2(access(), analyzed_request).unwrap()
+            else {
+                panic!("Analyze")
+            };
+            assert_eq!(analyzed.rows, expected);
+            assert_eq!(analyzed.columns, normal.columns);
+            assert_eq!(analyzed.semantics, normal.semantics);
+            assert_eq!(analyzed.snapshot, normal.snapshot);
+            assert_eq!(analyzed.completeness, normal.completeness);
+            assert_eq!(analyzed.index_frontiers, normal.index_frontiers);
+            assert_eq!(analyzed.cursor, normal.cursor);
+            let mut actual = analyzed.explain.unwrap();
+            assert_eq!(actual.plan_hash, plan.plan_hash);
+            assert_eq!(actual.planner_version, plan.planner_version);
+            let counts =
+                expected_counts(&actual, left.len() as u64, right.len() as u64, output_count);
+            for (id, op, input, output) in counts {
+                let node = actual.plan.iter_mut().find(|node| node.id == id).unwrap();
+                assert_eq!(node.logical_op, op);
+                let counters = serde_json::to_value(node.actual.take().unwrap()).unwrap();
+                for (name, count) in [("rows_in", input), ("rows_out", output)] {
+                    assert_eq!(
+                        counters[name],
+                        json!({"unit":"rows","measurement":{"status":"measured","value":count}})
+                    );
+                }
+                for (name, unit, reason) in [
+                    ("bytes_read", "bytes", "not_instrumented"),
+                    ("work_units", "work_units", "not_instrumented"),
+                    ("memory_peak_bytes", "bytes", "not_instrumented"),
+                    ("index_probes", "index_probes", "not_applicable"),
+                    (
+                        "distance_evaluations",
+                        "distance_evaluations",
+                        "not_applicable",
+                    ),
+                    ("graph_expansions", "graph_expansions", "not_applicable"),
+                    ("spill_bytes", "bytes", "not_applicable"),
+                ] {
+                    assert_eq!(
+                        counters[name],
+                        json!({"unit":unit,"measurement":{"status":"unknown","reason":reason}})
+                    );
+                }
+                assert_eq!(counters["elapsed_ns"]["unit"], "nanoseconds");
+                assert_eq!(counters["elapsed_ns"]["measurement"]["status"], "measured");
+                assert!(counters["elapsed_ns"]["measurement"]["value"]
+                    .as_u64()
+                    .is_some());
+                assert_eq!(counters["elapsed_scope"], "operator_execution");
+                assert_eq!(counters["clock_source"], "monotonic_instant");
+                assert_eq!(counters["sampling"], "complete");
+            }
+            assert_eq!(actual.plan, plan.plan);
+            for mode in [None, Some(ExplainV2::Analyze)] {
+                let mut denied = request.clone();
+                denied.explain = mode.clone();
+                let before = state(&storage, directory.path());
+                let error = storage
+                    .query_v2(
+                        AccessContext {
+                            principal: "no-namespace".into(),
+                            namespace: "default".into(),
+                        },
+                        denied,
+                    )
+                    .unwrap_err();
+                assert_eq!(error.code, "FORBIDDEN");
+                assert_eq!(error.stage, "authorize");
+                assert_state(&storage, directory.path(), &before);
+                let mut limited = request.clone();
+                limited.explain = mode;
+                limited.budget =
+                    Some(serde_json::from_value(json!({"max_result_bytes":1})).unwrap());
+                let before = state(&storage, directory.path());
+                let error = storage.query_v2(access(), limited.clone()).unwrap_err();
+                assert_eq!(error.code, "QUERY_BUDGET_EXCEEDED");
+                assert_eq!(error.stage, "execute");
+                assert_eq!(error.detail.unwrap()["reason"], "query_limit");
+                assert_state(&storage, directory.path(), &before);
+                if output_count == 0 {
+                    // The Storage boundary budgets the complete envelope, not only [].
+                    limited.budget =
+                        Some(serde_json::from_value(json!({"max_result_bytes":2})).unwrap());
+                    let error = storage.query_v2(access(), limited.clone()).unwrap_err();
+                    assert_eq!(error.code, "QUERY_BUDGET_EXCEEDED");
+                    assert_eq!(error.stage, "execute");
+                    assert_eq!(error.detail.unwrap()["reason"], "output_limit");
+                    assert_state(&storage, directory.path(), &before);
+                    limited.budget =
+                        Some(serde_json::from_value(json!({"max_result_bytes":1048576})).unwrap());
+                    let QueryOutcomeV2::Rows(empty) = storage.query_v2(access(), limited).unwrap()
+                    else {
+                        panic!("empty rows")
+                    };
+                    assert!(empty.rows.is_empty());
+                    assert_eq!(empty.completeness, normal.completeness);
+                    assert_state(&storage, directory.path(), &before);
+                }
+            }
+        }
     }
 }

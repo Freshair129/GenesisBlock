@@ -2,7 +2,7 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: "0.1.88b"
+version: "0.1.89b"
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
 last_update: "2026-10-23T00:00:00+07:00,Codex"
@@ -24,6 +24,44 @@ related_docs:
   - docs/adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md
   - docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md
 ---
+
+## Approved G4 UnionAll frontend diagnostics - 2026-10-23
+
+Owner approved tests/docs-only qualification at merged main `6cf46f9`
+(LOW, C-3), extending the existing Storage set-oracle target. The169-pair
+normal HQL/IR/P7 semantic oracle is preserved. New selected fixtures compare
+both frontends through Values/branch Projects/UnionAll/Sort/final Project,
+with independent P7 and literal ordered rows, including duplicates, NULL and
+left/right/both-empty inputs. Per-node rows are fixture cardinalities; measured
+zero and typed unknown remain distinct. Generated IDs and cross-frontend equal
+hashes are not acceptance requirements. Existing repeated IR edge counter and
+golden regressions are retained.
+Plan controls precede query execution/publication. Execution denial and byte
+budget controls use an explicitly published generation; frontier/files are
+observed before/after, with only established lock/shared-memory size comparisons.
+No universal internal/transient-write claim follows. Metadata mode equality is
+consistency, not independent full provenance acceptance. The complete result
+envelope counts toward byte limits, including empty results.
+Local runtime passes87/87 unique tests across10 targets, zero failed/ignored;
+focused2/2 is included once. Strict core/default all-target Clippy, formatting,
+docs244/0, version0.2.10 and diff checks pass. Hosted qualification is NOT_RUN for
+this candidate. Seven existing tests/docs files only; no runtime/planner/API/
+P6/WAL/hash/schema/ACL/index/grammar changes. Broader type/composition,
+G4/P8/P9-P13, independent runtime/device/release gates remain open.
+
+PR260 reviewed head `ca7f88402b0bca9c8058164a1ee2492f5e078b29` merged as
+`6cf46f90a0b57b081f7d0d3d08833422fbcffe7c` after four successful exact-head
+workflows and15 SUCCESS checks plus one genuine schedule-only skip. Tests
+`39899519869`, Security `39899519859`, worker `39899519995` and performance
+`39899519858` succeeded, with actual Rust Ubuntu/macOS/Windows steps successful.
+PR260 local79/79 across8 targets and strict static gates passed; its fresh
+whole-branch source/evidence review found Critical0/Important0/Minor0 and did
+not rerun runtime suites. Merged tree `edb4047a0ebeecdcf8d4951cafd24f48b755dde5`
+equals the reviewed/tested tree, not a new post-merge runtime run. Earlier
+hosted NOT_RUN/pending entries below are dated pre-CI checkpoints; historical
+fixture failures/RCAs remain preserved, not current uncorrected failures.
+
+
 
 ## Approved G4 Aggregate frontend diagnostics - 2026-10-23
 

@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Document Registry"
 doc_id: "DOC-REGISTRY-GENESISBLOCKDB"
 status: draft
-version: "0.5.116+draft"
+version: "0.5.117+draft"
 updated: "2026-10-23"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -17,6 +17,44 @@ related_docs:
   - "docs/SPEC--GENESISDB-P6-PEER-LOCALITY-ADDENDUM.md"
   - "docs/adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md"
 ---
+
+## Approved G4 UnionAll frontend diagnostics - 2026-10-23
+
+Owner approved tests/docs-only qualification at merged main `6cf46f9`
+(LOW, C-3), extending the existing Storage set-oracle target. The169-pair
+normal HQL/IR/P7 semantic oracle is preserved. New selected fixtures compare
+both frontends through Values/branch Projects/UnionAll/Sort/final Project,
+with independent P7 and literal ordered rows, including duplicates, NULL and
+left/right/both-empty inputs. Per-node rows are fixture cardinalities; measured
+zero and typed unknown remain distinct. Generated IDs and cross-frontend equal
+hashes are not acceptance requirements. Existing repeated IR edge counter and
+golden regressions are retained.
+Plan controls precede query execution/publication. Execution denial and byte
+budget controls use an explicitly published generation; frontier/files are
+observed before/after, with only established lock/shared-memory size comparisons.
+No universal internal/transient-write claim follows. Metadata mode equality is
+consistency, not independent full provenance acceptance. The complete result
+envelope counts toward byte limits, including empty results.
+Local runtime passes87/87 unique tests across10 targets, zero failed/ignored;
+focused2/2 is included once. Strict core/default all-target Clippy, formatting,
+docs244/0, version0.2.10 and diff checks pass. Hosted qualification is NOT_RUN for
+this candidate. Seven existing tests/docs files only; no runtime/planner/API/
+P6/WAL/hash/schema/ACL/index/grammar changes. Broader type/composition,
+G4/P8/P9-P13, independent runtime/device/release gates remain open.
+
+PR260 reviewed head `ca7f88402b0bca9c8058164a1ee2492f5e078b29` merged as
+`6cf46f90a0b57b081f7d0d3d08833422fbcffe7c` after four successful exact-head
+workflows and15 SUCCESS checks plus one genuine schedule-only skip. Tests
+`39899519869`, Security `39899519859`, worker `39899519995` and performance
+`39899519858` succeeded, with actual Rust Ubuntu/macOS/Windows steps successful.
+PR260 local79/79 across8 targets and strict static gates passed; its fresh
+whole-branch source/evidence review found Critical0/Important0/Minor0 and did
+not rerun runtime suites. Merged tree `edb4047a0ebeecdcf8d4951cafd24f48b755dde5`
+equals the reviewed/tested tree, not a new post-merge runtime run. Earlier
+hosted NOT_RUN/pending entries below are dated pre-CI checkpoints; historical
+fixture failures/RCAs remain preserved, not current uncorrected failures.
+
+
 
 ## Approved G4 Aggregate frontend diagnostics - 2026-10-23
 
@@ -184,17 +222,17 @@ registry row explicitly names them.
 
 | Role | Doc ID | Version | Status | Owner | Path |
 |---|---|---|---|---|---|
-| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.58b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
-| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.88b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
+| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.59b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
+| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.89b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
 | Execution DAG guard | `SPEC--EXECUTION-DAG-GUARD-V1` | `0.1.0` | accepted | Sol Decision / Contract and AC | `docs/SPEC--EXECUTION-DAG-GUARD-V1.md` |
 | HQL2 execution decision | `ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY` | `0.1.1b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY.md` |
-| HQL2 G4 shared-pipeline contract | `ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE` | `0.1.16b` | active | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md` |
+| HQL2 G4 shared-pipeline contract | `ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE` | `0.1.17b` | active | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md` |
 | HQL2 P8 completion addendum | `ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM` | `0.1.15b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md` |
 | HQL2 Sequence pattern constraints | `ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS` | `0.2.1b` | beta | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS.md` |
 | HQL2 durable revisions and annotations | `ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS` | `0.8.27b` | beta | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS.md` |
-| UEE-HQL2 orchestration plan | `IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22` | `0.8.91b` | beta | Boss (Founder / Product Authority) | `docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md` |
+| UEE-HQL2 orchestration plan | `IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22` | `0.8.92b` | beta | Boss (Founder / Product Authority) | `docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md` |
 | HQL2 typed P8 boundary | `SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY` | `0.2.67b` | beta | Boss (Founder / Product Authority) | `docs/SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY.md` |
-| HQL2 P8 core checkpoint | `REPORT--HQL2-P8-CORE-2026-09-28` | `0.1.83b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P8-CORE-2026-09-28.md` |
+| HQL2 P8 core checkpoint | `REPORT--HQL2-P8-CORE-2026-09-28` | `0.1.84b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P8-CORE-2026-09-28.md` |
 | HQL2 P7 bounded oracle evidence | `REPORT--HQL2-P7-ORACLE-2026-09-28` | `0.1.12b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P7-ORACLE-2026-09-28.md` |
 | Commit correctness | `SPEC--WAVE-A-COMMIT-CORRECTNESS` | `0.1.0b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-A-COMMIT-CORRECTNESS.md` |
 | Durable collections and edge history | `SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY` | `0.1.2b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY.md` |
