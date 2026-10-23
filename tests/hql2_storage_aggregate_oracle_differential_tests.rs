@@ -4,7 +4,7 @@ mod reference;
 
 use genesis_block_native::{
     query::hql2::{value::QueryValueV2 as V, QueryOutcomeV2},
-    uee_v2::{HqlLanguageVersionV2, QueryIrV2, QueryRequestV2},
+    uee_v2::{ExplainV2, HqlLanguageVersionV2, QueryIrV2, QueryOpV2, QueryRequestV2},
     *,
 };
 use serde_json::{json, Value};
@@ -184,5 +184,338 @@ fn storage_hql_and_ir_aggregates_match_independent_p7_for_nullable_bags() {
             hql_result.rows, ir_result.rows,
             "HQL/IR differ at case {case}"
         );
+    }
+}
+
+fn diagnostic_request(values: &[Option<i64>], grouped: bool, hql: bool) -> QueryRequestV2 {
+    let mut req = request("g4-aggregate-diagnostics".into(), values);
+    let mut ir = serde_json::to_value(req.ir.take().unwrap()).unwrap();
+    let names = ["n_all", "n", "sum_x", "avg_x", "min_x", "max_x", "items"];
+    let mut fields = Vec::new();
+    if grouped {
+        ir["nodes"][1]["config"]["group_by"] =
+            json!([{"expression":{"field":{"alias":"x","path":[]}},"as":"key"}]);
+        fields.push(json!({"expression":{"field":{"alias":"key","path":[]}},"as":"key"}));
+    }
+    fields.extend(
+        names
+            .iter()
+            .map(|name| json!({"expression":{"field":{"alias":name,"path":[]}},"as":name})),
+    );
+    ir["nodes"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"id":"p","op":"Project","inputs":["a"],"config":{"fields":fields}}));
+    ir["root"] = json!("p");
+    req.ir = Some(serde_json::from_value(ir).unwrap());
+    if hql {
+        req.ir = None;
+        req.language_version = Some(HqlLanguageVersionV2::HqlV2);
+        let grouping = if grouped {
+            "GROUP BY x AS key AGG"
+        } else {
+            "AGG"
+        };
+        let key = if grouped { "key, " } else { "" };
+        req.hql = Some(format!("VALUES $xs AS x |> {grouping} count(*) AS n_all, count(x) AS n, sum(x) AS sum_x, avg(x) AS avg_x, min(x) AS min_x, max(x) AS max_x, collect(x) AS items |> RETURN {key}n_all, n, sum_x, avg_x, min_x, max_x, items"));
+    }
+    req.temporal =
+        Some(serde_json::from_value(json!({"valid_at":"2026-10-23T00:00:00Z"})).unwrap());
+    req
+}
+
+fn sorted_rows(rows: Vec<BTreeMap<String, V>>) -> Vec<String> {
+    let mut rows: Vec<_> = rows
+        .iter()
+        .map(|row| serde_json::to_string(row).unwrap())
+        .collect();
+    rows.sort();
+    rows
+}
+
+fn diagnostic_rows(values: &[Option<i64>], grouped: bool) -> Vec<BTreeMap<String, V>> {
+    use reference::{Aggregate as A, Expr as E, Plan as P, Value as R};
+
+    let input = P::Values(
+        values
+            .iter()
+            .map(|value| BTreeMap::from([("x".into(), value.map(R::I64).unwrap_or(R::Null))]))
+            .collect(),
+    );
+    reference::execute(&P::Aggregate {
+        input: Box::new(input),
+        keys: if grouped {
+            vec![("key".into(), E::Field("x".into()))]
+        } else {
+            vec![]
+        },
+        aggregates: vec![
+            ("n_all".into(), A::CountAll),
+            ("n".into(), A::Count(E::Field("x".into()))),
+            ("sum_x".into(), A::Sum(E::Field("x".into()))),
+            ("avg_x".into(), A::Avg(E::Field("x".into()))),
+            ("min_x".into(), A::Min(E::Field("x".into()))),
+            ("max_x".into(), A::Max(E::Field("x".into()))),
+            ("items".into(), A::Collect(E::Field("x".into()), 4)),
+        ],
+    })
+    .unwrap()
+    .iter()
+    .map(|row| {
+        row.iter()
+            .map(|(key, value)| (key.clone(), from_p7(value)))
+            .collect()
+    })
+    .collect()
+}
+
+fn disk_tree(path: &Path) -> BTreeMap<String, Vec<u8>> {
+    fn visit(root: &Path, path: &Path, out: &mut BTreeMap<String, Vec<u8>>) {
+        for entry in std::fs::read_dir(path).unwrap() {
+            let path = entry.unwrap().path();
+            if path
+                .file_name()
+                .is_some_and(|name| name == "genesis.lock" || name == "projection.sqlite-shm")
+            {
+                out.insert(
+                    format!("{}:size", path.file_name().unwrap().to_string_lossy()),
+                    std::fs::metadata(&path)
+                        .unwrap()
+                        .len()
+                        .to_le_bytes()
+                        .to_vec(),
+                );
+                continue;
+            }
+            if path.is_dir() {
+                visit(root, &path, out);
+            } else {
+                out.insert(
+                    path.strip_prefix(root).unwrap().to_string_lossy().into(),
+                    std::fs::read(&path)
+                        .unwrap_or_else(|error| panic!("read {}: {error}", path.display())),
+                );
+            }
+        }
+    }
+
+    let mut out = BTreeMap::new();
+    visit(path, path, &mut out);
+    out
+}
+
+fn state(db: &Storage, path: &Path) -> (u64, BTreeMap<String, Vec<u8>>) {
+    (db.stable_frontier(), disk_tree(path))
+}
+fn assert_state(db: &Storage, path: &Path, before: &(u64, BTreeMap<String, Vec<u8>>)) {
+    assert_eq!(
+        db.stable_frontier(),
+        before.0,
+        "query changed durable frontier"
+    );
+    assert_eq!(disk_tree(path), before.1, "query changed fixture files");
+}
+
+fn aggregate_policy(storage: &Storage) {
+    storage
+        .replace_access_policy(
+            PolicyAdminActor {
+                access: AccessContext {
+                    principal: "local-owner".into(),
+                    namespace: "default".into(),
+                },
+            },
+            0,
+            AccessPolicy {
+                revision: 1,
+                mode: AccessPolicyMode::Enforced,
+                grants: vec![
+                    AccessGrant {
+                        principal: "reader".into(),
+                        action: AccessAction::Read,
+                        resource: AccessResource::Namespace("default".into()),
+                    },
+                    AccessGrant {
+                        principal: "local-owner".into(),
+                        action: AccessAction::ManagePolicy,
+                        resource: AccessResource::Namespace("default".into()),
+                    },
+                ],
+            },
+        )
+        .unwrap();
+}
+
+/// Catches lost NULL groups/duplicate members, empty-global suppression,
+/// frontend counter drift, Plan publication and unauthorized/budgeted partial success.
+#[test]
+fn storage_aggregate_diagnostics_preserve_p7_groups_counters_authority_and_state() {
+    // Group counts are literal, independent of actual execution/counters.
+    for (values, groups) in [
+        (vec![], 0u64),
+        (vec![None, None], 1),
+        (vec![Some(1), Some(1), None, Some(2)], 3),
+        (vec![Some(-1), Some(2), Some(-1), None], 3),
+    ] {
+        let directory = TempDir::new().unwrap();
+        let storage = open(directory.path());
+        aggregate_policy(&storage);
+        let before_plan = state(&storage, directory.path());
+        let mut cases = Vec::new();
+        // Both frontends and grouping modes are planned before execution/publication.
+        for grouped in [false, true] {
+            let output_count = if grouped { groups } else { 1 };
+            let expected = sorted_rows(diagnostic_rows(&values, grouped));
+            assert_eq!(expected.len() as u64, output_count);
+            for hql in [false, true] {
+                let request = diagnostic_request(&values, grouped, hql);
+                let mut planned = request.clone();
+                planned.explain = Some(ExplainV2::Plan);
+                let QueryOutcomeV2::Plan(plan) =
+                    storage.query_v2(access(), planned.clone()).unwrap()
+                else {
+                    panic!("Plan")
+                };
+                assert!(plan
+                    .plan
+                    .iter()
+                    .all(|node| node.actual.is_none() && node.estimates.is_none()));
+                assert_state(&storage, directory.path(), &before_plan);
+                let error = storage
+                    .query_v2(
+                        AccessContext {
+                            principal: "no-namespace".into(),
+                            namespace: "default".into(),
+                        },
+                        planned,
+                    )
+                    .unwrap_err();
+                assert_eq!(error.code, "FORBIDDEN");
+                assert_eq!(error.stage, "authorize");
+                assert_state(&storage, directory.path(), &before_plan);
+                cases.push((request, plan, expected.clone(), output_count));
+            }
+        }
+        // Execution may legitimately publish lazily; establish that boundary once
+        // before guarding normal/Analyze errors, never before the Plan control.
+        storage.publish_generation().unwrap();
+        for (request, plan, expected, output_count) in cases {
+            let QueryOutcomeV2::Rows(normal) = storage.query_v2(access(), request.clone()).unwrap()
+            else {
+                panic!("rows")
+            };
+            assert!(normal.explain.is_none());
+            assert_eq!(sorted_rows(normal.rows.clone()), expected);
+            let mut analyzed_request = request.clone();
+            analyzed_request.explain = Some(ExplainV2::Analyze);
+            let QueryOutcomeV2::Rows(analyzed) =
+                storage.query_v2(access(), analyzed_request).unwrap()
+            else {
+                panic!("Analyze")
+            };
+            assert_eq!(sorted_rows(analyzed.rows.clone()), expected);
+            assert_eq!(analyzed.columns, normal.columns);
+            assert_eq!(analyzed.semantics, normal.semantics);
+            assert_eq!(analyzed.snapshot, normal.snapshot);
+            assert_eq!(analyzed.completeness, normal.completeness);
+            assert_eq!(analyzed.index_frontiers, normal.index_frontiers);
+            assert_eq!(analyzed.cursor, normal.cursor);
+            let mut actual = analyzed.explain.unwrap();
+            assert_eq!(actual.plan_hash, plan.plan_hash);
+            assert_eq!(actual.planner_version, plan.planner_version);
+            assert_eq!(actual.plan.len(), 3);
+            for (op, input, output) in [
+                (QueryOpV2::Values, 0, values.len() as u64),
+                (QueryOpV2::Aggregate, values.len() as u64, output_count),
+                (QueryOpV2::Project, output_count, output_count),
+            ] {
+                let nodes: Vec<_> = actual
+                    .plan
+                    .iter_mut()
+                    .filter(|node| node.logical_op == op)
+                    .collect();
+                assert_eq!(nodes.len(), 1, "one {op:?}");
+                let node = nodes.into_iter().next().unwrap();
+                let counters = serde_json::to_value(node.actual.take().unwrap()).unwrap();
+                for (name, count) in [("rows_in", input), ("rows_out", output)] {
+                    assert_eq!(
+                        counters[name],
+                        json!({"unit":"rows","measurement":{"status":"measured","value":count}})
+                    );
+                }
+                for (name, unit, reason) in [
+                    ("bytes_read", "bytes", "not_instrumented"),
+                    ("work_units", "work_units", "not_instrumented"),
+                    ("memory_peak_bytes", "bytes", "not_instrumented"),
+                    ("index_probes", "index_probes", "not_applicable"),
+                    (
+                        "distance_evaluations",
+                        "distance_evaluations",
+                        "not_applicable",
+                    ),
+                    ("graph_expansions", "graph_expansions", "not_applicable"),
+                    ("spill_bytes", "bytes", "not_applicable"),
+                ] {
+                    assert_eq!(
+                        counters[name],
+                        json!({"unit":unit,"measurement":{"status":"unknown","reason":reason}})
+                    );
+                }
+                assert_eq!(counters["elapsed_ns"]["unit"], "nanoseconds");
+                assert_eq!(counters["elapsed_ns"]["measurement"]["status"], "measured");
+                assert!(counters["elapsed_ns"]["measurement"]["value"]
+                    .as_u64()
+                    .is_some());
+                assert_eq!(counters["elapsed_scope"], "operator_execution");
+                assert_eq!(counters["clock_source"], "monotonic_instant");
+                assert_eq!(counters["sampling"], "complete");
+            }
+            assert_eq!(actual.plan, plan.plan);
+            for mode in [None, Some(ExplainV2::Analyze)] {
+                let mut denied = request.clone();
+                denied.explain = mode.clone();
+                let before = state(&storage, directory.path());
+                let error = storage
+                    .query_v2(
+                        AccessContext {
+                            principal: "no-namespace".into(),
+                            namespace: "default".into(),
+                        },
+                        denied,
+                    )
+                    .unwrap_err();
+                assert_eq!(error.code, "FORBIDDEN");
+                assert_eq!(error.stage, "authorize");
+                assert_state(&storage, directory.path(), &before);
+                let mut limited = request.clone();
+                limited.explain = mode;
+                limited.budget =
+                    Some(serde_json::from_value(json!({"max_result_bytes":1})).unwrap());
+                let before = state(&storage, directory.path());
+                let error = storage.query_v2(access(), limited.clone()).unwrap_err();
+                assert_eq!(error.code, "QUERY_BUDGET_EXCEEDED");
+                assert_eq!(error.stage, "execute");
+                assert_eq!(error.detail.unwrap()["reason"], "query_limit");
+                assert_state(&storage, directory.path(), &before);
+                if output_count == 0 {
+                    // The Storage boundary budgets the complete envelope, not only [].
+                    limited.budget =
+                        Some(serde_json::from_value(json!({"max_result_bytes":2})).unwrap());
+                    let error = storage.query_v2(access(), limited.clone()).unwrap_err();
+                    assert_eq!(error.code, "QUERY_BUDGET_EXCEEDED");
+                    assert_eq!(error.detail.unwrap()["reason"], "output_limit");
+                    assert_state(&storage, directory.path(), &before);
+                    limited.budget =
+                        Some(serde_json::from_value(json!({"max_result_bytes":1048576})).unwrap());
+                    let QueryOutcomeV2::Rows(empty) = storage.query_v2(access(), limited).unwrap()
+                    else {
+                        panic!("empty rows")
+                    };
+                    assert!(empty.rows.is_empty());
+                    assert_eq!(empty.completeness, normal.completeness);
+                    assert_state(&storage, directory.path(), &before);
+                }
+            }
+        }
     }
 }
