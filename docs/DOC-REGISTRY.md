@@ -49,7 +49,7 @@ independent P7 + literal ordered rows -----------------> selected assertions
 Final author runtime passes103/103 unique tests across11 targets, zero failed/
 ignored; final scalar target8/8 is included once. Selected matrix152 requests=
 62 successes+42 namespace denials+48 budget errors,124 observed state guards.
-Source blob `69cd92dfe249ea3d9954bb243539b831a700dd37`; prior seven scalar test/helper
+Source blob `cb1b93021099f041af124a238c5e99fd7be676b1`; prior seven scalar test/helper
 bodies are unchanged. Strict core/default all-target Clippy, formatting, docs244/0,
 version0.2.10 and diff checks pass. Independent source/evidence/architecture
 review is recorded separately; no reviewer runtime rerun is claimed.

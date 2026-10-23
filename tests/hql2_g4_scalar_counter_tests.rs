@@ -822,6 +822,10 @@ fn scalar_frontends_preserve_p7_pipeline_counters_authority_and_state() {
             else {
                 panic!("Plan")
             };
+            // Fixture policy is revision1; this is the captured catalog frontier,
+            // not a generation receipt or an authority value inferred from output.
+            assert_eq!(plan.catalog.policy_revision, 1);
+            assert_eq!(plan.catalog.observed_frontier, before_plan.0);
             assert!(plan
                 .plan
                 .iter()
