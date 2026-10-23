@@ -1,6 +1,6 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.86b"
+version: "0.1.87b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
 last_update: "2026-10-24T00:00:00+07:00,Codex"
 status: beta
@@ -11,6 +11,200 @@ attributes:
   risk: HIGH
   complexity: C-3
 ---
+
+## Current G4/P8 broad host qualification ledger - 2026-10-24
+
+Owner approved the first broad qualification slice: six existing documents,
+existing host regressions and one fresh whole-scope independent source/evidence/
+architecture review. LOW risk, C-3; no test or production code change. Physical
+devices are unavailable; device execution is deferred, not accepted. Baseline
+is merged PR263 main `0a5db778e533152d20fdbd8be7dfcc0e03c4fc4b`, reviewed tree
+`ed2ba0fcf3d802f0c5e2f66a66c3a817c774ee56`.
+
+This ledger supersedes the *current-status interpretation* of the historical
+matrix based on `919814f` below; it does not rewrite that dated source audit.
+The finite partitions here describe observed qualification. They do not silently
+replace the governing G4 ADR acceptance criteria or make the type/expression/
+composition space exhaustive.
+
+### Evidence vocabulary and execution scopes
+
+- **IMPLEMENTED:** named production path exists; not a test-pass claim.
+- **TESTED (selected):** named assertions exist and their target passed the
+  recorded run. This does not assert every cell of a frontend/type/mode matrix.
+- **MISSING_EVIDENCE:** behavior may exist, but the stated broader obligation
+  lacks sufficient independent/finite accepted qualification in this ledger.
+- **MISSING_BEHAVIOR:** an explicit unsupported/future capability requires a
+  separate approved contract/implementation, not merely more test evidence.
+- **NOT_RUN:** no execution evidence obtained for that verification scope.
+- **N/A:** an explicit semantic reason is required; an empty fixture alone is
+  never a reason to label a dimension inapplicable.
+
+Author host regression: **455 passed, 0 failed, 1 ignored across all 44 root
+`tests/hql2_*.rs` Cargo integration targets**, locked no-default-features, jobs2,
+serial tests. The initial recursive filename count49 included support helpers;
+44 is the executable root-target inventory. The ignored top-level
+`hql2_parser_tests.rs::parser_heap_probe_child` is invoked by
+`heap_reservation_covers_isolated_allocator_probes` in two dedicated processes
+(default/detailed diagnostics); the passing parent asserts each child exit
+status. Count455 excludes child invocations and repeated focused runs. Child
+stdout is captured by the parent; the ordinary harness hides it on success.
+This is author execution on the reviewed source tree, not independent runtime
+reproduction or a new device run. Runtime inventory, exact commands and raw
+logs are preserved outside the repository in
+`D:/GenesisBlock_Dev/local-cleanup-backups/20261019T030925Z-genesisblock/branch-review/g4-p8-broad-qualification-20261024`.
+
+Separate compatibility qualification: **145 passed/0 failed/0 ignored across
+11 existing targets**. Combined author execution is600 passed/0 failed/1 ignored
+in55 targets, with600 distinct target/test-name pairs; this counts test cases,
+not600 independent semantic obligations. Strict core/default all-target Clippy
+passed (2m38s /4.41s), fmt/docs244 files0 violations/version0.2.10/diff checks
+passed. Source/test content remains unchanged; these runs qualify the baseline
+source tree, while the final docs commit has a different full Git tree.
+
+| Compatibility target | Passed / failed / ignored |
+|---|---|
+| `meta_format_migration_tests` | 4 / 0 / 0 |
+| `p6_generation_tests` | 6 / 0 / 0 |
+| `p6_lease_tests` | 10 / 0 / 0 |
+| `p6_peer_authority_tests` | 10 / 0 / 0 |
+| `p6_snapshot_authority_tests` | 6 / 0 / 0 |
+| `p6_visibility_tests` | 15 / 0 / 0 |
+| `query_ir_tests` | 11 / 0 / 0 |
+| `rest_api` | 13 / 0 / 0 |
+| `rest_api_tests` | 48 / 0 / 0 |
+| `schema6_migration_tests` | 19 / 0 / 0 |
+| `schema_version_tests` | 3 / 0 / 0 |
+
+
+### Eight governing G4 acceptance criteria
+
+| ADR criterion | Current evidence / authority | Remaining acceptance |
+|---|---|---|
+| 1. Approved ADR + parent/registry agreement | Owner approved this six-doc consolidation; synchronized version entries and dependency diagram | Candidate docs validation and final source/evidence review required before integration |
+| 2. Shared closed binder/runtime | `src/query/hql2/bind.rs::Kernel`, `plan.rs::plan_v2`; wire/request/lower/execution targets; HQL1 adapter and labeled-filter/property/ordering targets in run44 | TESTED selected supported allowlist, not all legacy HQL. Unsupported forms remain fail-closed; broader equivalence MISSING_EVIDENCE |
+| 3. Deterministic identity/capability | `hql2_g4_plan_identity_tests.rs::{fixed_values_golden_and_changed_parameters_share_shape_but_not_results,ordered_and_repeated_union_edges_are_preserved_in_shape_and_bag,hql_and_ir_share_hash_only_for_identical_independently_specified_shapes}` | TESTED selected independent goldens. Equal hash is shape consistency, not query equality/authorization; general optimizer/version policy outside this slice |
+| 4. No-effect Plan | `hql2_explain_source_tests.rs::{explain_source_plan_does_not_open_data_or_publish_a_snapshot,explain_edge_row_and_annotation_sources_preserve_frontier_and_fixture_files,explain_history_and_change_sources_do_not_publish_or_write,explain_lexical_and_context_do_not_publish_or_write}`; composed Plan-before-publication controls in provenance target | TESTED observed fixture frontier/files. Universal internal/transient-write absence MISSING_EVIDENCE; lock/shm sizes only, not byte identity |
+| 5. Measured read-only Analyze under P6 | Typed measured/unknown counters in G4 contract/scalar/source/graph/rank/text targets; `hql2_explain_source_tests.rs::analyze_does_not_attribute_pre_execution_source_scan_time_to_operator`; P6 regressions separately | TESTED selected exact counts/units/unknown reasons. No timing-performance threshold or universal ordinary-success state guarantee |
+| 6. Per-operator exact oracle / bags/order/NULL/temporal/ACL/budgets/completeness | 19-kernel inventory and source-family partitions below; independent P7 outcomes where explicitly named | TESTED finite partitions; whole cross-product and general independent complete metadata/provenance remain MISSING_EVIDENCE |
+| 7. Legacy regression/no transport or migration | Existing supported adapter targets in run44, plus separate Query IR v1/REST/schema regressions; six-doc-only diff | No user database migration or public contract change. Hosted candidate CI still required; broader P13 is not inferred |
+| 8. Independent/hosted/device/release separate | Prior patch reviews and PR263 exact-head hosted evidence reconciled below; this candidate fresh review/CI are separate records | Independent whole-scope reviewer runtime reproduction NOT_RUN; device/release NOT_RUN. Source review cannot certify these |
+
+### All 19 executable kernel variants
+
+Inventory authority: `src/query/hql2/bind.rs::Kernel` (19 variants). The six
+`BoundSourceV2` alternatives and two `VectorRankKind` modes are partitions
+inside SourceScan/VectorRank, not additional executors. Every row is
+**IMPLEMENTED / TESTED (selected) / MISSING_EVIDENCE (stated residual)**.
+Normal/Plan/Analyze are selected fixture modes, not a claim that each named
+assertion exercises every frontend/mode. HQL1 is governed by its separately
+proven compatibility allowlist, not by the HQL2/IR table.
+
+| Kernel | Exact diagnostic test anchor | Finite qualification / oracle authority | Residual partition |
+|---|---|---|---|
+| Values | `tests/hql2_g4_scalar_counter_tests.rs::scalar_frontends_preserve_p7_pipeline_counters_authority_and_state` | Nullable I64 duplicates/empty; literal/P7 rows and selected HQL/IR modes | Other value/type/expression combinations |
+| SourceScan | `tests/hql2_g4_source_counter_tests.rs::source_rows_are_exact_in_hql_ir_and_all_diagnostic_modes_including_empty` | Node/Edge/Row/Annotation emitted rows and selected HQL/IR modes; independent P7 source fixtures mapped below | Full per-source identity/ACL/retention/metadata cross-product |
+| MatchCompact | `tests/hql2_expand_tests.rs::analyze_reports_root_match_graph_work_and_budget_never_returns_partial_rows` | Selected root match counters/budget; P7 graph/root-match differential targets | Every path/anchor/authority/frontend-mode combination |
+| MatchSequence | `tests/hql2_expand_sequence_tests.rs::root_sequence_match_counts_work_before_shortest_deduplication` | Selected root sequence work before shortest; P7 pattern/pipeline targets | Every sequence predicate, path mode and boundary combination |
+| AnnotationLookup | `tests/hql2_annotation_lookup_tests.rs::lookup_diagnostic_counters_preserve_p7_bags_and_empty_inputs` | P7 bags/empty; enforced authority and exact identities in provenance target | All owner/reference and concurrent-policy combinations |
+| VectorRank | `tests/hql2_vector_operator_tests.rs::exact_rank_diagnostics_count_duplicate_bags_empty_inputs_and_missing_knn_vectors` | Exact KNN and Original Rerank; P7 rank/pipeline/vector differential targets | All metric/dimension/floor/composition combinations; approximate coverage not accepted |
+| LexicalMatch | `tests/hql2_p8_completion_tests.rs::lexical_diagnostics_match_p7_for_empty_duplicate_nonmatch_and_top_zero` | Paired frontend fixtures, P7 rows/rank; selected counter and budget assertions | Persisted analyzer/index lifecycle and broad tokenization acceptance |
+| ContextPack | `tests/hql2_p8_completion_tests.rs::context_diagnostics_preserve_p7_packages_for_empty_duplicate_and_token_limits` | Paired frontend fixtures and independent P7 rendered package/token limits | All tokenizer/range/provenance/lifecycle combinations |
+| Expand | `tests/hql2_expand_tests.rs::analyze_reports_measured_graph_expansion_work` | Selected graph-work assertions; HQL/IR path parity and P7 graph fixtures | Every optional/zero-hop/anchor/ACL/budget cross-product |
+| ExpandSequence | `tests/hql2_expand_sequence_tests.rs::sequence_diagnostics_count_parallel_duplicate_optional_and_empty_work` | Selected parallel/duplicate/optional/empty counters and P7 pattern/pipeline fixtures | Every sequence/path/frontend-mode combination |
+| Filter | `tests/hql2_g4_scalar_counter_tests.rs::scalar_frontends_preserve_p7_pipeline_counters_authority_and_state` | Nullable predicate filtering in paired scalar pipeline; P7 and literal rows | Full three-valued expression/type/coercion domain |
+| Project | `tests/hql2_g4_scalar_counter_tests.rs::scalar_frontends_preserve_p7_pipeline_counters_authority_and_state` | Paired pipeline; checked Add/Div/Rem and P7/literal rows/errors in arithmetic tests | Sub/Mul/functions/coercions/F64/nonfinite/signed-zero diagnostic partitions |
+| Distinct | `tests/hql2_g4_scalar_counter_tests.rs::scalar_frontends_preserve_p7_pipeline_counters_authority_and_state` | Duplicate removal in paired pipeline; separate surviving-NULL regression tests/hql2_g4_scalar_counter_tests.rs::projection_distinct_sort_offset_take_preserve_nulls_and_nonempty_results | Every supported type, nesting and equality combination |
+| Sort | `tests/hql2_g4_scalar_counter_tests.rs::scalar_frontends_preserve_p7_pipeline_counters_authority_and_state` | Literal ordered output without sorting actual; surviving-NULL regression tests/hql2_g4_scalar_counter_tests.rs::projection_distinct_sort_offset_take_preserve_nulls_and_nonempty_results | General mixed-type/tie/null-order/function/order compositions |
+| Take | `tests/hql2_g4_scalar_counter_tests.rs::scalar_frontends_preserve_p7_pipeline_counters_authority_and_state` | Selected finite and empty slices with fixture counters | Every limit/composition/budget boundary |
+| Offset | `tests/hql2_g4_scalar_counter_tests.rs::scalar_frontends_preserve_p7_pipeline_counters_authority_and_state` | Selected offset slices; wire operator name is Offset (HQL Skip) | Every offset/overflow/composition/budget boundary |
+| UnionAll | `tests/hql2_storage_set_oracle_differential_tests.rs::storage_union_all_diagnostics_preserve_p7_bags_counters_authority_and_state` | Paired seven-node diagnostics; independent P7 and literal order; repeated-edge regression retained | General typed/nested/multi-branch combinations |
+| Aggregate | `tests/hql2_storage_aggregate_oracle_differential_tests.rs::storage_aggregate_diagnostics_preserve_p7_groups_counters_authority_and_state` | Seven existing functions/global/grouped nullable bags; P7 rows and literal node counts | All numeric types/overflow/group-key/ordering combinations |
+| Join | `tests/hql2_storage_hql_join_oracle_differential_tests.rs::storage_join_diagnostics_preserve_p7_bags_counters_authority_and_state` | Inner/Left/Semi/Anti; P7 bags, duplicate/SQL NULL/JSON null/empty selected cases | All predicate/type/join-composition/authority permutations |
+
+Pure Values/scalar operations consume parameter rows; a record retention floor
+is N/A to that parameter-only operation itself. Request namespace authorization
+and output budgets remain applicable. Storage-backed graph/rank/lookup/source
+paths require their P6/source obligations; do not transfer parameter-only N/A
+to them. Optional NULL extension and empty-source counter assertions are test
+partitions, not proof of every ACL/retention branch.
+
+### P8 source identity / temporal / retention / ACL / oracle partitions
+
+| Source or mode | Named assertion evidence (all in run44) | Status / limit |
+|---|---|---|
+| Node/Edge/Row current scans | `hql2_storage_source_tests.rs::{node_scan_filters_labels_and_returns_revision_bound_entities,edge_scan_filters_relations_and_returns_revision_bound_entities,row_scan_returns_registry_identity_from_the_same_revision_projection,hql_and_ir_source_scans_match_independent_p7_bags}` | TESTED selected identity and independent P7 bags; G4 source target adds HQL/IR mode/counter/budget/actor fixtures. Not general lifecycle qualification |
+| Annotation current scan/lookup | `hql2_annotation_source_tests.rs`, `hql2_annotation_acl_tests.rs`; `hql2_annotation_lookup_tests.rs::hql_and_ir_annotation_lookup_match_independent_p7_bags`; `hql2_g4_provenance_completeness_tests.rs::{paired_frontends_preserve_exact_metadata_and_revision_ownership,enforced_annotation_grants_and_policy_revisions_qualify_composed_frontends,annotation_reference_expectation_includes_every_identity_component}` | TESTED frozen reference database/namespace/kind/id/revision and selected namespace+Annotation authority across policy revisions; P6 grant lifetime/concurrent revocation is not redesigned |
+| History | `hql2_history_change_tests.rs::{history_scan_matches_p7_for_edge_revisions_and_endpoint_acl,history_scan_reads_vector_revisions_with_hql_ir_and_p7_parity,history_scan_rejects_a_source_floor_beyond_the_pinned_frontier}`; row-history and annotation-source targets | TESTED selected Node/Edge/Row/Vector/Annotation revisions/floors; Artifact unsupported is fail-closed, not accepted as implemented |
+| Changes | `hql2_history_change_tests.rs::{change_scan_matches_p7_for_edge_row_vector_and_annotation_revisions,change_scan_matches_p7_for_exclusive_after_inclusive_through_windows,change_scan_floor_is_an_exclusive_cursor_and_equality_is_valid,change_scan_rejects_a_cursor_beyond_the_pinned_frontier}` | TESTED selected ordered sequence windows, exclusive cursor and floor/frontier rejection; not exhaustive event/family/lifecycle proof |
+| Selected snapshot | `hql2_history_change_tests.rs::{transaction_time_uses_one_selected_frontier_for_sources_hydration_and_snapshot,hql_and_typed_ir_tx_as_of_are_bounded_by_the_pinned_generation_frontier}`; P6 lease/generation/visibility/authority targets separately | TESTED selected S,V and bound; no blanket concurrency/crash/retention acceptance |
+| Exact KNN / Original Rerank | `hql2_vector_operator_tests.rs::{exact_rank_diagnostics_count_duplicate_bags_empty_inputs_and_missing_knn_vectors,exact_knn_fails_closed_below_the_selected_vector_history_floor}`; vector revision/oracle/rank targets | TESTED selected exact candidates, original-vector failures, counters and ownership; no approximate-candidate or persisted HNSW lifecycle acceptance |
+| Lexical/context metadata | `hql2_p8_completion_tests.rs::{lexical_diagnostics_match_p7_for_empty_duplicate_nonmatch_and_top_zero,context_diagnostics_preserve_p7_packages_for_empty_duplicate_and_token_limits,text_diagnostics_preserve_capability_errors_in_all_modes_and_frontends}` | TESTED finite P7 and capability partitions; broader analyzer/tokenizer/index lifecycle MISSING_EVIDENCE or separately planned behavior |
+
+Result metadata has two evidence levels: most mode helpers compare columns,
+semantics, completeness, index_frontiers and cursor for **self-consistency**;
+they are not independent expected metadata. The provenance target independently
+expects the four semantics fields, completion reason/eligible_count_known,
+full snapshot, empty index_frontiers/null cursor and entity/annotation/score
+revision ownership for its selected lookup and rank/graph compositions. Do not
+promote that selected independent proof to every kernel/type or source mode.
+Budget/authorization errors return Err with no success prefix in the named
+fixtures; observed file/frontier guards with lock/shm size exceptions do not
+prove universal internal writes absent or ordinary nonempty-success state.
+
+### Remaining gates and execution order
+
+```text
+G4/P8 finite ledger + existing host regression
+  -> independent whole-scope source/evidence/architecture review
+  -> owner-approved missing-evidence / real-defect scopes as needed
+P8 -> P9 planner -> P10 composition -> P11 lifecycle -> P12 resources
+  -> P13 surface/clean consumer + P14 recovery/migration rehearsal
+  -> P15 security -> P16 host/device/release/traceability
+```
+
+Current deterministic `plan.rs::plan_v2` preserves bound nodes/root. Broader
+legal index paths/pushdown/order reporting is P9 **planned behavior**, not
+proof the database lacks storage indexes. P10-P12 include existing kernels and
+unqualified broader composition/lifecycle/resource behavior; classify each new
+proposal against code before calling it missing. `request.rs::normalize`
+explicitly rejects v2 stream/partial results and selected capabilities; enabling
+them is **MISSING_BEHAVIOR / new contract scope**, not a test-only fix.
+Core and additive NAPI v2 exist (`Storage::query_v2`, `query_v2_contract`);
+REST/FFI Query IR v1 parity does not establish REST/FFI/SDK/MCP/mobile v2 parity.
+P13 requires a frozen surface mapping and clean-consumer evidence first.
+
+Physical iPhone + Android arm64 acceptance in `SPEC--MOBILE-SDK.md` includes
+installation, query/UI behavior, restart/WAL, sync and applicable performance.
+Owner selected **host first; devices not ready**. SDK adb was found outside
+PATH; read-only device listing found zero attached devices. iPhone/Mac/Xcode
+availability was not verified. Device = **NOT_RUN**, not failed or waived.
+`mobile-build.yml` host/cross-compile/simulator/emulator evidence is a separate
+scope. Release candidate hashes/consumer/rollback/traceability follow P13/P14/
+P15; `release.yml` publishes artifacts/packages and is not a safe dry run.
+No release, tag, registry publication, migration or external message is admitted.
+
+### PR263 hosted / merge reconciliation
+
+Reviewed head `157f62d7fdff3fcf9749aa85301e75ed5a2a4458`, tree
+`ed2ba0fcf3d802f0c5e2f66a66c3a817c774ee56` merged normally as
+`0a5db778e533152d20fdbd8be7dfcc0e03c4fc4b` at
+`2026-10-23T19:52:39Z` (2026-10-24 02:52:39+07:00). Tests `40000440422`,
+Security `40000440414`, worker `40000440421`, performance `40000440643` all
+completed success; full rollup15 SUCCESS +1 genuine schedule-only advisory
+SKIPPED. Actual Rust Ubuntu/macOS/Windows jobs `120574815046`/`120574815163`/
+`120574815188` succeeded. Fresh patch review0 Critical/0 Important/0 Minor was
+source/evidence/architecture only, not reviewer runtime reproduction. Fetch and
+reviewed-tree parity were verified separately; parity is not a runtime rerun.
+These are PR263 results, not this candidate's future hosted eligibility.
+
+Candidate independent whole-scope source/evidence/architecture review and
+hosted CI are **PENDING** until recorded at a fixed candidate head. Even a
+clean candidate review and CI do not automatically close broad G4/P8, independent
+runtime, exhaustive type/order/composition/provenance, P9-P16, performance,
+physical-device or release acceptance.
+
+Version transition: `0.1.86b` -> `0.1.87b`; broad qualification evidence/navigation only.
 
 ## Approved G4 checked arithmetic frontend diagnostics - 2026-10-24
 
