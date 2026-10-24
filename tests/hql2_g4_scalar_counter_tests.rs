@@ -1286,3 +1286,194 @@ fn checked_arithmetic_frontends_fail_closed_without_observed_state_change() {
         qualify_arithmetic_frontends(&input, op, rhs, Err((p7_reason, reason)));
     }
 }
+
+// Independent expectations: never seed metadata from a prior query result.
+fn qualify_metadata_fixture(
+    storage: &Storage,
+    path: &Path,
+    mut request: QueryRequestV2,
+    columns: Value,
+    expected: Vec<BTreeMap<String, V>>,
+    bag: bool,
+) {
+    use sha2::{Digest, Sha256};
+    // Presence-sensitive checks reject missing and accept explicit null.
+    assert_ne!(json!({}).get("cursor"), Some(&Value::Null));
+    assert_eq!(json!({"cursor":null}).get("cursor"), Some(&Value::Null));
+    let mut identity = Sha256::new();
+    identity.update(b"genesis.api.v2.database:");
+    identity.update(storage.verifying_key.as_bytes());
+    let database_id = hex::encode(identity.finalize());
+    let valid_at = "2030-01-01T00:00:00+00:00";
+    request.temporal = Some(serde_json::from_value(json!({"valid_at":valid_at})).unwrap());
+    let before = state(storage, path);
+    let mut planned = request.clone();
+    planned.explain = Some(ExplainV2::Plan);
+    let QueryOutcomeV2::Plan(plan) = storage.query_v2(access(), planned).unwrap() else {
+        panic!("Plan")
+    };
+    assert_eq!(plan.catalog.policy_revision, 1);
+    assert_eq!(plan.catalog.observed_frontier, before.0);
+    assert_eq!(plan.request_id, request.request_id);
+    let root = plan.plan.iter().find(|n| n.id == plan.root).unwrap();
+    assert_eq!(serde_json::to_value(&root.columns).unwrap(), columns);
+    assert!(plan
+        .plan
+        .iter()
+        .all(|n| n.actual.is_none() && n.estimates.is_none()));
+    assert_state(storage, path, &before);
+    // Publication is explicit setup, not another query or a pre-Plan receipt.
+    let generation = storage.publish_generation().unwrap();
+    // Publication appends a control event beyond the selected generation tx.
+    let execution_catalog_frontier = storage.stable_frontier();
+    request.temporal = Some(
+        serde_json::from_value(
+            json!({"valid_at":valid_at,"tx_as_of":generation.wal_frontier.to_string()}),
+        )
+        .unwrap(),
+    );
+    let snapshot = json!({"database_id":database_id,"tx":generation.wal_frontier.to_string(),"valid_at":valid_at,"catalog_generation":generation.generation_id.to_string(),"policy_version":generation.acl_revision.to_string()});
+    for mode in [None, Some(ExplainV2::Analyze)] {
+        request.explain = mode.clone();
+        let QueryOutcomeV2::Rows(result) = storage.query_v2(access(), request.clone()).unwrap()
+        else {
+            panic!("rows")
+        };
+        let actual = serde_json::to_value(&result).unwrap();
+        assert_eq!(actual["request_id"], request.request_id);
+        assert_eq!(actual["columns"], columns);
+        assert_eq!(actual["snapshot"], snapshot);
+        assert_eq!(
+            actual["semantics"],
+            json!({"candidate_search":"exact","distance_fidelity":"not_applicable","index_coverage":"not_applicable","scope":"whole_input"})
+        );
+        assert_eq!(
+            actual["completeness"],
+            json!({"status":"complete","reason":null,"eligible_count_known":true})
+        );
+        assert_eq!(actual["index_frontiers"], json!({}));
+        assert_eq!(actual.get("cursor"), Some(&Value::Null));
+        if bag {
+            let sorted = |rows: &[BTreeMap<String, V>]| {
+                let mut rows: Vec<_> = rows
+                    .iter()
+                    .map(|r| serde_json::to_string(r).unwrap())
+                    .collect();
+                rows.sort();
+                rows
+            };
+            assert_eq!(sorted(&result.rows), sorted(&expected));
+        } else {
+            assert_eq!(result.rows, expected);
+        }
+        if mode.is_none() {
+            assert!(result.explain.is_none());
+        } else {
+            let explain = result.explain.unwrap();
+            assert_eq!(explain.catalog.policy_revision, 1);
+            assert_eq!(
+                explain.catalog.observed_frontier,
+                execution_catalog_frontier
+            );
+            for node in explain.plan {
+                assert!(node.estimates.is_none());
+                let counters = serde_json::to_value(node.actual.unwrap()).unwrap();
+                for name in ["rows_in", "rows_out", "elapsed_ns"] {
+                    assert_eq!(counters[name]["measurement"]["status"], "measured");
+                    assert!(counters[name]["measurement"]["value"].as_u64().is_some());
+                }
+                assert_eq!(counters["elapsed_ns"]["unit"], "nanoseconds");
+                assert_eq!(counters["elapsed_scope"], "operator_execution");
+                assert_eq!(counters["clock_source"], "monotonic_instant");
+                assert_eq!(counters["sampling"], "complete");
+            }
+        }
+    }
+}
+
+#[test]
+fn scalar_result_metadata_has_independent_fixture_expectations() {
+    for (case, input, take, literal) in [
+        (
+            "nullable",
+            vec![Some(2), None, Some(1), Some(2), None],
+            9,
+            vec![V::I64(1), V::I64(2), V::Null],
+        ),
+        ("empty", vec![], 9, vec![]),
+        ("all-null", vec![None, None], 9, vec![V::Null]),
+        ("take-zero", vec![Some(2), None, Some(1)], 0, vec![]),
+    ] {
+        let oracle = P::Take(
+            Box::new(P::Offset(
+                Box::new(P::Sort(
+                    Box::new(P::Distinct(Box::new(P::Project(
+                        Box::new(p7_values("x", &input)),
+                        vec![("y".into(), E::Field("x".into()))],
+                    )))),
+                    vec![reference::SortKey {
+                        expr: E::Field("y".into()),
+                        descending: false,
+                        nulls_first: false,
+                    }],
+                )),
+                0,
+            )),
+            take,
+        );
+        let expected: Vec<BTreeMap<String, V>> = literal
+            .into_iter()
+            .map(|v| BTreeMap::from([("y".into(), v)]))
+            .collect();
+        let oracle: Vec<BTreeMap<String, V>> = reference::execute(&oracle)
+            .unwrap()
+            .iter()
+            .map(|row| row.iter().map(|(k, v)| (k.clone(), from_p7(v))).collect())
+            .collect();
+        assert_eq!(oracle, expected);
+        for hql in [false, true] {
+            let directory = TempDir::new().unwrap();
+            let storage = open(&directory);
+            scalar_policy(&storage);
+            let nodes = vec![
+                values("v", "xs", "x"),
+                node(
+                    "p",
+                    "Project",
+                    &["v"],
+                    json!({"fields":[{"expression":field("x"),"as":"y"}]}),
+                ),
+                node("d", "Distinct", &["p"], json!({})),
+                node(
+                    "s",
+                    "Sort",
+                    &["d"],
+                    json!({"keys":[{"expression":field("y"),"direction":"asc","nulls":"last"}]}),
+                ),
+                node("o", "Offset", &["s"], json!({"count":0})),
+                node("t", "Take", &["o"], json!({"count":take})),
+                node(
+                    "r",
+                    "Project",
+                    &["t"],
+                    json!({"fields":[{"expression":field("y"),"as":"y"}]}),
+                ),
+            ];
+            let mut req = request(nodes, "r", json!({"xs":parameter(&input)}));
+            req.request_id = format!("metadata-scalar-{case}-{hql}");
+            if hql {
+                req.ir = None;
+                req.language_version = Some(HqlLanguageVersionV2::HqlV2);
+                req.hql=Some(format!("VALUES $xs AS x |> PROJECT x AS y |> DISTINCT |> ORDER BY y ASC NULLS LAST |> SKIP 0 |> TAKE {take} |> RETURN y"));
+            }
+            qualify_metadata_fixture(
+                &storage,
+                directory.path(),
+                req,
+                json!([{"name":"y","type":"Nullable<I64>","nullable":true}]),
+                expected.clone(),
+                false,
+            );
+        }
+    }
+}

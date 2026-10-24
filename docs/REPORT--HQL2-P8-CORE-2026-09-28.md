@@ -1,6 +1,6 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.88b"
+version: "0.1.89b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
 last_update: "2026-10-24T00:00:00+07:00,Codex"
 status: beta
@@ -11,6 +11,114 @@ attributes:
   risk: HIGH
   complexity: C-3
 ---
+
+## Approved G4/P8 independent result metadata qualification - 2026-10-24
+
+Owner approved tests/docs-only9existing files (LOW,C-3): three existing test
+targets and these six governing documents. No production/runtime/API/P6/WAL/
+hash/schema/ACL/planner/index/grammar/shared-oracle/error-taxonomy change.
+Baseline merged PR265 main `5bfc475eef6a66aa2cc5905ca43a469e8fc30684`,
+tree `c48584599eaff12bcea70ad5c392624aec10a2b7`.
+
+The new selected matrix contains96requests:32Plan controls before publication
+and64normal/Analyze successes across16fixtures, paired HQL/IR. Scalar preserves
+surviving NULL through Project/Distinct/Sort/Offset/Take/Return; UnionAll adds
+selected Distinct/Sort/Project results; global/grouped Aggregate checks seven
+existing functions. Nullable duplicates,all-NULL,empty,Take0 and empty branches
+are finite partitions. Sorted scalar/set actual rows are compared without
+sorting them; unordered aggregate groups remain bags.
+
+Each successful envelope is compared independently to fixture expectations:
+ordered column names/type/nullability; request_id; all five snapshot fields;
+four non-ranking semantics fields; complete/reason=null/eligible_count_known=true;
+empty index_frontiers and an explicitly present null cursor. Rows match literal
+values AND unchanged
+P7. Expected database identity is SHA256 of fixed domain bytes and the fixture's
+public verifying key, never obtained by executing a query. Explicit publication
+GenerationInfo supplies tx/generation/policy receipts; fixed valid_at and tx_as_of
+are reused. These publication receipts are not an independent proof of all P6
+internals. Empty result schema is declared, not inferred from rows.
+
+Each frontend/case has a fresh enforced-policy store. Plan runs before publication,
+expects literal root columns and catalog policy_revision1/captured frontier, no
+actuals/estimates, and unchanged observed files/frontier (lock/shm size-only
+exceptions). Execution snapshot receipts remain distinct from Plan's catalog
+stamp. Normal has no explain; Analyze keeps measured readings and typed unknowns.
+Existing counter/namespace/budget/error fixtures and all original test functions
+remain unchanged. No universal transient/internal-write or ordinary-success
+no-effect claim is made.
+
+Author regression: HQL2 458 passed/0failed/1top-level ignored across44targets;
+compatibility145/0/0 across11targets; 603 unique passing target/test pairs.
+The ignored parser child is invoked in default/detailed processes by its passing
+parent and excluded from the unique main count. Focused three targets pass;
+focused results are included once in the broad total, not added again.
+Primary strict core/default all-target Clippy,fmt,docs244/0,version0.2.10 and
+diff checks passed. Fresh final source review/current-head hosted CI remain
+PENDING until their exact-head external records are complete.
+
+PR265's separate same-host independent verifier600pairs and sealed-before-author
+comparison remain historical evidence for its unchanged inventory, not execution
+of these new tests. Its final review0Critical/0Important/0Minor was source-only;
+all four hosted workflows passed,15SUCCESS+1genuine schedule-only advisory skip,
+including actual Rust Ubuntu/Windows/macOS, before normal merge5bfc475 at
+2026-10-24T06:37:04Z (13:37:04+07:00). Fetched/reviewed-tree parity was verified,
+not another runtime run. Prior pending/NOT_RUN sections are dated checkpoints.
+
+```text
+literal schema/rows + fixture public-key identity -> prepublication Plan control
+  -> explicit generation receipt -> HQL/IR normal and Analyze expected envelope
+  -> focused + broad host regressions -> final source/evidence review -> full CI
+P8 -> P9-P12 -> P13/P14 -> P15 -> P16 (device/release gates remain open)
+```
+
+Broad G4/P8/P9-P16, exhaustive types/order/composition/provenance, independent
+new implementations/other-machine/performance/device/release acceptance remain
+open. Devices unavailable; no further device request, release/tag/publication,
+public surface enablement or existing-user database migration is authorized.
+
+### Exact assertions and evidence boundary
+
+| Target / appended assertion | Selected partition | Independent expected authority |
+|---|---|---|
+| hql2_g4_scalar_counter_tests::scalar_result_metadata_has_independent_fixture_expectations |4cases x2frontends x3modes=24requests | Literal nullable y schema/ordered rows + independent P7 + fixture/publication receipt |
+| hql2_storage_set_oracle_differential_tests::union_result_metadata_has_independent_fixture_expectations |4cases x2frontends x3modes=24 | Literal nullable x schema/ordered distinct rows + P7 + fixture/publication receipt |
+| hql2_storage_aggregate_oracle_differential_tests::aggregate_result_metadata_has_independent_fixture_expectations |8cases x2frontends x3modes=48 | Literal count/sum/avg/min/max/collect/group-key schema, literal bags + P7 + fixture/publication receipt |
+
+Existing provenance target's database_id helper discovers identity through a
+query result. Its established lookup/rank ownership checks remain valuable,
+but that discovery is not independent proof of database-id derivation. The new
+three assertions intentionally use public fixture key/domain bytes instead.
+Mode equality elsewhere remains self-consistency; this selected stronger proof
+does not promote every kernel/source combination to complete metadata acceptance.
+G4 criterion6 receives selected additional evidence; criterion8 separately tracks
+author execution, final source review, hosted cross-OS, prior independent executor,
+device and release evidence. No entire-G4/P8 sign-off is inferred.
+
+External exact commands, first outcomes, source preservation, hashes, plan,
+ledger, review and hosted records:
+`D:/GenesisBlock_Dev/local-cleanup-backups/20261019T030925Z-genesisblock/branch-review/g4-p8-result-metadata-qualification`.
+Initial focused scalar execution retained10passes/1fixture failure; Cargo stopped
+before the other two targets ran. FIXTURE-RCA.md records a catalog/snapshot
+frontier expectation error: publication records generation data frontier3 and
+then emits receipt4; later catalog sees4. The new helper initially expected
+Analyze catalog3. Correction independently captures stable_frontier after
+publication for Analyze catalog, retaining generation receipt3 for snapshot.tx.
+No assertion removed, output-derived expectation or runtime change. Final
+corrected focused/broad acceptance is separate from that historical failure.
+Initial source review found0Critical/0Important/1Minor: JSON indexing cannot
+distinguish a missing cursor member from explicit null. The approved helper
+assertion now uses get()==Some(null), with absent/null predicate controls.
+Current runtime serialization was correct; this is test-only hardening. The
+initial review and pre-hardening qualification remain preserved separately.
+Corrected source requires full requalification and confirmation by the same
+final reviewer; external exact-head records determine closure.
+The frozen matrix/append script predates focused execution. Protected shared P7,
+runtime and all original test functions are preserved. Snapshot identity is
+fixture-derived, generation/frontier/policy expectations are publication receipts,
+and neither claims a new independent engine or exhaustive P6 authority proof.
+
+
 
 ## Approved G4/P8 independent host reproduction - 2026-10-24
 

@@ -511,3 +511,189 @@ fn storage_union_all_diagnostics_preserve_p7_bags_counters_authority_and_state()
         }
     }
 }
+
+// Independent expectations: never seed metadata from a prior query result.
+fn qualify_metadata_fixture(
+    storage: &Storage,
+    path: &Path,
+    mut request: QueryRequestV2,
+    columns: Value,
+    expected: Vec<BTreeMap<String, V>>,
+    bag: bool,
+) {
+    use sha2::{Digest, Sha256};
+    // Presence-sensitive checks reject missing and accept explicit null.
+    assert_ne!(json!({}).get("cursor"), Some(&Value::Null));
+    assert_eq!(json!({"cursor":null}).get("cursor"), Some(&Value::Null));
+    let mut identity = Sha256::new();
+    identity.update(b"genesis.api.v2.database:");
+    identity.update(storage.verifying_key.as_bytes());
+    let database_id = hex::encode(identity.finalize());
+    let valid_at = "2030-01-01T00:00:00+00:00";
+    request.temporal = Some(serde_json::from_value(json!({"valid_at":valid_at})).unwrap());
+    let before = state(storage, path);
+    let mut planned = request.clone();
+    planned.explain = Some(ExplainV2::Plan);
+    let QueryOutcomeV2::Plan(plan) = storage.query_v2(access(), planned).unwrap() else {
+        panic!("Plan")
+    };
+    assert_eq!(plan.catalog.policy_revision, 1);
+    assert_eq!(plan.catalog.observed_frontier, before.0);
+    assert_eq!(plan.request_id, request.request_id);
+    let root = plan.plan.iter().find(|n| n.id == plan.root).unwrap();
+    assert_eq!(serde_json::to_value(&root.columns).unwrap(), columns);
+    assert!(plan
+        .plan
+        .iter()
+        .all(|n| n.actual.is_none() && n.estimates.is_none()));
+    assert_state(storage, path, &before);
+    // Publication is explicit setup, not another query or a pre-Plan receipt.
+    let generation = storage.publish_generation().unwrap();
+    // Publication appends a control event beyond the selected generation tx.
+    let execution_catalog_frontier = storage.stable_frontier();
+    request.temporal = Some(
+        serde_json::from_value(
+            json!({"valid_at":valid_at,"tx_as_of":generation.wal_frontier.to_string()}),
+        )
+        .unwrap(),
+    );
+    let snapshot = json!({"database_id":database_id,"tx":generation.wal_frontier.to_string(),"valid_at":valid_at,"catalog_generation":generation.generation_id.to_string(),"policy_version":generation.acl_revision.to_string()});
+    for mode in [None, Some(ExplainV2::Analyze)] {
+        request.explain = mode.clone();
+        let QueryOutcomeV2::Rows(result) = storage.query_v2(access(), request.clone()).unwrap()
+        else {
+            panic!("rows")
+        };
+        let actual = serde_json::to_value(&result).unwrap();
+        assert_eq!(actual["request_id"], request.request_id);
+        assert_eq!(actual["columns"], columns);
+        assert_eq!(actual["snapshot"], snapshot);
+        assert_eq!(
+            actual["semantics"],
+            json!({"candidate_search":"exact","distance_fidelity":"not_applicable","index_coverage":"not_applicable","scope":"whole_input"})
+        );
+        assert_eq!(
+            actual["completeness"],
+            json!({"status":"complete","reason":null,"eligible_count_known":true})
+        );
+        assert_eq!(actual["index_frontiers"], json!({}));
+        assert_eq!(actual.get("cursor"), Some(&Value::Null));
+        if bag {
+            let sorted = |rows: &[BTreeMap<String, V>]| {
+                let mut rows: Vec<_> = rows
+                    .iter()
+                    .map(|r| serde_json::to_string(r).unwrap())
+                    .collect();
+                rows.sort();
+                rows
+            };
+            assert_eq!(sorted(&result.rows), sorted(&expected));
+        } else {
+            assert_eq!(result.rows, expected);
+        }
+        if mode.is_none() {
+            assert!(result.explain.is_none());
+        } else {
+            let explain = result.explain.unwrap();
+            assert_eq!(explain.catalog.policy_revision, 1);
+            assert_eq!(
+                explain.catalog.observed_frontier,
+                execution_catalog_frontier
+            );
+            for node in explain.plan {
+                assert!(node.estimates.is_none());
+                let counters = serde_json::to_value(node.actual.unwrap()).unwrap();
+                for name in ["rows_in", "rows_out", "elapsed_ns"] {
+                    assert_eq!(counters[name]["measurement"]["status"], "measured");
+                    assert!(counters[name]["measurement"]["value"].as_u64().is_some());
+                }
+                assert_eq!(counters["elapsed_ns"]["unit"], "nanoseconds");
+                assert_eq!(counters["elapsed_scope"], "operator_execution");
+                assert_eq!(counters["clock_source"], "monotonic_instant");
+                assert_eq!(counters["sampling"], "complete");
+            }
+        }
+    }
+}
+
+#[test]
+fn union_result_metadata_has_independent_fixture_expectations() {
+    for (case, left, right, literal) in [
+        (
+            "both",
+            vec![Some(2), None, Some(2)],
+            vec![Some(1), None],
+            vec![V::I64(1), V::I64(2), V::Null],
+        ),
+        (
+            "left-empty",
+            vec![],
+            vec![None, Some(2), Some(2)],
+            vec![V::I64(2), V::Null],
+        ),
+        (
+            "right-empty",
+            vec![Some(-1), None],
+            vec![],
+            vec![V::I64(-1), V::Null],
+        ),
+        ("both-empty", vec![], vec![], vec![]),
+    ] {
+        use reference::{Expr as E, Plan as P, SortKey};
+        let oracle = P::Sort(
+            Box::new(P::Distinct(Box::new(P::UnionAll(
+                Box::new(P::Values(p7_rows(&left))),
+                Box::new(P::Values(p7_rows(&right))),
+            )))),
+            vec![SortKey {
+                expr: E::Field("x".into()),
+                descending: false,
+                nulls_first: false,
+            }],
+        );
+        let oracle: Vec<BTreeMap<String, V>> = reference::execute(&oracle)
+            .unwrap()
+            .iter()
+            .map(|row| {
+                BTreeMap::from([(
+                    "x".into(),
+                    match row["x"] {
+                        reference::Value::Null => V::Null,
+                        reference::Value::I64(n) => V::I64(n),
+                        _ => panic!("P7 scalar"),
+                    },
+                )])
+            })
+            .collect();
+        let expected: Vec<BTreeMap<String, V>> = literal
+            .into_iter()
+            .map(|v| BTreeMap::from([("x".into(), v)]))
+            .collect();
+        assert_eq!(oracle, expected);
+        for hql in [false, true] {
+            let directory = TempDir::new().unwrap();
+            let storage = open(directory.path());
+            union_policy(&storage);
+            let mut req = diagnostic_request(&left, &right, hql);
+            req.request_id = format!("metadata-union-{case}-{hql}");
+            if hql {
+                req.hql=Some("UNION ALL { VALUES $left AS x |> RETURN x } { VALUES $right AS x |> RETURN x } |> DISTINCT |> ORDER BY x ASC NULLS LAST |> RETURN x".into());
+            } else {
+                let mut ir = serde_json::to_value(req.ir.take().unwrap()).unwrap();
+                let nodes = ir["nodes"].as_array_mut().unwrap();
+                let sort = nodes.iter_mut().find(|n| n["op"] == "Sort").unwrap();
+                sort["inputs"] = json!(["d"]);
+                nodes.push(json!({"id":"d","op":"Distinct","inputs":["u"],"config":{}}));
+                req.ir = Some(serde_json::from_value(ir).unwrap());
+            }
+            qualify_metadata_fixture(
+                &storage,
+                directory.path(),
+                req,
+                json!([{"name":"x","type":"Nullable<I64>","nullable":true}]),
+                expected.clone(),
+                false,
+            );
+        }
+    }
+}

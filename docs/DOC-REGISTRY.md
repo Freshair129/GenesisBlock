@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Document Registry"
 doc_id: "DOC-REGISTRY-GENESISBLOCKDB"
 status: draft
-version: "0.5.121+draft"
+version: "0.5.122+draft"
 updated: "2026-10-24"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -17,6 +17,75 @@ related_docs:
   - "docs/SPEC--GENESISDB-P6-PEER-LOCALITY-ADDENDUM.md"
   - "docs/adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md"
 ---
+
+## Approved G4/P8 independent result metadata qualification - 2026-10-24
+
+Owner approved tests/docs-only9existing files (LOW,C-3): three existing test
+targets and these six governing documents. No production/runtime/API/P6/WAL/
+hash/schema/ACL/planner/index/grammar/shared-oracle/error-taxonomy change.
+Baseline merged PR265 main `5bfc475eef6a66aa2cc5905ca43a469e8fc30684`,
+tree `c48584599eaff12bcea70ad5c392624aec10a2b7`.
+
+The new selected matrix contains96requests:32Plan controls before publication
+and64normal/Analyze successes across16fixtures, paired HQL/IR. Scalar preserves
+surviving NULL through Project/Distinct/Sort/Offset/Take/Return; UnionAll adds
+selected Distinct/Sort/Project results; global/grouped Aggregate checks seven
+existing functions. Nullable duplicates,all-NULL,empty,Take0 and empty branches
+are finite partitions. Sorted scalar/set actual rows are compared without
+sorting them; unordered aggregate groups remain bags.
+
+Each successful envelope is compared independently to fixture expectations:
+ordered column names/type/nullability; request_id; all five snapshot fields;
+four non-ranking semantics fields; complete/reason=null/eligible_count_known=true;
+empty index_frontiers and an explicitly present null cursor. Rows match literal
+values AND unchanged
+P7. Expected database identity is SHA256 of fixed domain bytes and the fixture's
+public verifying key, never obtained by executing a query. Explicit publication
+GenerationInfo supplies tx/generation/policy receipts; fixed valid_at and tx_as_of
+are reused. These publication receipts are not an independent proof of all P6
+internals. Empty result schema is declared, not inferred from rows.
+
+Each frontend/case has a fresh enforced-policy store. Plan runs before publication,
+expects literal root columns and catalog policy_revision1/captured frontier, no
+actuals/estimates, and unchanged observed files/frontier (lock/shm size-only
+exceptions). Execution snapshot receipts remain distinct from Plan's catalog
+stamp. Normal has no explain; Analyze keeps measured readings and typed unknowns.
+Existing counter/namespace/budget/error fixtures and all original test functions
+remain unchanged. No universal transient/internal-write or ordinary-success
+no-effect claim is made.
+
+Author regression: HQL2 458 passed/0failed/1top-level ignored across44targets;
+compatibility145/0/0 across11targets; 603 unique passing target/test pairs.
+The ignored parser child is invoked in default/detailed processes by its passing
+parent and excluded from the unique main count. Focused three targets pass;
+focused results are included once in the broad total, not added again.
+Primary strict core/default all-target Clippy,fmt,docs244/0,version0.2.10 and
+diff checks passed. Fresh final source review/current-head hosted CI remain
+PENDING until their exact-head external records are complete.
+
+PR265's separate same-host independent verifier600pairs and sealed-before-author
+comparison remain historical evidence for its unchanged inventory, not execution
+of these new tests. Its final review0Critical/0Important/0Minor was source-only;
+all four hosted workflows passed,15SUCCESS+1genuine schedule-only advisory skip,
+including actual Rust Ubuntu/Windows/macOS, before normal merge5bfc475 at
+2026-10-24T06:37:04Z (13:37:04+07:00). Fetched/reviewed-tree parity was verified,
+not another runtime run. Prior pending/NOT_RUN sections are dated checkpoints.
+
+```text
+literal schema/rows + fixture public-key identity -> prepublication Plan control
+  -> explicit generation receipt -> HQL/IR normal and Analyze expected envelope
+  -> focused + broad host regressions -> final source/evidence review -> full CI
+P8 -> P9-P12 -> P13/P14 -> P15 -> P16 (device/release gates remain open)
+```
+
+Broad G4/P8/P9-P16, exhaustive types/order/composition/provenance, independent
+new implementations/other-machine/performance/device/release acceptance remain
+open. Devices unavailable; no further device request, release/tag/publication,
+public surface enablement or existing-user database migration is authorized.
+
+Current selected evidence: [P8 result metadata](REPORT--HQL2-P8-CORE-2026-09-28.md#approved-g4p8-independent-result-metadata-qualification---2026-10-24).
+
+
 
 ## Approved G4/P8 independent host reproduction - 2026-10-24
 
@@ -455,17 +524,17 @@ registry row explicitly names them.
 
 | Role | Doc ID | Version | Status | Owner | Path |
 |---|---|---|---|---|---|
-| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.63b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
-| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.93b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
+| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.64b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
+| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.94b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
 | Execution DAG guard | `SPEC--EXECUTION-DAG-GUARD-V1` | `0.1.0` | accepted | Sol Decision / Contract and AC | `docs/SPEC--EXECUTION-DAG-GUARD-V1.md` |
 | HQL2 execution decision | `ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY` | `0.1.1b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY.md` |
-| HQL2 G4 shared-pipeline contract | `ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE` | `0.1.21b` | active | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md` |
+| HQL2 G4 shared-pipeline contract | `ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE` | `0.1.22b` | active | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md` |
 | HQL2 P8 completion addendum | `ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM` | `0.1.15b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md` |
 | HQL2 Sequence pattern constraints | `ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS` | `0.2.1b` | beta | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS.md` |
 | HQL2 durable revisions and annotations | `ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS` | `0.8.27b` | beta | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS.md` |
-| UEE-HQL2 orchestration plan | `IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22` | `0.8.96b` | beta | Boss (Founder / Product Authority) | `docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md` |
+| UEE-HQL2 orchestration plan | `IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22` | `0.8.97b` | beta | Boss (Founder / Product Authority) | `docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md` |
 | HQL2 typed P8 boundary | `SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY` | `0.2.67b` | beta | Boss (Founder / Product Authority) | `docs/SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY.md` |
-| HQL2 P8 core checkpoint | `REPORT--HQL2-P8-CORE-2026-09-28` | `0.1.88b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P8-CORE-2026-09-28.md` |
+| HQL2 P8 core checkpoint | `REPORT--HQL2-P8-CORE-2026-09-28` | `0.1.89b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P8-CORE-2026-09-28.md` |
 | HQL2 P7 bounded oracle evidence | `REPORT--HQL2-P7-ORACLE-2026-09-28` | `0.1.12b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P7-ORACLE-2026-09-28.md` |
 | Commit correctness | `SPEC--WAVE-A-COMMIT-CORRECTNESS` | `0.1.0b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-A-COMMIT-CORRECTNESS.md` |
 | Durable collections and edge history | `SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY` | `0.1.2b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY.md` |

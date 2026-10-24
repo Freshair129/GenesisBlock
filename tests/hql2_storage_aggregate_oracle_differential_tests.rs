@@ -519,3 +519,250 @@ fn storage_aggregate_diagnostics_preserve_p7_groups_counters_authority_and_state
         }
     }
 }
+
+// Independent expectations: never seed metadata from a prior query result.
+fn qualify_metadata_fixture(
+    storage: &Storage,
+    path: &Path,
+    mut request: QueryRequestV2,
+    columns: Value,
+    expected: Vec<BTreeMap<String, V>>,
+    bag: bool,
+) {
+    use sha2::{Digest, Sha256};
+    // Presence-sensitive checks reject missing and accept explicit null.
+    assert_ne!(json!({}).get("cursor"), Some(&Value::Null));
+    assert_eq!(json!({"cursor":null}).get("cursor"), Some(&Value::Null));
+    let mut identity = Sha256::new();
+    identity.update(b"genesis.api.v2.database:");
+    identity.update(storage.verifying_key.as_bytes());
+    let database_id = hex::encode(identity.finalize());
+    let valid_at = "2030-01-01T00:00:00+00:00";
+    request.temporal = Some(serde_json::from_value(json!({"valid_at":valid_at})).unwrap());
+    let before = state(storage, path);
+    let mut planned = request.clone();
+    planned.explain = Some(ExplainV2::Plan);
+    let QueryOutcomeV2::Plan(plan) = storage.query_v2(access(), planned).unwrap() else {
+        panic!("Plan")
+    };
+    assert_eq!(plan.catalog.policy_revision, 1);
+    assert_eq!(plan.catalog.observed_frontier, before.0);
+    assert_eq!(plan.request_id, request.request_id);
+    let root = plan.plan.iter().find(|n| n.id == plan.root).unwrap();
+    assert_eq!(serde_json::to_value(&root.columns).unwrap(), columns);
+    assert!(plan
+        .plan
+        .iter()
+        .all(|n| n.actual.is_none() && n.estimates.is_none()));
+    assert_state(storage, path, &before);
+    // Publication is explicit setup, not another query or a pre-Plan receipt.
+    let generation = storage.publish_generation().unwrap();
+    // Publication appends a control event beyond the selected generation tx.
+    let execution_catalog_frontier = storage.stable_frontier();
+    request.temporal = Some(
+        serde_json::from_value(
+            json!({"valid_at":valid_at,"tx_as_of":generation.wal_frontier.to_string()}),
+        )
+        .unwrap(),
+    );
+    let snapshot = json!({"database_id":database_id,"tx":generation.wal_frontier.to_string(),"valid_at":valid_at,"catalog_generation":generation.generation_id.to_string(),"policy_version":generation.acl_revision.to_string()});
+    for mode in [None, Some(ExplainV2::Analyze)] {
+        request.explain = mode.clone();
+        let QueryOutcomeV2::Rows(result) = storage.query_v2(access(), request.clone()).unwrap()
+        else {
+            panic!("rows")
+        };
+        let actual = serde_json::to_value(&result).unwrap();
+        assert_eq!(actual["request_id"], request.request_id);
+        assert_eq!(actual["columns"], columns);
+        assert_eq!(actual["snapshot"], snapshot);
+        assert_eq!(
+            actual["semantics"],
+            json!({"candidate_search":"exact","distance_fidelity":"not_applicable","index_coverage":"not_applicable","scope":"whole_input"})
+        );
+        assert_eq!(
+            actual["completeness"],
+            json!({"status":"complete","reason":null,"eligible_count_known":true})
+        );
+        assert_eq!(actual["index_frontiers"], json!({}));
+        assert_eq!(actual.get("cursor"), Some(&Value::Null));
+        if bag {
+            let sorted = |rows: &[BTreeMap<String, V>]| {
+                let mut rows: Vec<_> = rows
+                    .iter()
+                    .map(|r| serde_json::to_string(r).unwrap())
+                    .collect();
+                rows.sort();
+                rows
+            };
+            assert_eq!(sorted(&result.rows), sorted(&expected));
+        } else {
+            assert_eq!(result.rows, expected);
+        }
+        if mode.is_none() {
+            assert!(result.explain.is_none());
+        } else {
+            let explain = result.explain.unwrap();
+            assert_eq!(explain.catalog.policy_revision, 1);
+            assert_eq!(
+                explain.catalog.observed_frontier,
+                execution_catalog_frontier
+            );
+            for node in explain.plan {
+                assert!(node.estimates.is_none());
+                let counters = serde_json::to_value(node.actual.unwrap()).unwrap();
+                for name in ["rows_in", "rows_out", "elapsed_ns"] {
+                    assert_eq!(counters[name]["measurement"]["status"], "measured");
+                    assert!(counters[name]["measurement"]["value"].as_u64().is_some());
+                }
+                assert_eq!(counters["elapsed_ns"]["unit"], "nanoseconds");
+                assert_eq!(counters["elapsed_scope"], "operator_execution");
+                assert_eq!(counters["clock_source"], "monotonic_instant");
+                assert_eq!(counters["sampling"], "complete");
+            }
+        }
+    }
+}
+
+#[test]
+fn aggregate_result_metadata_has_independent_fixture_expectations() {
+    let row = |key: Option<V>, n_all, n, sum_x: V, avg_x: V, min_x: V, max_x: V, items: Vec<V>| {
+        let mut row = BTreeMap::from([
+            ("n_all".into(), V::I64(n_all)),
+            ("n".into(), V::I64(n)),
+            ("sum_x".into(), sum_x),
+            ("avg_x".into(), avg_x),
+            ("min_x".into(), min_x),
+            ("max_x".into(), max_x),
+            ("items".into(), V::List(items)),
+        ]);
+        if let Some(k) = key {
+            row.insert("key".into(), k);
+        }
+        row
+    };
+    for (case, input) in [
+        ("mixed", vec![Some(2), None, Some(2)]),
+        ("all-null", vec![None, None]),
+        ("empty", vec![]),
+        ("distinct", vec![Some(-1), Some(2)]),
+    ] {
+        for grouped in [false, true] {
+            let expected = match (case, grouped) {
+                ("mixed", false) => vec![row(
+                    None,
+                    3,
+                    2,
+                    V::I64(4),
+                    V::F64(2.0),
+                    V::I64(2),
+                    V::I64(2),
+                    vec![V::I64(2), V::Null, V::I64(2)],
+                )],
+                ("mixed", true) => vec![
+                    row(
+                        Some(V::I64(2)),
+                        2,
+                        2,
+                        V::I64(4),
+                        V::F64(2.0),
+                        V::I64(2),
+                        V::I64(2),
+                        vec![V::I64(2), V::I64(2)],
+                    ),
+                    row(
+                        Some(V::Null),
+                        1,
+                        0,
+                        V::Null,
+                        V::Null,
+                        V::Null,
+                        V::Null,
+                        vec![V::Null],
+                    ),
+                ],
+                ("all-null", g) => vec![row(
+                    if g { Some(V::Null) } else { None },
+                    2,
+                    0,
+                    V::Null,
+                    V::Null,
+                    V::Null,
+                    V::Null,
+                    vec![V::Null, V::Null],
+                )],
+                ("empty", false) => {
+                    vec![row(None, 0, 0, V::Null, V::Null, V::Null, V::Null, vec![])]
+                }
+                ("empty", true) => vec![],
+                ("distinct", false) => vec![row(
+                    None,
+                    2,
+                    2,
+                    V::I64(1),
+                    V::F64(0.5),
+                    V::I64(-1),
+                    V::I64(2),
+                    vec![V::I64(-1), V::I64(2)],
+                )],
+                ("distinct", true) => vec![
+                    row(
+                        Some(V::I64(-1)),
+                        1,
+                        1,
+                        V::I64(-1),
+                        V::F64(-1.0),
+                        V::I64(-1),
+                        V::I64(-1),
+                        vec![V::I64(-1)],
+                    ),
+                    row(
+                        Some(V::I64(2)),
+                        1,
+                        1,
+                        V::I64(2),
+                        V::F64(2.0),
+                        V::I64(2),
+                        V::I64(2),
+                        vec![V::I64(2)],
+                    ),
+                ],
+                _ => panic!("fixture"),
+            };
+            assert_eq!(
+                sorted_rows(diagnostic_rows(&input, grouped)),
+                sorted_rows(expected.clone())
+            );
+            let mut columns = vec![];
+            if grouped {
+                columns.push(json!({"name":"key","type":"Nullable<I64>","nullable":true}));
+            }
+            for (name, ty, nullable) in [
+                ("n_all", "I64", false),
+                ("n", "I64", false),
+                ("sum_x", "Nullable<I64>", true),
+                ("avg_x", "Nullable<F64Finite>", true),
+                ("min_x", "Nullable<I64>", true),
+                ("max_x", "Nullable<I64>", true),
+                ("items", "List<Nullable<I64>>", false),
+            ] {
+                columns.push(json!({"name":name,"type":ty,"nullable":nullable}));
+            }
+            for hql in [false, true] {
+                let directory = TempDir::new().unwrap();
+                let storage = open(directory.path());
+                aggregate_policy(&storage);
+                let mut req = diagnostic_request(&input, grouped, hql);
+                req.request_id = format!("metadata-aggregate-{case}-{grouped}-{hql}");
+                qualify_metadata_fixture(
+                    &storage,
+                    directory.path(),
+                    req,
+                    json!(columns),
+                    expected.clone(),
+                    true,
+                );
+            }
+        }
+    }
+}
