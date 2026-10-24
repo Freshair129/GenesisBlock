@@ -652,3 +652,265 @@ fn storage_join_diagnostics_preserve_p7_bags_counters_authority_and_state() {
         }
     }
 }
+
+// Literal schemas are fixture expectations, not copied from another mode.
+fn assert_join_metadata_schemas(
+    plan: &genesis_block_native::query::hql2::ExplainResultV2,
+    root_columns: &Value,
+    join_columns: &Value,
+) {
+    assert_eq!(plan.plan.len(), 4);
+    let find = |id: &str| plan.plan.iter().find(|n| n.id == id).unwrap();
+    let root = find(&plan.root);
+    assert_eq!(root.logical_op, QueryOpV2::Project);
+    assert_eq!(root.inputs.len(), 1);
+    assert_eq!(serde_json::to_value(&root.columns).unwrap(), *root_columns);
+    let join = find(&root.inputs[0]);
+    assert_eq!(join.logical_op, QueryOpV2::Join);
+    assert_eq!(join.inputs.len(), 2);
+    assert_ne!(join.inputs[0], join.inputs[1]);
+    assert_eq!(find(&join.inputs[0]).logical_op, QueryOpV2::NodeScan);
+    assert_eq!(find(&join.inputs[1]).logical_op, QueryOpV2::RowScan);
+    assert_eq!(serde_json::to_value(&join.columns).unwrap(), *join_columns);
+}
+
+fn qualify_join_result_metadata(
+    storage: &Storage,
+    path: &Path,
+    mut request: QueryRequestV2,
+    root_columns: Value,
+    join_columns: Value,
+    expected: Vec<BTreeMap<String, V>>,
+) {
+    use sha2::{Digest, Sha256};
+    // Guard optional-null member presence; JSON indexing alone misses absence.
+    assert_ne!(json!({}).get("cursor"), Some(&Value::Null));
+    assert_eq!(json!({"cursor":null}).get("cursor"), Some(&Value::Null));
+    let mut identity = Sha256::new();
+    identity.update(b"genesis.api.v2.database:");
+    identity.update(storage.verifying_key.as_bytes());
+    let database_id = hex::encode(identity.finalize());
+    // Rows use insertion time. One post-setup value is reused before/after Plan.
+    let valid_at = chrono::Utc::now().to_rfc3339();
+    request.temporal = Some(serde_json::from_value(json!({"valid_at":valid_at})).unwrap());
+    let before = state(storage, path);
+    let mut planned = request.clone();
+    planned.explain = Some(ExplainV2::Plan);
+    let QueryOutcomeV2::Plan(plan) = storage.query_v2(access(), planned).unwrap() else {
+        panic!("Plan")
+    };
+    assert_eq!(plan.request_id, request.request_id);
+    assert_eq!(plan.catalog.policy_revision, 1);
+    assert_eq!(plan.catalog.observed_frontier, before.0);
+    assert_join_metadata_schemas(&plan, &root_columns, &join_columns);
+    assert!(plan
+        .plan
+        .iter()
+        .all(|n| n.actual.is_none() && n.estimates.is_none()));
+    assert_state(storage, path, &before);
+    let generation = storage.publish_generation().unwrap();
+    let execution_catalog_frontier = storage.stable_frontier();
+    assert_eq!(execution_catalog_frontier, generation.publication_seq);
+    assert_eq!(generation.acl_revision, 1);
+    request.temporal = Some(
+        serde_json::from_value(
+            json!({"valid_at":valid_at,"tx_as_of":generation.wal_frontier.to_string()}),
+        )
+        .unwrap(),
+    );
+    let snapshot = json!({"database_id":database_id,"tx":generation.wal_frontier.to_string(),"valid_at":valid_at,"catalog_generation":generation.generation_id.to_string(),"policy_version":generation.acl_revision.to_string()});
+    for mode in [None, Some(ExplainV2::Analyze)] {
+        request.explain = mode.clone();
+        let QueryOutcomeV2::Rows(result) = storage.query_v2(access(), request.clone()).unwrap()
+        else {
+            panic!("rows")
+        };
+        let actual = serde_json::to_value(&result).unwrap();
+        assert_eq!(actual["request_id"], request.request_id);
+        assert_eq!(actual["columns"], root_columns);
+        assert_eq!(actual["snapshot"], snapshot);
+        assert_eq!(
+            actual["semantics"],
+            json!({"candidate_search":"exact","distance_fidelity":"not_applicable","index_coverage":"not_applicable","scope":"whole_input"})
+        );
+        assert_eq!(
+            actual["completeness"],
+            json!({"status":"complete","reason":null,"eligible_count_known":true})
+        );
+        assert_eq!(actual["index_frontiers"], json!({}));
+        assert_eq!(actual.get("cursor"), Some(&Value::Null));
+        assert_eq!(
+            sorted_rows(result.rows.clone()),
+            sorted_rows(expected.clone())
+        );
+        if mode.is_none() {
+            assert!(result.explain.is_none());
+        } else {
+            let explain = result.explain.unwrap();
+            assert_join_metadata_schemas(&explain, &root_columns, &join_columns);
+            assert_eq!(explain.request_id, request.request_id);
+            assert_eq!(explain.catalog.policy_revision, 1);
+            assert_eq!(
+                explain.catalog.observed_frontier,
+                execution_catalog_frontier
+            );
+            for node in explain.plan {
+                assert!(node.estimates.is_none());
+                let counters = serde_json::to_value(node.actual.unwrap()).unwrap();
+                for name in ["rows_in", "rows_out"] {
+                    assert_eq!(counters[name]["unit"], "rows");
+                    assert_eq!(counters[name]["measurement"]["status"], "measured");
+                    assert!(counters[name]["measurement"]["value"].as_u64().is_some());
+                }
+                for (name, unit, reason) in [
+                    ("bytes_read", "bytes", "not_instrumented"),
+                    ("work_units", "work_units", "not_instrumented"),
+                    ("memory_peak_bytes", "bytes", "not_instrumented"),
+                    ("index_probes", "index_probes", "not_applicable"),
+                    (
+                        "distance_evaluations",
+                        "distance_evaluations",
+                        "not_applicable",
+                    ),
+                    ("graph_expansions", "graph_expansions", "not_applicable"),
+                    ("spill_bytes", "bytes", "not_applicable"),
+                ] {
+                    assert_eq!(
+                        counters[name],
+                        json!({"unit":unit,"measurement":{"status":"unknown","reason":reason}})
+                    );
+                }
+                assert_eq!(counters["elapsed_ns"]["unit"], "nanoseconds");
+                if matches!(node.logical_op, QueryOpV2::NodeScan | QueryOpV2::RowScan) {
+                    assert_eq!(
+                        counters["elapsed_ns"]["measurement"],
+                        json!({"status":"unknown","reason":"not_instrumented"})
+                    );
+                } else {
+                    assert_eq!(counters["elapsed_ns"]["measurement"]["status"], "measured");
+                    assert!(counters["elapsed_ns"]["measurement"]["value"]
+                        .as_u64()
+                        .is_some());
+                }
+                assert_eq!(counters["elapsed_scope"], "operator_execution");
+                assert_eq!(counters["clock_source"], "monotonic_instant");
+                assert_eq!(counters["sampling"], "complete");
+            }
+        }
+    }
+}
+
+#[test]
+fn storage_join_result_metadata_has_independent_fixture_expectations() {
+    let full_left = [
+        JoinKey::Number(1),
+        JoinKey::Number(1),
+        JoinKey::Missing,
+        JoinKey::Number(2),
+        JoinKey::JsonNull,
+    ];
+    let full_right = [
+        JoinKey::Number(1),
+        JoinKey::Number(1),
+        JoinKey::JsonNull,
+        JoinKey::Number(99),
+    ];
+    let j1 = V::Json(json!(1));
+    let j2 = V::Json(json!(2));
+    let jnull = V::Json(Value::Null);
+    for (case, left, right, counts) in [
+        ("full", &full_left[..], &full_right[..], [5, 7, 3, 2]),
+        ("left-empty", &[][..], &full_right[..], [0, 0, 0, 0]),
+        ("right-empty", &full_left[..], &[][..], [0, 5, 0, 5]),
+        ("both-empty", &[][..], &[][..], [0, 0, 0, 0]),
+    ] {
+        for (index, (kind, oracle_kind)) in [
+            ("inner", reference::JoinKind::Inner),
+            ("left", reference::JoinKind::Left),
+            ("semi", reference::JoinKind::Semi),
+            ("anti", reference::JoinKind::Anti),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let one_side = matches!(kind, "semi" | "anti");
+            let pair = |left: V, right: V| {
+                let mut row = BTreeMap::from([("left_key".into(), left)]);
+                if !one_side {
+                    row.insert("right_key".into(), right);
+                }
+                row
+            };
+            // Hand-derived bags, independent of the production/P7 join loops.
+            let literal = match (case, kind) {
+                ("full", "inner") => vec![
+                    pair(j1.clone(), j1.clone()),
+                    pair(j1.clone(), j1.clone()),
+                    pair(j1.clone(), j1.clone()),
+                    pair(j1.clone(), j1.clone()),
+                    pair(jnull.clone(), jnull.clone()),
+                ],
+                ("full", "left") => vec![
+                    pair(j1.clone(), j1.clone()),
+                    pair(j1.clone(), j1.clone()),
+                    pair(j1.clone(), j1.clone()),
+                    pair(j1.clone(), j1.clone()),
+                    pair(jnull.clone(), jnull.clone()),
+                    pair(V::Null, V::Null),
+                    pair(j2.clone(), V::Null),
+                ],
+                ("full", "semi") => vec![
+                    pair(j1.clone(), V::Null),
+                    pair(j1.clone(), V::Null),
+                    pair(jnull.clone(), V::Null),
+                ],
+                ("full", "anti") => vec![pair(V::Null, V::Null), pair(j2.clone(), V::Null)],
+                ("right-empty", "left" | "anti") => vec![
+                    pair(j1.clone(), V::Null),
+                    pair(j1.clone(), V::Null),
+                    pair(V::Null, V::Null),
+                    pair(j2.clone(), V::Null),
+                    pair(jnull.clone(), V::Null),
+                ],
+                _ => vec![],
+            };
+            assert_eq!(literal.len(), counts[index]);
+            assert_eq!(
+                sorted_rows(expected_rows(left, right, oracle_kind)),
+                sorted_rows(literal.clone())
+            );
+            let mut join_columns = vec![json!({"name":"n","type":"Entity","nullable":false})];
+            let mut root_columns =
+                vec![json!({"name":"left_key","type":"Nullable<Json>","nullable":true})];
+            if !one_side {
+                join_columns.push(if kind == "left" {
+                    json!({"name":"r","type":"Nullable<Entity>","nullable":true})
+                } else {
+                    json!({"name":"r","type":"Entity","nullable":false})
+                });
+                root_columns
+                    .push(json!({"name":"right_key","type":"Nullable<Json>","nullable":true}));
+            }
+            for hql in [false, true] {
+                let dir = TempDir::new().unwrap();
+                let storage = open(dir.path());
+                populate_join(&storage, left, right);
+                join_policy(&storage);
+                let id = format!("join-metadata-{case}-{kind}-{hql}");
+                let request = if hql {
+                    hql_request(&id, kind)
+                } else {
+                    typed_ir_request(&id, kind)
+                };
+                qualify_join_result_metadata(
+                    &storage,
+                    dir.path(),
+                    request,
+                    json!(root_columns),
+                    json!(join_columns),
+                    literal.clone(),
+                );
+            }
+        }
+    }
+}
