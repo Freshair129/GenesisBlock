@@ -530,6 +530,9 @@ fn qualify_metadata_fixture(
     bag: bool,
 ) {
     use sha2::{Digest, Sha256};
+    // Presence-sensitive checks reject missing and accept explicit null.
+    assert_ne!(json!({}).get("cursor"), Some(&Value::Null));
+    assert_eq!(json!({"cursor":null}).get("cursor"), Some(&Value::Null));
     let mut identity = Sha256::new();
     identity.update(b"genesis.api.v2.database:");
     identity.update(storage.verifying_key.as_bytes());
@@ -582,7 +585,7 @@ fn qualify_metadata_fixture(
             json!({"status":"complete","reason":null,"eligible_count_known":true})
         );
         assert_eq!(actual["index_frontiers"], json!({}));
-        assert_eq!(actual["cursor"], Value::Null);
+        assert_eq!(actual.get("cursor"), Some(&Value::Null));
         if bag {
             let sorted = |rows: &[BTreeMap<String, V>]| {
                 let mut rows: Vec<_> = rows

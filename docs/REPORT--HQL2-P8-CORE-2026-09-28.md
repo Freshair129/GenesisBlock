@@ -31,7 +31,8 @@ sorting them; unordered aggregate groups remain bags.
 Each successful envelope is compared independently to fixture expectations:
 ordered column names/type/nullability; request_id; all five snapshot fields;
 four non-ranking semantics fields; complete/reason=null/eligible_count_known=true;
-empty index_frontiers and null cursor. Rows match literal values AND unchanged
+empty index_frontiers and an explicitly present null cursor. Rows match literal
+values AND unchanged
 P7. Expected database identity is SHA256 of fixed domain bytes and the fixture's
 public verifying key, never obtained by executing a query. Explicit publication
 GenerationInfo supplies tx/generation/policy receipts; fixed valid_at and tx_as_of
@@ -105,6 +106,13 @@ Analyze catalog3. Correction independently captures stable_frontier after
 publication for Analyze catalog, retaining generation receipt3 for snapshot.tx.
 No assertion removed, output-derived expectation or runtime change. Final
 corrected focused/broad acceptance is separate from that historical failure.
+Initial source review found0Critical/0Important/1Minor: JSON indexing cannot
+distinguish a missing cursor member from explicit null. The approved helper
+assertion now uses get()==Some(null), with absent/null predicate controls.
+Current runtime serialization was correct; this is test-only hardening. The
+initial review and pre-hardening qualification remain preserved separately.
+Corrected source requires full requalification and confirmation by the same
+final reviewer; external exact-head records determine closure.
 The frozen matrix/append script predates focused execution. Protected shared P7,
 runtime and all original test functions are preserved. Snapshot identity is
 fixture-derived, generation/frontier/policy expectations are publication receipts,

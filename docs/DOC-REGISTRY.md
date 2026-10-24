@@ -37,7 +37,8 @@ sorting them; unordered aggregate groups remain bags.
 Each successful envelope is compared independently to fixture expectations:
 ordered column names/type/nullability; request_id; all five snapshot fields;
 four non-ranking semantics fields; complete/reason=null/eligible_count_known=true;
-empty index_frontiers and null cursor. Rows match literal values AND unchanged
+empty index_frontiers and an explicitly present null cursor. Rows match literal
+values AND unchanged
 P7. Expected database identity is SHA256 of fixed domain bytes and the fixture's
 public verifying key, never obtained by executing a query. Explicit publication
 GenerationInfo supplies tx/generation/policy receipts; fixed valid_at and tx_as_of
