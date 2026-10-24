@@ -1,6 +1,6 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.87b"
+version: "0.1.88b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
 last_update: "2026-10-24T00:00:00+07:00,Codex"
 status: beta
@@ -11,6 +11,129 @@ attributes:
   risk: HIGH
   complexity: C-3
 ---
+
+## Approved G4/P8 independent host reproduction - 2026-10-24
+
+Owner approved this six-existing-document qualification lane (LOW, C-3) and
+host-only verification; no production/test/runtime/API/P6/WAL/hash/schema/ACL
+change. Baseline is merged PR264 main
+`f060b387e66d72c21851cc62ed22dd45fbdae2d4`, tree
+`57a077736ffef41eb505c44e3198ba892065bf32`.
+
+A fresh verifier context independently executed the existing frozen inventory
+from an exact-source snapshot, using a fresh build target and separate snapshot
+working directory. All1,041 tracked files matched exact Git blob bytes before
+execution. Snapshot `D:/GenesisBlock_Dev/g4ir-raw`, fresh output
+`D:/GenesisBlock_Dev/g4ir-target`; shared Cargo registry cache was allowed,
+while author test binaries/fixtures were not reused. This is separate-executor
+reproduction on the same Windows host, not a new machine, independent engine/
+oracle implementation, blind study, device or release qualification.
+
+Verifier HQL2:455 passed/0 failed/1 top-level ignored in44 targets;
+compatibility:145/0/0 in11. The600 passing target/test pairs
+match the prior author inventory exactly. The ignored parser child is invoked
+twice by its passing parent. A separate nocapture parser-parent rerun exposes
+two successful child configurations; that rerun/children are excluded from the
+main count. Verifier sealed its own raw outcomes/commands/times/hashes before
+root compared them with author264 evidence. Complete source hashes remained
+unchanged. Relative fixture paths use the separate snapshot; tests retain their
+existing fresh TempDir allocation under the shared OS TEMP root. This is not a
+filesystem security sandbox. Same-host finite reproduction is now recorded for this inventory;
+full G4/P8 correctness or exhaustive type/order/composition/provenance coverage
+is not thereby accepted.
+
+PR264 completed four workflows,15 SUCCESS+1 genuine schedule-only advisory skip,
+including actual Rust Ubuntu/macOS/Windows, before normal mergef060b38 at
+2026-10-23T23:12:58Z (2026-10-24 06:12:58+07:00). Reviewed-tree parity is a
+separate check, not another runtime run. Prior author/source-review/hosted and
+this verifier's execution remain separate evidence records. Historical pending/
+NOT_RUN statements below are dated checkpoints; the current reproduction item
+is qualified only to the finite scope above.
+
+```text
+exact main + tracked-source hashes -> fresh snapshot/target
+  -> independent verifier execution -> seal -> author comparison
+  -> six-doc candidate -> final source/evidence review -> current-head CI
+P8 -> P9-P12 -> P13 surfaces/P14 recovery -> P15 security -> P16 qualification
+```
+
+Primary strict core/default all-target Clippy, fmt, docs validation (244 documents,
+0 errors), version consistency (0.2.10) and diff checks passed. This candidate's
+final source review and hosted CI remain PENDING until exact-head records are
+finalized externally. Broad
+G4/P8/P9-P16, independent implementations/exhaustive semantics, universal no-write,
+performance, physical-device and release acceptance remain open. Device execution
+is NOT_RUN because the owner reports devices unavailable; no device request,
+publication, release/tag or existing-user-database migration is authorized.
+
+### Reproduction evidence and comparison boundary
+
+| Evidence scope | HQL2 root targets | P6/Query IRv1/REST/schema targets | Meaning |
+|---|---|---|---|
+| Prior author PR264 | 455 /0 /1 across44 |145 /0 /0 across11 | Existing author execution; retained unchanged |
+| Fresh independent verifier |455 /0 /1 across44 |145 /0 /0 across11 | Actual separate-executor same-host run from exact snapshot |
+| Separate parser-parent nocapture rerun |1 parent +2 child configurations |N/A, parser-only audit |Not added to the main600 count |
+| PR264 hosted |Ubuntu/macOS/Windows actual Rust suites passed |Part of completed Tests workflow |Separate cross-OS execution, not this candidate's future CI |
+| Final candidate source/evidence/architecture review |PENDING until fixed-head report |No extra runtime by implication |Independent of verifier execution; do not conflate roles |
+
+Raw records are in
+`D:/GenesisBlock_Dev/local-cleanup-backups/20261019T030925Z-genesisblock/branch-review/g4-p8-independent-host-reproduction-qualification`:
+SNAPSHOT-MANIFEST.json, verifier/PRE-RUN.json, verifier/SEAL.json,
+AUTHOR-VERIFIER-COMPARISON.json, independent raw logs/summaries/name inventory,
+and static/review/CI records. Commands/environment/toolchain were captured
+before verifier execution. Root checked the verifier seal/hash manifest and
+independently parsed target/test identity only after it was sealed. Passing
+counts are test cases, not600 independent semantic requirements.
+
+The existing 19-kernel/eight-criterion/source-mode ledger below remains the
+semantic coverage map. This execution adds reproducibility evidence to its
+selected assertions; it does not create new operator behavior, upgrade mode
+metadata consistency to universal independent provenance, or erase residual
+P6/H2-D11 concurrency/retention/crash/lifecycle/P13 surface obligations. Existing
+P7 reference code remains independent expected-value authority where named;
+rerunning it does not constitute a newly independent oracle implementation.
+Plan/error file-frontier guards retain lock/shm size-only exceptions and do not
+prove absence of all transient/internal writes or ordinary-success state effects.
+
+Verifier toolchain was rustc/cargo1.96.0, target x86_64-pc-windows-msvc,
+Windows11 build26300. The first command started2026-10-24T03:49:26Z; verifier
+sealed2026-10-24T04:05:37Z before root comparison at04:07:23Z. The root-checked
+seal SHA256 is91a977ee514f219b2e24d953c4b8f3a4be258aa363e79971616757c57c043f25.
+PRE-RUN records source/lock hashes, environment allowlist and absent target path
+before execution; per-command start/outcome files bind argv/cwd/times/exits/logs.
+Shared registry cache and the OS TEMP base are not claimed to be separately
+provisioned infrastructure; no author compiled test binaries or old fixture
+directories were copied into the new run.
+
+### Preparation tooling RCA (before any verifier runtime)
+
+The first snapshot extraction failed at a278-character Windows destination
+with an existing parent. A short-path extraction resolved that path condition,
+but the exact-byte guard then found git archive had applied existing
+`core.autocrlf=true`: one inspected Markdown blob40778bytes/0CRLF became
+41666bytes/888CRLF, equal only after normalization. Neither attempt was accepted
+or executed as verifier source. The archive and both unqualified extraction directories were retained.
+A fresh archive used per-command `-c core.autocrlf=false` without changing user
+Git/OS policy; a fresh short root passed all1,041 exact tracked-blob checks.
+TOOLING-RCA.md records symptoms/evidence/cause/detection gap/prevention. This
+is preparation tooling history, not an engine/test failure or a source fix.
+The approved six-doc ceiling is retained; no new tracked RCA/code file is added.
+
+### PR264 exact delivery reconciliation
+
+Reviewed head7aac197a248c837ad9ee25a460e90dafb11b1ac8/tree57a077736ffef41eb505c44e3198ba892065bf32
+merged asf060b387e66d72c21851cc62ed22dd45fbdae2d4. Tests40023005003,
+Security40023004936,performance40023004942,worker40023004825 all completed
+success. Actual Rust jobs Ubuntu120652058035/Windows120652057919/
+macOS120652058149 passed their applicable test steps and jobs. Full rollup15
+SUCCESS+1 genuine schedule-only advisory SKIPPED. Fresh whole-scope source/
+evidence/architecture review0Critical/0Important/0Minor was source-only;
+reviewer runtime at that checkpoint wasNOT_RUN. Fetch/tree parity was verified
+separately; no postmerge runtime rerun was inferred. This new same-host verifier
+run is explicitly later, separately executed evidence, not a rewrite of that
+source review or historical pipeline status.
+
+Version transition: `0.1.87b` -> `0.1.88b`; independently executed host evidence and PR264 reconciliation only.
 
 ## Current G4/P8 broad host qualification ledger - 2026-10-24
 
