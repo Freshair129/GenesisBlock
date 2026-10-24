@@ -1,5 +1,5 @@
 ---
-version: "0.8.97b"
+version: "0.8.98b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
@@ -14,6 +14,79 @@ attributes:
   risk: "HIGH"
   owner: "Boss (Founder / Product Authority)"
 ---
+
+## Approved G4/P8 Join result metadata qualification - 2026-10-24
+
+Owner approved tests/docs-only7existingfiles (LOW,C-3): one appended Join test
+and these six governing documents. No production/runtime/API/P6/WAL/hash/schema/
+ACL/planner/index/grammar/shared-P7/error-contract change. Baseline merged PR266
+main `9a4e543a75a401cd2afb6f001fa13cc8952583d1`, tree
+`95cf91c4a5428edb8aab5c2898c60d873cebc7a0`.
+
+Selected Join metadata matrix:96requests=32prepublicationPlan controls+
+64normal/Analyze successes, four Join kinds x four populated/empty-side datasets
+x paired HQL/IR. Literal Join schema distinguishes Inner's nonnullable n/r,
+Left's nullable right Entity, and Semi/Anti's absent right column. Root prop
+columns are literal Nullable<Json>, with right_key only for Inner/Left; empty
+results keep the same declared schemas. Nodes are located through root/input
+lineage, not generated HQL IDs. SQL NULL and JSON null remain distinct and
+duplicate bag multiplicity is checked against literal bags AND unchanged P7;
+no ordering guarantee or complete JSON oracle is inferred.
+
+All successful envelopes independently expect ordered root schema, request_id,
+five snapshot fields, four non-ranking semantics fields, complete/reason=null/
+eligible_count_known=true, empty index_frontiers and an explicitly present null
+cursor. Identity comes from fixture public key/domain SHA256, never a discovery
+query. Snapshot tx/generation/policy come from explicit publication receipt;
+valid_at is captured once after setup before Plan, then reused with selected
+tx_as_of. Analyze catalog uses separately captured live frontier/publication_seq,
+not selected snapshot data tx. Receipts are not a complete independent P6 verifier.
+
+Each dataset/kind/frontend gets a fresh enforced-policy fixture. Plan before any
+publication/query execution expects literal Join/root schemas, catalog policy1/
+captured frontier and no actuals/estimates, preserving observed files/frontier
+with existing lock/shm size-only exceptions. Analyze preserves typed counters:
+source elapsed stays unknown/not_instrumented; Join/Project elapsed is measured.
+No timing/performance threshold or universal internal/transient/ordinary-success
+no-write claim. Original Join functions, other tests and shared P7 remain unchanged.
+
+Author final regression: 459/0/1 across44HQL2 targets plus145/0/0 across11
+compatibility targets = 604 unique passing target/testpairs. Focused Join
+results are included once, not added again. Top-level ignored parser child is
+explicitly invoked twice by its passing parent; child invocations are excluded
+from the main count. Primary strict core/default all-target Clippy,fmt,docs244/0,version0.2.10 and
+diff checks passed. Fresh final source review/current-head hosted CI remain
+PENDING until exact-head external records complete.
+
+PR266 completed four workflows,15SUCCESS+1genuine schedule-only advisory skip,
+including actual Rust Ubuntu/Windows/macOS, before normal merge9a4e543 at
+2026-10-24T11:41:17Z (18:41:17+07:00). Reviewed headca9a686/tree95cf91c;
+fetched-main/reviewed-tree parity was verified, not a runtime rerun. Final source/
+evidence/architecture review0Critical/0Important/0Minor followed the corrected
+cursor-presence assertion and full requalification. Prior catalog3/livecatalog4
+fixture failure and initial Minor were retained/resolved, not new failures.
+Its603author pairs and priorPR265600pair independent same-host reproduction are
+separate dated evidence, not execution of this new Join test.
+
+```text
+literal Join/root schemas + literal/P7 bags + fixture identity
+  -> prepublication Plan (catalog, observed state)
+  -> explicit receipt + post-setup valid_at/selected tx
+  -> HQL/IR normal/Analyze independent envelope -> host regressions
+  -> final source/evidence review -> exact-head hosted CI
+P8 -> P9-P12 -> P13/P14 -> P15 -> P16 (device/release remain open)
+```
+
+Broad G4/P8/P9-P16, exhaustive JSON/types/order/composition/provenance, universal
+no-write/ordinary-success state effects, complete P6, independent new-test runtime/
+new oracle/other-machine/performance/device/release acceptance remain open.
+Devices unavailable; no repeat device request, release/tag/publication, surface
+enablement or user-database migration authorized. Historical pending/NOT_RUN
+sections remain dated checkpoints, not retroactively executed evidence.
+
+Current selected evidence: [P8 Join result metadata](REPORT--HQL2-P8-CORE-2026-09-28.md#approved-g4p8-join-result-metadata-qualification---2026-10-24).
+
+
 
 ## Approved G4/P8 independent result metadata qualification - 2026-10-24
 
