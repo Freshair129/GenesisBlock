@@ -51,6 +51,11 @@ jobs:
       image: rust:1.98.1-bookworm
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test E5 sidecar batch contract (stdlib only)
+        run: python -m unittest discover -s genesisrag17-worker/test -p "test_*.py" -v
 
       # genesisrag17-worker/package.json pins `"node": ">=24.18"`. 24.18.0 is the
       # version the worker README and the MSP GenesisRAG17 runbook name.
