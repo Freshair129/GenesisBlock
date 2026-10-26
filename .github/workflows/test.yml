@@ -151,6 +151,11 @@ jobs:
         host: [ ubuntu-latest, windows-latest, macos-latest ]
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test E5 sidecar batch contract (stdlib only)
+        run: python -m unittest discover -s genesisrag17-worker/test -p "test_*.py" -v
       # genesisrag17-worker/package.json pins `"node": ">=24.18"` — one major
       # ahead of node-tests above, which only needs the addon to load.
       - uses: actions/setup-node@v4

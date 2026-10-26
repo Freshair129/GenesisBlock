@@ -129,6 +129,7 @@ $env:GENESISRAG17_PYTHON = (Resolve-Path (Join-Path $GenesisRoot '.venv\Scripts\
 
 Set-Location $GenesisRoot
 npm test --prefix genesisrag17-worker
+python -m unittest discover -s genesisrag17-worker/test -p "test_*.py" -v
 node genesisrag17-worker\src\cli.mjs
 ```
 
@@ -189,6 +190,10 @@ The worker implements the physical sequence required by the contract:
    GKS, which closes Stage 13 once, runs `enrich_v1` Stage 14 and returns a
    separate immutable `derived` result and `derivedHash`.
 4. The worker embeds the allowed chunks with the pinned CPU model for Stage 15.
+   The sidecar keeps the existing E5 prefix, token truncation, mean pooling,
+   L2 normalization and input order while processing contiguous batches of at
+   most 32 texts. Each batch is padded to its own longest token sequence;
+   this internal bound does not change the worker protocol or vector schema.
    It checkpoints a newly created native vector collection before committing
    derived rows and vectors for the candidate generation. It then performs Stage
    16 lexical indexing, flush/checkpoint, six-lane readback and the independent

@@ -484,10 +484,11 @@ pub struct HybridSearchInput {
     /// validated against the collection dim (closes the cross-space bug).
     pub collection: Option<String>,
     /// Per-query HNSW `ef_search` override. When `None`, falls back to the
-    /// engine-global value (`set_index_params`). Higher = better recall, higher
-    /// latency. Lets a single index serve both high-recall and low-latency
-    /// callers (the global value can't satisfy both as N grows — see the
-    /// Recall@500k frontier).
+    /// engine-global value (`set_index_params`). Higher can improve approximate
+    /// recall at higher latency; it does not change candidate ranking for
+    /// non-temporal lossless `Quant::None` current views at or below the
+    /// 4,096-slot exact-scan ceiling. Larger and quantized collections retain
+    /// approximate HNSW behavior.
     pub ef_search: Option<u32>,
     /// Per-query rerank over-fetch multiplier. When `None`, falls back to the
     /// `RERANK_OVERFETCH` default. Only affects collections that carry a rerank
@@ -3470,13 +3471,12 @@ fn bq_unpack(words: &[u64], dim: usize) -> Vec<f32> {
 /// Bigger = better recall, more f32 distance work. BQ (1 bit/dim) benefits most.
 const RERANK_OVERFETCH: usize = 8;
 
-/// Slot-count ceiling for the exact-scan recall floor in `hybrid_search`: when
-/// the HNSW returns fewer candidates than the collection holds and the
-/// collection is no larger than this, the candidate set is rebuilt by exhaustive
-/// scan instead (RCA--HNSW-UNDER-RETURN-SMALL-GRAPH). Sized so the fallback stays
-/// cheap — a scan of this many vectors is a few ms even at large dims — while
-/// leaving real corpora, where a short return can be legitimate and a scan would
-/// be ruinous, entirely on the graph path.
+/// Slot-count ceiling for bounded exact candidate windows in `hybrid_search`.
+/// Small non-temporal `Quant::None` current views use an exact scan for each
+/// requested/refill window; other paths retain the existing under-return
+/// fallback when HNSW returns fewer candidates than requested. The ceiling
+/// bounds the extra distance work and keeps larger collections on the graph
+/// path (RCA--HNSW-SMALL-COLLECTION-RANK-RECALL).
 const EXACT_SCAN_MAX_SLOTS: usize = 4096;
 
 /// Exact Euclidean distance between two prepared f32 vectors. Used by the rerank
@@ -4274,8 +4274,9 @@ impl VectorCollection {
     const HNSW_MIN_CAP: usize = 1024;
 
     /// Exhaustive exact-distance scan over every slot, nearest-first, capped at
-    /// `k`. This is the recall floor beneath the approximate index — see
-    /// `EXACT_SCAN_MAX_SLOTS` and RCA--HNSW-UNDER-RETURN-SMALL-GRAPH.
+    /// `k`. This is used as the bounded recall floor for small lossless current
+    /// views, and by the existing under-return/epoch fallbacks — see
+    /// `EXACT_SCAN_MAX_SLOTS` and RCA--HNSW-SMALL-COLLECTION-RANK-RECALL.
     ///
     /// Distances come from `ArenaStore::f32_at`, which dequantizes for every
     /// `Quant` mode, so a caller must REPLACE the candidate set with this rather
@@ -23352,15 +23353,35 @@ impl Storage {
                         .filter(|meta| seen.insert(meta.node_u32))
                         .count()
                 };
+                // A full-sized HNSW shortlist is still approximate and can
+                // omit nearer rows. For a small lossless current view, use
+                // the exact arena scan to populate every requested window,
+                // including refills. The existing ceiling bounds the work;
+                // larger and quantized collections retain the ANN path.
+                let exact_small_lossless = coll.quant == Quant::None
+                    && coll.f32_sidecar.is_none()
+                    && slots <= EXACT_SCAN_MAX_SLOTS;
                 let mut requested = fetch.min(slots).max(1);
-                let mut hits = run_search(requested)?;
-                if hits.len() < requested && slots <= EXACT_SCAN_MAX_SLOTS {
+                let mut hits = if exact_small_lossless {
+                    coll.exact_candidates(&query_f32, requested)
+                } else {
+                    run_search(requested)?
+                };
+                if !exact_small_lossless && hits.len() < requested && slots <= EXACT_SCAN_MAX_SLOTS
+                {
                     hits = coll.exact_candidates(&query_f32, requested);
                 }
                 while eligible_count(&hits) < args.k as usize && requested < slots {
                     requested = requested.saturating_mul(2).min(slots);
-                    hits = run_search(requested)?;
-                    if hits.len() < requested && slots <= EXACT_SCAN_MAX_SLOTS {
+                    hits = if exact_small_lossless {
+                        coll.exact_candidates(&query_f32, requested)
+                    } else {
+                        run_search(requested)?
+                    };
+                    if !exact_small_lossless
+                        && hits.len() < requested
+                        && slots <= EXACT_SCAN_MAX_SLOTS
+                    {
                         hits = coll.exact_candidates(&query_f32, requested);
                     }
                 }

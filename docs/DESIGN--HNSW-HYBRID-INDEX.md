@@ -30,6 +30,7 @@ GenesisBlockDB prioritizes in-memory dominance and ultra-low-latency traversal. 
 *   **In-Memory Only:** The full HNSW graph structure (layers and neighbor indices) resides in RAM, rebuilt from the arena on load.
 *   **Asynchronous Mutation (ADR--GENESISDB-ASYNC-INDEXING):** CREATE/UPDATE stage the vector into the collection arena synchronously (durable via WAL), then **enqueue** the HNSW insert onto a dedicated indexing thread. Vectors are **eventually searchable**; `flush_index()` drains the queue for read-your-write.
 *   **Incremental Re-indexing:** The indexing thread inserts via `hnsw_rs` (single or rayon `parallel_insert` for batches), maintaining amortized $O(1)$ mutation off the caller thread.
+*   **Bounded exact recall floor (current view):** non-temporal searches over lossless `Quant::None` collections at or below the existing 4,096-slot ceiling form their candidate window with an exact arena scan. Quantized/sidecar collections, larger collections, and the separate temporal-search policy retain their existing paths. The requested candidate window and its existing budget checks are unchanged; the bounded scan may inspect up to 4,096 slots to fill that window. This does not promise exact recall for HNSW searches above the ceiling.
 
 ### 2.3 Zero-Copy FFI Contract
 *   The `hybrid_search` FFI call accepts an input vector pointer (`f32*`) and returns a result buffer of `u32` Arena IDs.

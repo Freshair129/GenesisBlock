@@ -206,10 +206,11 @@ export interface HybridSearchInput {
   collection?: string
   /**
    * Per-query HNSW `ef_search` override. When `None`, falls back to the
-   * engine-global value (`set_index_params`). Higher = better recall, higher
-   * latency. Lets a single index serve both high-recall and low-latency
-   * callers (the global value can't satisfy both as N grows — see the
-   * Recall@500k frontier).
+   * engine-global value (`set_index_params`). Higher can improve approximate
+   * recall at higher latency; it does not change candidate ranking for
+   * non-temporal lossless `Quant::None` current views at or below the
+   * 4,096-slot exact-scan ceiling. Larger and quantized collections retain
+   * approximate HNSW behavior.
    */
   efSearch?: number
   /**

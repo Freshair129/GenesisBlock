@@ -18,6 +18,7 @@ from tokenizers import Tokenizer
 
 MODEL_DIMENSIONS = 384
 MAX_LENGTH = 512
+MAX_EMBED_BATCH_SIZE = 32
 
 
 def fail(message):
@@ -42,13 +43,7 @@ def load(model_dir):
     return tokenizer, session
 
 
-def embed(tokenizer, session, texts, mode):
-    if mode not in ("query", "passage"):
-        fail("EMBED_MODE_INVALID")
-    prefix = "query: " if mode == "query" else "passage: "
-    encoded = tokenizer.encode_batch([prefix + text for text in texts])
-    if not encoded:
-        return []
+def _run_encoded_batch(session, encoded):
     max_len = max(len(item.ids) for item in encoded)
     max_len = min(max_len, MAX_LENGTH)
     ids = np.zeros((len(encoded), max_len), dtype=np.int64)
@@ -71,6 +66,20 @@ def embed(tokenizer, session, texts, mode):
         fail("EMBEDDING_ZERO_OR_NONFINITE")
     normalized = pooled / norms
     return normalized.astype(np.float64).tolist()
+
+
+def embed(tokenizer, session, texts, mode):
+    if mode not in ("query", "passage"):
+        fail("EMBED_MODE_INVALID")
+    prefix = "query: " if mode == "query" else "passage: "
+    encoded = tokenizer.encode_batch([prefix + text for text in texts])
+    if not encoded:
+        return []
+    vectors = []
+    for start in range(0, len(encoded), MAX_EMBED_BATCH_SIZE):
+        batch = encoded[start:start + MAX_EMBED_BATCH_SIZE]
+        vectors.extend(_run_encoded_batch(session, batch))
+    return vectors
 
 
 def main():
