@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.67b"
-updated: "2026-10-26"
+version: "2.3.68b"
+updated: "2026-10-27"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 related_issue: 84
@@ -25,17 +25,32 @@ related_docs:
   - "docs/GENESISRAG17-EXTENSION-MAP.md"
 ---
 
-## Current HQL2 G4/P8 status — 2026-10-26
+## Current HQL2 G4/P8 Phase B1 status (2026-10-26)
 
-The HQL2 G4 shared pipeline is implemented and partially qualified, not fully
-closed. PR #269 merged at `b4372dc347cc265f405b94aea38bc453d51565a7` with its
-recorded Ubuntu/Windows/macOS Rust checks successful; that evidence covers one
-selected SourceScan metadata slice. Comprehensive accepted type/order/composition/
-provenance coverage, broad P6, independent runtime, performance, P9-P16,
-physical-device and release gates remain open or NOT_RUN. Later planned features
-and explicitly unsupported capabilities are not inferred to be defects. The
-[current P8 ledger](REPORT--HQL2-P8-CORE-2026-09-28.md#post-pr269-type-order-composition-and-provenance-status-2026-10-26)
+Current base is `origin/main` `6bd493e7d8cc58d38b27a4c916b0d16237aeceb0`
+(tree `0f9480e3badf0137841e2e7aa3f05789d7bf1f2a`) after PR #271. The G4
+shared pipeline remains implemented and partially qualified, not fully closed.
+Owner-approved Phase B1 adds six tests to one existing target for selected
+scalar type-admissibility cells; the focused target passed 17/17. Repo-wide
+`cargo test --locked --offline --no-default-features --jobs 1 --tests` completed
+with exit 0: 158 result blocks, 1,297 passed, 0 failed, and 6 ignored; this
+includes 44 root HQL2 targets with 466 passed, 0 failed, and 1 ignored.
+Core/default all-target Clippy, formatting, docs validation (0/244), version
+check (0.2.10), and diff checks passed. Final independent review, hosted
+review/CI remain pending at this candidate snapshot. There is no runtime or
+contract change.
+
+This phase does not qualify full type space, order semantics, compositions,
+provenance, P6 authority, independent runtime, performance, P9-P16,
+physical-device or release gates. Later planned features and explicitly
+unsupported capabilities are not inferred to be defects. The [current P8
+ledger](REPORT--HQL2-P8-CORE-2026-09-28.md#post-pr271-phase-b1-scalar-type-admissibility-status-2026-10-26)
 is the detailed status authority; preserve P8 -> P9-P12 -> P13/P14 -> P15 -> P16.
+
+## Historical pre-PR271 G4/P8 status (2026-10-26)
+
+The following PR269 status is retained as a historical snapshot; it is not the
+current main or Phase B1 candidate status.
 ## Approved G4/P8 SourceScan result metadata qualification - 2026-10-26
 
 Owner approved tests/docs-only seven existing files (LOW, C-3): one appended
@@ -297,7 +312,7 @@ changes are admitted. Host first; owner reports physical devices unavailable.
 
 Current baseline is PR263 merged main `0a5db778e533152d20fdbd8be7dfcc0e03c4fc4b`
 with reviewed source tree `ed2ba0fcf3d802f0c5e2f66a66c3a817c774ee56`.
-The P8 report's **Current G4/P8 broad host qualification ledger** maps all eight
+The P8 report's **historical PR264 G4/P8 qualification ledger** maps all eight
 G4 criteria, all 19 executable `Kernel` variants, six `BoundSourceV2` partitions,
 exact-KNN/Original-Rerank modes and independently expected versus self-consistent
 metadata. Every kernel has selected test evidence and explicit residuals; no
@@ -1184,6 +1199,8 @@ independent-review or broad P8/P13 gates.
 
 ## Changelog
 
+Version diff 2.3.67b -> 2.3.68b: record the owner-approved Phase B1 scalar type-admissibility candidate on PR271 main while retaining broad G4/P8 and P6/P9-P16 gates; no contract or runtime behavior changes.
+
 Version diff 2.3.66b -> 2.3.67b: reconcile the merged PR #269 selected
 SourceScan metadata evidence on current main and retain the source-linked
 type/order/composition/provenance and P6/P9-P16 gates; no contract or runtime
@@ -1219,6 +1236,7 @@ shared-runtime and broad P8/P13 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 2.3.68b | 2026-10-26 | GenesisBlockDB Architecture | Record selected Phase B1 scalar type-admissibility candidate on PR271 main; preserve broad G4/P8/P6/P9-P16 gates |
 | 2.3.67b | 2026-10-26 | GenesisBlockDB Architecture | Reconcile merged PR #269 selected SourceScan evidence and retain broad G4/P8/P6/P9-P16 gates |
 | 2.3.52b | 2026-10-20 | GenesisBlockDB Architecture | Approve bounded G4 identity/golden qualification and reconcile hosted PR253; preserve production contracts and broad gates |
 | 2.3.51b | 2026-10-20 | GenesisBlockDB Architecture | Approve bounded G4 lexical/context diagnostics and reconcile hosted PR252; preserve production contracts and broader gates |

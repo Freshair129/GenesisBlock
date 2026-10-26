@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: "0.1.97b"
+version: "0.1.98b"
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-26T19:29:25+07:00,Codex"
+last_update: "2026-10-27T01:05:50+07:00,Codex"
 attributes:
   domain: architecture
   scope: repository
@@ -25,15 +25,30 @@ related_docs:
   - docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md
 ---
 
-## Current G4/P8 architecture status — 2026-10-26
+## Current G4/P8 Phase B1 architecture status (2026-10-26)
 
-PR #269 is merged at current `origin/main` `b4372dc347cc265f405b94aea38bc453d51565a7`.
-The selected SourceScan metadata evidence passed hosted checks on the recorded
-head; it does not close the shared pipeline. Treat the G4/P8 contract as partial
-until the current ledger's type/order/composition/provenance, broad P6 and
-independent review/runtime obligations pass. Keep P9 planner, P10 composition,
-P11 lifecycle, P12 resources, P13/P14 surfaces/recovery, P15 security and P16
-host/device/release in sequence. See the [current P8 ledger](REPORT--HQL2-P8-CORE-2026-09-28.md#post-pr269-type-order-composition-and-provenance-status-2026-10-26).
+Current base is `origin/main` `6bd493e7d8cc58d38b27a4c916b0d16237aeceb0`
+(tree `0f9480e3badf0137841e2e7aa3f05789d7bf1f2a`) after PR #271. The owner-
+approved Phase B1 candidate adds six selected scalar type-admissibility tests
+to one existing target; its focused run passed 17/17. Repo-wide
+`cargo test --locked --offline --no-default-features --jobs 1 --tests` completed
+with exit 0 (1,297 passed, 0 failed, 6 ignored across 158 result blocks),
+including 44 root HQL2 targets (466 passed, 0 failed, 1 ignored). Core/default
+all-target Clippy, formatting, docs validation (0/244), version check (0.2.10)
+and diff checks passed. Final independent review, hosted review and exact-head
+CI remain pending. No production or contract change is part of B1.
+
+Treat G4/P8 as partial. This phase checks only selected admission across
+`Values`, `Filter`, `Project`, `Distinct`, Sort key type, `Take`, and
+`Offset`/HQL `SKIP`; it does not qualify order semantics, composition, complete
+type space, provenance or P6. Keep P9 planner, P10 composition, P11 lifecycle,
+P12 resources, P13/P14 surfaces/recovery, P15 security and P16 host/device/
+release in sequence. See the [current P8 ledger](REPORT--HQL2-P8-CORE-2026-09-28.md#post-pr271-phase-b1-scalar-type-admissibility-status-2026-10-26).
+
+## Historical pre-PR271 G4/P8 status (2026-10-26)
+
+The following PR269 record is retained as historical evidence; its base SHA
+and candidate-time wording are not current status.
 ## Approved G4/P8 SourceScan result metadata qualification - 2026-10-26
 
 Owner approved tests/docs-only seven existing files (LOW, C-3): one appended
@@ -295,7 +310,7 @@ changes are admitted. Host first; owner reports physical devices unavailable.
 
 Current baseline is PR263 merged main `0a5db778e533152d20fdbd8be7dfcc0e03c4fc4b`
 with reviewed source tree `ed2ba0fcf3d802f0c5e2f66a66c3a817c774ee56`.
-The P8 report's **Current G4/P8 broad host qualification ledger** maps all eight
+The P8 report's **historical PR264 G4/P8 qualification ledger** maps all eight
 G4 criteria, all 19 executable `Kernel` variants, six `BoundSourceV2` partitions,
 exact-KNN/Original-Rerank modes and independently expected versus self-consistent
 metadata. Every kernel has selected test evidence and explicit residuals; no
@@ -1229,6 +1244,8 @@ Broader EXPLAIN/P8/P13 and P14 rehearsal remain open.
 
 ## CHANGELOG
 
+Version diff 0.1.97b -> 0.1.98b: synchronize current G4/P8 status to PR271 main and index the owner-approved Phase B1 scalar type-admissibility candidate; no runtime or contract change.
+
 Version diff 0.1.96b -> 0.1.97b: reconcile merged PR #269 SourceScan metadata
 evidence on current main and point to the source-linked type/order/composition/
 provenance and downstream gate ledger; preserve partial G4/P8 status.
@@ -1377,6 +1394,7 @@ full P8/P13 qualification remains open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.98b | 2026-10-26 | current | Reconcile PR271 main and index selected Phase B1 scalar type-admissibility tests; retain broader G4/P8/P6/P9-P16 gates | working-tree | Codex |
 | 0.1.97b | 2026-10-26 | current | Reconcile merged PR #269 current-main status and retain broad G4/P8/P6/P9-P16 qualification gates | working-tree | Codex |
 | 0.1.82b | 2026-10-20 | current | Approve tests-only G4 identity/golden matrix and reconcile hosted PR253 | working-tree | Codex |
 | 0.1.81b | 2026-10-20 | current | Approve test-only lexical/context mode/counter/P7 qualification and reconcile hosted PR252; no runtime contract change | working-tree | Codex |

@@ -1477,3 +1477,1249 @@ fn scalar_result_metadata_has_independent_fixture_expectations() {
         }
     }
 }
+
+#[derive(Clone, Copy, Debug)]
+enum B1RowKernel {
+    Values,
+    Project,
+    Distinct,
+    Sort,
+    Take,
+    Offset,
+}
+
+struct B1ValueCase {
+    type_name: &'static str,
+    encoded_rows: Value,
+    literal_values: Vec<V>,
+    p7_values: Option<Vec<R>>,
+    nullable: bool,
+    ordered: bool,
+}
+
+fn b1_hql_request(params: Value, hql: &str) -> QueryRequestV2 {
+    let mut req = request(Vec::new(), "", params);
+    req.ir = None;
+    req.language_version = Some(HqlLanguageVersionV2::HqlV2);
+    req.hql = Some(hql.to_owned());
+    req
+}
+
+fn b1_value_kernel_requests(
+    type_name: &str,
+    encoded_rows: Value,
+    kernel: B1RowKernel,
+) -> (QueryRequestV2, QueryRequestV2, String, String) {
+    let params = json!({
+        "xs": {
+            "type": format!("List<{type_name}>"),
+            "value": encoded_rows
+        }
+    });
+    let mut nodes = vec![values("v", "xs", "x")];
+    let (root, alias, hql) = match kernel {
+        B1RowKernel::Values => ("v", "x", "VALUES $xs AS x |> RETURN x".to_owned()),
+        B1RowKernel::Project => {
+            nodes.push(node(
+                "p",
+                "Project",
+                &["v"],
+                json!({"fields":[{"expression":field("x"),"as":"y"}]}),
+            ));
+            (
+                "p",
+                "y",
+                "VALUES $xs AS x |> PROJECT x AS y |> RETURN y".to_owned(),
+            )
+        }
+        B1RowKernel::Distinct => {
+            nodes.push(node("d", "Distinct", &["v"], json!({})));
+            (
+                "d",
+                "x",
+                "VALUES $xs AS x |> DISTINCT |> RETURN x".to_owned(),
+            )
+        }
+        B1RowKernel::Sort => {
+            nodes.push(node(
+                "s",
+                "Sort",
+                &["v"],
+                json!({"keys":[{"expression":field("x"),"direction":"asc","nulls":"last"}]}),
+            ));
+            (
+                "s",
+                "x",
+                "VALUES $xs AS x |> ORDER BY x ASC NULLS LAST |> RETURN x".to_owned(),
+            )
+        }
+        B1RowKernel::Take => {
+            nodes.push(node("t", "Take", &["v"], json!({"count":10})));
+            (
+                "t",
+                "x",
+                "VALUES $xs AS x |> TAKE 10 |> RETURN x".to_owned(),
+            )
+        }
+        B1RowKernel::Offset => {
+            nodes.push(node("o", "Offset", &["v"], json!({"count":0})));
+            ("o", "x", "VALUES $xs AS x |> SKIP 0 |> RETURN x".to_owned())
+        }
+    };
+    (
+        request(nodes, root, params.clone()),
+        b1_hql_request(params, &hql),
+        alias.to_owned(),
+        hql,
+    )
+}
+
+fn b1_project_requests(
+    params: Value,
+    ir_expression: Value,
+    hql_expression: &str,
+) -> (QueryRequestV2, QueryRequestV2) {
+    let ir = request(
+        vec![
+            values("v", "xs", "x"),
+            node(
+                "p",
+                "Project",
+                &["v"],
+                json!({"fields":[{"expression":ir_expression,"as":"y"}]}),
+            ),
+        ],
+        "p",
+        params.clone(),
+    );
+    let hql = b1_hql_request(
+        params,
+        &format!("VALUES $xs AS x |> RETURN {hql_expression} AS y"),
+    );
+    (ir, hql)
+}
+
+fn b1_filter_requests(
+    params: Value,
+    ir_predicate: Value,
+    hql_predicate: &str,
+) -> (QueryRequestV2, QueryRequestV2) {
+    let ir = request(
+        vec![
+            values("v", "xs", "x"),
+            node("f", "Filter", &["v"], json!({"predicate":ir_predicate})),
+        ],
+        "f",
+        params.clone(),
+    );
+    let hql = b1_hql_request(
+        params,
+        &format!("VALUES $xs AS x |> FILTER {hql_predicate} |> RETURN x"),
+    );
+    (ir, hql)
+}
+
+fn b1_from_p7(value: &R) -> V {
+    match value {
+        R::Null => V::Null,
+        R::Bool(value) => V::Bool(*value),
+        R::I64(value) => V::I64(*value),
+        R::F64(value) => V::F64(*value),
+        R::Text(value) => V::Utf8(value.clone()),
+        R::List(values) => V::List(values.iter().map(b1_from_p7).collect()),
+        other => panic!("P7 scalar-type case used an unsupported fixture value: {other:?}"),
+    }
+}
+
+fn b1_literal_rows(alias: &str, values: Vec<V>) -> Vec<BTreeMap<String, V>> {
+    values
+        .into_iter()
+        .map(|value| BTreeMap::from([(alias.to_owned(), value)]))
+        .collect()
+}
+
+fn b1_p7_values(alias: &str, values: Vec<R>) -> P {
+    P::Values(
+        values
+            .into_iter()
+            .map(|value| BTreeMap::from([(alias.to_owned(), value)]))
+            .collect(),
+    )
+}
+
+fn b1_p7_kernel(kernel: B1RowKernel, values: Vec<R>) -> P {
+    let rows = values.len();
+    let plan = b1_p7_values("x", values);
+    match kernel {
+        B1RowKernel::Values => plan,
+        B1RowKernel::Project => {
+            P::Project(Box::new(plan), vec![("y".into(), E::Field("x".into()))])
+        }
+        B1RowKernel::Distinct => P::Distinct(Box::new(plan)),
+        B1RowKernel::Sort => P::Sort(
+            Box::new(plan),
+            vec![reference::SortKey {
+                expr: E::Field("x".into()),
+                descending: false,
+                nulls_first: false,
+            }],
+        ),
+        B1RowKernel::Take => P::Take(Box::new(plan), rows.max(1)),
+        B1RowKernel::Offset => P::Offset(Box::new(plan), 0),
+    }
+}
+
+fn b1_assert_rows(
+    db: &Storage,
+    ir_request: QueryRequestV2,
+    hql_request: QueryRequestV2,
+    expected_columns: Value,
+    expected_rows: Vec<BTreeMap<String, V>>,
+    p7: Option<P>,
+) {
+    let QueryOutcomeV2::Rows(ir) = db.query_v2(access(), ir_request).unwrap() else {
+        panic!("typed IR request must return rows");
+    };
+    let QueryOutcomeV2::Rows(hql) = db.query_v2(access(), hql_request).unwrap() else {
+        panic!("HQL request must return rows");
+    };
+    assert!(ir.explain.is_none());
+    assert!(hql.explain.is_none());
+    assert_eq!(serde_json::to_value(&ir.columns).unwrap(), expected_columns);
+    assert_eq!(
+        serde_json::to_value(&hql.columns).unwrap(),
+        expected_columns
+    );
+    assert_eq!(ir.rows, expected_rows);
+    assert_eq!(hql.rows, expected_rows);
+    assert_eq!(ir.rows, hql.rows);
+    if let Some(plan) = p7 {
+        let expected_p7 = reference::execute(&plan)
+            .unwrap()
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .map(|(name, value)| (name.clone(), b1_from_p7(value)))
+                    .collect::<BTreeMap<_, _>>()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(expected_p7, expected_rows);
+    }
+}
+
+fn b1_assert_error(db: &Storage, req: QueryRequestV2, code: &str, stage: &str, reason: &str) {
+    let error = db.query_v2(access(), req).unwrap_err();
+    assert_eq!(error.code, code);
+    assert_eq!(error.stage, stage);
+    assert_eq!(error.detail.unwrap()["reason"], reason);
+}
+
+fn b1_assert_paired_error(
+    db: &Storage,
+    ir_request: QueryRequestV2,
+    hql_request: QueryRequestV2,
+    code: &str,
+    stage: &str,
+    reason: &str,
+) {
+    b1_assert_error(db, ir_request, code, stage, reason);
+    b1_assert_error(db, hql_request, code, stage, reason);
+}
+
+/// Contract-derived row-shaping admission only: every successful cell has a
+/// literal schema/row oracle, with the unchanged P7 interpreter where it has an
+/// independent representation. Sort inputs have at most one row so this does
+/// not qualify ASC/DESC, NULL placement, tie, or multi-key ordering semantics.
+#[test]
+fn scalar_type_admissibility_matrix_accepts_row_shaping_kernels() {
+    let directory = TempDir::new().unwrap();
+    let db = open(&directory);
+    let cases = vec![
+        B1ValueCase {
+            type_name: "Bool",
+            encoded_rows: json!([true]),
+            literal_values: vec![V::Bool(true)],
+            p7_values: Some(vec![R::Bool(true)]),
+            nullable: false,
+            ordered: true,
+        },
+        B1ValueCase {
+            type_name: "I64",
+            encoded_rows: json!(["-9223372036854775808"]),
+            literal_values: vec![V::I64(i64::MIN)],
+            p7_values: Some(vec![R::I64(i64::MIN)]),
+            nullable: false,
+            ordered: true,
+        },
+        B1ValueCase {
+            type_name: "I64",
+            encoded_rows: json!(["9223372036854775807"]),
+            literal_values: vec![V::I64(i64::MAX)],
+            p7_values: Some(vec![R::I64(i64::MAX)]),
+            nullable: false,
+            ordered: true,
+        },
+        B1ValueCase {
+            type_name: "DecimalU64",
+            encoded_rows: json!(["0"]),
+            literal_values: vec![V::DecimalU64(0)],
+            p7_values: None,
+            nullable: false,
+            ordered: true,
+        },
+        B1ValueCase {
+            type_name: "DecimalU64",
+            encoded_rows: json!(["18446744073709551615"]),
+            literal_values: vec![V::DecimalU64(u64::MAX)],
+            p7_values: None,
+            nullable: false,
+            ordered: true,
+        },
+        B1ValueCase {
+            type_name: "F64Finite",
+            encoded_rows: json!([1.25]),
+            literal_values: vec![V::F64(1.25)],
+            p7_values: Some(vec![R::F64(1.25)]),
+            nullable: false,
+            ordered: true,
+        },
+        B1ValueCase {
+            type_name: "F64Finite",
+            encoded_rows: json!([f64::MAX]),
+            literal_values: vec![V::F64(f64::MAX)],
+            p7_values: Some(vec![R::F64(f64::MAX)]),
+            nullable: false,
+            ordered: true,
+        },
+        B1ValueCase {
+            type_name: "Utf8",
+            encoded_rows: json!(["λ"]),
+            literal_values: vec![V::Utf8("λ".into())],
+            p7_values: Some(vec![R::Text("λ".into())]),
+            nullable: false,
+            ordered: true,
+        },
+        B1ValueCase {
+            type_name: "Nullable<I64>",
+            encoded_rows: json!([null]),
+            literal_values: vec![V::Null],
+            p7_values: Some(vec![R::Null]),
+            nullable: true,
+            ordered: true,
+        },
+        B1ValueCase {
+            type_name: "Nullable<I64>",
+            encoded_rows: json!(["9"]),
+            literal_values: vec![V::I64(9)],
+            p7_values: Some(vec![R::I64(9)]),
+            nullable: true,
+            ordered: true,
+        },
+        B1ValueCase {
+            type_name: "Nullable<Bool>",
+            encoded_rows: json!([true, null]),
+            literal_values: vec![V::Bool(true), V::Null],
+            p7_values: Some(vec![R::Bool(true), R::Null]),
+            nullable: true,
+            ordered: true,
+        },
+        B1ValueCase {
+            type_name: "Nullable<DecimalU64>",
+            encoded_rows: json!([null, "18446744073709551615"]),
+            literal_values: vec![V::Null, V::DecimalU64(u64::MAX)],
+            p7_values: None,
+            nullable: true,
+            ordered: true,
+        },
+        B1ValueCase {
+            type_name: "Nullable<F64Finite>",
+            encoded_rows: json!([null, 1.25]),
+            literal_values: vec![V::Null, V::F64(1.25)],
+            p7_values: Some(vec![R::Null, R::F64(1.25)]),
+            nullable: true,
+            ordered: true,
+        },
+        B1ValueCase {
+            type_name: "Nullable<Utf8>",
+            encoded_rows: json!([null, "λ"]),
+            literal_values: vec![V::Null, V::Utf8("λ".into())],
+            p7_values: Some(vec![R::Null, R::Text("λ".into())]),
+            nullable: true,
+            ordered: true,
+        },
+        B1ValueCase {
+            type_name: "Nullable<Vector<g4-b1-space,2,f64>>",
+            encoded_rows: json!([null, [0.5, 1.5]]),
+            literal_values: vec![
+                V::Null,
+                V::Vector(genesis_block_native::query::hql2::value::VectorValueV2 {
+                    space_id: "g4-b1-space".into(),
+                    scalar: genesis_block_native::query::hql2::value::VectorScalarV2::F64,
+                    values: vec![0.5, 1.5],
+                }),
+            ],
+            p7_values: None,
+            nullable: true,
+            ordered: false,
+        },
+        B1ValueCase {
+            type_name: "List<I64>",
+            encoded_rows: json!([["7", "8"]]),
+            literal_values: vec![V::List(vec![V::I64(7), V::I64(8)])],
+            p7_values: Some(vec![R::List(vec![R::I64(7), R::I64(8)])]),
+            nullable: false,
+            ordered: false,
+        },
+        B1ValueCase {
+            type_name: "List<Nullable<I64>>",
+            encoded_rows: json!([[null, "9"]]),
+            literal_values: vec![V::List(vec![V::Null, V::I64(9)])],
+            p7_values: Some(vec![R::List(vec![R::Null, R::I64(9)])]),
+            nullable: false,
+            ordered: false,
+        },
+        B1ValueCase {
+            type_name: "List<List<I64>>",
+            encoded_rows: json!([[["1", "2"], []]]),
+            literal_values: vec![V::List(vec![
+                V::List(vec![V::I64(1), V::I64(2)]),
+                V::List(vec![]),
+            ])],
+            p7_values: Some(vec![R::List(vec![
+                R::List(vec![R::I64(1), R::I64(2)]),
+                R::List(vec![]),
+            ])]),
+            nullable: false,
+            ordered: false,
+        },
+        B1ValueCase {
+            type_name: "Nullable<List<I64>>",
+            encoded_rows: json!([null]),
+            literal_values: vec![V::Null],
+            p7_values: Some(vec![R::Null]),
+            nullable: true,
+            ordered: false,
+        },
+        B1ValueCase {
+            type_name: "Vector<g4-b1-space,2,f64>",
+            encoded_rows: json!([[0.5, 1.5]]),
+            literal_values: vec![V::Vector(
+                genesis_block_native::query::hql2::value::VectorValueV2 {
+                    space_id: "g4-b1-space".into(),
+                    scalar: genesis_block_native::query::hql2::value::VectorScalarV2::F64,
+                    values: vec![0.5, 1.5],
+                },
+            )],
+            p7_values: None,
+            nullable: false,
+            ordered: false,
+        },
+        B1ValueCase {
+            type_name: "Vector<g4-b1-space,2,f32>",
+            encoded_rows: json!([[0.5, 1.5]]),
+            literal_values: vec![V::Vector(
+                genesis_block_native::query::hql2::value::VectorValueV2 {
+                    space_id: "g4-b1-space".into(),
+                    scalar: genesis_block_native::query::hql2::value::VectorScalarV2::F32,
+                    values: vec![0.5, 1.5],
+                },
+            )],
+            p7_values: None,
+            nullable: false,
+            ordered: false,
+        },
+        B1ValueCase {
+            type_name: "I64",
+            encoded_rows: json!([]),
+            literal_values: vec![],
+            p7_values: Some(vec![]),
+            nullable: false,
+            ordered: true,
+        },
+    ];
+
+    for case in cases {
+        let kernels = vec![
+            B1RowKernel::Values,
+            B1RowKernel::Project,
+            B1RowKernel::Distinct,
+            B1RowKernel::Take,
+            B1RowKernel::Offset,
+        ];
+        for kernel in kernels {
+            let (ir, hql, alias, _query) =
+                b1_value_kernel_requests(case.type_name, case.encoded_rows.clone(), kernel);
+            let expected_rows = b1_literal_rows(&alias, case.literal_values.clone());
+            let p7 = case
+                .p7_values
+                .clone()
+                .map(|values| b1_p7_kernel(kernel, values));
+            b1_assert_rows(
+                &db,
+                ir,
+                hql,
+                json!([{"name":alias,"type":case.type_name,"nullable":case.nullable}]),
+                expected_rows,
+                p7,
+            );
+        }
+        if case.ordered {
+            // Sort is qualified for type admission only. Restrict its input to
+            // at most one row so no ordering/null-placement rule is implied.
+            let mut encoded_rows = case.encoded_rows.clone();
+            if let Some(rows) = encoded_rows.as_array_mut() {
+                rows.truncate(1);
+            }
+            let literal_values = case
+                .literal_values
+                .first()
+                .cloned()
+                .into_iter()
+                .collect::<Vec<_>>();
+            let p7_values = case
+                .p7_values
+                .clone()
+                .map(|values| values.into_iter().take(1).collect::<Vec<_>>());
+            let (ir, hql, alias, _) =
+                b1_value_kernel_requests(case.type_name, encoded_rows, B1RowKernel::Sort);
+            b1_assert_rows(
+                &db,
+                ir,
+                hql,
+                json!([{"name":alias,"type":case.type_name,"nullable":case.nullable}]),
+                b1_literal_rows(&alias, literal_values),
+                p7_values.map(|values| b1_p7_kernel(B1RowKernel::Sort, values)),
+            );
+        }
+    }
+}
+
+/// Same-type comparison admission is pinned independently for each ordered
+/// scalar. P7 supplies only the equality cells it actually implements; literal
+/// expected rows remain the primary oracle for every operator.
+#[test]
+fn scalar_type_admissibility_matrix_filters_and_compares() {
+    let directory = TempDir::new().unwrap();
+    let db = open(&directory);
+
+    for (type_name, encoded, p7_values, expected) in [
+        (
+            "Bool",
+            json!([true, false]),
+            vec![R::Bool(true), R::Bool(false)],
+            vec![V::Bool(true)],
+        ),
+        (
+            "Nullable<Bool>",
+            json!([true, false, null]),
+            vec![R::Bool(true), R::Bool(false), R::Null],
+            vec![V::Bool(true)],
+        ),
+    ] {
+        let params = json!({"xs":{"type":format!("List<{type_name}>"),"value":encoded}});
+        let (ir, hql) = b1_filter_requests(params, field("x"), "x");
+        let p7 = P::Filter(Box::new(b1_p7_values("x", p7_values)), E::Field("x".into()));
+        b1_assert_rows(
+            &db,
+            ir,
+            hql,
+            json!([{"name":"x","type":type_name,"nullable":type_name.starts_with("Nullable<")}]),
+            b1_literal_rows("x", expected),
+            Some(p7),
+        );
+    }
+
+    let nullable_bool = json!({
+        "xs":{"type":"List<Nullable<Bool>>","value":[true,false,null]},
+        "rhs":{"type":"Bool","value":true}
+    });
+    for (operation, symbol, expected) in [
+        ("and", "AND", vec![V::Bool(true), V::Bool(false), V::Null]),
+        (
+            "or",
+            "OR",
+            vec![V::Bool(true), V::Bool(true), V::Bool(true)],
+        ),
+    ] {
+        let (ir, hql) = b1_project_requests(
+            nullable_bool.clone(),
+            json!({"binary":operation,"left":field("x"),"right":{"param":"rhs"}}),
+            &format!("x {symbol} $rhs"),
+        );
+        let oracle_op = if operation == "and" {
+            E::And(
+                Box::new(E::Field("x".into())),
+                Box::new(E::Literal(R::Bool(true))),
+            )
+        } else {
+            E::Or(
+                Box::new(E::Field("x".into())),
+                Box::new(E::Literal(R::Bool(true))),
+            )
+        };
+        b1_assert_rows(
+            &db,
+            ir,
+            hql,
+            json!([{"name":"y","type":"Nullable<Bool>","nullable":true}]),
+            b1_literal_rows("y", expected),
+            Some(P::Project(
+                Box::new(b1_p7_values(
+                    "x",
+                    vec![R::Bool(true), R::Bool(false), R::Null],
+                )),
+                vec![("y".into(), oracle_op)],
+            )),
+        );
+    }
+    let (ir, hql) = b1_project_requests(
+        json!({"xs":{"type":"List<Nullable<Bool>>","value":[true,false,null]}}),
+        json!({"unary":"not","arg":field("x")}),
+        "NOT x",
+    );
+    b1_assert_rows(
+        &db,
+        ir,
+        hql,
+        json!([{"name":"y","type":"Nullable<Bool>","nullable":true}]),
+        b1_literal_rows("y", vec![V::Bool(false), V::Bool(true), V::Null]),
+        Some(P::Project(
+            Box::new(b1_p7_values(
+                "x",
+                vec![R::Bool(true), R::Bool(false), R::Null],
+            )),
+            vec![("y".into(), E::Not(Box::new(E::Field("x".into()))))],
+        )),
+    );
+
+    struct ComparisonCase {
+        type_name: &'static str,
+        encoded: Value,
+        rhs_type: &'static str,
+        rhs_value: Value,
+        rhs_hql: &'static str,
+        p7_values: Option<Vec<R>>,
+        expected: [&'static [bool]; 6],
+    }
+    let cases = [
+        ComparisonCase {
+            type_name: "Bool",
+            encoded: json!([false, true]),
+            rhs_type: "Bool",
+            rhs_value: json!(true),
+            rhs_hql: "true",
+            p7_values: Some(vec![R::Bool(false), R::Bool(true)]),
+            expected: [
+                &[false, true],
+                &[true, false],
+                &[true, false],
+                &[true, true],
+                &[false, false],
+                &[false, true],
+            ],
+        },
+        ComparisonCase {
+            type_name: "I64",
+            encoded: json!(["-9223372036854775808", "9223372036854775807"]),
+            rhs_type: "I64",
+            rhs_value: json!("9223372036854775807"),
+            rhs_hql: "9223372036854775807",
+            p7_values: Some(vec![R::I64(i64::MIN), R::I64(i64::MAX)]),
+            expected: [
+                &[false, true],
+                &[true, false],
+                &[true, false],
+                &[true, true],
+                &[false, false],
+                &[false, true],
+            ],
+        },
+        ComparisonCase {
+            type_name: "DecimalU64",
+            encoded: json!(["0", "18446744073709551615"]),
+            rhs_type: "DecimalU64",
+            rhs_value: json!("18446744073709551615"),
+            rhs_hql: "$rhs",
+            p7_values: None,
+            expected: [
+                &[false, true],
+                &[true, false],
+                &[true, false],
+                &[true, true],
+                &[false, false],
+                &[false, true],
+            ],
+        },
+        ComparisonCase {
+            type_name: "F64Finite",
+            encoded: json!([1.25, 2.5]),
+            rhs_type: "F64Finite",
+            rhs_value: json!(2.0),
+            rhs_hql: "2.0",
+            p7_values: Some(vec![R::F64(1.25), R::F64(2.5)]),
+            expected: [
+                &[false, false],
+                &[true, true],
+                &[true, false],
+                &[true, false],
+                &[false, true],
+                &[false, true],
+            ],
+        },
+        ComparisonCase {
+            type_name: "Utf8",
+            encoded: json!(["λ", "東京"]),
+            rhs_type: "Utf8",
+            rhs_value: json!("μ"),
+            rhs_hql: "\"μ\"",
+            p7_values: Some(vec![R::Text("λ".into()), R::Text("東京".into())]),
+            expected: [
+                &[false, false],
+                &[true, true],
+                &[true, false],
+                &[true, false],
+                &[false, true],
+                &[false, true],
+            ],
+        },
+    ];
+    let operations = [
+        ("eq", "="),
+        ("ne", "!="),
+        ("lt", "<"),
+        ("le", "<="),
+        ("gt", ">"),
+        ("ge", ">="),
+    ];
+    for case in cases {
+        for (op_index, (operator, symbol)) in operations.into_iter().enumerate() {
+            let params = json!({
+                "xs":{"type":format!("List<{}>",case.type_name),"value":case.encoded.clone()},
+                "rhs":{"type":case.rhs_type,"value":case.rhs_value.clone()}
+            });
+            let ir_expr = json!({"binary":operator,"left":field("x"),"right":{"param":"rhs"}});
+            let (ir, hql) =
+                b1_project_requests(params, ir_expr, &format!("x {symbol} {}", case.rhs_hql));
+            let expected_rows = case.expected[op_index]
+                .iter()
+                .map(|value| V::Bool(*value))
+                .collect::<Vec<_>>();
+            let p7 = if operator == "eq" {
+                case.p7_values.clone().map(|values| {
+                    P::Project(
+                        Box::new(b1_p7_values("x", values)),
+                        vec![(
+                            "y".into(),
+                            E::Eq(
+                                Box::new(E::Field("x".into())),
+                                Box::new(E::Literal(match case.type_name {
+                                    "Bool" => R::Bool(true),
+                                    "I64" => R::I64(i64::MAX),
+                                    "F64Finite" => R::F64(2.0),
+                                    "Utf8" => R::Text("μ".into()),
+                                    _ => unreachable!(),
+                                })),
+                            ),
+                        )],
+                    )
+                })
+            } else {
+                None
+            };
+            b1_assert_rows(
+                &db,
+                ir,
+                hql,
+                json!([{"name":"y","type":"Bool","nullable":false}]),
+                b1_literal_rows("y", expected_rows),
+                p7,
+            );
+        }
+    }
+
+    let nullable_params = json!({
+        "xs":{"type":"List<Nullable<I64>>","value":["1",null,"3"]},
+        "rhs":{"type":"I64","value":"1"}
+    });
+    let (ir, hql) = b1_project_requests(
+        nullable_params,
+        json!({"binary":"eq","left":field("x"),"right":{"param":"rhs"}}),
+        "x = $rhs",
+    );
+    let p7 = P::Project(
+        Box::new(b1_p7_values("x", vec![R::I64(1), R::Null, R::I64(3)])),
+        vec![(
+            "y".into(),
+            E::Eq(
+                Box::new(E::Field("x".into())),
+                Box::new(E::Literal(R::I64(1))),
+            ),
+        )],
+    );
+    b1_assert_rows(
+        &db,
+        ir,
+        hql,
+        json!([{"name":"y","type":"Nullable<Bool>","nullable":true}]),
+        b1_literal_rows("y", vec![V::Bool(true), V::Null, V::Bool(false)]),
+        Some(p7),
+    );
+}
+
+#[test]
+fn scalar_type_admissibility_matrix_functions_and_checked_arithmetic() {
+    let directory = TempDir::new().unwrap();
+    let db = open(&directory);
+
+    let strings = json!({
+        "xs":{"type":"List<Nullable<Utf8>>","value":["Äther","ก😀",null]}
+    });
+    for (ir_expression, hql_expression, expected_type, expected) in [
+        (
+            json!({"call":"lower","args":[field("x")]}),
+            "lower(x)",
+            "Nullable<Utf8>",
+            vec![V::Utf8("äther".into()), V::Utf8("ก😀".into()), V::Null],
+        ),
+        (
+            json!({"call":"length","args":[field("x")]}),
+            "length(x)",
+            "Nullable<I64>",
+            vec![V::I64(5), V::I64(2), V::Null],
+        ),
+    ] {
+        let (ir, hql) = b1_project_requests(strings.clone(), ir_expression, hql_expression);
+        b1_assert_rows(
+            &db,
+            ir,
+            hql,
+            json!([{"name":"y","type":expected_type,"nullable":true}]),
+            b1_literal_rows("y", expected),
+            None,
+        );
+    }
+
+    struct ArithmeticCase {
+        type_name: &'static str,
+        encoded: Value,
+        rhs_type: &'static str,
+        rhs_value: Value,
+        rhs_hql: &'static str,
+        p7_values: R,
+        p7_rhs: R,
+        expected: [V; 5],
+    }
+    let arithmetic_cases = [
+        ArithmeticCase {
+            type_name: "I64",
+            encoded: json!(["6"]),
+            rhs_type: "I64",
+            rhs_value: json!("2"),
+            rhs_hql: "$rhs",
+            p7_values: R::I64(6),
+            p7_rhs: R::I64(2),
+            expected: [V::I64(8), V::I64(4), V::I64(12), V::I64(3), V::I64(0)],
+        },
+        ArithmeticCase {
+            type_name: "F64Finite",
+            encoded: json!([7.5]),
+            rhs_type: "F64Finite",
+            rhs_value: json!(2.0),
+            rhs_hql: "2.0",
+            p7_values: R::F64(7.5),
+            p7_rhs: R::F64(2.0),
+            expected: [
+                V::F64(9.5),
+                V::F64(5.5),
+                V::F64(15.0),
+                V::F64(3.75),
+                V::F64(1.5),
+            ],
+        },
+    ];
+    let arithmetic_ops = [
+        ("add", "+"),
+        ("sub", "-"),
+        ("mul", "*"),
+        ("div", "/"),
+        ("rem", "%"),
+    ];
+    for case in arithmetic_cases {
+        for (index, (op, symbol)) in arithmetic_ops.into_iter().enumerate() {
+            let params = json!({
+                "xs":{"type":format!("List<{}>",case.type_name),"value":case.encoded.clone()},
+                "rhs":{"type":case.rhs_type,"value":case.rhs_value.clone()}
+            });
+            let ir_expression = json!({"binary":op,"left":field("x"),"right":{"param":"rhs"}});
+            let (ir, hql) = b1_project_requests(
+                params,
+                ir_expression,
+                &format!("x {symbol} {}", case.rhs_hql),
+            );
+            let p7 = match op {
+                "add" => Some(E::Add(
+                    Box::new(E::Field("x".into())),
+                    Box::new(E::Literal(case.p7_rhs.clone())),
+                )),
+                "div" => Some(E::Div(
+                    Box::new(E::Field("x".into())),
+                    Box::new(E::Literal(case.p7_rhs.clone())),
+                )),
+                "rem" => Some(E::Rem(
+                    Box::new(E::Field("x".into())),
+                    Box::new(E::Literal(case.p7_rhs.clone())),
+                )),
+                _ => None,
+            }
+            .map(|expression| {
+                P::Project(
+                    Box::new(b1_p7_values("x", vec![case.p7_values.clone()])),
+                    vec![("y".into(), expression)],
+                )
+            });
+            b1_assert_rows(
+                &db,
+                ir,
+                hql,
+                json!([{"name":"y","type":case.type_name,"nullable":false}]),
+                b1_literal_rows("y", vec![case.expected[index].clone()]),
+                p7,
+            );
+        }
+    }
+
+    let nullable = json!({
+        "xs":{"type":"List<Nullable<I64>>","value":[null,"6"]},
+        "rhs":{"type":"I64","value":"2"}
+    });
+    let (ir, hql) = b1_project_requests(
+        nullable,
+        json!({"binary":"add","left":field("x"),"right":{"param":"rhs"}}),
+        "x + $rhs",
+    );
+    b1_assert_rows(
+        &db,
+        ir,
+        hql,
+        json!([{"name":"y","type":"Nullable<I64>","nullable":true}]),
+        b1_literal_rows("y", vec![V::Null, V::I64(8)]),
+        Some(P::Project(
+            Box::new(b1_p7_values("x", vec![R::Null, R::I64(6)])),
+            vec![(
+                "y".into(),
+                E::Add(
+                    Box::new(E::Field("x".into())),
+                    Box::new(E::Literal(R::I64(2))),
+                ),
+            )],
+        )),
+    );
+
+    let wrong_function = json!({
+        "xs":{"type":"List<I64>","value":["1"]}
+    });
+    let (ir, hql) = b1_project_requests(
+        wrong_function,
+        json!({"call":"lower","args":[field("x")]}),
+        "lower(x)",
+    );
+    b1_assert_paired_error(&db, ir, hql, "BIND_ERROR", "bind", "function_type");
+}
+
+#[test]
+fn scalar_type_admissibility_matrix_rejects_unsupported_cells() {
+    let directory = TempDir::new().unwrap();
+    let db = open(&directory);
+
+    let (ir, hql) = b1_filter_requests(
+        json!({"xs":{"type":"List<I64>","value":["1"]}}),
+        field("x"),
+        "x",
+    );
+    b1_assert_paired_error(&db, ir, hql, "BIND_ERROR", "bind", "boolean_type");
+
+    let (ir, hql) = b1_project_requests(
+        json!({
+            "xs":{"type":"List<I64>","value":["1"]},
+            "rhs":{"type":"Bool","value":true}
+        }),
+        json!({"binary":"and","left":field("x"),"right":{"param":"rhs"}}),
+        "x AND $rhs",
+    );
+    b1_assert_paired_error(&db, ir, hql, "BIND_ERROR", "bind", "boolean_type");
+
+    for (type_name, encoded) in [
+        ("List<I64>", json!([["1"]])),
+        ("Vector<g4-b1-space,2,f64>", json!([[0.5, 1.5]])),
+    ] {
+        // The type_name here is itself a scalar row type: List<T> therefore
+        // declares a parameter list whose elements have that non-scalar shape.
+        let params = json!({"xs":{"type":format!("List<{type_name}>"),"value":encoded}});
+        let (ir, hql) = b1_project_requests(
+            params,
+            json!({"binary":"eq","left":field("x"),"right":field("x")}),
+            "x = x",
+        );
+        b1_assert_paired_error(
+            &db,
+            ir,
+            hql,
+            "CAPABILITY_UNSUPPORTED",
+            "bind",
+            "equality_unavailable",
+        );
+    }
+
+    let (ir, hql, _, _) = b1_value_kernel_requests(
+        "Vector<g4-b1-space,2,f64>",
+        json!([[0.5]]),
+        B1RowKernel::Values,
+    );
+    b1_assert_paired_error(
+        &db,
+        ir,
+        hql,
+        "COLLECTION_SPACE_MISMATCH",
+        "bind",
+        "vector_dimension",
+    );
+
+    let params = json!({
+        "xs":{"type":"List<I64>","value":["1"]},
+        "rhs":{"type":"F64Finite","value":1.0}
+    });
+    let (ir, hql) = b1_project_requests(
+        params,
+        json!({"binary":"eq","left":field("x"),"right":{"param":"rhs"}}),
+        "x = $rhs",
+    );
+    b1_assert_paired_error(&db, ir, hql, "BIND_ERROR", "bind", "comparison_type");
+
+    for (type_name, rhs_type, rhs_value, operation, symbol) in [
+        ("I64", "F64Finite", json!(2.0), "add", "+"),
+        ("DecimalU64", "DecimalU64", json!("2"), "add", "+"),
+    ] {
+        let params = json!({
+            "xs":{"type":format!("List<{type_name}>"),"value":json!(["1"])},
+            "rhs":{"type":rhs_type,"value":rhs_value}
+        });
+        let (ir, hql) = b1_project_requests(
+            params,
+            json!({"binary":operation,"left":field("x"),"right":{"param":"rhs"}}),
+            &format!("x {symbol} $rhs"),
+        );
+        b1_assert_paired_error(&db, ir, hql, "BIND_ERROR", "bind", "numeric_type");
+    }
+
+    for (type_name, encoded) in [
+        ("List<I64>", json!([["1"]])),
+        ("Vector<g4-b1-space,2,f64>", json!([[0.5, 1.5]])),
+    ] {
+        let (ir, hql, _, _) = b1_value_kernel_requests(type_name, encoded, B1RowKernel::Sort);
+        b1_assert_paired_error(&db, ir, hql, "BIND_ERROR", "bind", "comparator_unavailable");
+    }
+
+    for (type_name, encoded, expected_code, expected_reason) in [
+        (
+            "Json",
+            json!([]),
+            "CAPABILITY_UNSUPPORTED",
+            "json_parameter_unavailable",
+        ),
+        (
+            "Entity",
+            json!([]),
+            "CAPABILITY_UNSUPPORTED",
+            "entity_parameter_scope",
+        ),
+        // Path has an internal value variant but is intentionally outside the
+        // accepted public type spellings, so it fails closed during type parse.
+        (
+            "Path",
+            json!([]),
+            "CAPABILITY_UNSUPPORTED",
+            "type_unavailable",
+        ),
+        (
+            "Score",
+            json!([{}]),
+            "CAPABILITY_UNSUPPORTED",
+            "domain_parameter_unavailable",
+        ),
+        (
+            "Context",
+            json!([{}]),
+            "CAPABILITY_UNSUPPORTED",
+            "domain_parameter_unavailable",
+        ),
+        (
+            "HistoryRevision",
+            json!([{}]),
+            "CAPABILITY_UNSUPPORTED",
+            "domain_parameter_unavailable",
+        ),
+        (
+            "ChangeEvent",
+            json!([{}]),
+            "CAPABILITY_UNSUPPORTED",
+            "domain_parameter_unavailable",
+        ),
+        (
+            "Nullable<Nullable<I64>>",
+            json!([]),
+            "BIND_ERROR",
+            "nested_nullable",
+        ),
+    ] {
+        let (ir, hql, _, _) = b1_value_kernel_requests(type_name, encoded, B1RowKernel::Values);
+        b1_assert_paired_error(&db, ir, hql, expected_code, "bind", expected_reason);
+    }
+
+    for type_name in ["Null", "Json", "Nullable<Json>"] {
+        let params = json!({
+            "xs":{"type":"List<I64>","value":[]},
+            "bad":{"type":type_name,"value":null}
+        });
+        let ir = request(
+            vec![
+                values("v", "xs", "x"),
+                node(
+                    "p",
+                    "Project",
+                    &["v"],
+                    json!({"fields":[{"expression":{"param":"bad"},"as":"y"}]}),
+                ),
+            ],
+            "p",
+            params.clone(),
+        );
+        let hql = b1_hql_request(params, "VALUES $xs AS x |> RETURN $bad AS y");
+        b1_assert_paired_error(
+            &db,
+            ir,
+            hql,
+            "CAPABILITY_UNSUPPORTED",
+            "bind",
+            "json_parameter_unavailable",
+        );
+    }
+}
+
+#[test]
+fn decimal_u64_structural_pagination_accepts_boundary_parameters() {
+    let directory = TempDir::new().unwrap();
+    let db = open(&directory);
+    let source_values = vec![V::I64(4), V::I64(5)];
+    let p7_values = vec![R::I64(4), R::I64(5)];
+
+    for (op, count) in [
+        ("Take", 0_u64),
+        ("Take", u64::MAX),
+        ("Offset", 0),
+        ("Offset", u64::MAX),
+    ] {
+        let params = json!({
+            "xs":{"type":"List<I64>","value":["4","5"]},
+            "n":{"type":"DecimalU64","value":count.to_string()}
+        });
+        let ir = request(
+            vec![
+                values("v", "xs", "x"),
+                node("k", op, &["v"], json!({"count":count})),
+            ],
+            "k",
+            params.clone(),
+        );
+        let hql_clause = if op == "Take" { "TAKE" } else { "SKIP" };
+        let hql = b1_hql_request(
+            params,
+            &format!("VALUES $xs AS x |> {hql_clause} $n |> RETURN x"),
+        );
+        let expected = match (op, count) {
+            ("Take", 0) | ("Offset", u64::MAX) => vec![],
+            _ => source_values.clone(),
+        };
+        let bounded_count = if op == "Take" {
+            if count == 0 {
+                0
+            } else {
+                p7_values.len()
+            }
+        } else if count == 0 {
+            0
+        } else {
+            3
+        };
+        let p7 = if op == "Take" {
+            P::Take(
+                Box::new(b1_p7_values("x", p7_values.clone())),
+                bounded_count,
+            )
+        } else {
+            P::Offset(
+                Box::new(b1_p7_values("x", p7_values.clone())),
+                bounded_count,
+            )
+        };
+        b1_assert_rows(
+            &db,
+            ir,
+            hql,
+            json!([{"name":"x","type":"I64","nullable":false}]),
+            b1_literal_rows("x", expected),
+            Some(p7),
+        );
+    }
+
+    // Typed IR expresses pagination as a numeric config field, so there is no
+    // typed-IR parameter cell corresponding to HQL's DecimalU64 parameter gate.
+    let params = json!({
+        "xs":{"type":"List<I64>","value":["4"]},
+        "n":{"type":"I64","value":"1"}
+    });
+    let hql = b1_hql_request(params, "VALUES $xs AS x |> TAKE $n |> RETURN x");
+    b1_assert_error(&db, hql, "BIND_ERROR", "bind", "parameter_type_mismatch");
+}
+
+#[test]
+fn finite_float_boundary_and_checked_result_fail_closed() {
+    let directory = TempDir::new().unwrap();
+    let db = open(&directory);
+
+    // JSON has no numeric representation for NaN or infinity. HQL rejects an
+    // overflowing numeric token during parse; typed IR rejects a string that is
+    // not a JSON number. These are representation-specific guards, not a
+    // fabricated cross-frontend NaN value.
+    let empty_i64 = json!({"xs":{"type":"List<I64>","value":[]}});
+    let hql = b1_hql_request(empty_i64.clone(), "VALUES $xs AS x |> RETURN 1e999 AS y");
+    b1_assert_error(&db, hql, "HQL_PARSE_ERROR", "parse", "nonfinite_literal");
+
+    let ir = request(
+        vec![
+            values("v", "xs", "x"),
+            node(
+                "p",
+                "Project",
+                &["v"],
+                json!({"fields":[{"expression":{"type":"F64Finite","literal":"NaN"},"as":"y"}]}),
+            ),
+        ],
+        "p",
+        empty_i64,
+    );
+    b1_assert_error(&db, ir, "BIND_ERROR", "bind", "literal_type");
+
+    let overflow = json!({
+        "xs":{"type":"List<F64Finite>","value":[1e308]},
+        "rhs":{"type":"F64Finite","value":1e308}
+    });
+    db.publish_generation().unwrap();
+    let before = state(&db, directory.path());
+    let (ir, hql) = b1_project_requests(
+        overflow,
+        json!({"binary":"mul","left":field("x"),"right":{"param":"rhs"}}),
+        "x * $rhs",
+    );
+    b1_assert_paired_error(&db, ir, hql, "BIND_ERROR", "execute", "nonfinite_result");
+    assert_state(&db, directory.path(), &before);
+}
