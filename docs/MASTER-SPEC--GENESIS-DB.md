@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.66b"
+version: "2.3.67b"
 updated: "2026-10-26"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -25,6 +25,17 @@ related_docs:
   - "docs/GENESISRAG17-EXTENSION-MAP.md"
 ---
 
+## Current HQL2 G4/P8 status — 2026-10-26
+
+The HQL2 G4 shared pipeline is implemented and partially qualified, not fully
+closed. PR #269 merged at `b4372dc347cc265f405b94aea38bc453d51565a7` with its
+recorded Ubuntu/Windows/macOS Rust checks successful; that evidence covers one
+selected SourceScan metadata slice. Comprehensive accepted type/order/composition/
+provenance coverage, broad P6, independent runtime, performance, P9-P16,
+physical-device and release gates remain open or NOT_RUN. Later planned features
+and explicitly unsupported capabilities are not inferred to be defects. The
+[current P8 ledger](REPORT--HQL2-P8-CORE-2026-09-28.md#post-pr269-type-order-composition-and-provenance-status-2026-10-26)
+is the detailed status authority; preserve P8 -> P9-P12 -> P13/P14 -> P15 -> P16.
 ## Approved G4/P8 SourceScan result metadata qualification - 2026-10-26
 
 Owner approved tests/docs-only seven existing files (LOW, C-3): one appended
@@ -1173,6 +1184,11 @@ independent-review or broad P8/P13 gates.
 
 ## Changelog
 
+Version diff 2.3.66b -> 2.3.67b: reconcile the merged PR #269 selected
+SourceScan metadata evidence on current main and retain the source-linked
+type/order/composition/provenance and P6/P9-P16 gates; no contract or runtime
+behavior changes.
+
 Version diff 2.3.45b -> 2.3.46b: bound membership authorization preflight for
 legacy, sealed, and active journal sources by uncompressed payload and record
 count before journal-wide accumulation; preserve fail-closed context errors and
@@ -1203,6 +1219,7 @@ shared-runtime and broad P8/P13 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 2.3.67b | 2026-10-26 | GenesisBlockDB Architecture | Reconcile merged PR #269 selected SourceScan evidence and retain broad G4/P8/P6/P9-P16 gates |
 | 2.3.52b | 2026-10-20 | GenesisBlockDB Architecture | Approve bounded G4 identity/golden qualification and reconcile hosted PR253; preserve production contracts and broad gates |
 | 2.3.51b | 2026-10-20 | GenesisBlockDB Architecture | Approve bounded G4 lexical/context diagnostics and reconcile hosted PR252; preserve production contracts and broader gates |
 | 2.3.50b | 2026-10-20 | GenesisBlockDB Architecture | Approve test-only History/Change diagnostic matrix and reconcile PR251 hosted qualification; preserve runtime contracts and broader acceptance gates |

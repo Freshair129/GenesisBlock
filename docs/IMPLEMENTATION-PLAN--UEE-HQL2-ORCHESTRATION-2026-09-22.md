@@ -1,9 +1,9 @@
 ---
-version: "0.8.99b"
+version: "0.9.0b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-26T00:00:00+07:00,Codex"
+last_update: "2026-10-26T19:29:25+07:00,Codex"
 status: beta
 superseded_by: null
 attributes:
@@ -15,6 +15,16 @@ attributes:
   owner: "Boss (Founder / Product Authority)"
 ---
 
+## Post-PR269 staged qualification status — 2026-10-26
+
+PR #269 is merged at `b4372dc347cc265f405b94aea38bc453d51565a7`; its recorded
+hosted Rust Ubuntu/Windows/macOS suites passed with 15 successful checks and
+one schedule-only security advisory skip. This closes only that seven-file
+SourceScan metadata candidate's host/CI gate. G4/P8 remains partial; comprehensive
+contract-valid type/order/composition/provenance cells and broad P6 remain
+MISSING_EVIDENCE. First planner behavior is implemented; P9 optimizer and P11
+index lifecycle remain planned behavior. P13-P16 surfaces, recovery, security,
+device and release gates remain separately sequenced. See the [current P8 ledger](REPORT--HQL2-P8-CORE-2026-09-28.md#post-pr269-type-order-composition-and-provenance-status-2026-10-26). No user DB migration or public contract is authorized by this reconciliation.
 ## Approved G4/P8 SourceScan result metadata qualification - 2026-10-26
 
 Owner approved tests/docs-only seven existing files (LOW, C-3): one appended
@@ -1768,6 +1778,10 @@ authorization.
 
 ## CHANGELOG
 
+Version diff 0.8.99b -> 0.9.0b: reconcile PR #269 current-main host evidence,
+classify broad G4/P8 and P6/P9-P16 gates, and keep later behavior separately
+planned; no implementation or contract change.
+
 Version diff 0.8.77b -> 0.8.78b: document the P7.1 G3 WAL-only recovery
 proof gap, its test-only acceptance/write-set, RCA, and conflict-free
 Verify/Review/Final order. Documentation approval only; model selection and
@@ -1986,6 +2000,7 @@ Version diff `0.8.27b -> 0.8.28b`: implement approved D1-D5, record 9 focused pa
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.9.0b | 2026-10-26 | beta | Reconcile PR #269 current-main evidence and retain staged G4/P8 through P9-P16 qualification gates | working-tree | Codex |
 | 0.8.85b | 2026-10-20 | beta | Approve tests-only G4 identity/golden matrix and reconcile hosted PR253 | working-tree | Codex |
 | 0.8.84b | 2026-10-20 | beta | Approve test-only lexical/context mode/counter/P7 qualification and reconcile hosted PR252; no runtime contract change | working-tree | Codex |
 | 0.8.83b | 2026-10-20 | beta | Approve test-only History/Change diagnostic matrix and reconcile PR251 hosted qualification; preserve runtime contracts and broader acceptance gates | working-tree | Codex |

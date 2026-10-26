@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.91b"
+version: "0.1.92b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-26T00:00:00+07:00,Codex"
+last_update: "2026-10-26T19:29:25+07:00,Codex"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -12,6 +12,81 @@ attributes:
   complexity: C-3
 ---
 
+## Post-PR269 type, order, composition and provenance status — 2026-10-26
+
+Authority: current fetched `origin/main` `b4372dc347cc265f405b94aea38bc453d51565a7`
+(tree `0db1f62d3b1e0b1c8faf13f400164d5606c0aade`), the G4 ADR, P8 addendum,
+typed boundary, C4/Master, implementation plan and P6/H2-D11 peer contracts.
+This post-merge record supersedes candidate-time CI/review status in the #269
+section below; it does not rewrite those historical observations.
+
+PR #269 is merged. Its recorded host qualification is 460/0/1 across 44 HQL2
+targets plus 145/0/0 across 11 compatibility targets (605 distinct passing
+target/test-name pairs). Hosted checks were 15 SUCCESS plus one conditional
+schedule-only security advisory SKIPPED, including Rust Ubuntu/Windows/macOS
+SUCCESS. The merge record contains no formal GitHub review event; independent
+reviewer runtime is NOT_RUN. The #269 SourceScan matrix is selected evidence,
+not a broad closure claim.
+
+Current source anchors: `src/query/hql2/value.rs::QueryTypeV2` defines output
+types and wrappers; `src/query/hql2/bind.rs::Kernel` and its `ordered`,
+`equality_comparable`, and `numeric` predicates define the executable kernels
+and selected operator classes; `src/query/hql2/result.rs::QueryResultV2` and
+`ExplainResultV2` define result/plan metadata; `src/query/hql2/request.rs`
+retains the request-boundary rejection of unsupported streaming/partial modes.
+Selected fixture anchors are
+`tests/hql2_g4_source_counter_tests.rs::source_result_metadata_has_independent_fixture_expectations_in_hql_and_ir`,
+`tests/hql2_g4_scalar_counter_tests.rs::scalar_result_metadata_has_independent_fixture_expectations`,
+`tests/hql2_storage_set_oracle_differential_tests.rs::union_result_metadata_has_independent_fixture_expectations`,
+`tests/hql2_storage_aggregate_oracle_differential_tests.rs::aggregate_result_metadata_has_independent_fixture_expectations`,
+and `tests/hql2_storage_hql_join_oracle_differential_tests.rs::storage_join_result_metadata_has_independent_fixture_expectations`.
+These anchors identify selected cases only; the matrix below remains the
+contract-derived gap map. Peer authority anchors are
+`docs/SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL.md`,
+`docs/SPEC--GENESISDB-P6-PEER-LOCALITY-ADDENDUM.md`, and
+`docs/REPORT--HQL2-P7-ORACLE-2026-09-28.md`; this G4/P8 reconciliation does not
+redefine or independently close those contracts.
+
+| Dimension | Contract/source universe | Current evidence | Remaining status |
+|---|---|---|---|
+| Types | `QueryTypeV2`: Null, Bool, I64, DecimalU64, F64Finite, Utf8, Json, Entity, HistoryRevision, ChangeEvent, Path, Score, Context, Vector; Nullable and List are recursive wrappers. P8 input constructors and operator admissibility are narrower (typed-boundary lines 606-668). | Selected scalar I64, nullable, source/domain, Join/UnionAll/Aggregate and metadata fixtures. | MISSING_EVIDENCE: contract-derived `(kernel, type, nullability/nesting, frontend, mode)` matrix for every supported and explicitly unsupported cell. Engine-issued domain values are not implied valid user parameters. |
+| Ordering/equality | P8 exact comparator and NULL rules; binder `ordered`, `equality_comparable` and numeric predicates (`bind.rs` lines 315-325). | Selected NULL regressions, literal ordered rows, selected UnionAll edge order and bounded HQL1 D7 ordering. | MISSING_EVIDENCE: all declared key types × ASC/DESC × explicit/default NULL order × ties/multi-key and preserving/destroying composition edges. Mixed/domain ordering is unsupported unless explicitly named. |
+| Composition | 19 `Kernel` variants (`bind.rs` lines 192-264), six `BoundSourceV2` alternatives and KNN/Rerank modes. | Selected scalar pipeline and storage-backed UnionAll, Aggregate, Join, graph, vector, annotation and text compositions named in the matrix below. | MISSING_EVIDENCE: complete contract-derived legal composition graph and every legal edge plus selected longer paths across HQL/typed IR and Normal/Plan/Analyze. Do not turn an undocumented edge into accepted behavior. |
+| Provenance | `QueryResultV2` fields: request ID, selected snapshot, ordered columns/rows, semantics, completeness, frontiers/cursor, optional Explain (`result.rs` lines 140-221). P6/H2-D11 remain authority for lease, ACL and durable revision lineage. | Independent literal/P7 assertions for selected #266/#267/#269 output families and existing provenance fixtures. | MISSING_EVIDENCE: full source × kernel × type × mode provenance matrix, all direct literal identities/revisions, and independent complete P6 authority proof. Metadata equality is consistency only. |
+| Plan/Analyze state | G4 plan-only EXPLAIN and read-only measured ANALYZE; selected no-effect and typed counter rules. | Selected fixture frontier/files/counter guards and Plan-before-publication cases. | MISSING_EVIDENCE: universal transient/internal-write absence, ordinary nonempty-success state effects and general performance thresholds. Lock/shm size-only observations are not byte identity. |
+
+The 19-kernel inventory and test anchors remain in “All 19 executable kernel
+variants” above. Selected coverage includes every named family, but cells listed
+as residual there remain open. The registry is not a complete cross-product.
+
+### Downstream gate status
+
+| Gate | Classification | Closure evidence still required |
+|---|---|---|
+| P6 / H2-D11 | IMPLEMENTED contracts; selected TESTED | Fresh exact-main lease/generation/ACL/temporal/retention/revocation/recovery matrix. Keep the P6 contract fixed; R6 RCA and separate approval before any defect correction. |
+| P9 | First deterministic `plan_v2` IMPLEMENTED; later optimizer/index-path/pushdown work is planned | Define accepted planner behavior and baseline before implementation or performance claims. |
+| P10 | Kernels IMPLEMENTED; selected composition TESTED | Contract-derived legal composition edges with exact bags/order/errors/counters/provenance and resource checks. |
+| P11-P12 | Selected lexical profile and budgets IMPLEMENTED/TESTED | Durable index lifecycle is later planned behavior; fresh resource boundary, cancellation, cleanup and no-partial-result qualification remain. |
+| P13-P14 | Core and additive NAPI v2 exist; broad surface mapping/recovery rehearsal NOT_RUN | Freeze each surface and clean-consumer mapping; separately rehearse fixture recovery/migration. No endpoint or user-database migration is authorized here. |
+| P15-P16 | Broad current-main security/release NOT_RUN; physical-device gate unavailable | Fresh security review, build/release traceability and device evidence. No release/tag/publication is included. |
+
+`request.rs::normalize` explicitly rejects v2 streaming/partial results;
+enabling them is MISSING_BEHAVIOR/new contract scope, not a test-only gap.
+Persisted analyzer/index lifecycle and P9 optimizer features are planned work,
+not defects inferred from absence. Historical `AUDIT--P9` through `AUDIT--P16`
+reports are baselines, not current gate passes. Physical iPhone/Android devices
+are unavailable and remain NOT_RUN.
+
+The root `AGENT.md` still contains a legacy HQL pipeline description that
+predates the current `src/query/hql2/plan.rs` path. It is outside the approved
+eight-file documentation phase; preserve it here as a separately scoped docs
+reconciliation finding rather than expanding this change.
+
+Current execution order: finite G4/P8 matrix and source-linked evidence ->
+independent whole-scope source/evidence/architecture review -> separately
+approved missing-evidence scopes -> P9 -> P10 -> P11 -> P12 -> P13/P14 -> P15
+-> P16. Passing docs validation or host CI alone never marks the later gates
+complete.
 ## Approved G4/P8 SourceScan result metadata qualification - 2026-10-26
 
 Owner approved tests/docs-only seven existing files (LOW, C-3): one appended
@@ -2044,6 +2119,8 @@ The separate U9 backup/restore target passes 7/7; no user database was modified.
 
 ## Version diff
 
+Version diff `0.1.91b -> 0.1.92b`: reconcile merged PR #269 hosted status and add the source-linked current-main type/order/composition/provenance and P6/P9-P16 gate map; preserve the partial closure status.
+
 Recovery version diff `0.1.69b -> 0.1.70b`: recover the bounded G4 diagnostic
 schema from the archived branch, with fresh validation recorded above. The
 following table describes the earlier integrated checkpoint.
@@ -2295,6 +2372,7 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.92b | 2026-10-26 | beta | Reconcile merged PR #269 and classify current-main G4/P8 type/order/composition/provenance and P6/P9-P16 gates | working-tree | Codex |
 | 0.1.77b | 2026-10-20 | beta | Approve tests-only G4 identity/golden matrix and reconcile hosted PR253 | working-tree | Codex |
 | 0.1.76b | 2026-10-20 | beta | Approve test-only lexical/context mode/counter/P7 qualification and reconcile hosted PR252; no runtime contract change | working-tree | Codex |
 | 0.1.75b | 2026-10-20 | beta | Approve test-only History/Change diagnostic matrix and reconcile PR251 hosted qualification; preserve runtime contracts and broader acceptance gates | working-tree | Codex |

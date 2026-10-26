@@ -1,8 +1,8 @@
 ---
 doc_id: SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY
-version: "0.2.67b"
+version: "0.2.68b"
 created_at: "2026-09-28T01:25:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-19T11:27:08+07:00,Codex"
+last_update: "2026-10-26T19:29:25+07:00,Codex"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -15,6 +15,17 @@ attributes:
 ---
 
 # P8 typed boundary — approved concrete contract
+
+## Current qualification status — 2026-10-26
+
+PR #269 is merged on `origin/main` at `b4372dc347cc265f405b94aea38bc453d51565a7`.
+Its host and CI evidence qualifies the selected SourceScan metadata fixture,
+not all cells of this closed typed boundary. `QueryTypeV2` output variants do
+not imply universal parameter or operator support; keep documented
+`CAPABILITY_UNSUPPORTED` and `BIND_ERROR` boundaries. Comprehensive legal type,
+null/order, operator-composition and provenance matrices remain
+MISSING_EVIDENCE. P6/H2-D11 semantics are unchanged; P9-P16, independent
+runtime, device and release gates remain separate. See the [current P8 ledger](REPORT--HQL2-P8-CORE-2026-09-28.md#post-pr269-type-order-composition-and-provenance-status-2026-10-26).
 
 ## D7 labeled property recovery candidate — 2026-10-19
 
@@ -929,6 +940,8 @@ separate shape limits. No process-global Pest setting is changed.
 
 ## Version diff and changelog
 
+Version diff `0.2.67b -> 0.2.68b`: reconcile PR #269 current-main evidence and restate that selected SourceScan qualification does not close the closed typed boundary or broad P8/P6 gates; no type or runtime contract change.
+
 Version diff `0.2.65b -> 0.2.66b`: synchronize the recovered G4 typed counter
 readings and provenance contract; distinguish explicit unknown counter readings
 from absent estimates/frontiers. Preliminary diagnostic consumers must use
@@ -1184,6 +1197,7 @@ detail with unchanged JSON shape; broader P8/P13/review gates remain open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.2.68b | 2026-10-26 | beta | Reconcile selected PR #269 evidence while retaining closed type support boundaries and broad P8 gates | working-tree | Codex |
 | 0.2.64b | 2026-10-06 | beta | Strengthen AnnotationScan P7 parity with future-valid and post-S controls; verify HQL/IR missing Annotation(Read) denial separately; focused annotation/History/Change 42/42; no runtime/P6/schema/transport change; broad P8/P13/review remain open | working-tree | ATHER |
 | 0.2.63b | 2026-10-06 | beta | Add HQL/typed-IR AnnotationScan P7 differential at explicit S,V; focused Annotation source/ACL target passes 7/7; no runtime/P6/schema/transport change; broad exact-oracle and P8/review gates remain open | working-tree | ATHER |
 | 0.2.62b | 2026-10-06 | beta | Reconcile G4 stable plan identity with D7 single-property and exact-seed depth-one TRAVERSE evidence; preserve explicit compatibility allowlist and broad G4/P8/P13/review gates | working-tree | ATHER |
