@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE
-version: "0.1.24b"
+version: "0.1.25b"
 created_at: "2026-10-04T13:08:29+07:00,Codex,2be63a7"
-last_update: "2026-10-26T00:00:00+07:00,Codex"
+last_update: "2026-10-26T19:29:25+07:00,Codex"
 status: active
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -15,6 +15,22 @@ attributes:
   amends: ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY
 ---
 
+## Post-PR269 qualification status — 2026-10-26
+
+The fetched current main is `b4372dc347cc265f405b94aea38bc453d51565a7`
+(tree `0db1f62d3b1e0b1c8faf13f400164d5606c0aade`), with PR #269 merged. Its
+recorded CI passed 15 checks, had one schedule-only security advisory skip, and
+passed Rust suites on Ubuntu, Windows and macOS. The 605 local passing pairs
+are selected regression coverage. The prior SourceScan section's `PENDING`
+review/CI wording is the candidate-time snapshot; no formal GitHub review event
+or independent reviewer runtime is recorded.
+
+This status reconciliation changes no G4-D01..D10 decision or P8/P6 contract.
+G4/P8 remains partial; the current type/order/composition/provenance ledger and
+P6/P9-P16 dependencies are in the [source-linked P8 ledger](../REPORT--HQL2-P8-CORE-2026-09-28.md#post-pr269-type-order-composition-and-provenance-status-2026-10-26).
+The selected PR does not prove complete P6 provenance, universal no-write,
+ordinary successful-execution state, performance, device or release acceptance.
+Preserve P8 -> P9-P12 -> P13/P14 -> P15 -> P16.
 ## Approved G4/P8 SourceScan result metadata qualification - 2026-10-26
 
 Owner approved tests/docs-only seven existing files (LOW, C-3): one appended
@@ -1272,6 +1288,8 @@ an ADR amendment and renewed review.
 
 ## Version diff and changelog
 
+Version diff `0.1.24b -> 0.1.25b`: reconcile the merged PR #269 SourceScan status on current main and point to the finite G4/P8 type/order/composition/provenance ledger; no runtime or contract change.
+
 Version diff: `0.1.3b -> 0.1.4b` selectively recovers the approved typed
 diagnostic vocabulary, checked counter arithmetic and truthful source timing
 from the archived branch onto current main. The recovery validation above is
@@ -1285,6 +1303,7 @@ and release qualification open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.25b | 2026-10-26 | active | Reconcile merged PR #269 current-main host status and retain broad G4/P8/P6/P9-P16 gates | working-tree | Codex |
 | 0.1.10b | 2026-10-20 | active | Approve tests-only G4 identity/golden matrix and reconcile hosted PR253 | working-tree | Codex |
 | 0.1.9b | 2026-10-20 | active | Approve test-only lexical/context mode/counter/P7 qualification and reconcile hosted PR252; no runtime contract change | working-tree | Codex |
 | 0.1.8b | 2026-10-20 | active | Approve test-only History/Change diagnostic matrix and reconcile PR251 hosted qualification; preserve runtime contracts and broader acceptance gates | working-tree | Codex |

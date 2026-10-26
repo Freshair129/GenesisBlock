@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM
-version: "0.1.15b"
+version: "0.1.16b"
 created_at: "2026-09-30T06:29:47+07:00,ATHER,working-tree"
-last_update: "2026-10-19T11:27:08+07:00,Codex"
+last_update: "2026-10-26T19:29:25+07:00,Codex"
 status: accepted
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -15,6 +15,17 @@ attributes:
 ---
 
 # HQL2 P8 completion addendum: typed semantics and actor-scoped HQL1 bridge
+
+## Current qualification status — 2026-10-26
+
+PR #269 is merged on `origin/main` at `b4372dc347cc265f405b94aea38bc453d51565a7`.
+Its 15 successful hosted checks, one schedule-only security advisory skip and
+Ubuntu/Windows/macOS Rust passes qualify the selected SourceScan metadata slice
+only. The existing D1-D7 approvals, P6 authorization-before-parse, closed IR
+wire, and no-migration boundary remain unchanged. Broad G4/P8, type/order/
+composition/provenance, independent reviewer runtime, P6, P9-P16, device and
+release gates remain open or NOT_RUN. Candidate-time pending text below remains
+a historical checkpoint; see the [current P8 ledger](../REPORT--HQL2-P8-CORE-2026-09-28.md#post-pr269-type-order-composition-and-provenance-status-2026-10-26).
 
 ## D7 labeled property recovery candidate — 2026-10-19
 
@@ -348,6 +359,7 @@ addendum does not authorize migration of a user database, deployment or release.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.16b | 2026-10-26 | accepted | Reconcile merged PR #269 status; preserve D1-D7 and broad P8/P13 boundary | working-tree | Codex |
 | 0.1.14b | 2026-10-05 | accepted | Extend approved D7 after legacy/HQL2 differential with one unlabeled zero-hop single-property projection and exact-seed depth-one TRAVERSE ID projection; adapter 13/13, property 2/2, ordering 2/2, labeled-filter 2/2; root HQL2 404/0/1 across 39 targets; U9 restore 7/7; preserve fail-closed boundaries and open shared-runtime/P8/P13 gates | working-tree | ATHER |
 | 0.1.13b | 2026-10-04 | accepted | Extend D7 after differential evidence to the exact same-alias string ID predicate on labeled zero-hop scans; match/miss/wrong-label plus backslash/Unicode differential, adapter 11/11, ordering 2/2, new differential target 2/2; HQL2 394/0/1 across 35 targets and selected P6 peers 45/0/0 across 7; independent review found no runtime parity/authorization defect; PR #213 code commit checks 40 pass, 4 worker failures with unconfirmed cause, 5 skipped, 1 Windows Cargo cancellation at 15-minute job limit; preserve other fail-closed boundaries and broad P8/P13 gates | working-tree | ATHER |
 | 0.1.12b | 2026-10-04 | accepted | Extend D7 after legacy/HQL2 differential for one exact string ID predicate on unlabeled zero-hop scans; adapter 11/11, ordering 2/2, HQL2 393/0/1 across 34 targets; preserve label+predicate/order/multi-predicate fail-closed boundaries; no P6/schema/transport change; independent review and broad P8/P13 gates remain open | working-tree | ATHER |

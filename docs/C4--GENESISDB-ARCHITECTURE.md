@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: "0.1.96b"
+version: "0.1.97b"
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-26T00:00:00+07:00,Codex"
+last_update: "2026-10-26T19:29:25+07:00,Codex"
 attributes:
   domain: architecture
   scope: repository
@@ -25,6 +25,15 @@ related_docs:
   - docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md
 ---
 
+## Current G4/P8 architecture status — 2026-10-26
+
+PR #269 is merged at current `origin/main` `b4372dc347cc265f405b94aea38bc453d51565a7`.
+The selected SourceScan metadata evidence passed hosted checks on the recorded
+head; it does not close the shared pipeline. Treat the G4/P8 contract as partial
+until the current ledger's type/order/composition/provenance, broad P6 and
+independent review/runtime obligations pass. Keep P9 planner, P10 composition,
+P11 lifecycle, P12 resources, P13/P14 surfaces/recovery, P15 security and P16
+host/device/release in sequence. See the [current P8 ledger](REPORT--HQL2-P8-CORE-2026-09-28.md#post-pr269-type-order-composition-and-provenance-status-2026-10-26).
 ## Approved G4/P8 SourceScan result metadata qualification - 2026-10-26
 
 Owner approved tests/docs-only seven existing files (LOW, C-3): one appended
@@ -1220,6 +1229,10 @@ Broader EXPLAIN/P8/P13 and P14 rehearsal remain open.
 
 ## CHANGELOG
 
+Version diff 0.1.96b -> 0.1.97b: reconcile merged PR #269 SourceScan metadata
+evidence on current main and point to the source-linked type/order/composition/
+provenance and downstream gate ledger; preserve partial G4/P8 status.
+
 Version diff 0.1.72b -> 0.1.73b: index the approved execution DAG guard and
 synthetic pilot boundary; preserve separate W1 implementation authorization.
 
@@ -1364,6 +1377,7 @@ full P8/P13 qualification remains open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.97b | 2026-10-26 | current | Reconcile merged PR #269 current-main status and retain broad G4/P8/P6/P9-P16 qualification gates | working-tree | Codex |
 | 0.1.82b | 2026-10-20 | current | Approve tests-only G4 identity/golden matrix and reconcile hosted PR253 | working-tree | Codex |
 | 0.1.81b | 2026-10-20 | current | Approve test-only lexical/context mode/counter/P7 qualification and reconcile hosted PR252; no runtime contract change | working-tree | Codex |
 | 0.1.80b | 2026-10-20 | current | Approve test-only History/Change diagnostic matrix and reconcile PR251 hosted qualification; preserve runtime contracts and broader acceptance gates | working-tree | Codex |
