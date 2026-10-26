@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: "0.1.98b"
+version: "0.1.99b"
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-27T01:05:50+07:00,Codex"
+last_update: "2026-10-27T01:13:44+07:00,Codex"
 attributes:
   domain: architecture
   scope: repository
@@ -35,7 +35,10 @@ to one existing target; its focused run passed 17/17. Repo-wide
 with exit 0 (1,297 passed, 0 failed, 6 ignored across 158 result blocks),
 including 44 root HQL2 targets (466 passed, 0 failed, 1 ignored). Core/default
 all-target Clippy, formatting, docs validation (0/244), version check (0.2.10)
-and diff checks passed. Final independent review, hosted review and exact-head
+and diff checks passed. Final independent source review passed on commit
+d6978664ae6c5797887e0b968d1bf06976d6e891, tree
+baac58b38fb7a0f27a1f0e055992ce11a05503bb, with 0 Critical, 0 Important and 0
+Minor findings; reviewer runtime is NOT_RUN. Formal hosted review and exact-head
 CI remain pending. No production or contract change is part of B1.
 
 Treat G4/P8 as partial. This phase checks only selected admission across
@@ -1244,6 +1247,8 @@ Broader EXPLAIN/P8/P13 and P14 rehearsal remain open.
 
 ## CHANGELOG
 
+Version diff 0.1.98b -> 0.1.99b: record the exact-tree independent source review for Phase B1 while preserving hosted review, exact-head CI and downstream gates; no runtime or contract change.
+
 Version diff 0.1.97b -> 0.1.98b: synchronize current G4/P8 status to PR271 main and index the owner-approved Phase B1 scalar type-admissibility candidate; no runtime or contract change.
 
 Version diff 0.1.96b -> 0.1.97b: reconcile merged PR #269 SourceScan metadata
@@ -1394,6 +1399,7 @@ full P8/P13 qualification remains open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.99b | 2026-10-27 | current | Record exact-tree Phase B1 independent source review; hosted review and exact-head CI remain pending | working-tree | Codex |
 | 0.1.98b | 2026-10-26 | current | Reconcile PR271 main and index selected Phase B1 scalar type-admissibility tests; retain broader G4/P8/P6/P9-P16 gates | working-tree | Codex |
 | 0.1.97b | 2026-10-26 | current | Reconcile merged PR #269 current-main status and retain broad G4/P8/P6/P9-P16 qualification gates | working-tree | Codex |
 | 0.1.82b | 2026-10-20 | current | Approve tests-only G4 identity/golden matrix and reconcile hosted PR253 | working-tree | Codex |

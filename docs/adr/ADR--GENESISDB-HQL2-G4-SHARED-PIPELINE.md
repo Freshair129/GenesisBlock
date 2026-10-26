@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE
-version: "0.1.26b"
+version: "0.1.27b"
 created_at: "2026-10-04T13:08:29+07:00,Codex,2be63a7"
-last_update: "2026-10-27T01:05:50+07:00,Codex"
+last_update: "2026-10-27T01:13:44+07:00,Codex"
 status: active
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -26,8 +26,11 @@ passed 17/17 with zero failures or ignored tests. Repo-wide
 with exit 0 (158 result blocks: 1,297 passed, 0 failed, 6 ignored); its 44 root
 HQL2 targets recorded 466 passed, 0 failed, 1 ignored. Core/default all-target
 Clippy, formatting, docs validation (0/244), version check (0.2.10), and diff
-checks passed. Final independent review, hosted review, and exact-head CI remain
-pending.
+checks passed. Final independent source review passed on commit
+d6978664ae6c5797887e0b968d1bf06976d6e891, tree
+baac58b38fb7a0f27a1f0e055992ce11a05503bb, with 0 Critical, 0 Important and 0
+Minor findings; reviewer runtime is NOT_RUN. Formal hosted review and exact-head
+CI remain pending.
 
 The matrix covers `Values`, `Filter`, `Project`, `Distinct`, Sort key type,
 `Take`, and `Offset`/HQL `SKIP`; selected scalar type admission, comparisons,
@@ -1301,6 +1304,8 @@ an ADR amendment and renewed review.
 
 ## Version diff and changelog
 
+Version diff `0.1.26b -> 0.1.27b`: record the exact-tree independent source review for the Phase B1 candidate while retaining hosted review, exact-head CI and downstream gates; no runtime, decision or contract change.
+
 Version diff `0.1.25b -> 0.1.26b`: reconcile the Phase B1 scalar type-admissibility candidate on PR271 main, retain the selected scope and downstream gates; no runtime, decision or contract change.
 
 Version diff `0.1.24b -> 0.1.25b`: reconcile the merged PR #269 SourceScan status on current main and point to the finite G4/P8 type/order/composition/provenance ledger; no runtime or contract change.
@@ -1318,6 +1323,7 @@ and release qualification open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.27b | 2026-10-27 | active | Record exact-tree Phase B1 independent source review; formal hosted review and exact-head CI remain pending | working-tree | Codex |
 | 0.1.26b | 2026-10-26 | active | Record Phase B1 selected scalar type-admissibility candidate on PR271 main; preserve broad G4/P8/P6/P9-P16 gates | working-tree | Codex |
 | 0.1.25b | 2026-10-26 | active | Reconcile merged PR #269 current-main host status and retain broad G4/P8/P6/P9-P16 gates | working-tree | Codex |
 | 0.1.10b | 2026-10-20 | active | Approve tests-only G4 identity/golden matrix and reconcile hosted PR253 | working-tree | Codex |

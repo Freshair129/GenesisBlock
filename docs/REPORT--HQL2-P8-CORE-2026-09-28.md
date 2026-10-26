@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.93b"
+version: "0.1.94b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-27T01:05:50+07:00,Codex"
+last_update: "2026-10-27T01:13:44+07:00,Codex"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -25,8 +25,13 @@ HQL2 targets had 466 passed, 0 failed, and 1 ignored; the parser probe child
 is exercised by its passing parent and is not added as a second target result.
 The focused scalar target passed 17/17 after the final test-name clarification.
 Core/default all-target Clippy, formatting, docs validation (0 violations in
-244 files), version check (0.2.10) and diff checks passed. Final independent
-review, hosted review and exact-head CI have not yet been recorded here.
+244 files), version check (0.2.10) and diff checks passed. The final independent
+source review passed on commit d6978664ae6c5797887e0b968d1bf06976d6e891,
+tree baac58b38fb7a0f27a1f0e055992ce11a05503bb, with 0 Critical, 0 Important
+and 0 Minor findings; reviewer runtime is NOT_RUN. The report is
+FINAL-INDEPENDENT-REVIEW.md in the evidence folder, SHA-256
+F5DC2D2E1C8659D51E0C477F9F3E4A7B35A061CDFF6B2A0F1E8869067C29C132. Formal
+hosted review and exact-head CI remain pending.
 
 Phase B1 qualifies scalar type admissibility for `Values`, `Filter`, `Project`,
 `Distinct`, Sort key type, `Take`, and HQL `SKIP`/typed-IR `Offset`. Six tests
@@ -2156,6 +2161,8 @@ from these local tests.
 The separate U9 backup/restore target passes 7/7; no user database was modified.
 
 ## Version diff
+
+Version diff `0.1.93b -> 0.1.94b`: record the exact-tree independent source review for the Phase B1 candidate; formal hosted review and exact-head CI remain pending, with broad G4/P8, P6 and P9-P16 gates open.
 
 Version diff `0.1.92b -> 0.1.93b`: record the Phase B1 scalar type-admissibility candidate on PR271 main, six appended tests and bounded scope; preserve open order/composition/provenance, P6 and P9-P16 gates.
 

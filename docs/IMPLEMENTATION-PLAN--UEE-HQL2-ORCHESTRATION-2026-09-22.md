@@ -1,9 +1,9 @@
 ---
-version: "0.9.1b"
+version: "0.9.2b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-27T01:05:50+07:00,Codex"
+last_update: "2026-10-27T01:13:44+07:00,Codex"
 status: beta
 superseded_by: null
 attributes:
@@ -25,8 +25,11 @@ scalar-counter target; its final focused run passed 17/17. The repo-wide
 with exit 0 (158 result blocks: 1,297 passed, 0 failed, 6 ignored), including
 44 root HQL2 targets (466 passed, 0 failed, 1 ignored). Core/default all-target
 Clippy, formatting, docs validation (0/244), version check (0.2.10) and diff
-checks passed. The remaining pre-PR gates are final independent review, hosted
-review and exact-head CI.
+checks passed. Final independent source review passed on commit
+d6978664ae6c5797887e0b968d1bf06976d6e891, tree
+baac58b38fb7a0f27a1f0e055992ce11a05503bb, with 0 Critical, 0 Important and 0
+Minor findings; reviewer runtime is NOT_RUN. Formal hosted review and exact-head
+CI remain pending.
 
 Phase B1 qualifies only selected scalar type admission in `Values`, `Filter`,
 `Project`, `Distinct`, Sort key type, `Take`, and `Offset`/HQL `SKIP`. It changes
@@ -43,7 +46,8 @@ user DB migration or public contract is authorized. See the
 | Focused target | `hql2_g4_scalar_counter_tests`: 17 passed, 0 failed, 0 ignored | PASS |
 | Local broad tests | `cargo test --tests`: 1,297 passed, 0 failed, 6 ignored; 44 HQL2 targets: 466 passed, 0 failed, 1 ignored | PASS |
 | Static/local docs | Core/default all-target Clippy, fmt, docs validation 0/244, version 0.2.10, diff checks | PASS |
-| Hosted delivery | Independent final review, formal hosted review and exact-head CI | PENDING |
+| Independent source review | Exact candidate commit/tree; 0 Critical/Important/Minor findings; reviewer runtime NOT_RUN | PASS |
+| Hosted delivery | Formal hosted review and exact-head CI | PENDING |
 
 The ignored parser probe is invoked by its passing parent; that nested execution
 is not counted as a second target result. The ledger and test names distinguish
@@ -1807,6 +1811,8 @@ correction, rerun Verify and Review before Final. Final PASS is not merge
 authorization.
 
 ## CHANGELOG
+
+Version diff 0.9.1b -> 0.9.2b: record the exact-tree independent source review for Phase B1; retain formal hosted review, exact-head CI, broad G4/P8 and P6/P9-P16 stages.
 
 Version diff 0.9.0b -> 0.9.1b: add the owner-approved Phase B1 scalar type-admissibility qualification status on PR271 main and retain the separate ordering/composition/provenance and P6/P9-P16 stages.
 
