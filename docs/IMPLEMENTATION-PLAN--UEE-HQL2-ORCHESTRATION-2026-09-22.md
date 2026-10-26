@@ -1,9 +1,9 @@
 ---
-version: "0.9.0b"
+version: "0.9.2b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-26T19:29:25+07:00,Codex"
+last_update: "2026-10-27T01:13:44+07:00,Codex"
 status: beta
 superseded_by: null
 attributes:
@@ -15,16 +15,50 @@ attributes:
   owner: "Boss (Founder / Product Authority)"
 ---
 
-## Post-PR269 staged qualification status — 2026-10-26
+## Post-PR271 Phase B1 staged qualification status (2026-10-26)
 
-PR #269 is merged at `b4372dc347cc265f405b94aea38bc453d51565a7`; its recorded
-hosted Rust Ubuntu/Windows/macOS suites passed with 15 successful checks and
-one schedule-only security advisory skip. This closes only that seven-file
-SourceScan metadata candidate's host/CI gate. G4/P8 remains partial; comprehensive
-contract-valid type/order/composition/provenance cells and broad P6 remain
-MISSING_EVIDENCE. First planner behavior is implemented; P9 optimizer and P11
-index lifecycle remain planned behavior. P13-P16 surfaces, recovery, security,
-device and release gates remain separately sequenced. See the [current P8 ledger](REPORT--HQL2-P8-CORE-2026-09-28.md#post-pr269-type-order-composition-and-provenance-status-2026-10-26). No user DB migration or public contract is authorized by this reconciliation.
+PR #271 is merged at base `6bd493e7d8cc58d38b27a4c916b0d16237aeceb0`
+(tree `0f9480e3badf0137841e2e7aa3f05789d7bf1f2a`). Owner approved Phase B1:
+seven existing tests/docs files only, LOW/C-3. Six tests are appended to the
+scalar-counter target; its final focused run passed 17/17. The repo-wide
+`cargo test --locked --offline --no-default-features --jobs 1 --tests` completed
+with exit 0 (158 result blocks: 1,297 passed, 0 failed, 6 ignored), including
+44 root HQL2 targets (466 passed, 0 failed, 1 ignored). Core/default all-target
+Clippy, formatting, docs validation (0/244), version check (0.2.10) and diff
+checks passed. Final independent source review passed on commit
+d6978664ae6c5797887e0b968d1bf06976d6e891, tree
+baac58b38fb7a0f27a1f0e055992ce11a05503bb, with 0 Critical, 0 Important and 0
+Minor findings; reviewer runtime is NOT_RUN. Formal hosted review and exact-head
+CI remain pending.
+
+Phase B1 qualifies only selected scalar type admission in `Values`, `Filter`,
+`Project`, `Distinct`, Sort key type, `Take`, and `Offset`/HQL `SKIP`. It changes
+no runtime behavior or public contract and does not qualify ordering semantics.
+G4/P8 remains partial. Broad accepted type-space, order/composition/provenance,
+P6, P9-P16, performance, device and release gates remain separate or open; no
+user DB migration or public contract is authorized. See the
+[current P8 ledger](REPORT--HQL2-P8-CORE-2026-09-28.md#post-pr271-phase-b1-scalar-type-admissibility-status-2026-10-26).
+
+| Phase B1 gate | Evidence on this candidate | State |
+|---|---|---|
+| Exact scope | One existing scalar-counter test plus six existing governing documents | PASS |
+| Selected type matrix | Paired HQL/typed-IR cases for Values, Filter, Project, Distinct, Sort-key admission, Take and Offset/SKIP; literal schemas/rows and P7 where applicable | PASS, finite |
+| Focused target | `hql2_g4_scalar_counter_tests`: 17 passed, 0 failed, 0 ignored | PASS |
+| Local broad tests | `cargo test --tests`: 1,297 passed, 0 failed, 6 ignored; 44 HQL2 targets: 466 passed, 0 failed, 1 ignored | PASS |
+| Static/local docs | Core/default all-target Clippy, fmt, docs validation 0/244, version 0.2.10, diff checks | PASS |
+| Independent source review | Exact candidate commit/tree; 0 Critical/Important/Minor findings; reviewer runtime NOT_RUN | PASS |
+| Hosted delivery | Formal hosted review and exact-head CI | PENDING |
+
+The ignored parser probe is invoked by its passing parent; that nested execution
+is not counted as a second target result. The ledger and test names distinguish
+DecimalU64 boundary-parameter acceptance from proof of exact downstream count
+semantics. None of these finite checks closes order, composition, provenance,
+P6 or P9-P16 gates.
+
+## Historical post-PR269 staged qualification snapshot (2026-10-26)
+
+The following PR269 record predates PR #271 and remains for history only; its
+candidate-time review/CI wording is not current Phase B1 status.
 ## Approved G4/P8 SourceScan result metadata qualification - 2026-10-26
 
 Owner approved tests/docs-only seven existing files (LOW, C-3): one appended
@@ -286,7 +320,7 @@ changes are admitted. Host first; owner reports physical devices unavailable.
 
 Current baseline is PR263 merged main `0a5db778e533152d20fdbd8be7dfcc0e03c4fc4b`
 with reviewed source tree `ed2ba0fcf3d802f0c5e2f66a66c3a817c774ee56`.
-The P8 report's **Current G4/P8 broad host qualification ledger** maps all eight
+The P8 report's **historical PR264 G4/P8 qualification ledger** maps all eight
 G4 criteria, all 19 executable `Kernel` variants, six `BoundSourceV2` partitions,
 exact-KNN/Original-Rerank modes and independently expected versus self-consistent
 metadata. Every kernel has selected test evidence and explicit residuals; no
@@ -1778,6 +1812,10 @@ authorization.
 
 ## CHANGELOG
 
+Version diff 0.9.1b -> 0.9.2b: record the exact-tree independent source review for Phase B1; retain formal hosted review, exact-head CI, broad G4/P8 and P6/P9-P16 stages.
+
+Version diff 0.9.0b -> 0.9.1b: add the owner-approved Phase B1 scalar type-admissibility qualification status on PR271 main and retain the separate ordering/composition/provenance and P6/P9-P16 stages.
+
 Version diff 0.8.99b -> 0.9.0b: reconcile PR #269 current-main host evidence,
 classify broad G4/P8 and P6/P9-P16 gates, and keep later behavior separately
 planned; no implementation or contract change.
@@ -2000,6 +2038,7 @@ Version diff `0.8.27b -> 0.8.28b`: implement approved D1-D5, record 9 focused pa
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.9.1b | 2026-10-26 | beta | Record Phase B1 selected scalar type-admissibility candidate on PR271 main; keep broad G4/P8 and downstream gates staged | working-tree | Codex |
 | 0.9.0b | 2026-10-26 | beta | Reconcile PR #269 current-main evidence and retain staged G4/P8 through P9-P16 qualification gates | working-tree | Codex |
 | 0.8.85b | 2026-10-20 | beta | Approve tests-only G4 identity/golden matrix and reconcile hosted PR253 | working-tree | Codex |
 | 0.8.84b | 2026-10-20 | beta | Approve test-only lexical/context mode/counter/P7 qualification and reconcile hosted PR252; no runtime contract change | working-tree | Codex |

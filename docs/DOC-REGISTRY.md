@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Document Registry"
 doc_id: "DOC-REGISTRY-GENESISBLOCKDB"
 status: draft
-version: "0.5.125+draft"
-updated: "2026-10-26"
+version: "0.5.127+draft"
+updated: "2026-10-27"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 related_issue: 84
@@ -18,16 +18,29 @@ related_docs:
   - "docs/adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md"
 ---
 
-## Current G4/P8 qualification status — 2026-10-26
+## Current G4/P8 Phase B1 qualification status (2026-10-26)
 
-Current main is `b4372dc347cc265f405b94aea38bc453d51565a7` after PR #269. The
-SourceScan result-metadata slice has merged and its recorded hosted checks
-passed (15 SUCCESS, one schedule-only security advisory skip; Rust Ubuntu,
-Windows and macOS SUCCESS). G4/P8 is still partial. See the current source-linked
-P8 ledger for typed/order/composition/provenance and P6/P9-P16 residual gates:
-[REPORT--HQL2-P8-CORE-2026-09-28.md](REPORT--HQL2-P8-CORE-2026-09-28.md#post-pr269-type-order-composition-and-provenance-status-2026-10-26).
-Historical pending text inside dated candidate records is preserved as a
-snapshot, not current merge status.
+Current main/base is `6bd493e7d8cc58d38b27a4c916b0d16237aeceb0` after PR #271
+(tree `0f9480e3badf0137841e2e7aa3f05789d7bf1f2a`). Phase B1 is an owner-approved
+seven-file tests/docs candidate; its focused existing scalar target passed
+17/17. Repo-wide `cargo test --locked --offline --no-default-features --jobs 1
+--tests` completed with exit 0: 158 result blocks, 1,297 passed, 0 failed, and
+6 ignored, including 44 root HQL2 targets (466 passed, 0 failed, 1 ignored).
+Core/default all-target Clippy, formatting, docs validation (0/244), version
+check (0.2.10) and diff checks passed. Final independent source review passed
+on commit d6978664ae6c5797887e0b968d1bf06976d6e891, tree
+baac58b38fb7a0f27a1f0e055992ce11a05503bb, with 0 Critical, 0 Important and 0
+Minor findings; reviewer runtime is NOT_RUN. Formal hosted review and exact-head
+CI remain pending. The selected matrix does not close G4/P8. See the current source-linked P8 ledger for
+type/order/composition/provenance and P6/P9-P16 residual gates:
+[REPORT--HQL2-P8-CORE-2026-09-28.md](REPORT--HQL2-P8-CORE-2026-09-28.md#post-pr271-phase-b1-scalar-type-admissibility-status-2026-10-26).
+Historical PR269 candidate text below is preserved as a snapshot, not current
+main or B1 hosted status.
+
+## Historical pre-PR271 G4/P8 status (2026-10-26)
+
+The following PR269 record is retained for history; its former base SHA is not
+current main.
 ## Approved G4/P8 SourceScan result metadata qualification - 2026-10-26
 
 Owner approved tests/docs-only seven existing files (LOW, C-3): one appended
@@ -289,7 +302,7 @@ changes are admitted. Host first; owner reports physical devices unavailable.
 
 Current baseline is PR263 merged main `0a5db778e533152d20fdbd8be7dfcc0e03c4fc4b`
 with reviewed source tree `ed2ba0fcf3d802f0c5e2f66a66c3a817c774ee56`.
-The P8 report's **Current G4/P8 broad host qualification ledger** maps all eight
+The P8 report's **historical PR264 G4/P8 qualification ledger** maps all eight
 G4 criteria, all 19 executable `Kernel` variants, six `BoundSourceV2` partitions,
 exact-KNN/Original-Rerank modes and independently expected versus self-consistent
 metadata. Every kernel has selected test evidence and explicit residuals; no
@@ -658,17 +671,17 @@ registry row explicitly names them.
 
 | Role | Doc ID | Version | Status | Owner | Path |
 |---|---|---|---|---|---|
-| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.67b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
-| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.97b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
+| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.69b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
+| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.99b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
 | Execution DAG guard | `SPEC--EXECUTION-DAG-GUARD-V1` | `0.1.0` | accepted | Sol Decision / Contract and AC | `docs/SPEC--EXECUTION-DAG-GUARD-V1.md` |
 | HQL2 execution decision | `ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY` | `0.1.1b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY.md` |
-| HQL2 G4 shared-pipeline contract | `ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE` | `0.1.25b` | active | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md` |
+| HQL2 G4 shared-pipeline contract | `ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE` | `0.1.27b` | active | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md` |
 | HQL2 P8 completion addendum | `ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM` | `0.1.16b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md` |
 | HQL2 Sequence pattern constraints | `ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS` | `0.2.1b` | beta | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS.md` |
 | HQL2 durable revisions and annotations | `ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS` | `0.8.27b` | beta | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS.md` |
-| UEE-HQL2 orchestration plan | `IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22` | `0.9.0b` | beta | Boss (Founder / Product Authority) | `docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md` |
+| UEE-HQL2 orchestration plan | `IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22` | `0.9.2b` | beta | Boss (Founder / Product Authority) | `docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md` |
 | HQL2 typed P8 boundary | `SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY` | `0.2.68b` | beta | Boss (Founder / Product Authority) | `docs/SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY.md` |
-| HQL2 P8 core checkpoint | `REPORT--HQL2-P8-CORE-2026-09-28` | `0.1.92b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P8-CORE-2026-09-28.md` |
+| HQL2 P8 core checkpoint | `REPORT--HQL2-P8-CORE-2026-09-28` | `0.1.94b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P8-CORE-2026-09-28.md` |
 | HQL2 P7 bounded oracle evidence | `REPORT--HQL2-P7-ORACLE-2026-09-28` | `0.1.12b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P7-ORACLE-2026-09-28.md` |
 | Commit correctness | `SPEC--WAVE-A-COMMIT-CORRECTNESS` | `0.1.0b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-A-COMMIT-CORRECTNESS.md` |
 | Durable collections and edge history | `SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY` | `0.1.2b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY.md` |
@@ -729,6 +742,10 @@ The following documents should be created only when implementation work requires
 - third-client namespace conformance report.
 
 ## 9. Changelog
+
+Version diff 0.5.126+draft -> 0.5.127+draft: record the exact-tree Phase B1 independent source review and synchronize the six governance-document versions; keep formal hosted review, exact-head CI, broad G4/P8 and downstream gates open.
+
+Version diff 0.5.125+draft -> 0.5.126+draft: record the owner-approved Phase B1 scalar type-admissibility candidate and synchronize six governance-document versions; keep the broad G4/P8 and downstream gates open.
 
 Version diff 0.5.124+draft -> 0.5.125+draft: reconcile merged PR #269 current
 main and synchronize the G4/P8 governance document versions while preserving
@@ -1133,6 +1150,8 @@ review and full P8 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 0.5.127+draft | 2026-10-27 | GenesisBlockDB Architecture | Record exact-tree Phase B1 independent source review; preserve formal hosted review, exact-head CI and broad G4/P8/P6/P9-P16 gates |
+| 0.5.126+draft | 2026-10-26 | GenesisBlockDB Architecture | Reconcile the Phase B1 scalar type-admissibility candidate and synchronize governing document versions; preserve G4/P8, P6 and P9-P16 gates |
 | 0.5.111+draft | 2026-10-20 | GenesisBlockDB Architecture | Reconcile hosted PR254 and bounded G4 acceptance matrix; keep broad gates partial |
 | 0.5.110+draft | 2026-10-20 | GenesisBlockDB Architecture | Approve bounded G4 identity/golden qualification and reconcile hosted PR253; preserve production contracts and broad gates |
 | 0.5.109+draft | 2026-10-20 | GenesisBlockDB Architecture | Approve bounded G4 lexical/context diagnostics and reconcile hosted PR252; preserve production contracts and broader gates |

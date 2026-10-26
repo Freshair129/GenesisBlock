@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE
-version: "0.1.25b"
+version: "0.1.27b"
 created_at: "2026-10-04T13:08:29+07:00,Codex,2be63a7"
-last_update: "2026-10-26T19:29:25+07:00,Codex"
+last_update: "2026-10-27T01:13:44+07:00,Codex"
 status: active
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -15,22 +15,38 @@ attributes:
   amends: ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY
 ---
 
-## Post-PR269 qualification status — 2026-10-26
+## Post-PR271 Phase B1 scalar type-admissibility status (2026-10-26)
 
-The fetched current main is `b4372dc347cc265f405b94aea38bc453d51565a7`
-(tree `0db1f62d3b1e0b1c8faf13f400164d5606c0aade`), with PR #269 merged. Its
-recorded CI passed 15 checks, had one schedule-only security advisory skip, and
-passed Rust suites on Ubuntu, Windows and macOS. The 605 local passing pairs
-are selected regression coverage. The prior SourceScan section's `PENDING`
-review/CI wording is the candidate-time snapshot; no formal GitHub review event
-or independent reviewer runtime is recorded.
+Current base is fetched `origin/main` `6bd493e7d8cc58d38b27a4c916b0d16237aeceb0`
+(tree `0f9480e3badf0137841e2e7aa3f05789d7bf1f2a`), after PR #271. Owner
+approved the tests/docs-only Phase B1 scalar type-admissibility candidate. Its
+six new tests are in the existing scalar counter target; the focused target
+passed 17/17 with zero failures or ignored tests. Repo-wide
+`cargo test --locked --offline --no-default-features --jobs 1 --tests` completed
+with exit 0 (158 result blocks: 1,297 passed, 0 failed, 6 ignored); its 44 root
+HQL2 targets recorded 466 passed, 0 failed, 1 ignored. Core/default all-target
+Clippy, formatting, docs validation (0/244), version check (0.2.10), and diff
+checks passed. Final independent source review passed on commit
+d6978664ae6c5797887e0b968d1bf06976d6e891, tree
+baac58b38fb7a0f27a1f0e055992ce11a05503bb, with 0 Critical, 0 Important and 0
+Minor findings; reviewer runtime is NOT_RUN. Formal hosted review and exact-head
+CI remain pending.
 
-This status reconciliation changes no G4-D01..D10 decision or P8/P6 contract.
-G4/P8 remains partial; the current type/order/composition/provenance ledger and
-P6/P9-P16 dependencies are in the [source-linked P8 ledger](../REPORT--HQL2-P8-CORE-2026-09-28.md#post-pr269-type-order-composition-and-provenance-status-2026-10-26).
-The selected PR does not prove complete P6 provenance, universal no-write,
-ordinary successful-execution state, performance, device or release acceptance.
+The matrix covers `Values`, `Filter`, `Project`, `Distinct`, Sort key type,
+`Take`, and `Offset`/HQL `SKIP`; selected scalar type admission, comparisons,
+registered functions, checked arithmetic and DecimalU64 structural pagination.
+Sort cases do not qualify ordering semantics. This adds no G4-D01..D10
+decision, accepted contract, runtime behavior, shared P7, or P6 authority.
+G4/P8 remains partial; complete type/order/composition/provenance, broad P6,
+P9-P16 and performance/device/release gates remain open or NOT_RUN. See the
+[current source-linked P8 ledger](../REPORT--HQL2-P8-CORE-2026-09-28.md#post-pr271-phase-b1-scalar-type-admissibility-status-2026-10-26).
 Preserve P8 -> P9-P12 -> P13/P14 -> P15 -> P16.
+
+## Historical post-PR269 qualification snapshot (2026-10-26)
+
+The following PR269 status was recorded before PR #271 and is retained as a
+dated snapshot, not current main status. Its SourceScan section's candidate-time
+review/CI wording is historical and does not describe Phase B1.
 ## Approved G4/P8 SourceScan result metadata qualification - 2026-10-26
 
 Owner approved tests/docs-only seven existing files (LOW, C-3): one appended
@@ -292,7 +308,7 @@ changes are admitted. Host first; owner reports physical devices unavailable.
 
 Current baseline is PR263 merged main `0a5db778e533152d20fdbd8be7dfcc0e03c4fc4b`
 with reviewed source tree `ed2ba0fcf3d802f0c5e2f66a66c3a817c774ee56`.
-The P8 report's **Current G4/P8 broad host qualification ledger** maps all eight
+The P8 report's **historical PR264 G4/P8 qualification ledger** maps all eight
 G4 criteria, all 19 executable `Kernel` variants, six `BoundSourceV2` partitions,
 exact-KNN/Original-Rerank modes and independently expected versus self-consistent
 metadata. Every kernel has selected test evidence and explicit residuals; no
@@ -1288,6 +1304,10 @@ an ADR amendment and renewed review.
 
 ## Version diff and changelog
 
+Version diff `0.1.26b -> 0.1.27b`: record the exact-tree independent source review for the Phase B1 candidate while retaining hosted review, exact-head CI and downstream gates; no runtime, decision or contract change.
+
+Version diff `0.1.25b -> 0.1.26b`: reconcile the Phase B1 scalar type-admissibility candidate on PR271 main, retain the selected scope and downstream gates; no runtime, decision or contract change.
+
 Version diff `0.1.24b -> 0.1.25b`: reconcile the merged PR #269 SourceScan status on current main and point to the finite G4/P8 type/order/composition/provenance ledger; no runtime or contract change.
 
 Version diff: `0.1.3b -> 0.1.4b` selectively recovers the approved typed
@@ -1303,6 +1323,8 @@ and release qualification open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.27b | 2026-10-27 | active | Record exact-tree Phase B1 independent source review; formal hosted review and exact-head CI remain pending | working-tree | Codex |
+| 0.1.26b | 2026-10-26 | active | Record Phase B1 selected scalar type-admissibility candidate on PR271 main; preserve broad G4/P8/P6/P9-P16 gates | working-tree | Codex |
 | 0.1.25b | 2026-10-26 | active | Reconcile merged PR #269 current-main host status and retain broad G4/P8/P6/P9-P16 gates | working-tree | Codex |
 | 0.1.10b | 2026-10-20 | active | Approve tests-only G4 identity/golden matrix and reconcile hosted PR253 | working-tree | Codex |
 | 0.1.9b | 2026-10-20 | active | Approve test-only lexical/context mode/counter/P7 qualification and reconcile hosted PR252; no runtime contract change | working-tree | Codex |

@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.92b"
+version: "0.1.94b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-26T19:29:25+07:00,Codex"
+last_update: "2026-10-27T01:13:44+07:00,Codex"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -12,40 +12,79 @@ attributes:
   complexity: C-3
 ---
 
-## Post-PR269 type, order, composition and provenance status — 2026-10-26
+## Post-PR271 Phase B1 scalar type-admissibility status (2026-10-26)
 
-Authority: current fetched `origin/main` `b4372dc347cc265f405b94aea38bc453d51565a7`
-(tree `0db1f62d3b1e0b1c8faf13f400164d5606c0aade`), the G4 ADR, P8 addendum,
-typed boundary, C4/Master, implementation plan and P6/H2-D11 peer contracts.
-This post-merge record supersedes candidate-time CI/review status in the #269
-section below; it does not rewrite those historical observations.
+Authority: fetched `origin/main` `6bd493e7d8cc58d38b27a4c916b0d16237aeceb0`
+(tree `0f9480e3badf0137841e2e7aa3f05789d7bf1f2a`) after PR #271, together with
+the G4 ADR, P8 addendum, typed boundary, C4/Master, implementation plan and
+P6/H2-D11 peer contracts. The Phase B1 owner-approved branch is a local
+tests/docs candidate only. Its repo-wide `cargo test --locked --offline
+--no-default-features --jobs 1 --tests` completed with exit 0: 158 target
+result blocks, 1,297 passed, 0 failed, and 6 ignored. The subset of 44 root
+HQL2 targets had 466 passed, 0 failed, and 1 ignored; the parser probe child
+is exercised by its passing parent and is not added as a second target result.
+The focused scalar target passed 17/17 after the final test-name clarification.
+Core/default all-target Clippy, formatting, docs validation (0 violations in
+244 files), version check (0.2.10) and diff checks passed. The final independent
+source review passed on commit d6978664ae6c5797887e0b968d1bf06976d6e891,
+tree baac58b38fb7a0f27a1f0e055992ce11a05503bb, with 0 Critical, 0 Important
+and 0 Minor findings; reviewer runtime is NOT_RUN. The report is
+FINAL-INDEPENDENT-REVIEW.md in the evidence folder, SHA-256
+F5DC2D2E1C8659D51E0C477F9F3E4A7B35A061CDFF6B2A0F1E8869067C29C132. Formal
+hosted review and exact-head CI remain pending.
 
-PR #269 is merged. Its recorded host qualification is 460/0/1 across 44 HQL2
-targets plus 145/0/0 across 11 compatibility targets (605 distinct passing
-target/test-name pairs). Hosted checks were 15 SUCCESS plus one conditional
-schedule-only security advisory SKIPPED, including Rust Ubuntu/Windows/macOS
-SUCCESS. The merge record contains no formal GitHub review event; independent
-reviewer runtime is NOT_RUN. The #269 SourceScan matrix is selected evidence,
-not a broad closure claim.
+Phase B1 qualifies scalar type admissibility for `Values`, `Filter`, `Project`,
+`Distinct`, Sort key type, `Take`, and HQL `SKIP`/typed-IR `Offset`. Six tests
+were appended to the existing scalar counter target:
+`scalar_type_admissibility_matrix_accepts_row_shaping_kernels`,
+`scalar_type_admissibility_matrix_filters_and_compares`,
+`scalar_type_admissibility_matrix_functions_and_checked_arithmetic`,
+`scalar_type_admissibility_matrix_rejects_unsupported_cells`,
+`decimal_u64_structural_pagination_accepts_boundary_parameters`, and
+`finite_float_boundary_and_checked_result_fail_closed`. The focused target
+passed 17/17 with zero failures or ignored tests on this candidate.
 
-Current source anchors: `src/query/hql2/value.rs::QueryTypeV2` defines output
-types and wrappers; `src/query/hql2/bind.rs::Kernel` and its `ordered`,
-`equality_comparable`, and `numeric` predicates define the executable kernels
-and selected operator classes; `src/query/hql2/result.rs::QueryResultV2` and
-`ExplainResultV2` define result/plan metadata; `src/query/hql2/request.rs`
-retains the request-boundary rejection of unsupported streaming/partial modes.
-Selected fixture anchors are
-`tests/hql2_g4_source_counter_tests.rs::source_result_metadata_has_independent_fixture_expectations_in_hql_and_ir`,
-`tests/hql2_g4_scalar_counter_tests.rs::scalar_result_metadata_has_independent_fixture_expectations`,
-`tests/hql2_storage_set_oracle_differential_tests.rs::union_result_metadata_has_independent_fixture_expectations`,
-`tests/hql2_storage_aggregate_oracle_differential_tests.rs::aggregate_result_metadata_has_independent_fixture_expectations`,
-and `tests/hql2_storage_hql_join_oracle_differential_tests.rs::storage_join_result_metadata_has_independent_fixture_expectations`.
-These anchors identify selected cases only; the matrix below remains the
-contract-derived gap map. Peer authority anchors are
-`docs/SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL.md`,
-`docs/SPEC--GENESISDB-P6-PEER-LOCALITY-ADDENDUM.md`, and
-`docs/REPORT--HQL2-P7-ORACLE-2026-09-28.md`; this G4/P8 reconciliation does not
-redefine or independently close those contracts.
+The paired HQL2/typed-IR cases use literal output schemas and rows, with the
+unchanged P7 oracle only for independently representable cells. They cover the
+selected Bool/I64/DecimalU64/F64Finite/Utf8, nullable, nested-list and
+structural Vector cases; Boolean filters/logic, same-type comparisons,
+registered scalar functions, ordinary I64/F64 arithmetic results, and HQL
+DecimalU64 pagination boundary acceptance at zero and `u64::MAX`. The existing
+paired checked-I64 overflow/division test remains unchanged in this target; the
+B1 finite-float test adds a non-finite-result guard. The two-row pagination
+fixture verifies accepted boundary parameters and bounded output, not exact
+downstream count semantics. Rejected cells pin existing categories/reasons.
+Sort uses at most one row (or an empty input), so this is key-type admission
+evidence only; it does not assert order, tie, multi-key, or composition rules.
+
+This is finite `TESTED` evidence, not complete type-space qualification or G4/P8
+closure. JSON/domain source values, Aggregate/UnionAll/Join, source provenance,
+Plan/Analyze metadata, P6 authority, complete ordering/composition, broad
+type-space, independent runtime/new-machine, performance, physical-device and
+release gates remain outside this phase or open. P7 is unchanged. Preserve
+P8 -> P9-P12 -> P13/P14 -> P15 -> P16. The prior PR269 SourceScan record below
+is a historical snapshot; this section is the current base and B1 candidate
+status.
+
+Current source anchors: `src/query/hql2/value.rs::QueryTypeV2` and its
+parameter decoder define accepted spellings and fail-closed representations;
+`src/query/hql2/bind.rs::Kernel` plus `ordered`, `equality_comparable`, and
+`numeric` define the selected admission predicates. The typed-boundary
+contract and P6/P7 peer specifications remain the authority; tests do not
+change them.
+
+## Historical post-PR269 type, order, composition and provenance snapshot (2026-10-26)
+
+This section preserves the earlier snapshot taken before PR #271. Its recorded
+base `b4372dc347cc265f405b94aea38bc453d51565a7` and tree
+`0db1f62d3b1e0b1c8faf13f400164d5606c0aade` are historical, not current main.
+PR #269 was merged and its recorded host qualification was 460/0/1 across 44
+HQL2 targets plus 145/0/0 across 11 compatibility targets (605 distinct
+passing target/test-name pairs). Its hosted checks were 15 SUCCESS and one
+conditional schedule-only security advisory SKIPPED, including Rust Ubuntu,
+Windows and macOS SUCCESS. The merge record contains no formal GitHub review
+event; its independent reviewer runtime is NOT_RUN. Those selected SourceScan
+results remain historical evidence, not broad closure or B1 results.
 
 | Dimension | Contract/source universe | Current evidence | Remaining status |
 |---|---|---|---|
@@ -466,7 +505,11 @@ source review or historical pipeline status.
 
 Version transition: `0.1.87b` -> `0.1.88b`; independently executed host evidence and PR264 reconciliation only.
 
-## Current G4/P8 broad host qualification ledger - 2026-10-24
+## Historical PR264 G4/P8 broad host qualification ledger - 2026-10-24
+
+This is the first broad qualification snapshot before PR #265-#271. Current
+main and the Phase B1 candidate are summarized at the top of this report; this
+dated ledger and its original counts remain historical evidence.
 
 Owner approved the first broad qualification slice: six existing documents,
 existing host regressions and one fresh whole-scope independent source/evidence/
@@ -2119,6 +2162,10 @@ The separate U9 backup/restore target passes 7/7; no user database was modified.
 
 ## Version diff
 
+Version diff `0.1.93b -> 0.1.94b`: record the exact-tree independent source review for the Phase B1 candidate; formal hosted review and exact-head CI remain pending, with broad G4/P8, P6 and P9-P16 gates open.
+
+Version diff `0.1.92b -> 0.1.93b`: record the Phase B1 scalar type-admissibility candidate on PR271 main, six appended tests and bounded scope; preserve open order/composition/provenance, P6 and P9-P16 gates.
+
 Version diff `0.1.91b -> 0.1.92b`: reconcile merged PR #269 hosted status and add the source-linked current-main type/order/composition/provenance and P6/P9-P16 gate map; preserve the partial closure status.
 
 Recovery version diff `0.1.69b -> 0.1.70b`: recover the bounded G4 diagnostic
@@ -2372,6 +2419,7 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.93b | 2026-10-26 | beta | Reconcile the owner-approved Phase B1 scalar type-admissibility candidate on PR271 main; record focused tests and retain all broader gates | working-tree | Codex |
 | 0.1.92b | 2026-10-26 | beta | Reconcile merged PR #269 and classify current-main G4/P8 type/order/composition/provenance and P6/P9-P16 gates | working-tree | Codex |
 | 0.1.77b | 2026-10-20 | beta | Approve tests-only G4 identity/golden matrix and reconcile hosted PR253 | working-tree | Codex |
 | 0.1.76b | 2026-10-20 | beta | Approve test-only lexical/context mode/counter/P7 qualification and reconcile hosted PR252; no runtime contract change | working-tree | Codex |
