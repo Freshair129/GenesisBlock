@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.94b"
+version: "0.1.95b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-27T01:13:44+07:00,Codex"
+last_update: "2026-10-27T07:10:10+07:00,Codex"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -12,7 +12,41 @@ attributes:
   complexity: C-3
 ---
 
-## Post-PR271 Phase B1 scalar type-admissibility status (2026-10-26)
+## Post-PR272 Phase C1 ordering status (2026-10-27)
+
+Fetched `origin/main` is PR #272 merge `464dcb93c5cc66cfbd641f5c7e85c14ca954d93c`,
+tree `87c80b518983e091705783df83392ab0a027bb6f`. The owner approved a
+tests/docs-only seven-file Phase C1 candidate on that base. The appended
+`scalar_ordering_matrix_pairs_frontends_with_literal_rows_and_counters` test
+pairs HQL2 and typed IR for Bool, I64, DecimalU64, F64Finite and Utf8 sort
+keys; ASC/DESC and NULL placement; empty/single/duplicate inputs; a secondary
+key that resolves primary-key ties; and bounded Sort -> Project -> Skip/Offset
+-> Take cases. Literal ordered rows are authoritative. Unchanged P7 is invoked
+only for its independently representable scalar values. The test also pins
+existing Plan and Analyze expectations. It does not assert identity/order for
+distinguishable rows tied on the full key because that contract is unspecified.
+
+The selected comparator types follow the P8 typed boundary and `bind.rs`;
+existing B1 List/Vector rejection checks retain `comparator_unavailable`. No
+JSON/domain ordering, type, kernel, error contract, P7 or runtime behavior is
+added. The C1 focused test passed 1/1 and the shared scalar-counter target
+passed 18/18. The full local `cargo test --locked --offline --no-default-features
+--jobs 1 --tests` run completed with exit 0: 158 result blocks, 1,298 passed,
+0 failed and 6 ignored; the 44 root HQL2 targets had 467 passed, 0 failed and
+1 ignored. The broad run included the focused target once. Formatting and diff
+checks passed. After the small test-helper Clippy cleanup, the focused C1 test
+passed again (1/1) and the shared scalar-counter target passed 18/18. The full
+suite predates only this mechanical test-helper cleanup. Core/default
+all-target strict Clippy, docs validation
+(0 violations in 244 files), and version validation (0.2.10) passed.
+Independent source review, formal PR review and exact-head hosted CI remain
+pending. This is a candidate, not merged evidence.
+G4/P8 remains partial: full-key tie policy, complete composition,
+other sources/types, provenance/P6, P9-P16, independent runtime/performance,
+device and release gates remain open. Preserve P8 -> P9-P12 -> P13/P14 -> P15
+-> P16.
+
+## Historical pre-PR272 Phase B1 scalar type-admissibility candidate (2026-10-26)
 
 Authority: fetched `origin/main` `6bd493e7d8cc58d38b27a4c916b0d16237aeceb0`
 (tree `0f9480e3badf0137841e2e7aa3f05789d7bf1f2a`) after PR #271, together with
@@ -30,8 +64,9 @@ source review passed on commit d6978664ae6c5797887e0b968d1bf06976d6e891,
 tree baac58b38fb7a0f27a1f0e055992ce11a05503bb, with 0 Critical, 0 Important
 and 0 Minor findings; reviewer runtime is NOT_RUN. The report is
 FINAL-INDEPENDENT-REVIEW.md in the evidence folder, SHA-256
-F5DC2D2E1C8659D51E0C477F9F3E4A7B35A061CDFF6B2A0F1E8869067C29C132. Formal
-hosted review and exact-head CI remain pending.
+F5DC2D2E1C8659D51E0C477F9F3E4A7B35A061CDFF6B2A0F1E8869067C29C132. At this
+candidate snapshot, formal hosted review and exact-head CI were pending; PR
+#272 later merged the Phase B1 change.
 
 Phase B1 qualifies scalar type admissibility for `Values`, `Filter`, `Project`,
 `Distinct`, Sort key type, `Take`, and HQL `SKIP`/typed-IR `Offset`. Six tests
@@ -2162,7 +2197,9 @@ The separate U9 backup/restore target passes 7/7; no user database was modified.
 
 ## Version diff
 
-Version diff `0.1.93b -> 0.1.94b`: record the exact-tree independent source review for the Phase B1 candidate; formal hosted review and exact-head CI remain pending, with broad G4/P8, P6 and P9-P16 gates open.
+Version diff `0.1.94b -> 0.1.95b`: record the approved Phase C1 ordering candidate on PR272 main, bounded focused evidence and open broad gates; the repository-wide suite is in progress.
+
+Version diff `0.1.93b -> 0.1.94b`: record the exact-tree independent source review for the Phase B1 candidate; at that candidate snapshot formal hosted review and exact-head CI were pending, with broad G4/P8, P6 and P9-P16 gates open.
 
 Version diff `0.1.92b -> 0.1.93b`: record the Phase B1 scalar type-admissibility candidate on PR271 main, six appended tests and bounded scope; preserve open order/composition/provenance, P6 and P9-P16 gates.
 
@@ -2419,6 +2456,7 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.95b | 2026-10-27 | beta | Record selected C1 ordering candidate on PR272 main, local broad tests 1,298/0/6 and 44 HQL2 targets 467/0/1; preserve broader gates | working-tree | Codex |
 | 0.1.93b | 2026-10-26 | beta | Reconcile the owner-approved Phase B1 scalar type-admissibility candidate on PR271 main; record focused tests and retain all broader gates | working-tree | Codex |
 | 0.1.92b | 2026-10-26 | beta | Reconcile merged PR #269 and classify current-main G4/P8 type/order/composition/provenance and P6/P9-P16 gates | working-tree | Codex |
 | 0.1.77b | 2026-10-20 | beta | Approve tests-only G4 identity/golden matrix and reconcile hosted PR253 | working-tree | Codex |
