@@ -1726,6 +1726,224 @@ fn b1_assert_paired_error(
     b1_assert_error(db, hql_request, code, stage, reason);
 }
 
+fn c1_sort_key(expression: Value, direction: &str, nulls: &str) -> Value {
+    json!({"expression":expression,"direction":direction,"nulls":nulls})
+}
+
+fn c1_sort_requests(
+    params: Value,
+    keys: Vec<Value>,
+    hql_order: &str,
+) -> (QueryRequestV2, QueryRequestV2) {
+    let ir = request(
+        vec![
+            values("v", "xs", "x"),
+            node("s", "Sort", &["v"], json!({"keys":keys})),
+            node(
+                "p",
+                "Project",
+                &["s"],
+                json!({"fields":[{"expression":field("x"),"as":"y"}]}),
+            ),
+        ],
+        "p",
+        params.clone(),
+    );
+    let hql = b1_hql_request(
+        params,
+        &format!("VALUES $xs AS x |> ORDER BY {hql_order} |> RETURN x AS y"),
+    );
+    (ir, hql)
+}
+
+fn c1_pagination_requests(params: Value, skip: u64, take: u64) -> (QueryRequestV2, QueryRequestV2) {
+    let ir = request(
+        vec![
+            values("v", "xs", "x"),
+            node(
+                "p0",
+                "Project",
+                &["v"],
+                json!({"fields":[{"expression":field("x"),"as":"y"}]}),
+            ),
+            node(
+                "s",
+                "Sort",
+                &["p0"],
+                json!({"keys":[c1_sort_key(field("y"),"asc","last")]}),
+            ),
+            node("o", "Offset", &["s"], json!({"count":skip})),
+            node("t", "Take", &["o"], json!({"count":take})),
+            node(
+                "p1",
+                "Project",
+                &["t"],
+                json!({"fields":[{"expression":field("y"),"as":"y"}]}),
+            ),
+        ],
+        "p1",
+        params.clone(),
+    );
+    let hql = b1_hql_request(
+        params,
+        &format!(
+            "VALUES $xs AS x |> PROJECT x AS y |> ORDER BY y ASC NULLS LAST |> SKIP {skip} |> TAKE {take} |> RETURN y"
+        ),
+    );
+    (ir, hql)
+}
+
+fn c1_p7_sort_project(values: Vec<R>, keys: Vec<reference::SortKey>) -> P {
+    P::Project(
+        Box::new(P::Sort(Box::new(b1_p7_values("x", values)), keys)),
+        vec![("y".into(), E::Field("x".into()))],
+    )
+}
+
+fn c1_assert_plan_nodes(
+    explain: &genesis_block_native::query::hql2::ExplainResultV2,
+    expected: &[(QueryOpV2, u64, u64)],
+    analyzed: bool,
+) {
+    assert_eq!(explain.plan.len(), expected.len());
+    let mut id = explain.root.clone();
+    for (index, (op, rows_in, rows_out)) in expected.iter().enumerate().rev() {
+        let node = explain.plan.iter().find(|node| node.id == id).unwrap();
+        assert_eq!(&node.logical_op, op);
+        if index == 0 {
+            assert!(node.inputs.is_empty());
+        } else {
+            assert_eq!(node.inputs.len(), 1);
+            id = node.inputs[0].clone();
+        }
+        if !analyzed {
+            assert!(node.actual.is_none());
+            assert!(node.estimates.is_none());
+            continue;
+        }
+
+        let actual = serde_json::to_value(node.actual.as_ref().unwrap()).unwrap();
+        for (name, count) in [("rows_in", rows_in), ("rows_out", rows_out)] {
+            assert_eq!(
+                actual[name],
+                json!({"unit":"rows","measurement":{"status":"measured","value":count}}),
+                "{op:?}.{name}"
+            );
+        }
+        for (name, unit, reason) in [
+            ("bytes_read", "bytes", "not_instrumented"),
+            ("work_units", "work_units", "not_instrumented"),
+            ("memory_peak_bytes", "bytes", "not_instrumented"),
+            ("index_probes", "index_probes", "not_applicable"),
+            (
+                "distance_evaluations",
+                "distance_evaluations",
+                "not_applicable",
+            ),
+            ("graph_expansions", "graph_expansions", "not_applicable"),
+            ("spill_bytes", "bytes", "not_applicable"),
+        ] {
+            assert_eq!(
+                actual[name],
+                json!({"unit":unit,"measurement":{"status":"unknown","reason":reason}}),
+                "{op:?}.{name}"
+            );
+        }
+        assert_eq!(actual["elapsed_ns"]["unit"], "nanoseconds");
+        assert_eq!(actual["elapsed_ns"]["measurement"]["status"], "measured");
+        assert!(actual["elapsed_ns"]["measurement"]["value"]
+            .as_u64()
+            .is_some());
+        assert_eq!(actual["clock_source"], "monotonic_instant");
+        assert_eq!(actual["sampling"], "complete");
+        assert_eq!(actual["elapsed_scope"], "operator_execution");
+    }
+}
+
+struct C1OrderExpectation<'a> {
+    type_name: &'a str,
+    nullable: bool,
+    values: Vec<V>,
+    p7: Option<P>,
+    ops: &'a [(QueryOpV2, u64, u64)],
+}
+
+fn c1_assert_order_modes(
+    db: &Storage,
+    ir_request: QueryRequestV2,
+    hql_request: QueryRequestV2,
+    expected: C1OrderExpectation<'_>,
+) {
+    let expected_columns =
+        json!([{"name":"y","type":expected.type_name,"nullable":expected.nullable}]);
+    let expected_rows = b1_literal_rows("y", expected.values);
+    if let Some(oracle) = expected.p7 {
+        let p7_rows = reference::execute(&oracle)
+            .unwrap()
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .map(|(name, value)| (name.clone(), b1_from_p7(value)))
+                    .collect::<BTreeMap<_, _>>()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(p7_rows, expected_rows, "literal C1 rows vs unchanged P7");
+    }
+
+    for (frontend, request) in [("typed IR", ir_request), ("HQL2", hql_request)] {
+        let QueryOutcomeV2::Rows(normal) = db.query_v2(access(), request.clone()).unwrap() else {
+            panic!("{frontend} normal execution must return rows");
+        };
+        assert!(normal.explain.is_none());
+        assert_eq!(
+            serde_json::to_value(&normal.columns).unwrap(),
+            expected_columns
+        );
+        assert_eq!(
+            normal.rows, expected_rows,
+            "{frontend} literal ordered rows"
+        );
+        assert_eq!(
+            normal.completeness.status,
+            genesis_block_native::query::hql2::result::CompletionStatusV2::Complete
+        );
+
+        let mut planned_request = request.clone();
+        planned_request.explain = Some(ExplainV2::Plan);
+        let QueryOutcomeV2::Plan(plan) = db.query_v2(access(), planned_request).unwrap() else {
+            panic!("{frontend} Plan must return a plan");
+        };
+        c1_assert_plan_nodes(&plan, expected.ops, false);
+
+        let mut analyzed_request = request;
+        analyzed_request.explain = Some(ExplainV2::Analyze);
+        let QueryOutcomeV2::Rows(analyzed) = db.query_v2(access(), analyzed_request).unwrap()
+        else {
+            panic!("{frontend} Analyze must return rows");
+        };
+        assert_eq!(analyzed.rows, expected_rows, "{frontend} Analyze rows");
+        assert_eq!(
+            serde_json::to_value(&analyzed.columns).unwrap(),
+            expected_columns
+        );
+        assert_eq!(normal.rows, analyzed.rows);
+        assert_eq!(normal.columns, analyzed.columns);
+        assert_eq!(normal.semantics, analyzed.semantics);
+        assert_eq!(normal.completeness, analyzed.completeness);
+        assert_eq!(normal.index_frontiers, analyzed.index_frontiers);
+        assert_eq!(normal.cursor, analyzed.cursor);
+
+        let mut analyzed_plan = analyzed.explain.unwrap();
+        assert_eq!(analyzed_plan.plan_hash, plan.plan_hash);
+        assert_eq!(analyzed_plan.planner_version, plan.planner_version);
+        c1_assert_plan_nodes(&analyzed_plan, expected.ops, true);
+        for node in &mut analyzed_plan.plan {
+            node.actual.take();
+        }
+        assert_eq!(analyzed_plan.plan, plan.plan);
+    }
+}
+
 /// Contract-derived row-shaping admission only: every successful cell has a
 /// literal schema/row oracle, with the unchanged P7 interpreter where it has an
 /// independent representation. Sort inputs have at most one row so this does
@@ -2722,4 +2940,374 @@ fn finite_float_boundary_and_checked_result_fail_closed() {
     );
     b1_assert_paired_error(&db, ir, hql, "BIND_ERROR", "execute", "nonfinite_result");
     assert_state(&db, directory.path(), &before);
+}
+
+/// Phase C1 selected ORDER BY contract cases: literal rows are primary,
+/// unchanged P7 is used only for its supported scalar values, and full-key tie
+/// identity is deliberately not asserted because the contract does not define
+/// a stable tie order.
+#[test]
+fn scalar_ordering_matrix_pairs_frontends_with_literal_rows_and_counters() {
+    let directory = TempDir::new().unwrap();
+    let db = open(&directory);
+
+    struct SortCase {
+        type_name: &'static str,
+        encoded: Value,
+        ascending: Vec<V>,
+        descending: Vec<V>,
+        p7_values: Option<Vec<R>>,
+    }
+    let cases = [
+        SortCase {
+            type_name: "Bool",
+            encoded: json!([true, false, true]),
+            ascending: vec![V::Bool(false), V::Bool(true), V::Bool(true)],
+            descending: vec![V::Bool(true), V::Bool(true), V::Bool(false)],
+            p7_values: Some(vec![R::Bool(true), R::Bool(false), R::Bool(true)]),
+        },
+        SortCase {
+            type_name: "I64",
+            encoded: json!(["2", "-1", "2", "0"]),
+            ascending: vec![V::I64(-1), V::I64(0), V::I64(2), V::I64(2)],
+            descending: vec![V::I64(2), V::I64(2), V::I64(0), V::I64(-1)],
+            p7_values: Some(vec![R::I64(2), R::I64(-1), R::I64(2), R::I64(0)]),
+        },
+        SortCase {
+            type_name: "DecimalU64",
+            encoded: json!(["10", "2", "10", "0"]),
+            ascending: vec![
+                V::DecimalU64(0),
+                V::DecimalU64(2),
+                V::DecimalU64(10),
+                V::DecimalU64(10),
+            ],
+            descending: vec![
+                V::DecimalU64(10),
+                V::DecimalU64(10),
+                V::DecimalU64(2),
+                V::DecimalU64(0),
+            ],
+            p7_values: None,
+        },
+        SortCase {
+            type_name: "F64Finite",
+            encoded: json!([2.5, -0.5, 2.5, 0.0]),
+            ascending: vec![V::F64(-0.5), V::F64(0.0), V::F64(2.5), V::F64(2.5)],
+            descending: vec![V::F64(2.5), V::F64(2.5), V::F64(0.0), V::F64(-0.5)],
+            p7_values: Some(vec![R::F64(2.5), R::F64(-0.5), R::F64(2.5), R::F64(0.0)]),
+        },
+        SortCase {
+            type_name: "Utf8",
+            encoded: json!(["b", "a", "b", "c"]),
+            ascending: vec![
+                V::Utf8("a".into()),
+                V::Utf8("b".into()),
+                V::Utf8("b".into()),
+                V::Utf8("c".into()),
+            ],
+            descending: vec![
+                V::Utf8("c".into()),
+                V::Utf8("b".into()),
+                V::Utf8("b".into()),
+                V::Utf8("a".into()),
+            ],
+            p7_values: Some(vec![
+                R::Text("b".into()),
+                R::Text("a".into()),
+                R::Text("b".into()),
+                R::Text("c".into()),
+            ]),
+        },
+    ];
+
+    for case in cases {
+        let params = json!({
+            "xs":{"type":format!("List<{}>",case.type_name),"value":case.encoded.clone()}
+        });
+        let row_count = case.ascending.len() as u64;
+        let ops = [
+            (QueryOpV2::Values, 0, row_count),
+            (QueryOpV2::Sort, row_count, row_count),
+            (QueryOpV2::Project, row_count, row_count),
+        ];
+        for (direction, descending, expected) in [
+            ("asc", false, &case.ascending),
+            ("desc", true, &case.descending),
+        ] {
+            let (ir, hql) = c1_sort_requests(
+                params.clone(),
+                vec![c1_sort_key(field("x"), direction, "last")],
+                &format!("x {} NULLS LAST", direction.to_ascii_uppercase()),
+            );
+            let p7 = case.p7_values.clone().map(|values| {
+                c1_p7_sort_project(
+                    values,
+                    vec![reference::SortKey {
+                        expr: E::Field("x".into()),
+                        descending,
+                        nulls_first: false,
+                    }],
+                )
+            });
+            c1_assert_order_modes(
+                &db,
+                ir,
+                hql,
+                C1OrderExpectation {
+                    type_name: case.type_name,
+                    nullable: false,
+                    values: expected.clone(),
+                    p7,
+                    ops: &ops,
+                },
+            );
+        }
+    }
+
+    let nullable_input = [Some(2), None, Some(1), Some(2), None];
+    let nullable_params = json!({
+        "xs":{"type":"List<Nullable<I64>>","value":["2",null,"1","2",null]}
+    });
+    let nullable_p7 = nullable_input
+        .iter()
+        .map(|value| value.map(R::I64).unwrap_or(R::Null))
+        .collect::<Vec<_>>();
+    let nullable_ops = [
+        (QueryOpV2::Values, 0, 5),
+        (QueryOpV2::Sort, 5, 5),
+        (QueryOpV2::Project, 5, 5),
+    ];
+    for (direction, descending, expected_first, expected_last) in [
+        (
+            "asc",
+            false,
+            vec![V::Null, V::Null, V::I64(1), V::I64(2), V::I64(2)],
+            vec![V::I64(1), V::I64(2), V::I64(2), V::Null, V::Null],
+        ),
+        (
+            "desc",
+            true,
+            vec![V::Null, V::Null, V::I64(2), V::I64(2), V::I64(1)],
+            vec![V::I64(2), V::I64(2), V::I64(1), V::Null, V::Null],
+        ),
+    ] {
+        for (nulls, nulls_first, expected) in [
+            ("first", true, expected_first),
+            ("last", false, expected_last.clone()),
+        ] {
+            let (ir, hql) = c1_sort_requests(
+                nullable_params.clone(),
+                vec![c1_sort_key(field("x"), direction, nulls)],
+                &format!(
+                    "x {} NULLS {}",
+                    direction.to_ascii_uppercase(),
+                    nulls.to_ascii_uppercase()
+                ),
+            );
+            let p7 = c1_p7_sort_project(
+                nullable_p7.clone(),
+                vec![reference::SortKey {
+                    expr: E::Field("x".into()),
+                    descending,
+                    nulls_first,
+                }],
+            );
+            c1_assert_order_modes(
+                &db,
+                ir,
+                hql,
+                C1OrderExpectation {
+                    type_name: "Nullable<I64>",
+                    nullable: true,
+                    values: expected,
+                    p7: Some(p7),
+                    ops: &nullable_ops,
+                },
+            );
+        }
+
+        // HQL's omitted NULL placement is contract-defined as LAST in either
+        // direction; typed IR still supplies its required explicit NullOrder.
+        let (ir, hql) = c1_sort_requests(
+            nullable_params.clone(),
+            vec![c1_sort_key(field("x"), direction, "last")],
+            &format!("x {}", direction.to_ascii_uppercase()),
+        );
+        let p7 = c1_p7_sort_project(
+            nullable_p7.clone(),
+            vec![reference::SortKey {
+                expr: E::Field("x".into()),
+                descending,
+                nulls_first: false,
+            }],
+        );
+        c1_assert_order_modes(
+            &db,
+            ir,
+            hql,
+            C1OrderExpectation {
+                type_name: "Nullable<I64>",
+                nullable: true,
+                values: expected_last,
+                p7: Some(p7),
+                ops: &nullable_ops,
+            },
+        );
+    }
+
+    for (encoded, values, expected) in [
+        (json!([]), vec![], vec![]),
+        (json!(["7"]), vec![R::I64(7)], vec![V::I64(7)]),
+    ] {
+        let params = json!({"xs":{"type":"List<I64>","value":encoded}});
+        let count = expected.len() as u64;
+        let ops = [
+            (QueryOpV2::Values, 0, count),
+            (QueryOpV2::Sort, count, count),
+            (QueryOpV2::Project, count, count),
+        ];
+        let (ir, hql) = c1_sort_requests(
+            params,
+            vec![c1_sort_key(field("x"), "asc", "last")],
+            "x ASC NULLS LAST",
+        );
+        c1_assert_order_modes(
+            &db,
+            ir,
+            hql,
+            C1OrderExpectation {
+                type_name: "I64",
+                nullable: false,
+                values: expected,
+                p7: Some(c1_p7_sort_project(
+                    values,
+                    vec![reference::SortKey {
+                        expr: E::Field("x".into()),
+                        descending: false,
+                        nulls_first: false,
+                    }],
+                )),
+                ops: &ops,
+            },
+        );
+    }
+
+    let tie_params = json!({"xs":{"type":"List<I64>","value":["2","1","4","3","2","1","4"]}});
+    let primary_ir = json!({
+        "binary":"rem","left":field("x"),"right":{"type":"I64","literal":"2"}
+    });
+    let (ir, hql) = c1_sort_requests(
+        tie_params,
+        vec![
+            c1_sort_key(primary_ir, "asc", "last"),
+            c1_sort_key(field("x"), "desc", "last"),
+        ],
+        "x % 2 ASC NULLS LAST, x DESC NULLS LAST",
+    );
+    let tie_input = [2, 1, 4, 3, 2, 1, 4];
+    let tie_p7 = c1_p7_sort_project(
+        tie_input.iter().copied().map(R::I64).collect::<Vec<_>>(),
+        vec![
+            reference::SortKey {
+                expr: E::Rem(
+                    Box::new(E::Field("x".into())),
+                    Box::new(E::Literal(R::I64(2))),
+                ),
+                descending: false,
+                nulls_first: false,
+            },
+            reference::SortKey {
+                expr: E::Field("x".into()),
+                descending: true,
+                nulls_first: false,
+            },
+        ],
+    );
+    let tie_rows = 7;
+    c1_assert_order_modes(
+        &db,
+        ir,
+        hql,
+        C1OrderExpectation {
+            type_name: "I64",
+            nullable: false,
+            values: vec![
+                V::I64(4),
+                V::I64(4),
+                V::I64(2),
+                V::I64(2),
+                V::I64(3),
+                V::I64(1),
+                V::I64(1),
+            ],
+            p7: Some(tie_p7),
+            ops: &[
+                (QueryOpV2::Values, 0, tie_rows),
+                (QueryOpV2::Sort, tie_rows, tie_rows),
+                (QueryOpV2::Project, tie_rows, tie_rows),
+            ],
+        },
+    );
+
+    let pagination_input = [4, 1, 3, 2, 2];
+    for (skip, take, expected_values) in [
+        (0_u64, 3_u64, vec![V::I64(1), V::I64(2), V::I64(2)]),
+        (2, 2, vec![V::I64(2), V::I64(3)]),
+        (9, 1, vec![]),
+        (0, 0, vec![]),
+        (4, 5, vec![V::I64(4)]),
+    ] {
+        let params = json!({
+            "xs":{"type":"List<I64>","value":["4","1","3","2","2"]}
+        });
+        let (ir, hql) = c1_pagination_requests(params, skip, take);
+        let offset_out = pagination_input.len().saturating_sub(skip as usize) as u64;
+        let take_out = offset_out.min(take);
+        let p7_source = P::Project(
+            Box::new(b1_p7_values(
+                "x",
+                pagination_input
+                    .iter()
+                    .copied()
+                    .map(R::I64)
+                    .collect::<Vec<_>>(),
+            )),
+            vec![("y".into(), E::Field("x".into()))],
+        );
+        let p7_sorted = P::Sort(
+            Box::new(p7_source),
+            vec![reference::SortKey {
+                expr: E::Field("y".into()),
+                descending: false,
+                nulls_first: false,
+            }],
+        );
+        let p7_paged = P::Project(
+            Box::new(P::Take(
+                Box::new(P::Offset(Box::new(p7_sorted), skip as usize)),
+                take as usize,
+            )),
+            vec![("y".into(), E::Field("y".into()))],
+        );
+        c1_assert_order_modes(
+            &db,
+            ir,
+            hql,
+            C1OrderExpectation {
+                type_name: "I64",
+                nullable: false,
+                values: expected_values,
+                p7: Some(p7_paged),
+                ops: &[
+                    (QueryOpV2::Values, 0, 5),
+                    (QueryOpV2::Project, 5, 5),
+                    (QueryOpV2::Sort, 5, 5),
+                    (QueryOpV2::Offset, 5, offset_out),
+                    (QueryOpV2::Take, offset_out, take_out),
+                    (QueryOpV2::Project, take_out, take_out),
+                ],
+            },
+        );
+    }
 }

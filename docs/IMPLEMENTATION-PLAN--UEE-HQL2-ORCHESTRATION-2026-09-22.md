@@ -1,9 +1,9 @@
 ---
-version: "0.9.2b"
+version: "0.9.3b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-27T01:13:44+07:00,Codex"
+last_update: "2026-10-27T07:10:10+07:00,Codex"
 status: beta
 superseded_by: null
 attributes:
@@ -15,7 +15,47 @@ attributes:
   owner: "Boss (Founder / Product Authority)"
 ---
 
-## Post-PR271 Phase B1 staged qualification status (2026-10-26)
+## Post-PR272 Phase C1 ordering qualification status (2026-10-27)
+
+Phase B1 was merged in PR #272 at `464dcb93c5cc66cfbd641f5c7e85c14ca954d93c`
+(tree `87c80b518983e091705783df83392ab0a027bb6f`). Phase C1 is an owner-
+approved, seven-existing-file tests/docs candidate that qualifies selected
+contract-defined ordering and bounded row-shaping cases for HQL2 and typed IR.
+It adds one scalar-counter test; it makes no runtime or contract change. The
+accepted comparator set is Bool, I64, DecimalU64, F64Finite and Utf8, matching
+the P8 boundary and current binding predicate. Unsupported List/Vector
+fail-closed evidence remains in the pre-existing B1 target. Literal rows, not
+normalized query output, define expected order; P7 is used only where
+independently applicable. Full-key tie order remains unspecified and is not
+claimed. Composition coverage is limited to selected Sort/Project/
+Skip-or-Offset/Take paths.
+
+The C1 focused test passed 1/1 and its shared scalar-counter target passed
+18/18. The full local `cargo test --locked --offline --no-default-features
+--jobs 1 --tests` run exited 0: 158 result blocks, 1,298 passed, 0 failed, 6
+ignored; 44 root HQL2 targets had 467 passed, 0 failed, 1 ignored. The focused
+target was included once. `cargo fmt --all -- --check` and `git diff --check`
+passed. After a Clippy-only test-helper refactor, the focused C1 test passed
+again (1/1), as did the shared scalar-counter target (18/18). The full suite
+predates only that mechanical cleanup. Both core/default strict all-target Clippy configurations, docs
+validation (0 violations in 244 files), and version validation (0.2.10) passed.
+Independent source review and hosted review/CI remain pending. This phase does
+not close complete ordering, composition, provenance,
+P6, P9-P16, independent runtime/performance, device or release gates. Keep
+P8 -> P9-P12 -> P13/P14 -> P15 -> P16. See the
+[current P8 ledger](REPORT--HQL2-P8-CORE-2026-09-28.md#post-pr272-phase-c1-ordering-status-2026-10-27).
+
+| Phase C1 gate | Candidate evidence | State |
+|---|---|---|
+| Exact scope | One existing scalar-counter test plus six existing governance documents | PASS |
+| Focused test | C1 ordering test 1/1; shared target 18/18 | PASS |
+| Local broad tests | 158 result blocks: 1,298 passed, 0 failed, 6 ignored; 44 root HQL2 targets: 467/0/1 | PASS, local |
+| Formatting and diff | `cargo fmt --all -- --check`; `git diff --check` | PASS |
+| Strict static/docs/version | Core/default all-target Clippy; docs validation 0/244; version 0.2.10 | PASS, local |
+| Independent source review | Exact C1 head/tree review | PENDING |
+| Hosted delivery | Formal review and full exact-head CI | PENDING |
+
+## Historical pre-PR272 Phase B1 candidate snapshot (2026-10-26)
 
 PR #271 is merged at base `6bd493e7d8cc58d38b27a4c916b0d16237aeceb0`
 (tree `0f9480e3badf0137841e2e7aa3f05789d7bf1f2a`). Owner approved Phase B1:
@@ -28,8 +68,9 @@ Clippy, formatting, docs validation (0/244), version check (0.2.10) and diff
 checks passed. Final independent source review passed on commit
 d6978664ae6c5797887e0b968d1bf06976d6e891, tree
 baac58b38fb7a0f27a1f0e055992ce11a05503bb, with 0 Critical, 0 Important and 0
-Minor findings; reviewer runtime is NOT_RUN. Formal hosted review and exact-head
-CI remain pending.
+Minor findings; reviewer runtime is NOT_RUN. At this candidate snapshot,
+formal hosted review and exact-head CI were pending; PR #272 later merged the
+Phase B1 change.
 
 Phase B1 qualifies only selected scalar type admission in `Values`, `Filter`,
 `Project`, `Distinct`, Sort key type, `Take`, and `Offset`/HQL `SKIP`. It changes
@@ -1812,7 +1853,9 @@ authorization.
 
 ## CHANGELOG
 
-Version diff 0.9.1b -> 0.9.2b: record the exact-tree independent source review for Phase B1; retain formal hosted review, exact-head CI, broad G4/P8 and P6/P9-P16 stages.
+Version diff 0.9.2b -> 0.9.3b: record the approved Phase C1 ordering candidate on PR272 main, bounded focused evidence and open broad gates; full-suite/static/review/hosted checks remain pending.
+
+Version diff 0.9.1b -> 0.9.2b: record the exact-tree independent source review for Phase B1; at that candidate snapshot hosted review and exact-head CI were pending; retain broad G4/P8 and P6/P9-P16 stages.
 
 Version diff 0.9.0b -> 0.9.1b: add the owner-approved Phase B1 scalar type-admissibility qualification status on PR271 main and retain the separate ordering/composition/provenance and P6/P9-P16 stages.
 
