@@ -1,9 +1,9 @@
 ---
-version: "0.9.3b"
+version: "0.9.4b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-27T07:10:10+07:00,Codex"
+last_update: "2026-10-27T19:45:54+07:00,Codex"
 status: beta
 superseded_by: null
 attributes:
@@ -15,45 +15,25 @@ attributes:
   owner: "Boss (Founder / Product Authority)"
 ---
 
-## Post-PR272 Phase C1 ordering qualification status (2026-10-27)
+## Post-PR273 Phase C1 ordering qualification status (2026-10-27)
 
-Phase B1 was merged in PR #272 at `464dcb93c5cc66cfbd641f5c7e85c14ca954d93c`
-(tree `87c80b518983e091705783df83392ab0a027bb6f`). Phase C1 is an owner-
-approved, seven-existing-file tests/docs candidate that qualifies selected
-contract-defined ordering and bounded row-shaping cases for HQL2 and typed IR.
-It adds one scalar-counter test; it makes no runtime or contract change. The
-accepted comparator set is Bool, I64, DecimalU64, F64Finite and Utf8, matching
-the P8 boundary and current binding predicate. Unsupported List/Vector
-fail-closed evidence remains in the pre-existing B1 target. Literal rows, not
-normalized query output, define expected order; P7 is used only where
-independently applicable. Full-key tie order remains unspecified and is not
-claimed. Composition coverage is limited to selected Sort/Project/
-Skip-or-Offset/Take paths.
+PR #273 merged normally at 445a07942edb941893f7e0ab68288f5abcfb9538 from PR head 774c3aa428dec5d5562c21f7efef30fe80e80b72; its exact tree is 694ecf0796d40bf3e36a00acc094167678fa7078 and matches fetched origin/main. Hosted CI completed 15 SUCCESS checks plus one genuine schedule-only security-advisory SKIPPED; Rust Ubuntu/Windows/macOS suites passed. GitHub recorded no formal PR review event (blank reviewDecision, empty reviews/reviewRequests). No reviewer runtime rerun is claimed.
 
-The C1 focused test passed 1/1 and its shared scalar-counter target passed
-18/18. The full local `cargo test --locked --offline --no-default-features
---jobs 1 --tests` run exited 0: 158 result blocks, 1,298 passed, 0 failed, 6
-ignored; 44 root HQL2 targets had 467 passed, 0 failed, 1 ignored. The focused
-target was included once. `cargo fmt --all -- --check` and `git diff --check`
-passed. After a Clippy-only test-helper refactor, the focused C1 test passed
-again (1/1), as did the shared scalar-counter target (18/18). The full suite
-predates only that mechanical cleanup. Both core/default strict all-target Clippy configurations, docs
-validation (0 violations in 244 files), and version validation (0.2.10) passed.
-Independent source review and hosted review/CI remain pending. This phase does
-not close complete ordering, composition, provenance,
-P6, P9-P16, independent runtime/performance, device or release gates. Keep
-P8 -> P9-P12 -> P13/P14 -> P15 -> P16. See the
-[current P8 ledger](REPORT--HQL2-P8-CORE-2026-09-28.md#post-pr272-phase-c1-ordering-status-2026-10-27).
+The author local full suite recorded 1,298/0/6 across 158 result blocks, including 44 root HQL2 targets at 467/0/1. It preceded only a mechanical test-helper Clippy cleanup; focused C1 (1/1) and shared scalar-counter (18/18) reruns followed. Strict core/default all-target Clippy, fmt/diff, docs validation (0/244) and version check (0.2.10) passed. A selected exact-main P6 run passed 77/0/0 across nine targets on one local Windows host, plus cargo check/fmt/docs (0/244)/diff. It does not refresh independent P6 Verify/Review/Final or establish cross-platform/device/release acceptance; see the P6 specification and P8 ledger.
 
-| Phase C1 gate | Candidate evidence | State |
+This is evidence reconciliation only: no runtime, public contract, P6, P7 or architecture decision changes. Full-key tie policy remains unspecified; broad type/source/order/composition/provenance, universal no-write and ordinary-success-state evidence, complete P6, P9-P16, independent runtime/performance, device and release gates remain open or NOT_RUN. Preserve P8 -> P9-P12 -> P13/P14 -> P15 -> P16 and use the [current P8 ledger](REPORT--HQL2-P8-CORE-2026-09-28.md#post-pr273-phase-c1-ordering-status-2026-10-27).
+
+| Phase C1 gate | Merged evidence | State |
 |---|---|---|
-| Exact scope | One existing scalar-counter test plus six existing governance documents | PASS |
-| Focused test | C1 ordering test 1/1; shared target 18/18 | PASS |
-| Local broad tests | 158 result blocks: 1,298 passed, 0 failed, 6 ignored; 44 root HQL2 targets: 467/0/1 | PASS, local |
-| Formatting and diff | `cargo fmt --all -- --check`; `git diff --check` | PASS |
-| Strict static/docs/version | Core/default all-target Clippy; docs validation 0/244; version 0.2.10 | PASS, local |
-| Independent source review | Exact C1 head/tree review | PENDING |
-| Hosted delivery | Formal review and full exact-head CI | PENDING |
+| Exact scope and merge | PR #273 head 774c3aa428dec5d5562c21f7efef30fe80e80b72; merge 445a07942edb941893f7e0ab68288f5abcfb9538; tree 694ecf0796d40bf3e36a00acc094167678fa7078 | PASS |
+| Hosted CI | 15 SUCCESS; one genuine schedule-only security-advisory SKIPPED; Rust Ubuntu/Windows/macOS suites passed | PASS |
+| Formal GitHub review event | Blank reviewDecision; reviews and reviewRequests empty | NOT_RECORDED |
+| Local broad tests | 158 result blocks: 1,298/0/6; 44 root HQL2 targets: 467/0/1; full run preceded only mechanical helper Clippy cleanup | PASS, author-local |
+| Post-cleanup focused reruns | C1 test 1/1; shared scalar-counter target 18/18 | PASS, author-local |
+| Strict static/docs/version | Core/default all-target Clippy; fmt/diff; docs 0/244; version 0.2.10 | PASS, author-local |
+| Selected exact-main P6 tests | 77/0/0 across nine existing targets on one local Windows host | PASS, supplemental author-local |
+| Independent reviewer runtime | No reviewer runtime rerun claimed | NOT_RUN |
+| Broad closure | Exhaustive and downstream gates retained as open in the P8 ledger | OPEN / NOT_RUN |
 
 ## Historical pre-PR272 Phase B1 candidate snapshot (2026-10-26)
 
@@ -1853,7 +1833,7 @@ authorization.
 
 ## CHANGELOG
 
-Version diff 0.9.2b -> 0.9.3b: record the approved Phase C1 ordering candidate on PR272 main, bounded focused evidence and open broad gates; full-suite/static/review/hosted checks remain pending.
+Version diff 0.9.3b -> 0.9.4b: record PR #273 merged exact-head CI and selected P6 local exact-main results; distinguish author execution from formal review and independent P6 gates; retain open broad G4/P8/P6/P9-P16 stages.
 
 Version diff 0.9.1b -> 0.9.2b: record the exact-tree independent source review for Phase B1; at that candidate snapshot hosted review and exact-head CI were pending; retain broad G4/P8 and P6/P9-P16 stages.
 

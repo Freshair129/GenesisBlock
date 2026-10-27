@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: "0.1.100b"
+version: "0.1.101b"
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-27T07:10:10+07:00,Codex"
+last_update: "2026-10-27T19:45:54+07:00,Codex"
 attributes:
   domain: architecture
   scope: repository
@@ -27,25 +27,11 @@ related_docs:
 
 ## Current G4/P8 Phase C1 architecture status (2026-10-27)
 
-PR #272 is merged at `464dcb93c5cc66cfbd641f5c7e85c14ca954d93c` (tree
-`87c80b518983e091705783df83392ab0a027bb6f`). C1 is a bounded owner-approved
-tests/docs candidate on that main revision: one existing scalar-counter test
-pairs HQL2 and typed IR over selected sort types, direction and NULL placement,
-literal row order, empty/single/duplicate inputs, and selected pagination
-composition. The focused test passed 1/1 and the shared target passed 18/18.
-The full local suite passed 1,298/0/6 across 158 result blocks, including 44
-root HQL2 targets at 467/0/1. The focused C1 test and shared target (18/18)
-passed again after a Clippy-only test-helper refactor; the full suite predates
-only that mechanical cleanup. Format/diff checks, both core/default strict
-all-target Clippy configurations, docs validation (0/244), and version check
-(0.2.10) passed. Independent source review and hosted status remain pending.
-No runtime, public contract, P6, P7 or architectural decision changes.
+PR #273 merged normally: head 774c3aa428dec5d5562c21f7efef30fe80e80b72, merge 445a07942edb941893f7e0ab68288f5abcfb9538, tree 694ecf0796d40bf3e36a00acc094167678fa7078; fetched origin/main matches. Hosted CI completed 15 SUCCESS checks plus one genuine schedule-only security-advisory SKIPPED, with Rust Ubuntu/Windows/macOS suites passing. GitHub recorded no formal review event; no reviewer runtime rerun is claimed.
 
-The selected matrix does not specify ordering among distinguishable rows tied
-on every key and does not establish every legal composition. G4/P8 remains
-partial; broader type/source coverage, provenance, P6, P9-P16,
-independent-runtime/performance, device and release gates remain open. Preserve
-P8 -> P9-P12 -> P13/P14 -> P15 -> P16. See the [current P8 ledger](REPORT--HQL2-P8-CORE-2026-09-28.md#post-pr272-phase-c1-ordering-status-2026-10-27).
+The author local full suite recorded 1,298/0/6 across 158 result blocks, including 44 root HQL2 targets at 467/0/1. The full run preceded only a mechanical helper Clippy cleanup; focused C1 (1/1) and shared scalar-counter (18/18) reruns followed. Strict core/default all-target Clippy, fmt/diff, docs validation (0/244) and version validation (0.2.10) passed. A selected P6 run on this exact main passed 77/0/0 across nine targets on one local Windows host; it is supplemental, not independent P6 Verify/Review/Final or cross-platform/device/release acceptance.
+
+This is evidence reconciliation only: no runtime, contract, P6, P7 or architecture decision changes. C1 leaves full-key ties unspecified and does not establish exhaustive types, sources, order, composition, provenance, universal no-write or ordinary successful-result state. Broad P6, P9-P16, independent runtime/performance, device and release gates remain open or NOT_RUN. Preserve P8 -> P9-P12 -> P13/P14 -> P15 -> P16. See the [current P8 ledger](REPORT--HQL2-P8-CORE-2026-09-28.md#post-pr273-phase-c1-ordering-status-2026-10-27).
 
 ## Historical pre-PR272 Phase B1 architecture snapshot (2026-10-26)
 
@@ -1270,7 +1256,7 @@ Broader EXPLAIN/P8/P13 and P14 rehearsal remain open.
 
 ## CHANGELOG
 
-Version diff 0.1.99b -> 0.1.100b: record the selected Phase C1 ordering candidate and preserve full-key tie, complete composition, provenance, P6 and P9-P16 gates; no runtime or contract change.
+Version diff 0.1.100b -> 0.1.101b: reconcile merged PR #273 exact-head CI and selected P6 exact-main host evidence; record the absent formal review event and preserve broad G4/P8/P6/P9-P16 gates; no runtime or contract change.
 
 Version diff 0.1.98b -> 0.1.99b: record the exact-tree independent source review for Phase B1; hosted review and exact-head CI were pending at that candidate snapshot, while downstream gates remain open; no runtime or contract change.
 
@@ -1424,6 +1410,8 @@ full P8/P13 qualification remains open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.101b | 2026-10-27 | current | Reconcile merged PR #273 and selected exact-main P6 host evidence; retain formal-review and broad gate limits | working-tree | Codex |
+| 0.1.100b | 2026-10-27 | current | Record the selected C1 ordering qualification at merged PR #273; preserve unspecified full-key ties and broader composition/provenance/P6/P9-P16 gates | working-tree | Codex |
 | 0.1.99b | 2026-10-27 | current | Record exact-tree Phase B1 independent source review; hosted review and exact-head CI remain pending | working-tree | Codex |
 | 0.1.98b | 2026-10-26 | current | Reconcile PR271 main and index selected Phase B1 scalar type-admissibility tests; retain broader G4/P8/P6/P9-P16 gates | working-tree | Codex |
 | 0.1.97b | 2026-10-26 | current | Reconcile merged PR #269 current-main status and retain broad G4/P8/P6/P9-P16 qualification gates | working-tree | Codex |

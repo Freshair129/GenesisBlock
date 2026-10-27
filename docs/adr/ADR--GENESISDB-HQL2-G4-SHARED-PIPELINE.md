@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE
-version: "0.1.28b"
+version: "0.1.29b"
 created_at: "2026-10-04T13:08:29+07:00,Codex,2be63a7"
-last_update: "2026-10-27T07:10:10+07:00,Codex"
+last_update: "2026-10-27T19:45:54+07:00,Codex"
 status: active
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -15,33 +15,15 @@ attributes:
   amends: ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY
 ---
 
-## Post-PR272 Phase C1 ordering qualification status (2026-10-27)
+## Post-PR273 Phase C1 ordering qualification status (2026-10-27)
 
-Current base is merged PR #272 `464dcb93c5cc66cfbd641f5c7e85c14ca954d93c`
-(tree `87c80b518983e091705783df83392ab0a027bb6f`). Owner approved a bounded
-tests/docs-only C1 candidate across seven existing files. One appended test
-pairs HQL2 and typed IR for contract-defined Bool, I64, DecimalU64, F64Finite
-and Utf8 sort keys, directions and NULL placement, literal ordered rows,
-empty/single/duplicate inputs, bounded pagination composition, and defined
-Plan/Analyze observations. Existing P7 is used only where its scalar model is
-independent. The test intentionally makes no promise about distinguishable
-rows tied on every sort key. Existing B1 unsupported List/Vector keys remain
-fail-closed; no comparator types, kernels, error taxonomy, P7, planner or
-runtime behavior are changed.
+PR #273 merged normally: PR head 774c3aa428dec5d5562c21f7efef30fe80e80b72, merge 445a07942edb941893f7e0ab68288f5abcfb9538, exact tree 694ecf0796d40bf3e36a00acc094167678fa7078; fetched origin/main matches that tree. Its hosted rollup had 15 SUCCESS checks plus one genuine schedule-only security-advisory SKIPPED check, and Rust Ubuntu/Windows/macOS suites passed. GitHub recorded no formal PR review event (blank reviewDecision and empty reviews/reviewRequests); no reviewer runtime rerun is claimed.
 
-Focused C1 test passed 1/1; the shared scalar-counter target passed 18/18 and
-the broad local Rust suite passed 1,298/0/6 across 158 result blocks (44 root
-HQL2 targets: 467/0/1). The focused test passed again after a Clippy-only test
-helper refactor; the shared target also passed 18/18 afterward. The full suite
-predates only that mechanical helper refactor. Formatting/diff checks, both
-core/default strict all-target Clippy configurations, docs validation (0/244),
-and version validation (0.2.10) passed. Independent source review and hosted
-review/CI remain pending.
-This candidate does not close G4 or P8.
-Complete ordering policy for full-key ties, broader composition, provenance,
-P6 and P9-P16, independent runtime/performance, device and release gates are
-still open. Preserve P8 -> P9-P12 -> P13/P14 -> P15 -> P16. See the
-[current P8 ledger](../REPORT--HQL2-P8-CORE-2026-09-28.md#post-pr272-phase-c1-ordering-status-2026-10-27).
+The selected local suite was 1,298/0/6 across 158 result blocks, including 44 root HQL2 targets at 467/0/1. That full run preceded only a mechanical test-helper Clippy cleanup; the focused C1 test (1/1) and shared scalar-counter target (18/18) passed after it. Strict core/default all-target Clippy, formatting/diff, docs validation (0/244) and version validation (0.2.10) passed.
+
+A selected exact-main P6 host run passed 77/0/0 across nine existing targets, with cargo check, fmt, docs validation (0/244) and diff check passing. This is one local Windows author run, not independent P6 Verify/Review/Final or cross-platform/device/release evidence; see the P8 report and P6 specification for limits and raw evidence. No P6 contract or runtime change is implied.
+
+This reconciles hosted status only. C1 does not close G4/P8: full-key tie policy remains unspecified and exhaustive type/source/order/composition/provenance, universal no-write, ordinary-success-state, broad P6, P9-P16, independent runtime/performance, device and release gates remain open or NOT_RUN. Preserve P8 -> P9-P12 -> P13/P14 -> P15 -> P16. See the [current P8 ledger](../REPORT--HQL2-P8-CORE-2026-09-28.md#post-pr273-phase-c1-ordering-status-2026-10-27).
 
 ## Historical pre-PR272 Phase B1 scalar type-admissibility candidate (2026-10-26)
 
@@ -1333,7 +1315,7 @@ an ADR amendment and renewed review.
 
 ## Version diff and changelog
 
-Version diff `0.1.27b -> 0.1.28b`: record the tests/docs-only Phase C1 ordering candidate on merged PR272 main; preserve unspecified full-key ties and the broader composition, provenance, P6 and P9-P16 gates. No architecture decision, runtime or contract change.
+Version diff 0.1.28b -> 0.1.29b: reconcile merged PR #273 exact-head CI and selected P6 exact-main host evidence; record that no formal GitHub review event exists and retain all broad G4/P8/P6/P9-P16 gates. No architecture decision, runtime or contract change.
 
 Version diff `0.1.26b -> 0.1.27b`: record the exact-tree independent source review for the Phase B1 candidate while retaining hosted review, exact-head CI and downstream gates; no runtime, decision or contract change.
 
@@ -1354,6 +1336,7 @@ and release qualification open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.29b | 2026-10-27 | active | Reconcile merged PR #273 and supplemental P6 host evidence; retain no-formal-review fact and broad G4/P8/P6/P9-P16 gates | working-tree | Codex |
 | 0.1.28b | 2026-10-27 | active | Record selected C1 ordering candidate and local broad results; preserve full-key tie and wider gates | working-tree | Codex |
 | 0.1.27b | 2026-10-27 | active | Record exact-tree Phase B1 independent source review; formal hosted review and exact-head CI remain pending | working-tree | Codex |
 | 0.1.26b | 2026-10-26 | active | Record Phase B1 selected scalar type-admissibility candidate on PR271 main; preserve broad G4/P8/P6/P9-P16 gates | working-tree | Codex |

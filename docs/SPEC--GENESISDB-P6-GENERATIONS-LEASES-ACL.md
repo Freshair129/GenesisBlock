@@ -1,9 +1,9 @@
 ---
 doc_id: SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL
 owner: GenesisBlockDB Engineering
-version: 0.5.47b
+version: 0.5.48b
 created_at: "2026-09-22T22:55:00+07:00,ATHER,working-tree"
-last_update: "2026-10-16T12:00:00+07:00,Codex"
+last_update: "2026-10-27T19:45:54+07:00,Codex"
 status: beta
 attributes:
   domain: storage-correctness
@@ -484,6 +484,19 @@ and diff check. At this checkpoint the new independent Review rerun was pending;
 broad P6 gate status below for its superseding verdict. This enforces the approved CAS contract
 without an API expansion.
 
+## Supplemental selected P6 host execution — 2026-10-27
+
+This run was performed on a detached, clean local Windows worktree at exact origin/main commit 445a07942edb941893f7e0ab68288f5abcfb9538, tree 694ecf0796d40bf3e36a00acc094167678fa7078. That is the merge commit/tree for PR #273 (PR head 774c3aa428dec5d5562c21f7efef30fe80e80b72). The PR hosted rollup completed 15 SUCCESS checks and one genuine schedule-only security-advisory SKIPPED check; Rust Ubuntu/Windows/macOS suites passed. GitHub recorded no formal review event for #273; no reviewer runtime rerun is claimed.
+
+The selected command was cargo test --locked --offline --no-default-features --jobs 1 --test p6_generation_tests --test p6_lease_tests --test p6_visibility_tests --test wave_a_commit_tests --test temporal_queries_tests --test tx_as_of_wp22_tests --test governance_tests --test p6_snapshot_authority_tests --test hql2_history_change_tests. It passed 77 tests, 0 failed and 0 ignored across nine targets: governance_tests 1, hql2_history_change_tests 21, p6_generation_tests 6, p6_lease_tests 10, p6_snapshot_authority_tests 6, p6_visibility_tests 15, temporal_queries_tests 2, tx_as_of_wp22_tests 4, and wave_a_commit_tests 12. Also passed: cargo check --locked --offline --no-default-features, cargo fmt --all -- --check, npm run docs:validate (0 violations in 244 files), and git diff --check.
+
+This is one local author execution. It is supplemental test evidence only; it is not an independent Verify, Review or Final, does not refresh the tree-specific historical P6 receipts below, and does not establish hosted cross-platform P6 acceptance, recovery/concurrency completion, another-machine/device acceptance, release or deployment readiness. No source, test, schema, API or contract files changed in that run.
+
+Raw external evidence is stored outside this repository at:
+D:/GenesisBlock_Dev/local-cleanup-backups/20261019T030925Z-genesisblock/branch-review/g4-p8-p6-exact-main-qualification-20261027
+P6-VALIDATION.json SHA-256: 12241DF952B591D8235D8075AFD04E587DE120B10DA1D4640F3E0AA654F192BA
+P6-EXACT-MAIN-TESTS.log SHA-256: 319D9655B699D6E712AE1DADB054C84296F972C4FF35478CBA6663C775CC5B6A
+The adjacent P6-COMMAND.txt, CARGO-CHECK.log, DOCS-VALIDATE.log, FMT.log and DIFF-CHECK.log preserve the command and supplemental gate output. See the [P8 current-main ledger](REPORT--HQL2-P8-CORE-2026-09-28.md#post-pr273-phase-c1-ordering-status-2026-10-27).
 ## Current broad P6 gates — 2026-10-05
 
 Fresh independent Verify passed on the exact corrected worktree: seven-target P6 acceptance
@@ -613,6 +626,8 @@ failures. Its source was not established; retain this as an environment
 limitation rather than attributing it to the P6 implementation.
 
 ## CHANGELOG
+
+Version diff 0.5.47b -> 0.5.48b: record the selected exact-main 77/0/0 P6 host run as supplemental single-host author evidence; preserve historical independent Verify/Review/Final limits and make no contract or runtime change.
 
 Version diff 0.5.46b -> 0.5.47b: link the candidate peer-membership
 authorization contract and clarify that P6 cursor-receipt handling does not
@@ -792,6 +807,7 @@ broader P6/P8/P13 qualification is claimed.
 
 | Version | Date | Status | Summary | Commit | Agent |
 |---|---|---|---|---|---|
+| 0.5.48b | 2026-10-27 | beta | Record selected 77/0/0 P6 host run on PR #273 exact main; supplemental single-host author evidence, not independent Verify/Review/Final or cross-platform acceptance | working-tree | Codex |
 | 0.5.47b | 2026-10-16 | beta | Link candidate peer-membership authorization contract; clarify P6 cursor-receipt scope does not authorize ordinary sync events; no P6 runtime or schema change | working-tree | Codex |
 | 0.5.46b | 2026-10-06 | beta | Re-integrate onto mainline 4b78596; local Verify P6 49/49, focused snapshot/lease/history 35/35, cargo check/fmt/strict core Clippy/docs/diff pass; Astra Final remains limited to the predecessor slice and was not rerun on this HEAD; hosted checks pending | working-tree | Codex |
 | 0.5.45b | 2026-10-06 | beta | Record Astra 6 Final PASS_WITH_LIMITATIONS for the reviewed local P6 slice; stale-Plan fallback fixture limitation accepted; hosted/cross-platform CI and release/deployment remain NOT_RUN | working-tree | Codex |

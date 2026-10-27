@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.70b"
+version: "2.3.71b"
 updated: "2026-10-27"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -27,27 +27,11 @@ related_docs:
 
 ## Current HQL2 G4/P8 Phase C1 status (2026-10-27)
 
-PR #272 is merged at `464dcb93c5cc66cfbd641f5c7e85c14ca954d93c` (tree
-`87c80b518983e091705783df83392ab0a027bb6f`). Phase C1 is an owner-approved,
-tests/docs-only seven-file candidate for selected contract-defined HQL2 and
-typed-IR ordering behavior. Its one appended test covers Bool, I64,
-DecimalU64, F64Finite and Utf8 sort keys, ASC/DESC and NULL placement, literal
-ordered rows, empty/single/duplicate inputs, secondary-key ordering, bounded
-Sort/Project/Skip-or-Offset/Take paths, and defined Plan/Analyze observations.
-It uses P7 only for independently representable cases. The C1 focused test
-passed 1/1 and its shared target passed 18/18. The full local suite passed
-1,298/0/6 across 158 result blocks, including 44 root HQL2 targets at 467/0/1.
-The focused C1 test and shared target (18/18) passed again after a Clippy-only
-test-helper refactor; the full suite predates only that mechanical cleanup.
-Formatting/diff checks, both core/default strict all-target Clippy
-configurations, docs validation (0/244), and version check (0.2.10) passed.
-Independent source review and hosted CI gates remain pending.
+PR #273 merged normally: PR head 774c3aa428dec5d5562c21f7efef30fe80e80b72, merge 445a07942edb941893f7e0ab68288f5abcfb9538, exact tree 694ecf0796d40bf3e36a00acc094167678fa7078, matching fetched origin/main. Hosted CI completed 15 SUCCESS checks plus one genuine schedule-only security-advisory SKIPPED; Rust Ubuntu/Windows/macOS suites passed. GitHub recorded no formal review event (blank reviewDecision, empty reviews/reviewRequests); no reviewer runtime rerun is claimed.
 
-C1 changes no normative contract, runtime, P6, P7 or architecture decision.
-Full-key tie behavior remains unspecified and untested. This selected matrix
-does not close broad types, sources, composition, provenance, P6, P9-P16,
-independent runtime/performance, device or release gates. Preserve P8 ->
-P9-P12 -> P13/P14 -> P15 -> P16. See the [current P8 ledger](REPORT--HQL2-P8-CORE-2026-09-28.md#post-pr272-phase-c1-ordering-status-2026-10-27).
+The author local full run recorded 1,298/0/6 across 158 result blocks, including 44 root HQL2 targets at 467/0/1. It preceded only a mechanical test-helper Clippy cleanup; focused C1 (1/1) and shared scalar-counter (18/18) reruns followed. Strict core/default all-target Clippy, fmt/diff, docs validation (0/244) and version validation (0.2.10) passed. The selected exact-main P6 host run passed 77/0/0 across nine targets on one local Windows host, supplemental only; it does not refresh independent P6 Verify/Review/Final or prove cross-platform/device/release acceptance.
+
+This documentation status change does not alter runtime or normative contracts. C1 does not close G4/P8; full-key ties remain unspecified, and exhaustive type/source/order/composition/provenance, universal no-write and ordinary-success-state evidence remain open. Broad P6 and P9-P16, independent runtime/performance, device and release gates remain open or NOT_RUN. Preserve P8 -> P9-P12 -> P13/P14 -> P15 -> P16. See the [current P8 ledger](REPORT--HQL2-P8-CORE-2026-09-28.md#post-pr273-phase-c1-ordering-status-2026-10-27).
 
 ## Historical pre-PR272 Phase B1 candidate snapshot (2026-10-26)
 
@@ -1226,7 +1210,7 @@ independent-review or broad P8/P13 gates.
 
 ## Changelog
 
-Version diff 2.3.69b -> 2.3.70b: record the selected Phase C1 ordering candidate on PR272 main and keep unspecified full-key tie, full composition/provenance, P6 and P9-P16 gates open; no contract/runtime change.
+Version diff 2.3.70b -> 2.3.71b: reconcile merged PR #273 exact-head CI and selected P6 exact-main host evidence, including absent formal review and the single-host limit; retain broad G4/P8/P6/P9-P16 gates. No contract or runtime change.
 
 Version diff 2.3.68b -> 2.3.69b: record the exact-tree independent source review for Phase B1 while retaining formal hosted review, exact-head CI and broad G4/P8 and P6/P9-P16 gates; no contract or runtime behavior changes.
 
