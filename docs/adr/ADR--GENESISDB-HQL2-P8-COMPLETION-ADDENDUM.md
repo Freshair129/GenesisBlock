@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM
-version: "0.1.16b"
+version: "0.1.17b"
 created_at: "2026-09-30T06:29:47+07:00,ATHER,working-tree"
-last_update: "2026-10-26T19:29:25+07:00,Codex"
+last_update: "2026-10-27T19:45:54+07:00,Codex"
 status: accepted
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -16,16 +16,19 @@ attributes:
 
 # HQL2 P8 completion addendum: typed semantics and actor-scoped HQL1 bridge
 
-## Current qualification status — 2026-10-26
+## Current Phase C1 and selected P6 status — 2026-10-27
 
-PR #269 is merged on `origin/main` at `b4372dc347cc265f405b94aea38bc453d51565a7`.
-Its 15 successful hosted checks, one schedule-only security advisory skip and
-Ubuntu/Windows/macOS Rust passes qualify the selected SourceScan metadata slice
-only. The existing D1-D7 approvals, P6 authorization-before-parse, closed IR
-wire, and no-migration boundary remain unchanged. Broad G4/P8, type/order/
-composition/provenance, independent reviewer runtime, P6, P9-P16, device and
-release gates remain open or NOT_RUN. Candidate-time pending text below remains
-a historical checkpoint; see the [current P8 ledger](../REPORT--HQL2-P8-CORE-2026-09-28.md#post-pr269-type-order-composition-and-provenance-status-2026-10-26).
+PR #273 merged normally. PR head 774c3aa428dec5d5562c21f7efef30fe80e80b72; merge commit 445a07942edb941893f7e0ab68288f5abcfb9538; exact tree 694ecf0796d40bf3e36a00acc094167678fa7078, which matches fetched origin/main. Hosted CI completed 15 SUCCESS checks plus one genuine schedule-only security-advisory SKIPPED; Rust Ubuntu, Windows and macOS suites passed. GitHub recorded no formal review event (blank reviewDecision, empty reviews/reviewRequests); no reviewer runtime rerun is claimed.
+
+The selected local Rust suite was 1,298/0/6 across 158 result blocks; 44 root HQL2 targets were 467/0/1. The full run preceded only a mechanical test-helper Clippy cleanup; the focused C1 test (1/1) and shared scalar-counter target (18/18) passed after cleanup. Strict core/default all-target Clippy, formatting/diff, docs validation (0/244) and version validation (0.2.10) passed.
+
+On that exact main, one local Windows author run passed selected P6 tests 77/0/0 across nine targets, with cargo check, fmt, docs validation (244 files, zero violations) and diff check passing. This supplements but does not refresh the tree-specific independent P6 Verify/Review/Final receipts; it is not cross-platform, device or release acceptance. See the P8 ledger and P6 spec for source-linked limits and raw evidence.
+
+This is status reconciliation only: the accepted D1-D7 addendum and P6 authorization-before-parse, closed Query IR v2 wire and no-migration boundaries are unchanged. Broad G4/P8, exhaustive type/order/composition/provenance, P6, P9-P16, independent runtime/performance, device and release gates remain open or NOT_RUN. Preserve P8 -> P9-P12 -> P13/P14 -> P15 -> P16. See the [current P8 ledger](../REPORT--HQL2-P8-CORE-2026-09-28.md#post-pr273-phase-c1-ordering-status-2026-10-27).
+
+## Historical PR #269 SourceScan qualification status — 2026-10-26
+
+PR #269 merged on origin/main at b4372dc347cc265f405b94aea38bc453d51565a7. Its 15 successful hosted checks, one schedule-only security advisory skip and Ubuntu/Windows/macOS Rust passes qualified only the selected SourceScan metadata slice. The D1-D7 approvals, P6 authorization-before-parse, closed IR wire, and no-migration boundary remained unchanged. Broad G4/P8, type/order/composition/provenance, independent reviewer runtime, P6, P9-P16, device and release gates remained open or NOT_RUN. This is a historical checkpoint; see the [current P8 ledger](../REPORT--HQL2-P8-CORE-2026-09-28.md#post-pr273-phase-c1-ordering-status-2026-10-27).
 
 ## D7 labeled property recovery candidate — 2026-10-19
 
@@ -355,10 +358,13 @@ are not the current document versions.
 Engine version remains unchanged. H2-D11 migration remains fixture-only; this
 addendum does not authorize migration of a user database, deployment or release.
 
+Version diff 0.1.16b -> 0.1.17b: reconcile PR #273 hosted status and selected exact-main P6 host execution; retain the accepted D1-D7 boundary, no-migration rule and broad P8/P6/P9-P16 gates. No contract or runtime change.
+
 ## CHANGELOG
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.17b | 2026-10-27 | accepted | Reconcile PR #273 and exact-main selected P6 host evidence; preserve D1-D7, no-migration and broad gates | working-tree | Codex |
 | 0.1.16b | 2026-10-26 | accepted | Reconcile merged PR #269 status; preserve D1-D7 and broad P8/P13 boundary | working-tree | Codex |
 | 0.1.14b | 2026-10-05 | accepted | Extend approved D7 after legacy/HQL2 differential with one unlabeled zero-hop single-property projection and exact-seed depth-one TRAVERSE ID projection; adapter 13/13, property 2/2, ordering 2/2, labeled-filter 2/2; root HQL2 404/0/1 across 39 targets; U9 restore 7/7; preserve fail-closed boundaries and open shared-runtime/P8/P13 gates | working-tree | ATHER |
 | 0.1.13b | 2026-10-04 | accepted | Extend D7 after differential evidence to the exact same-alias string ID predicate on labeled zero-hop scans; match/miss/wrong-label plus backslash/Unicode differential, adapter 11/11, ordering 2/2, new differential target 2/2; HQL2 394/0/1 across 35 targets and selected P6 peers 45/0/0 across 7; independent review found no runtime parity/authorization defect; PR #213 code commit checks 40 pass, 4 worker failures with unconfirmed cause, 5 skipped, 1 Windows Cargo cancellation at 15-minute job limit; preserve other fail-closed boundaries and broad P8/P13 gates | working-tree | ATHER |
