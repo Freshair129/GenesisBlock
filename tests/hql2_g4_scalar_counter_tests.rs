@@ -3311,3 +3311,253 @@ fn scalar_ordering_matrix_pairs_frontends_with_literal_rows_and_counters() {
         );
     }
 }
+
+fn c1b_assert_order_modes_plan_first(
+    db: &Storage,
+    requests: &[(&str, QueryRequestV2)],
+    expected: C1OrderExpectation<'_>,
+) {
+    let expected_columns =
+        json!([{"name":"y","type":expected.type_name,"nullable":expected.nullable}]);
+    let expected_rows = b1_literal_rows("y", expected.values);
+    if let Some(oracle) = expected.p7 {
+        let p7_rows = reference::execute(&oracle)
+            .unwrap()
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .map(|(name, value)| (name.clone(), b1_from_p7(value)))
+                    .collect::<BTreeMap<_, _>>()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(p7_rows, expected_rows, "C1b literal rows vs unchanged P7");
+    }
+
+    let mut planned = Vec::with_capacity(requests.len());
+    for (frontend, request) in requests {
+        let mut planned_request = request.clone();
+        planned_request.explain = Some(ExplainV2::Plan);
+        let QueryOutcomeV2::Plan(plan) = db.query_v2(access(), planned_request).unwrap() else {
+            panic!("{frontend} Plan must be checked before result queries");
+        };
+        c1_assert_plan_nodes(&plan, expected.ops, false);
+        planned.push((*frontend, request.clone(), plan));
+    }
+
+    for (frontend, request, plan) in planned {
+        let QueryOutcomeV2::Rows(normal) = db.query_v2(access(), request.clone()).unwrap() else {
+            panic!("{frontend} normal execution must return rows");
+        };
+        assert!(normal.explain.is_none());
+        assert_eq!(
+            serde_json::to_value(&normal.columns).unwrap(),
+            expected_columns
+        );
+        assert_eq!(
+            normal.rows, expected_rows,
+            "{frontend} literal ordered rows"
+        );
+        assert_eq!(
+            normal.completeness.status,
+            genesis_block_native::query::hql2::result::CompletionStatusV2::Complete
+        );
+
+        let mut analyzed_request = request.clone();
+        analyzed_request.explain = Some(ExplainV2::Analyze);
+        let QueryOutcomeV2::Rows(analyzed) = db.query_v2(access(), analyzed_request).unwrap()
+        else {
+            panic!("{frontend} Analyze must return rows");
+        };
+        assert_eq!(analyzed.rows, expected_rows, "{frontend} Analyze rows");
+        assert_eq!(
+            serde_json::to_value(&analyzed.columns).unwrap(),
+            expected_columns
+        );
+        assert_eq!(normal.rows, analyzed.rows);
+        assert_eq!(normal.columns, analyzed.columns);
+        assert_eq!(normal.semantics, analyzed.semantics);
+        assert_eq!(normal.completeness, analyzed.completeness);
+        assert_eq!(normal.index_frontiers, analyzed.index_frontiers);
+        assert_eq!(normal.cursor, analyzed.cursor);
+
+        let mut analyzed_plan = analyzed.explain.unwrap();
+        assert_eq!(analyzed_plan.plan_hash, plan.plan_hash);
+        assert_eq!(analyzed_plan.planner_version, plan.planner_version);
+        c1_assert_plan_nodes(&analyzed_plan, expected.ops, true);
+        for node in &mut analyzed_plan.plan {
+            node.actual.take();
+        }
+        assert_eq!(analyzed_plan.plan, plan.plan);
+    }
+}
+
+/// Phase C1b qualifies nullable ordering for the remaining contract-orderable
+/// scalar bases. Literal rows are primary; P7 is independent only where its
+/// value model represents the type. Full-key tie identity remains unspecified.
+#[test]
+fn scalar_nullable_ordering_matrix_covers_remaining_orderable_types() {
+    let directory = TempDir::new().unwrap();
+    let db = open(&directory);
+
+    struct NullableSortCase {
+        type_name: &'static str,
+        encoded: Value,
+        ascending: Vec<V>,
+        descending: Vec<V>,
+        p7_values: Option<Vec<R>>,
+    }
+    let cases = [
+        NullableSortCase {
+            type_name: "Nullable<Bool>",
+            encoded: json!([true, null, false, true, null]),
+            ascending: vec![V::Bool(false), V::Bool(true), V::Bool(true)],
+            descending: vec![V::Bool(true), V::Bool(true), V::Bool(false)],
+            p7_values: Some(vec![
+                R::Bool(true),
+                R::Null,
+                R::Bool(false),
+                R::Bool(true),
+                R::Null,
+            ]),
+        },
+        NullableSortCase {
+            type_name: "Nullable<DecimalU64>",
+            encoded: json!(["10", null, "2", "10", null]),
+            ascending: vec![V::DecimalU64(2), V::DecimalU64(10), V::DecimalU64(10)],
+            descending: vec![V::DecimalU64(10), V::DecimalU64(10), V::DecimalU64(2)],
+            p7_values: None,
+        },
+        NullableSortCase {
+            type_name: "Nullable<F64Finite>",
+            encoded: json!([2.5, null, -0.5, 2.5, 0.0, null]),
+            ascending: vec![V::F64(-0.5), V::F64(0.0), V::F64(2.5), V::F64(2.5)],
+            descending: vec![V::F64(2.5), V::F64(2.5), V::F64(0.0), V::F64(-0.5)],
+            p7_values: Some(vec![
+                R::F64(2.5),
+                R::Null,
+                R::F64(-0.5),
+                R::F64(2.5),
+                R::F64(0.0),
+                R::Null,
+            ]),
+        },
+        NullableSortCase {
+            type_name: "Nullable<Utf8>",
+            encoded: json!(["b", null, "a", "b", null, "c"]),
+            ascending: vec![
+                V::Utf8("a".into()),
+                V::Utf8("b".into()),
+                V::Utf8("b".into()),
+                V::Utf8("c".into()),
+            ],
+            descending: vec![
+                V::Utf8("c".into()),
+                V::Utf8("b".into()),
+                V::Utf8("b".into()),
+                V::Utf8("a".into()),
+            ],
+            p7_values: Some(vec![
+                R::Text("b".into()),
+                R::Null,
+                R::Text("a".into()),
+                R::Text("b".into()),
+                R::Null,
+                R::Text("c".into()),
+            ]),
+        },
+    ];
+
+    for case in &cases {
+        let params = json!({
+            "xs": {
+                "type": format!("List<{}>", case.type_name),
+                "value": case.encoded.clone()
+            }
+        });
+        let row_count = case.ascending.len() as u64 + 2;
+        let ops = [
+            (QueryOpV2::Values, 0, row_count),
+            (QueryOpV2::Sort, row_count, row_count),
+            (QueryOpV2::Project, row_count, row_count),
+        ];
+
+        for (direction, descending) in [("asc", false), ("desc", true)] {
+            let sorted = if descending {
+                case.descending.clone()
+            } else {
+                case.ascending.clone()
+            };
+            for (nulls, nulls_first) in [("first", true), ("last", false)] {
+                let mut expected = sorted.clone();
+                let null_rows = vec![V::Null; 2];
+                if nulls_first {
+                    expected.splice(0..0, null_rows);
+                } else {
+                    expected.extend(null_rows);
+                }
+                let (ir, hql) = c1_sort_requests(
+                    params.clone(),
+                    vec![c1_sort_key(field("x"), direction, nulls)],
+                    &format!(
+                        "x {} NULLS {}",
+                        direction.to_ascii_uppercase(),
+                        nulls.to_ascii_uppercase()
+                    ),
+                );
+                let p7 = case.p7_values.clone().map(|values| {
+                    c1_p7_sort_project(
+                        values,
+                        vec![reference::SortKey {
+                            expr: E::Field("x".into()),
+                            descending,
+                            nulls_first,
+                        }],
+                    )
+                });
+                c1b_assert_order_modes_plan_first(
+                    &db,
+                    &[("typed IR", ir), ("HQL2", hql)],
+                    C1OrderExpectation {
+                        type_name: case.type_name,
+                        nullable: true,
+                        values: expected,
+                        p7,
+                        ops: &ops,
+                    },
+                );
+            }
+
+            // The HQL-only default control is three requests (Normal, Plan,
+            // Analyze); typed IR remains explicit and is covered above.
+            let mut expected_default = sorted.clone();
+            expected_default.extend(vec![V::Null; 2]);
+            let (ir, hql) = c1_sort_requests(
+                params.clone(),
+                vec![c1_sort_key(field("x"), direction, "last")],
+                &format!("x {}", direction.to_ascii_uppercase()),
+            );
+            drop(ir);
+            let p7 = case.p7_values.clone().map(|values| {
+                c1_p7_sort_project(
+                    values,
+                    vec![reference::SortKey {
+                        expr: E::Field("x".into()),
+                        descending,
+                        nulls_first: false,
+                    }],
+                )
+            });
+            c1b_assert_order_modes_plan_first(
+                &db,
+                &[("HQL2 default NULLS LAST", hql)],
+                C1OrderExpectation {
+                    type_name: case.type_name,
+                    nullable: true,
+                    values: expected_default,
+                    p7,
+                    ops: &ops,
+                },
+            );
+        }
+    }
+}

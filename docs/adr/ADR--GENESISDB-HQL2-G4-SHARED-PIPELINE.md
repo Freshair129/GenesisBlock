@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE
-version: "0.1.29b"
+version: "0.1.30b"
 created_at: "2026-10-04T13:08:29+07:00,Codex,2be63a7"
-last_update: "2026-10-27T19:45:54+07:00,Codex"
+last_update: "2026-10-28T19:02:18+07:00,Codex"
 status: active
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -14,6 +14,16 @@ attributes:
   risk: HIGH
   amends: ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY
 ---
+
+## Current C1b nullable scalar ordering qualification (2026-10-28)
+
+This owner-approved host-only tests/docs candidate extends the selected C1 ordering evidence to Nullable<Bool>, Nullable<DecimalU64>, Nullable<F64Finite> and Nullable<Utf8>; Nullable<I64> remains the C1 control. It adds one test to tests/hql2_g4_scalar_counter_tests.rs and reconciles these six existing governance documents. Runtime, API and normative contract behavior are unchanged.
+
+The governing anchors are docs/SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY.md:390-393 (HQL omission defaults to NULLS LAST for ASC and DESC; typed IR requires explicit NullOrder), src/query/hql2/bind.rs::ordered and the named C1b test. The matrix issues 96 paired explicit-placement requests (four types x two directions x NULLS FIRST/LAST x HQL/IR x Normal/Plan/Analyze) plus 24 HQL-only omitted-placement requests (four types x two directions x three modes), 120 total. Literal ordered rows and root schema are asserted. The C1b-only helper checks Plan before Normal result queries, then Analyze; the original C1 helper and assertions are unchanged. P7 is used for Bool, F64Finite and Utf8, including default controls; DecimalU64 is literal-only. Repeated equal values assert multiplicity, not tie identity.
+
+Author evidence on one Windows host: the full tests command reported 158 result blocks, 1,299 passed, 0 failed and 6 ignored; the 44 root HQL2 targets reported 468/0/1, with the scalar-counter target 19/0/0. The whole-suite run used the first C1b test helper and preceded its C1b-only Plan-before-result ordering refactor, plus rustfmt normalization; it is not a whole-suite run of the final source. The corrected formatted scalar-counter target passed 19/19, and strict core/default all-target Clippy and fmt checks passed after that refactor. Docs validation (0 violations in 244 files), version validation (0.2.10) and diff check passed for the reconciled documents. PR exact-head hosted workflows remain a separate gate. Raw commands/logs and the D-volume linker tooling RCA are retained in D:/GenesisBlock_Dev/local-cleanup-backups/20261019T030925Z-genesisblock/branch-review/g4-p8-c1b-nullable-ordering-20261028. This is author host evidence, not hosted CI, independent runtime or cross-device acceptance.
+
+C1b is finite evidence, not broad G4/P8 closure. It does not establish exhaustive types/sources/nullability, multi-key order or full-key ties, composition, complete provenance, universal no-write, or ordinary successful-result state outside the selected guards. Broad P6 and P9-P16, independent runtime/performance, device and release gates remain OPEN or NOT_RUN. Preserve P8 -> P9-P12 -> P13/P14 -> P15 -> P16.
 
 ## Post-PR273 Phase C1 ordering qualification status (2026-10-27)
 
@@ -1315,7 +1325,7 @@ an ADR amendment and renewed review.
 
 ## Version diff and changelog
 
-Version diff 0.1.28b -> 0.1.29b: reconcile merged PR #273 exact-head CI and selected P6 exact-main host evidence; record that no formal GitHub review event exists and retain all broad G4/P8/P6/P9-P16 gates. No architecture decision, runtime or contract change.
+Version diff 0.1.29b -> 0.1.30b: record the selected C1b nullable ordering matrix and bounded author evidence; preserve the existing G4/P8 decision and all broad G4/P8/P6/P9-P16 gates. No architecture decision, runtime or contract change.
 
 Version diff `0.1.26b -> 0.1.27b`: record the exact-tree independent source review for the Phase B1 candidate while retaining hosted review, exact-head CI and downstream gates; no runtime, decision or contract change.
 
@@ -1336,7 +1346,7 @@ and release qualification open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
-| 0.1.29b | 2026-10-27 | active | Reconcile merged PR #273 and supplemental P6 host evidence; retain no-formal-review fact and broad G4/P8/P6/P9-P16 gates | working-tree | Codex |
+| 0.1.30b | 2026-10-28 | active | Record selected C1b nullable sorting evidence; preserve the G4/P8 contract and open broad gates | working-tree | Codex |
 | 0.1.28b | 2026-10-27 | active | Record selected C1 ordering candidate and local broad results; preserve full-key tie and wider gates | working-tree | Codex |
 | 0.1.27b | 2026-10-27 | active | Record exact-tree Phase B1 independent source review; formal hosted review and exact-head CI remain pending | working-tree | Codex |
 | 0.1.26b | 2026-10-26 | active | Record Phase B1 selected scalar type-admissibility candidate on PR271 main; preserve broad G4/P8/P6/P9-P16 gates | working-tree | Codex |
