@@ -1,9 +1,9 @@
 ---
-version: "0.9.4b"
+version: "0.9.5b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-27T19:45:54+07:00,Codex"
+last_update: "2026-10-28T19:02:18+07:00,Codex"
 status: beta
 superseded_by: null
 attributes:
@@ -14,6 +14,16 @@ attributes:
   risk: "HIGH"
   owner: "Boss (Founder / Product Authority)"
 ---
+
+## Current C1b nullable scalar ordering qualification (2026-10-28)
+
+This owner-approved host-only tests/docs candidate extends the selected C1 ordering evidence to Nullable<Bool>, Nullable<DecimalU64>, Nullable<F64Finite> and Nullable<Utf8>; Nullable<I64> remains the C1 control. It adds one test to tests/hql2_g4_scalar_counter_tests.rs and reconciles these six existing governance documents. Runtime, API and normative contract behavior are unchanged.
+
+The governing anchors are docs/SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY.md:390-393 (HQL omission defaults to NULLS LAST for ASC and DESC; typed IR requires explicit NullOrder), src/query/hql2/bind.rs::ordered and the named C1b test. The matrix issues 96 paired explicit-placement requests (four types x two directions x NULLS FIRST/LAST x HQL/IR x Normal/Plan/Analyze) plus 24 HQL-only omitted-placement requests (four types x two directions x three modes), 120 total. Literal ordered rows and root schema are asserted. The C1b-only helper checks Plan before Normal result queries, then Analyze; the original C1 helper and assertions are unchanged. P7 is used for Bool, F64Finite and Utf8, including default controls; DecimalU64 is literal-only. Repeated equal values assert multiplicity, not tie identity.
+
+Author evidence on one Windows host: the full tests command reported 158 result blocks, 1,299 passed, 0 failed and 6 ignored; the 44 root HQL2 targets reported 468/0/1, with the scalar-counter target 19/0/0. The whole-suite run used the first C1b test helper and preceded its C1b-only Plan-before-result ordering refactor, plus rustfmt normalization; it is not a whole-suite run of the final source. The corrected formatted scalar-counter target passed 19/19, and strict core/default all-target Clippy and fmt checks passed after that refactor. Docs validation (0 violations in 244 files), version validation (0.2.10) and diff check passed for the reconciled documents. PR exact-head hosted workflows remain a separate gate. Raw commands/logs and the D-volume linker tooling RCA are retained in D:/GenesisBlock_Dev/local-cleanup-backups/20261019T030925Z-genesisblock/branch-review/g4-p8-c1b-nullable-ordering-20261028. This is author host evidence, not hosted CI, independent runtime or cross-device acceptance.
+
+C1b is finite evidence, not broad G4/P8 closure. It does not establish exhaustive types/sources/nullability, multi-key order or full-key ties, composition, complete provenance, universal no-write, or ordinary successful-result state outside the selected guards. Broad P6 and P9-P16, independent runtime/performance, device and release gates remain OPEN or NOT_RUN. Preserve P8 -> P9-P12 -> P13/P14 -> P15 -> P16.
 
 ## Post-PR273 Phase C1 ordering qualification status (2026-10-27)
 
@@ -1833,7 +1843,7 @@ authorization.
 
 ## CHANGELOG
 
-Version diff 0.9.3b -> 0.9.4b: record PR #273 merged exact-head CI and selected P6 local exact-main results; distinguish author execution from formal review and independent P6 gates; retain open broad G4/P8/P6/P9-P16 stages.
+Version diff 0.9.4b -> 0.9.5b: add selected C1b nullable-order host qualification and local results; retain broad G4/P8, P6 and P9-P16 work as open stages. No runtime, API or contract work is included.
 
 Version diff 0.9.1b -> 0.9.2b: record the exact-tree independent source review for Phase B1; at that candidate snapshot hosted review and exact-head CI were pending; retain broad G4/P8 and P6/P9-P16 stages.
 
