@@ -6,16 +6,26 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+LOCKFILES = (
+    "Cargo.lock",
+    "studio/src-tauri/Cargo.lock",
+    "genesisblock-mobile/src-tauri/Cargo.lock",
+)
 
 
 def main() -> int:
     policy = json.loads(
         (ROOT / ".github/security-advisory-exceptions.json").read_text(encoding="utf-8")
     )
-    command = ["cargo", "audit", "--file", "Cargo.lock"]
-    for advisory in sorted(policy):
-        command.extend(["--ignore", advisory])
-    return subprocess.call(command, cwd=ROOT)
+    first_failure = 0
+    for lockfile in LOCKFILES:
+        command = ["cargo", "audit", "--file", lockfile]
+        for advisory in sorted(policy):
+            command.extend(["--ignore", advisory])
+        result = subprocess.call(command, cwd=ROOT)
+        if result and not first_failure:
+            first_failure = result
+    return first_failure
 
 
 if __name__ == "__main__":

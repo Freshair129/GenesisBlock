@@ -45,6 +45,8 @@ Security-relevant areas of the engine:
 
 ## Dependency Hygiene
 
-`Cargo.lock` is committed and audited against the [RustSec](https://rustsec.org)
-advisory database on every push/PR and weekly (see
+All committed Rust lockfiles — `Cargo.lock`,
+`studio/src-tauri/Cargo.lock`, and
+`genesisblock-mobile/src-tauri/Cargo.lock` — are audited against the
+[RustSec](https://rustsec.org) advisory database on every push/PR and weekly (see
 `.github/workflows/security.yml`).
