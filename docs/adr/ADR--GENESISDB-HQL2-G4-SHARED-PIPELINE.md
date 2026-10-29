@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE
-version: "0.1.30b"
+version: "0.1.31b"
 created_at: "2026-10-04T13:08:29+07:00,Codex,2be63a7"
-last_update: "2026-10-28T19:02:18+07:00,Codex"
+last_update: "2026-10-29T09:43:02+07:00,Codex"
 status: active
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -15,7 +15,15 @@ attributes:
   amends: ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY
 ---
 
-## Current C1b nullable scalar ordering qualification (2026-10-28)
+## Current Phase C2 composed scalar pipeline qualification (2026-10-29)
+
+The owner-approved Phase C2 host qualification adds one test to the existing scalar-counter target and reconciles six existing governance documents. It exercises paired HQL2 and typed-IR `Values -> Filter -> Project -> Distinct -> Sort -> Offset -> Take -> Project` requests for nullable I64, Bool, DecimalU64, F64Finite, and Utf8. Literal output rows/schema and all operator row counters are the expected values. P7 independently checks the four represented value families; DecimalU64 is literal-only.
+
+The five fixtures contain nulls and repeated inputs. Filter removes nulls and Distinct leaves unique single-key Sort values, so this evidence makes no claim about multi-key ordering or full-key ties. Across 80 requests, 30 Plans/Normal/Analyze requests succeed, 30 namespace controls deny, and 20 byte-budget controls fail closed. Plan precedes result queries and explicit publication; observed state is compared around Plan and error controls. The focused test passed 1/1 and the scalar-counter target 20/20 on one Windows author host. Strict core/default all-target Clippy, formatting, docs validation (0/244), version validation (0.2.10), and diff checks passed. See the [C2 P8 ledger](../REPORT--HQL2-P8-CORE-2026-09-28.md#current-phase-c2-composed-scalar-pipeline-qualification-2026-10-29) for the exact bounded matrix and raw evidence location.
+
+This is test evidence only: it changes no G4 contract, runtime, API, schema, P6 authority, P7 interpreter, or error taxonomy. Broad type/source/order/composition/provenance, universal no-write and ordinary-success-state evidence, broad P6, P9-P16, independent runtime/performance, device and release gates remain open or NOT_RUN. Preserve P8 -> P9-P12 -> P13/P14 -> P15 -> P16.
+
+## Historical Phase C1b nullable scalar ordering qualification (2026-10-28)
 
 This owner-approved host-only tests/docs candidate extends the selected C1 ordering evidence to Nullable<Bool>, Nullable<DecimalU64>, Nullable<F64Finite> and Nullable<Utf8>; Nullable<I64> remains the C1 control. It adds one test to tests/hql2_g4_scalar_counter_tests.rs and reconciles these six existing governance documents. Runtime, API and normative contract behavior are unchanged.
 

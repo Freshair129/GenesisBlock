@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.72b"
-updated: "2026-10-28"
+version: "2.3.73b"
+updated: "2026-10-29"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 related_issue: 84
@@ -25,7 +25,13 @@ related_docs:
   - "docs/GENESISRAG17-EXTENSION-MAP.md"
 ---
 
-## Current C1b nullable scalar ordering qualification (2026-10-28)
+## Current Phase C2 composed scalar pipeline qualification (2026-10-29)
+
+Owner-approved Phase C2 is a tests/docs-only host qualification of one composed scalar pipeline across nullable I64, Bool, DecimalU64, F64Finite, and Utf8. Paired HQL2/typed-IR requests assert literal rows/schema, measured row counters, Plan-before-result behavior, and selected namespace/budget guards; the unchanged P7 interpreter is used only for types it represents. Focused test result: 1/1. Existing scalar-counter target: 20/20 on one Windows author host. Strict core/default all-target Clippy, formatting, docs validation (0/244), version validation (0.2.10), and diff checks passed. The [P8 ledger](REPORT--HQL2-P8-CORE-2026-09-28.md#current-phase-c2-composed-scalar-pipeline-qualification-2026-10-29) records the bounded matrix and evidence location.
+
+Phase C2 does not create or change runtime/API/normative contract behavior. It does not establish multi-key or tie ordering, exhaustive types/sources/composition/provenance, universal no-write, ordinary-success state outside selected guards, complete P6, P9-P16, independent runtime/performance, device, or release acceptance. Those gates remain open or NOT_RUN. Preserve P8 -> P9-P12 -> P13/P14 -> P15 -> P16.
+
+## Historical Phase C1b nullable scalar ordering qualification (2026-10-28)
 
 This owner-approved host-only tests/docs candidate extends the selected C1 ordering evidence to Nullable<Bool>, Nullable<DecimalU64>, Nullable<F64Finite> and Nullable<Utf8>; Nullable<I64> remains the C1 control. It adds one test to tests/hql2_g4_scalar_counter_tests.rs and reconciles these six existing governance documents. Runtime, API and normative contract behavior are unchanged.
 
