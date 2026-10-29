@@ -932,6 +932,44 @@ struct H1Export {
     source_addr: SocketAddr,
 }
 
+// Diagnostic control, not an in-budget protocol acceptance test: the original
+// required prefix-budget response must still arrive in the test below.
+#[tokio::test]
+async fn gossip_datagram_default_capacity_probe() {
+    let sender = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let receiver = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    eprintln!(
+        "H1-T default probe: sndbuf={:?} rcvbuf={:?}",
+        socket2::SockRef::from(&sender).send_buffer_size(),
+        socket2::SockRef::from(&receiver).recv_buffer_size(),
+    );
+    for bytes in [128, 30_000, 55_000, 65_507] {
+        let data = vec![0x5a; bytes];
+        match sender.send_to(&data, receiver.local_addr().unwrap()).await {
+            Ok(sent) => {
+                eprintln!("H1-T default probe: bytes={bytes} sent={sent}");
+                assert_eq!(sent, bytes);
+                let mut buf = vec![0; 65_535];
+                let (received, addr) =
+                    tokio::time::timeout(GOSSIP_TEST_TIMEOUT, receiver.recv_from(&mut buf))
+                        .await
+                        .expect("successful loopback send must arrive within the unchanged guard")
+                        .unwrap();
+                assert_eq!(addr, sender.local_addr().unwrap());
+                assert_eq!(&buf[..received], data.as_slice());
+            }
+            Err(error) => {
+                eprintln!(
+                    "H1-T default probe: bytes={bytes} send_error_kind={:?} raw_os_error={:?}",
+                    error.kind(),
+                    error.raw_os_error(),
+                );
+                assert_ne!(bytes, 128, "small control send must succeed");
+            }
+        }
+    }
+}
+
 async fn h1_export(source: &Arc<Storage>) -> H1Export {
     let dir = TempDir::new().unwrap();
     let requester = open_with_identity(&dir, &deterministic_signing_key(0x91));
@@ -972,6 +1010,7 @@ async fn h1_export(source: &Arc<Storage>) -> H1Export {
 }
 
 async fn h1_pull(harness: &H1Export, from: u64, nonce: &str) -> Option<GossipMessage> {
+    eprintln!("H1 pull: from={from} nonce={nonce:.64}");
     let request = harness
         .requester
         .encode_gossip_message(GossipMessage::PullRequest {

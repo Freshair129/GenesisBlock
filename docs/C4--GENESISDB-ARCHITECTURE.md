@@ -2,7 +2,7 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: "0.1.104b"
+version: "0.1.105b"
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
 last_update: "2026-10-30T02:22:13+07:00,Codex"
@@ -24,6 +24,27 @@ related_docs:
   - docs/adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md
   - docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md
 ---
+
+## H1-T transport diagnostics — 2026-10-30
+
+The owner approved a HIGH/C-3 extension to at most15 existing/new files: retain the twelve H1/H1-R files and add only Cargo.toml, Cargo.lock and the distinct [transport ../.brain/rca/2026-10-30-gossip-datagram-capacity.md](../.brain/rca/2026-10-30-gossip-datagram-capacity.md). Actual macOS Rust job123693025312 at head15574fcd8eef83faa1a08e31938c9ade05abdabf passed nested graph/reopen and13 peer cases but failed the required prefix-budget reply after the unchanged three-second timeout. The graph success and old source-bound Windows qualification below are historical; overall hosted eligibility is FAILED, not cross-platform acceptance.
+
+This candidate is **DIAGNOSTIC ONLY / NOT MERGE ELIGIBLE**. The bound source socket's send/receive capacity, encoded PushDelta length and actual send errno are observed through safe borrowed socket2=0.6.4 APIs. A separate default-capacity loopback probe reports large-send outcomes; it does not replace the required authenticated prefix/budget assertions. No capacity setter or transport repair is present yet. Insufficient Darwin send capacity is a hypothesis until actual source-socket/OS-error evidence confirms it. The approved conditional repair may configure/verify sufficient per-socket capacity before nonzero gossip_port readiness only after that evidence; a different cause requires a concrete new scope.
+
+All54,000/54,001 event and55,000/55,001 vector boundaries, existing receipts/state checks, timeout and oversized-group bounded no-response behavior remain unchanged. No skip, retry, global sysctl, public API/protocol/WAL/schema/ACL or workflow change. Cargo promotes the already-locked socket2 without package/checksum churn and activates the additional non-publication Release PR workflow; tag/manual-only publication paths remain excluded and unrun. Fresh current-source author/independent execution, whole-branch source/evidence/architecture review and every applicable Ubuntu/Windows/macOS/mobile-host CI job are required after any repair. Old-head greens cannot qualify new bytes.
+
+Non-graph nested composition correctness, standalone-Edge historical replay, oversized positive-group sync liveness, broad P6/G4/P8/H2-H4/P9-P16 and exhaustive type/order/composition/provenance remain open. Same-host execution is not another machine/new oracle; universal transient/internal no-write, performance/device/release gates are not established. Devices remain unavailable. Preserve P8 → P9–P12 → P13/P14 → P15 → P16; no customer database repair, broad closure or release permission is implied.
+
+```mermaid
+flowchart LR
+    B[Bind numeric UDP socket] --> D[Diagnostic candidate: observe capacity]
+    D --> R[Publish existing gossip readiness]
+    R --> S[Measure authenticated PushDelta send]
+    S --> E[Actual macOS size and errno evidence]
+    E --> G{Capacity rejection confirmed?}
+    G -->|yes, later approved repair stage| V[Set and verify capacity before readiness]
+    G -->|no| P[Stop behavioral repair and propose actual cause]
+```
 
 ## H1-R P6 boundary qualification — 2026-10-29
 

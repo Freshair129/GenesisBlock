@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Document Registry"
 doc_id: "DOC-REGISTRY-GENESISBLOCKDB"
 status: draft
-version: "0.5.132+draft"
+version: "0.5.133+draft"
 updated: "2026-10-30"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -17,6 +17,16 @@ related_docs:
   - "docs/SPEC--GENESISDB-P6-PEER-LOCALITY-ADDENDUM.md"
   - "docs/adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md"
 ---
+
+## H1-T transport diagnostics — 2026-10-30
+
+The owner approved a HIGH/C-3 extension to at most15 existing/new files: retain the twelve H1/H1-R files and add only Cargo.toml, Cargo.lock and the distinct [transport ../.brain/rca/2026-10-30-gossip-datagram-capacity.md](../.brain/rca/2026-10-30-gossip-datagram-capacity.md). Actual macOS Rust job123693025312 at head15574fcd8eef83faa1a08e31938c9ade05abdabf passed nested graph/reopen and13 peer cases but failed the required prefix-budget reply after the unchanged three-second timeout. The graph success and old source-bound Windows qualification below are historical; overall hosted eligibility is FAILED, not cross-platform acceptance.
+
+This candidate is **DIAGNOSTIC ONLY / NOT MERGE ELIGIBLE**. The bound source socket's send/receive capacity, encoded PushDelta length and actual send errno are observed through safe borrowed socket2=0.6.4 APIs. A separate default-capacity loopback probe reports large-send outcomes; it does not replace the required authenticated prefix/budget assertions. No capacity setter or transport repair is present yet. Insufficient Darwin send capacity is a hypothesis until actual source-socket/OS-error evidence confirms it. The approved conditional repair may configure/verify sufficient per-socket capacity before nonzero gossip_port readiness only after that evidence; a different cause requires a concrete new scope.
+
+All54,000/54,001 event and55,000/55,001 vector boundaries, existing receipts/state checks, timeout and oversized-group bounded no-response behavior remain unchanged. No skip, retry, global sysctl, public API/protocol/WAL/schema/ACL or workflow change. Cargo promotes the already-locked socket2 without package/checksum churn and activates the additional non-publication Release PR workflow; tag/manual-only publication paths remain excluded and unrun. Fresh current-source author/independent execution, whole-branch source/evidence/architecture review and every applicable Ubuntu/Windows/macOS/mobile-host CI job are required after any repair. Old-head greens cannot qualify new bytes.
+
+Non-graph nested composition correctness, standalone-Edge historical replay, oversized positive-group sync liveness, broad P6/G4/P8/H2-H4/P9-P16 and exhaustive type/order/composition/provenance remain open. Same-host execution is not another machine/new oracle; universal transient/internal no-write, performance/device/release gates are not established. Devices remain unavailable. Preserve P8 → P9–P12 → P13/P14 → P15 → P16; no customer database repair, broad closure or release permission is implied.
 
 ## H1-R P6 boundary qualification — 2026-10-29
 
@@ -712,22 +722,22 @@ registry row explicitly names them.
 
 | Role | Doc ID | Version | Status | Owner | Path |
 |---|---|---|---|---|---|
-| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.74b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
-| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.104b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
+| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.75b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
+| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.105b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
 | Execution DAG guard | `SPEC--EXECUTION-DAG-GUARD-V1` | `0.1.0` | accepted | Sol Decision / Contract and AC | `docs/SPEC--EXECUTION-DAG-GUARD-V1.md` |
 | HQL2 execution decision | `ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY` | `0.1.1b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY.md` |
-| HQL2 G4 shared-pipeline contract | `ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE` | `0.1.32b` | active | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md` |
+| HQL2 G4 shared-pipeline contract | `ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE` | `0.1.33b` | active | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md` |
 | HQL2 P8 completion addendum | `ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM` | `0.1.17b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md` |
 | HQL2 Sequence pattern constraints | `ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS` | `0.2.1b` | beta | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS.md` |
 | HQL2 durable revisions and annotations | `ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS` | `0.8.27b` | beta | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS.md` |
-| UEE-HQL2 orchestration plan | `IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22` | `0.9.7b` | beta | Boss (Founder / Product Authority) | `docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md` |
+| UEE-HQL2 orchestration plan | `IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22` | `0.9.8b` | beta | Boss (Founder / Product Authority) | `docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md` |
 | HQL2 typed P8 boundary | `SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY` | `0.2.68b` | beta | Boss (Founder / Product Authority) | `docs/SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY.md` |
-| HQL2 P8 core checkpoint | `REPORT--HQL2-P8-CORE-2026-09-28` | `0.1.99b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P8-CORE-2026-09-28.md` |
+| HQL2 P8 core checkpoint | `REPORT--HQL2-P8-CORE-2026-09-28` | `0.1.100b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P8-CORE-2026-09-28.md` |
 | HQL2 P7 bounded oracle evidence | `REPORT--HQL2-P7-ORACLE-2026-09-28` | `0.1.12b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P7-ORACLE-2026-09-28.md` |
 | Commit correctness | `SPEC--WAVE-A-COMMIT-CORRECTNESS` | `0.1.0b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-A-COMMIT-CORRECTNESS.md` |
 | Durable collections and edge history | `SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY` | `0.1.2b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY.md` |
-| Generation, lease, temporal and ACL contract | `SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL` | `0.5.49b` | beta | GenesisBlockDB Engineering | `docs/SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL.md` |
-| P6 peer-locality addendum | `SPEC--GENESISDB-P6-PEER-LOCALITY-ADDENDUM` | `0.1.17b` | active | GenesisBlockDB Engineering | `docs/SPEC--GENESISDB-P6-PEER-LOCALITY-ADDENDUM.md` |
+| Generation, lease, temporal and ACL contract | `SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL` | `0.5.50b` | beta | GenesisBlockDB Engineering | `docs/SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL.md` |
+| P6 peer-locality addendum | `SPEC--GENESISDB-P6-PEER-LOCALITY-ADDENDUM` | `0.1.18b` | active | GenesisBlockDB Engineering | `docs/SPEC--GENESISDB-P6-PEER-LOCALITY-ADDENDUM.md` |
 | Peer membership and sync authorization | `ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION` | `1.0.0` | accepted | GenesisBlockDB Architecture | `docs/adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md` |
 | Backup and restore contract | `SPEC--GENESISDB-BACKUP-RESTORE-U9` | `0.1.8b` | beta | Boss (Founder / Product Authority) | `docs/SPEC--GENESISDB-BACKUP-RESTORE-U9.md` |
 | Query correctness | `SPEC--WAVE-C-QUERY-CORRECTNESS` | `0.2.1b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-C-QUERY-CORRECTNESS.md` |

@@ -25189,6 +25189,13 @@ impl Storage {
             let mut pending_sync_requests: HashMap<String, PendingSyncRequest> = HashMap::new();
             let socket = match tokio::net::UdpSocket::bind(bind_addr).await {
                 Ok(s) => {
+                    // H1-T diagnostic only: observe the actual source socket before
+                    // any capacity change. This candidate does not repair capacity.
+                    eprintln!(
+                        "gossip: bound socket sndbuf={:?} rcvbuf={:?}",
+                        socket2::SockRef::from(&s).send_buffer_size(),
+                        socket2::SockRef::from(&s).recv_buffer_size(),
+                    );
                     let addr = match s.local_addr() {
                         Ok(a) => a,
                         Err(e) => {
@@ -25392,7 +25399,12 @@ impl Storage {
                                                                 .ok()
                                                         });
                                                     if let Ok(data)=storage.encode_gossip_message(GossipMessage::PushDelta {events,source_peer_id:storage.local_peer_id.clone(),through_seq:Some(through_seq),progress_receipt}) {
-                                                        let _=socket.send_to(&data,reply_addr).await;
+                                                        // Bounded transport evidence only; never log the authenticated payload.
+                                                        let capacity = socket2::SockRef::from(&socket).send_buffer_size();
+                                                        match socket.send_to(&data,reply_addr).await {
+                                                            Ok(sent) => eprintln!("gossip: PushDelta bytes={} sndbuf={capacity:?} sent={sent}", data.len()),
+                                                            Err(error) => eprintln!("gossip: PushDelta bytes={} sndbuf={capacity:?} send_error_kind={:?} raw_os_error={:?}", data.len(), error.kind(), error.raw_os_error()),
+                                                        }
                                                     }
                                                 }
                                                 Err(e)=> {
