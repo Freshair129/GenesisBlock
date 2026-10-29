@@ -43,6 +43,69 @@ const GOSSIP_PENDING_SYNC_TTL: Duration = Duration::from_secs(60);
 const GOSSIP_PULL_RETRY_INTERVAL: Duration = Duration::from_secs(1);
 const GOSSIP_STATE_SWEEP_INTERVAL: Duration = Duration::from_secs(15);
 const GOSSIP_PACKET_VERSION: u32 = 1;
+const GOSSIP_SOCKET_SEND_CAPACITY: usize = 65_535;
+
+fn configure_gossip_send_capacity(socket: &tokio::net::UdpSocket) -> std::io::Result<usize> {
+    // Darwin's default atomic-send capacity can be smaller than an in-budget
+    // authenticated delta. Borrow the Tokio socket; keep larger host defaults.
+    let socket = socket2::SockRef::from(socket);
+    if socket.send_buffer_size()? < GOSSIP_SOCKET_SEND_CAPACITY {
+        socket.set_send_buffer_size(GOSSIP_SOCKET_SEND_CAPACITY)?;
+    }
+    let effective = socket.send_buffer_size()?;
+    if effective < GOSSIP_SOCKET_SEND_CAPACITY {
+        return Err(std::io::Error::other(format!(
+            "gossip UDP send capacity below {} bytes: {}",
+            GOSSIP_SOCKET_SEND_CAPACITY, effective,
+        )));
+    }
+    Ok(effective)
+}
+
+#[cfg(test)]
+mod gossip_socket_capacity_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn constrained_ipv4_and_ipv6_sockets_deliver_existing_size_replies() {
+        for bind in ["127.0.0.1:0", "[::1]:0"] {
+            let sender = tokio::net::UdpSocket::bind(bind).await.unwrap();
+            let receiver = tokio::net::UdpSocket::bind(bind).await.unwrap();
+            socket2::SockRef::from(&sender)
+                .set_send_buffer_size(4_096)
+                .unwrap();
+            let before = socket2::SockRef::from(&sender).send_buffer_size().unwrap();
+            assert!(before < GOSSIP_SOCKET_SEND_CAPACITY, "{bind}: {before}");
+            let effective = configure_gossip_send_capacity(&sender).unwrap();
+            assert!(
+                effective >= GOSSIP_SOCKET_SEND_CAPACITY,
+                "{bind}: {effective}"
+            );
+            assert_eq!(
+                socket2::SockRef::from(&sender).send_buffer_size().unwrap(),
+                effective,
+            );
+            // Raw transport control above the selected authenticated wrapper
+            // sizes; this does not enlarge the 54KB/55KB protocol budgets.
+            let data = vec![0x5a; 55_900];
+            assert_eq!(
+                sender
+                    .send_to(&data, receiver.local_addr().unwrap())
+                    .await
+                    .unwrap(),
+                data.len(),
+            );
+            let mut buf = vec![0; 65_535];
+            let (received, addr) =
+                tokio::time::timeout(Duration::from_secs(3), receiver.recv_from(&mut buf))
+                    .await
+                    .expect("prepared loopback socket must deliver within the existing guard")
+                    .unwrap();
+            assert_eq!(addr, sender.local_addr().unwrap());
+            assert_eq!(&buf[..received], data.as_slice());
+        }
+    }
+}
 
 #[derive(Clone)]
 struct PendingSyncRequest {
@@ -25189,13 +25252,16 @@ impl Storage {
             let mut pending_sync_requests: HashMap<String, PendingSyncRequest> = HashMap::new();
             let socket = match tokio::net::UdpSocket::bind(bind_addr).await {
                 Ok(s) => {
-                    // H1-T diagnostic only: observe the actual source socket before
-                    // any capacity change. This candidate does not repair capacity.
-                    eprintln!(
-                        "gossip: bound socket sndbuf={:?} rcvbuf={:?}",
-                        socket2::SockRef::from(&s).send_buffer_size(),
-                        socket2::SockRef::from(&s).recv_buffer_size(),
-                    );
+                    // Do not publish a usable port unless the socket can hold
+                    // the existing bounded delta plus its authenticated wrapper.
+                    let capacity = match configure_gossip_send_capacity(&s) {
+                        Ok(capacity) => capacity,
+                        Err(error) => {
+                            eprintln!("gossip: failed to prepare UDP send capacity: {error}");
+                            return;
+                        }
+                    };
+                    eprintln!("gossip: prepared socket sndbuf={capacity}");
                     let addr = match s.local_addr() {
                         Ok(a) => a,
                         Err(e) => {
@@ -25399,11 +25465,10 @@ impl Storage {
                                                                 .ok()
                                                         });
                                                     if let Ok(data)=storage.encode_gossip_message(GossipMessage::PushDelta {events,source_peer_id:storage.local_peer_id.clone(),through_seq:Some(through_seq),progress_receipt}) {
-                                                        // Bounded transport evidence only; never log the authenticated payload.
-                                                        let capacity = socket2::SockRef::from(&socket).send_buffer_size();
-                                                        match socket.send_to(&data,reply_addr).await {
-                                                            Ok(sent) => eprintln!("gossip: PushDelta bytes={} sndbuf={capacity:?} sent={sent}", data.len()),
-                                                            Err(error) => eprintln!("gossip: PushDelta bytes={} sndbuf={capacity:?} send_error_kind={:?} raw_os_error={:?}", data.len(), error.kind(), error.raw_os_error()),
+                                                        // Keep failures observable without payloads, per-packet
+                                                        // success logging or an extra syscall on successful sends.
+                                                        if let Err(error) = socket.send_to(&data,reply_addr).await {
+                                                            eprintln!("gossip: PushDelta bytes={} send_error_kind={:?} raw_os_error={:?}", data.len(), error.kind(), error.raw_os_error());
                                                         }
                                                     }
                                                 }
