@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Document Registry"
 doc_id: "DOC-REGISTRY-GENESISBLOCKDB"
 status: draft
-version: "0.5.131+draft"
-updated: "2026-10-29"
+version: "0.5.132+draft"
+updated: "2026-10-30"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 related_issue: 84
@@ -17,6 +17,22 @@ related_docs:
   - "docs/SPEC--GENESISDB-P6-PEER-LOCALITY-ADDENDUM.md"
   - "docs/adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md"
 ---
+
+## H1-R P6 boundary qualification — 2026-10-29
+
+Owner approved H1 and the evidence-backed H1-R storage repair (HIGH/C-3), at most twelve files, on a branch in the existing checkout. Baseline is main `a14b6ad498d738e7a2343c901fff2b958035eba9`. The first ordinary nested Batch positive control exposed missing projected properties and failed reopen; the flat control passed. [RCA](../.brain/rca/2026-10-29-nested-batch-projection-recovery.md) records the first failures and root cause before correction.
+
+The live graph Batch projection now traverses nested Node/Edge leaves in encounter order within the existing SQLite transaction; journal projection replay reaches those graph leaves. Original signed outer envelopes and frame sequences remain intact. Nested relational/transaction/retraction combinations are outside this graph repair and remain separately unqualified.
+
+Selected assertions are in [history/Plan fixtures](../tests/hql2_history_change_tests.rs) and [peer fixtures](../tests/p6_peer_authority_tests.rs): fresh/current/stale Plan uses the selected candidate or generation frontier, paired HQL/IR temporal bounds and exact catalog/error diagnostics; signed generation/policy batches with real ordinary siblings reject atomically; nested ordinary graph props, Edge projection and original-envelope/reopen controls; authenticated mixed-export obstruction; complete-prefix, same-sequence, byte-budget, filtered/trailing, retry and real folded-base controls. Synthetic CRC-valid journal images qualify export accounting, not recovery/admission for those images. Limits are 54,000 bytes per signed event and 55,000 bytes per serialized delta events vector. An oversized positive same-sequence group retains bounded no-response/no-ack behavior; no new bootstrap error contract is inferred.
+
+Before/after file/frontier controls use size-only exceptions for lock/SHM files. They do not establish universal transient/internal-write absence. A reopened Storage correctly rejects an old handle's lease as `LEASE_OWNER_MISMATCH`. The graph repair and selected H1 tests do not close broad P6, G4/P8, exhaustive types/order/composition/provenance or P9–P16. Preserve P8 → P9–P12 → P13/P14 → P15 → P16. Devices are unavailable; device/performance/release and other-machine gates remain OPEN/NOT_RUN.
+
+Revision-bound local qualification: graph regression RED→GREEN was observed. On final source/test/Cargo manifest `2889964b54b5b2a8e19d630dfca87222688f28eef9c5764d9593295830fba84b`, the author library + all 44 HQL2 targets + peer selection passed **526 unique tests, zero failures, one existing ignored parser child across 46 targets**; its passing parent explicitly invokes that child. A separate executor then ran **193 unique tests, zero failures/ignored/filtered across 26 P6/projection/recovery/journal/sync/consensus targets** with the same frozen source hashes before and after. Overlapping tests are not added together. Five new top-level regressions cover 18 Plan requests, six denied ingress branches, three accepted graph nesting shapes and 27 explicit UDP pulls (15 receipted deltas, ten bootstrap errors, two bounded no-response cases).
+
+The earlier full-crate author run passed 1,305 unique tests, zero failures and six existing ignored entries across 158 targets, but preceded the final Batch-only scope alignment and fixture strengthening. It is pre-final evidence, not execution of final source bytes. All final local runs use one Windows host with dev/test debug information and incremental compilation disabled. The independent executor shares the compiled Cargo cache/registry and checkout, with fresh dedicated OS TEMP; compile-time target scratch paths are shared and reinitialized by existing tests. This is not a fresh build, filesystem sandbox, new machine, new oracle or blind study. Its first attempt failed in an external manifest-parser preflight before Cargo. The completed run exited Cargo 0; its reporting gate initially missed one test name split by child-process output. Separate executor and root parsers reconciled that exact raw prefix/standalone `ok`, all 193 source names and all 26 passing summaries while preserving the original failed reporting receipt. The extra crash-child invocation is excluded from 193. Both tooling cases are retained separately from engine results. No source correction or runtime retry occurred during independent execution.
+
+Exact commands, raw first/final logs, signed fixture/source hashes, source-preservation checks and dispositions are retained in external `branch-review/p6-h1-boundary-qualification-20261029` evidence. Strict core/default all-target Clippy, formatting, docs/version/diff, fresh whole-branch source/evidence/architecture review and all applicable exact-head PR workflows are separate delivery gates recorded in their receipts; source review does not substitute for runtime or hosted eligibility. Tag/manual-only publication and physical-device/release acceptance are excluded from this host PR. This finite entry does not declare broad P6 or G4/P8 closure.
 
 ## Current Phase C2 composed scalar pipeline qualification (2026-10-29)
 
@@ -696,22 +712,22 @@ registry row explicitly names them.
 
 | Role | Doc ID | Version | Status | Owner | Path |
 |---|---|---|---|---|---|
-| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.73b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
-| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.103b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
+| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.74b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
+| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.104b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
 | Execution DAG guard | `SPEC--EXECUTION-DAG-GUARD-V1` | `0.1.0` | accepted | Sol Decision / Contract and AC | `docs/SPEC--EXECUTION-DAG-GUARD-V1.md` |
 | HQL2 execution decision | `ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY` | `0.1.1b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY.md` |
-| HQL2 G4 shared-pipeline contract | `ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE` | `0.1.31b` | active | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md` |
+| HQL2 G4 shared-pipeline contract | `ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE` | `0.1.32b` | active | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md` |
 | HQL2 P8 completion addendum | `ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM` | `0.1.17b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md` |
 | HQL2 Sequence pattern constraints | `ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS` | `0.2.1b` | beta | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS.md` |
 | HQL2 durable revisions and annotations | `ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS` | `0.8.27b` | beta | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS.md` |
-| UEE-HQL2 orchestration plan | `IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22` | `0.9.6b` | beta | Boss (Founder / Product Authority) | `docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md` |
+| UEE-HQL2 orchestration plan | `IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22` | `0.9.7b` | beta | Boss (Founder / Product Authority) | `docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md` |
 | HQL2 typed P8 boundary | `SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY` | `0.2.68b` | beta | Boss (Founder / Product Authority) | `docs/SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY.md` |
-| HQL2 P8 core checkpoint | `REPORT--HQL2-P8-CORE-2026-09-28` | `0.1.98b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P8-CORE-2026-09-28.md` |
+| HQL2 P8 core checkpoint | `REPORT--HQL2-P8-CORE-2026-09-28` | `0.1.99b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P8-CORE-2026-09-28.md` |
 | HQL2 P7 bounded oracle evidence | `REPORT--HQL2-P7-ORACLE-2026-09-28` | `0.1.12b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P7-ORACLE-2026-09-28.md` |
 | Commit correctness | `SPEC--WAVE-A-COMMIT-CORRECTNESS` | `0.1.0b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-A-COMMIT-CORRECTNESS.md` |
 | Durable collections and edge history | `SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY` | `0.1.2b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY.md` |
-| Generation, lease, temporal and ACL contract | `SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL` | `0.5.48b` | beta | GenesisBlockDB Engineering | `docs/SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL.md` |
-| P6 peer-locality addendum | `SPEC--GENESISDB-P6-PEER-LOCALITY-ADDENDUM` | `0.1.16b` | active | GenesisBlockDB Engineering | `docs/SPEC--GENESISDB-P6-PEER-LOCALITY-ADDENDUM.md` |
+| Generation, lease, temporal and ACL contract | `SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL` | `0.5.49b` | beta | GenesisBlockDB Engineering | `docs/SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL.md` |
+| P6 peer-locality addendum | `SPEC--GENESISDB-P6-PEER-LOCALITY-ADDENDUM` | `0.1.17b` | active | GenesisBlockDB Engineering | `docs/SPEC--GENESISDB-P6-PEER-LOCALITY-ADDENDUM.md` |
 | Peer membership and sync authorization | `ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION` | `1.0.0` | accepted | GenesisBlockDB Architecture | `docs/adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md` |
 | Backup and restore contract | `SPEC--GENESISDB-BACKUP-RESTORE-U9` | `0.1.8b` | beta | Boss (Founder / Product Authority) | `docs/SPEC--GENESISDB-BACKUP-RESTORE-U9.md` |
 | Query correctness | `SPEC--WAVE-C-QUERY-CORRECTNESS` | `0.2.1b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-C-QUERY-CORRECTNESS.md` |

@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: "0.1.103b"
+version: "0.1.104b"
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-29T09:43:02+07:00,Codex"
+last_update: "2026-10-30T02:22:13+07:00,Codex"
 attributes:
   domain: architecture
   scope: repository
@@ -24,6 +24,35 @@ related_docs:
   - docs/adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md
   - docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md
 ---
+
+## H1-R P6 boundary qualification — 2026-10-29
+
+```mermaid
+flowchart LR
+    A[Original signed Batch] --> B[Recursive authorization and P6 preflight]
+    B --> C[One acknowledged WAL frame]
+    C --> D[One SQLite transaction: nested graph traversal]
+    D --> E[Recursive memory application]
+    C --> F[Verified journal recovery]
+    F --> G[Nested graph projection replay]
+    G --> H[Resident props completeness check]
+```
+
+The graph compatibility fixtures use schema 5; HQL2 Plan fixtures use the existing schema-6 path. This diagram describes the selected graph flow, not admission of new nested leaf variants.
+
+Owner approved H1 and the evidence-backed H1-R storage repair (HIGH/C-3), at most twelve files, on a branch in the existing checkout. Baseline is main `a14b6ad498d738e7a2343c901fff2b958035eba9`. The first ordinary nested Batch positive control exposed missing projected properties and failed reopen; the flat control passed. [RCA](../.brain/rca/2026-10-29-nested-batch-projection-recovery.md) records the first failures and root cause before correction.
+
+The live graph Batch projection now traverses nested Node/Edge leaves in encounter order within the existing SQLite transaction; journal projection replay reaches those graph leaves. Original signed outer envelopes and frame sequences remain intact. Nested relational/transaction/retraction combinations are outside this graph repair and remain separately unqualified.
+
+Selected assertions are in [history/Plan fixtures](../tests/hql2_history_change_tests.rs) and [peer fixtures](../tests/p6_peer_authority_tests.rs): fresh/current/stale Plan uses the selected candidate or generation frontier, paired HQL/IR temporal bounds and exact catalog/error diagnostics; signed generation/policy batches with real ordinary siblings reject atomically; nested ordinary graph props, Edge projection and original-envelope/reopen controls; authenticated mixed-export obstruction; complete-prefix, same-sequence, byte-budget, filtered/trailing, retry and real folded-base controls. Synthetic CRC-valid journal images qualify export accounting, not recovery/admission for those images. Limits are 54,000 bytes per signed event and 55,000 bytes per serialized delta events vector. An oversized positive same-sequence group retains bounded no-response/no-ack behavior; no new bootstrap error contract is inferred.
+
+Before/after file/frontier controls use size-only exceptions for lock/SHM files. They do not establish universal transient/internal-write absence. A reopened Storage correctly rejects an old handle's lease as `LEASE_OWNER_MISMATCH`. The graph repair and selected H1 tests do not close broad P6, G4/P8, exhaustive types/order/composition/provenance or P9–P16. Preserve P8 → P9–P12 → P13/P14 → P15 → P16. Devices are unavailable; device/performance/release and other-machine gates remain OPEN/NOT_RUN.
+
+Revision-bound local qualification: graph regression RED→GREEN was observed. On final source/test/Cargo manifest `2889964b54b5b2a8e19d630dfca87222688f28eef9c5764d9593295830fba84b`, the author library + all 44 HQL2 targets + peer selection passed **526 unique tests, zero failures, one existing ignored parser child across 46 targets**; its passing parent explicitly invokes that child. A separate executor then ran **193 unique tests, zero failures/ignored/filtered across 26 P6/projection/recovery/journal/sync/consensus targets** with the same frozen source hashes before and after. Overlapping tests are not added together. Five new top-level regressions cover 18 Plan requests, six denied ingress branches, three accepted graph nesting shapes and 27 explicit UDP pulls (15 receipted deltas, ten bootstrap errors, two bounded no-response cases).
+
+The earlier full-crate author run passed 1,305 unique tests, zero failures and six existing ignored entries across 158 targets, but preceded the final Batch-only scope alignment and fixture strengthening. It is pre-final evidence, not execution of final source bytes. All final local runs use one Windows host with dev/test debug information and incremental compilation disabled. The independent executor shares the compiled Cargo cache/registry and checkout, with fresh dedicated OS TEMP; compile-time target scratch paths are shared and reinitialized by existing tests. This is not a fresh build, filesystem sandbox, new machine, new oracle or blind study. Its first attempt failed in an external manifest-parser preflight before Cargo. The completed run exited Cargo 0; its reporting gate initially missed one test name split by child-process output. Separate executor and root parsers reconciled that exact raw prefix/standalone `ok`, all 193 source names and all 26 passing summaries while preserving the original failed reporting receipt. The extra crash-child invocation is excluded from 193. Both tooling cases are retained separately from engine results. No source correction or runtime retry occurred during independent execution.
+
+Exact commands, raw first/final logs, signed fixture/source hashes, source-preservation checks and dispositions are retained in external `branch-review/p6-h1-boundary-qualification-20261029` evidence. Strict core/default all-target Clippy, formatting, docs/version/diff, fresh whole-branch source/evidence/architecture review and all applicable exact-head PR workflows are separate delivery gates recorded in their receipts; source review does not substitute for runtime or hosted eligibility. Tag/manual-only publication and physical-device/release acceptance are excluded from this host PR. This finite entry does not declare broad P6 or G4/P8 closure.
 
 ## Current Phase C2 composed scalar pipeline qualification (2026-10-29)
 

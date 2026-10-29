@@ -13143,8 +13143,12 @@ impl Storage {
                     .transaction()
                     .map_err(|e| Error::from_reason(e.to_string()))?;
                 let mut max_clock = 0;
-                for inner in events {
+                // Nested graph batches share the outer frame and SQLite
+                // transaction. Do not reacquire projection_db recursively.
+                let mut pending: Vec<_> = events.iter().rev().collect();
+                while let Some(inner) = pending.pop() {
                     match inner {
+                        Event::Batch(children) => pending.extend(children.iter().rev()),
                         Event::Node(node) => {
                             let node_u32 = self.get_or_intern_id(&node.id);
                             if node.clock.time > max_clock {
@@ -13600,10 +13604,14 @@ impl Storage {
                     for event in events {
                         match event {
                             Event::Node(_)
+                            | Event::Edge(_)
                             | Event::RelationalSchema(_)
                             | Event::RelationalRows { .. }
                             | Event::Transaction(_)
                             | Event::NodeRetract { .. } => apply(event),
+                            // Reuse graph Batch projection's transaction and
+                            // traversal; other nested leaf kinds stay excluded.
+                            Event::Batch(_) => apply(event),
                             _ => {}
                         }
                     }
