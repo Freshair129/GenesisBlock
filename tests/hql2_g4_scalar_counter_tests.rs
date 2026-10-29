@@ -3561,3 +3561,294 @@ fn scalar_nullable_ordering_matrix_covers_remaining_orderable_types() {
         }
     }
 }
+
+/// Phase C2 qualifies selected composed scalar row shaping across the base
+/// scalar types. Values are distinct before Sort so this does not assert
+/// equal-key tie identity or multi-key ordering behavior.
+#[test]
+fn composed_scalar_pipeline_matches_literals_p7_and_diagnostics() {
+    struct C2Case {
+        type_name: &'static str,
+        encoded: Value,
+        p7_values: Option<Vec<R>>,
+        expected: Vec<V>,
+        sizes: [u64; 8],
+    }
+
+    let cases = [
+        C2Case {
+            type_name: "I64",
+            encoded: json!(["2", null, "1", "2", "3", "0"]),
+            p7_values: Some(vec![
+                R::I64(2),
+                R::Null,
+                R::I64(1),
+                R::I64(2),
+                R::I64(3),
+                R::I64(0),
+            ]),
+            expected: vec![V::I64(1), V::I64(2)],
+            sizes: [6, 5, 5, 4, 4, 3, 2, 2],
+        },
+        C2Case {
+            type_name: "Bool",
+            encoded: json!([true, null, false, true, false]),
+            p7_values: Some(vec![
+                R::Bool(true),
+                R::Null,
+                R::Bool(false),
+                R::Bool(true),
+                R::Bool(false),
+            ]),
+            expected: vec![V::Bool(true)],
+            sizes: [5, 4, 4, 2, 2, 1, 1, 1],
+        },
+        C2Case {
+            type_name: "DecimalU64",
+            encoded: json!(["10", null, "2", "10", "2", "7"]),
+            p7_values: None,
+            expected: vec![V::DecimalU64(7), V::DecimalU64(10)],
+            sizes: [6, 5, 5, 3, 3, 2, 2, 2],
+        },
+        C2Case {
+            type_name: "F64Finite",
+            encoded: json!([-0.5, null, 2.5, 0.0, 2.5]),
+            p7_values: Some(vec![
+                R::F64(-0.5),
+                R::Null,
+                R::F64(2.5),
+                R::F64(0.0),
+                R::F64(2.5),
+            ]),
+            expected: vec![V::F64(0.0), V::F64(2.5)],
+            sizes: [5, 4, 4, 3, 3, 2, 2, 2],
+        },
+        C2Case {
+            type_name: "Utf8",
+            encoded: json!(["b", null, "a", "c", "b"]),
+            p7_values: Some(vec![
+                R::Text("b".into()),
+                R::Null,
+                R::Text("a".into()),
+                R::Text("c".into()),
+                R::Text("b".into()),
+            ]),
+            expected: vec![V::Utf8("b".into()), V::Utf8("c".into())],
+            sizes: [5, 4, 4, 3, 3, 2, 2, 2],
+        },
+    ];
+
+    for case in cases {
+        let params = json!({
+            "xs": {
+                "type": format!("List<Nullable<{}>>", case.type_name),
+                "value": case.encoded.clone()
+            }
+        });
+        let ir = request(
+            vec![
+                values("v", "xs", "x"),
+                node(
+                    "f",
+                    "Filter",
+                    &["v"],
+                    json!({"predicate":{"binary":"eq","left":field("x"),"right":field("x")}}),
+                ),
+                node(
+                    "p",
+                    "Project",
+                    &["f"],
+                    json!({"fields":[{"expression":field("x"),"as":"y"}]}),
+                ),
+                node("d", "Distinct", &["p"], json!({})),
+                node(
+                    "s",
+                    "Sort",
+                    &["d"],
+                    json!({"keys":[{"expression":field("y"),"direction":"asc","nulls":"last"}]}),
+                ),
+                node("o", "Offset", &["s"], json!({"count":1})),
+                node("t", "Take", &["o"], json!({"count":2})),
+                node(
+                    "r",
+                    "Project",
+                    &["t"],
+                    json!({"fields":[{"expression":field("y"),"as":"y"}]}),
+                ),
+            ],
+            "r",
+            params.clone(),
+        );
+        let mut ir = ir;
+        ir.temporal = Some(
+            serde_json::from_value(json!({"valid_at":chrono::Utc::now().to_rfc3339()})).unwrap(),
+        );
+        let mut hql = b1_hql_request(
+            params,
+            "VALUES $xs AS x |> FILTER x = x |> PROJECT x AS y |> DISTINCT |> ORDER BY y ASC NULLS LAST |> SKIP 1 |> TAKE 2 |> RETURN y",
+        );
+        hql.temporal = ir.temporal.clone();
+
+        let literal_rows = b1_literal_rows("y", case.expected.clone());
+        if let Some(p7_values) = case.p7_values {
+            let filtered = P::Filter(
+                Box::new(b1_p7_values("x", p7_values)),
+                E::Eq(
+                    Box::new(E::Field("x".into())),
+                    Box::new(E::Field("x".into())),
+                ),
+            );
+            let projected =
+                P::Project(Box::new(filtered), vec![("y".into(), E::Field("x".into()))]);
+            let distinct = P::Distinct(Box::new(projected));
+            let sorted = P::Sort(
+                Box::new(distinct),
+                vec![reference::SortKey {
+                    expr: E::Field("y".into()),
+                    descending: false,
+                    nulls_first: false,
+                }],
+            );
+            let offset = P::Offset(Box::new(sorted), 1);
+            let taken = P::Take(Box::new(offset), 2);
+            let p7 = P::Project(Box::new(taken), vec![("y".into(), E::Field("y".into()))]);
+            let p7_rows = reference::execute(&p7)
+                .unwrap()
+                .iter()
+                .map(|row| {
+                    row.iter()
+                        .map(|(name, value)| (name.clone(), b1_from_p7(value)))
+                        .collect::<BTreeMap<_, _>>()
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(
+                p7_rows, literal_rows,
+                "{} P7 vs independent literals",
+                case.type_name
+            );
+        }
+
+        let directory = TempDir::new().unwrap();
+        let storage = open(&directory);
+        scalar_policy(&storage);
+        let before_plan = state(&storage, directory.path());
+        let ops = [
+            (QueryOpV2::Values, 0, case.sizes[0]),
+            (QueryOpV2::Filter, case.sizes[0], case.sizes[1]),
+            (QueryOpV2::Project, case.sizes[1], case.sizes[2]),
+            (QueryOpV2::Distinct, case.sizes[2], case.sizes[3]),
+            (QueryOpV2::Sort, case.sizes[3], case.sizes[4]),
+            (QueryOpV2::Offset, case.sizes[4], case.sizes[5]),
+            (QueryOpV2::Take, case.sizes[5], case.sizes[6]),
+            (QueryOpV2::Project, case.sizes[6], case.sizes[7]),
+        ];
+        let mut planned = Vec::new();
+        for (frontend, request) in [("typed IR", ir.clone()), ("HQL2", hql.clone())] {
+            let mut plan_request = request.clone();
+            plan_request.explain = Some(ExplainV2::Plan);
+            let QueryOutcomeV2::Plan(plan) =
+                storage.query_v2(access(), plan_request.clone()).unwrap()
+            else {
+                panic!("{frontend} Plan must be catalog-only");
+            };
+            assert_eq!(plan.catalog.policy_revision, 1);
+            assert_eq!(plan.catalog.observed_frontier, before_plan.0);
+            c1_assert_plan_nodes(&plan, &ops, false);
+            assert_state(&storage, directory.path(), &before_plan);
+
+            let denied = storage
+                .query_v2(
+                    AccessContext {
+                        principal: "no-namespace".into(),
+                        namespace: "default".into(),
+                    },
+                    plan_request,
+                )
+                .unwrap_err();
+            assert_eq!(denied.code, "FORBIDDEN");
+            assert_eq!(denied.stage, "authorize");
+            assert_state(&storage, directory.path(), &before_plan);
+            planned.push((frontend, request, plan));
+        }
+
+        storage.publish_generation().unwrap();
+        let expected_columns = json!([{
+            "name":"y",
+            "type":format!("Nullable<{}>", case.type_name),
+            "nullable":true
+        }]);
+        for (frontend, request, plan) in planned {
+            let QueryOutcomeV2::Rows(normal) = storage.query_v2(access(), request.clone()).unwrap()
+            else {
+                panic!("{frontend} must return rows");
+            };
+            assert!(normal.explain.is_none());
+            assert_eq!(
+                serde_json::to_value(&normal.columns).unwrap(),
+                expected_columns
+            );
+            assert_eq!(normal.rows, literal_rows, "{frontend} literal rows");
+            assert_eq!(
+                normal.completeness.status,
+                genesis_block_native::query::hql2::result::CompletionStatusV2::Complete
+            );
+
+            let mut analyze_request = request.clone();
+            analyze_request.explain = Some(ExplainV2::Analyze);
+            let QueryOutcomeV2::Rows(analyzed) =
+                storage.query_v2(access(), analyze_request).unwrap()
+            else {
+                panic!("{frontend} Analyze must return rows");
+            };
+            assert_eq!(analyzed.rows, literal_rows);
+            assert_eq!(
+                serde_json::to_value(&analyzed.columns).unwrap(),
+                expected_columns
+            );
+            assert_eq!(normal.rows, analyzed.rows);
+            assert_eq!(normal.columns, analyzed.columns);
+            assert_eq!(normal.semantics, analyzed.semantics);
+            assert_eq!(normal.completeness, analyzed.completeness);
+            assert_eq!(normal.index_frontiers, analyzed.index_frontiers);
+            assert_eq!(normal.cursor, analyzed.cursor);
+
+            let mut actual = analyzed.explain.unwrap();
+            assert_eq!(actual.plan_hash, plan.plan_hash);
+            assert_eq!(actual.planner_version, plan.planner_version);
+            c1_assert_plan_nodes(&actual, &ops, true);
+            for node in &mut actual.plan {
+                node.actual.take();
+            }
+            assert_eq!(actual.plan, plan.plan);
+
+            for mode in [None, Some(ExplainV2::Analyze)] {
+                let mut denied_request = request.clone();
+                denied_request.explain = mode.clone();
+                let before = state(&storage, directory.path());
+                let denied = storage
+                    .query_v2(
+                        AccessContext {
+                            principal: "no-namespace".into(),
+                            namespace: "default".into(),
+                        },
+                        denied_request,
+                    )
+                    .unwrap_err();
+                assert_eq!(denied.code, "FORBIDDEN");
+                assert_eq!(denied.stage, "authorize");
+                assert_state(&storage, directory.path(), &before);
+
+                let mut limited_request = request.clone();
+                limited_request.explain = mode;
+                limited_request.budget =
+                    Some(serde_json::from_value(json!({"max_result_bytes":1})).unwrap());
+                let before = state(&storage, directory.path());
+                let error = storage.query_v2(access(), limited_request).unwrap_err();
+                assert_eq!(error.code, "QUERY_BUDGET_EXCEEDED");
+                assert_eq!(error.stage, "execute");
+                assert_eq!(error.detail.unwrap()["reason"], "query_limit");
+                assert_state(&storage, directory.path(), &before);
+            }
+        }
+    }
+}

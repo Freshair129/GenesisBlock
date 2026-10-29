@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: "0.1.102b"
+version: "0.1.103b"
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-28T19:02:18+07:00,Codex"
+last_update: "2026-10-29T09:43:02+07:00,Codex"
 attributes:
   domain: architecture
   scope: repository
@@ -25,7 +25,13 @@ related_docs:
   - docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md
 ---
 
-## Current C1b nullable scalar ordering qualification (2026-10-28)
+## Current Phase C2 composed scalar pipeline qualification (2026-10-29)
+
+Phase C2 adds selected paired HQL2/typed-IR evidence for the composed row-shaping pipeline across nullable I64, Bool, DecimalU64, F64Finite, and Utf8. One existing test target asserts literal output schema/rows, per-node row counters, catalog-only Plan behavior, and selected namespace/budget failure guards. P7 is independent for four supported value models; DecimalU64 is literal-only. The focused test passed 1/1 and the full scalar-counter target 20/20 on the author host.
+
+Strict core/default all-target Clippy, formatting, docs validation (0/244), version validation (0.2.10), and diff checks passed on the author host. This is finite qualification, not architecture closure or a new contract. The test uses a self-equality filter and Distinct before single-key Sort; it does not assert full-key ties or multi-key ordering. Exhaustive type/source/order/composition/provenance, universal no-write, ordinary-success-state, broad P6, P9-P16, independent runtime/performance, device, and release gates remain open or NOT_RUN. See the [current P8 evidence ledger](REPORT--HQL2-P8-CORE-2026-09-28.md#current-phase-c2-composed-scalar-pipeline-qualification-2026-10-29); preserve P8 -> P9-P12 -> P13/P14 -> P15 -> P16.
+
+## Historical Phase C1b nullable scalar ordering qualification (2026-10-28)
 
 This owner-approved host-only tests/docs candidate extends the selected C1 ordering evidence to Nullable<Bool>, Nullable<DecimalU64>, Nullable<F64Finite> and Nullable<Utf8>; Nullable<I64> remains the C1 control. It adds one test to tests/hql2_g4_scalar_counter_tests.rs and reconciles these six existing governance documents. Runtime, API and normative contract behavior are unchanged.
 

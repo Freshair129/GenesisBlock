@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.97b"
+version: "0.1.98b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-28T19:02:18+07:00,Codex"
+last_update: "2026-10-29T09:43:02+07:00,Codex"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -12,7 +12,19 @@ attributes:
   complexity: C-3
 ---
 
-## Current C1b nullable scalar ordering qualification (2026-10-28)
+## Current Phase C2 composed scalar pipeline qualification (2026-10-29)
+
+Owner approved this host-only tests/docs phase after review of the exact main baseline `e954b9eae663149255733bbe8a807b7eae2c1f91`. It adds `tests/hql2_g4_scalar_counter_tests.rs::composed_scalar_pipeline_matches_literals_p7_and_diagnostics` and reconciles these six existing governance documents. No runtime, API, normative contract, P6, WAL, hash, schema, ACL, shared-P7, or error-contract behavior changes.
+
+The bounded paired HQL2/typed-IR matrix runs `Values -> Filter -> Project -> Distinct -> Sort -> Offset -> Take -> Project` for nullable I64, Bool, DecimalU64, F64Finite, and Utf8 fixture inputs. Each fixture contains nulls and repeated values. The self-equality filter removes nulls; Distinct precedes single-key ascending Sort so sort inputs have unique keys. The final literal rows, root schema, and per-node row counters are asserted. The unchanged P7 interpreter is an independent oracle for I64, Bool, F64Finite, and Utf8; DecimalU64 is checked against literals only. The matrix does not assert full-key tie identity or multi-key ordering.
+
+Across five fixtures, the test issues 80 requests: 30 successful Plan/Normal/Analyze requests, 30 namespace denials, and 20 result-byte budget errors. It checks Plan catalog revision/frontier and no actuals/estimates before any result request or explicit publication. After publication it compares Normal and Analyze rows/schema/selected metadata, checks all eight operator row counters, and verifies observed state remains unchanged around 60 Plan and failure controls. This is selected fixture coverage, not an exhaustive type, source, ordering, or composition matrix.
+
+Author evidence on this Windows host: the focused test passed 1/1; the entire scalar-counter target passed 20/20 with zero failures or ignored tests after formatting. Strict core/default all-target Clippy, formatting, docs validation (0 violations in 244 files), version validation (0.2.10), and diff checks passed. P7 was unavailable only for DecimalU64 by design. These runs are author-local evidence, not hosted CI, independent runtime, another machine, device, or release acceptance. Exact commands and raw logs are retained in `D:/GenesisBlock_Dev/local-cleanup-backups/20261019T030925Z-genesisblock/branch-review/g4-composed-scalar-pipeline-20261029`.
+
+Phase C2 does not close broad G4/P8. Nullable type coverage is limited to these five fixture sets and this one composition; ordering remains single-key only, with full-key ties and multi-key behavior unspecified. Complete source/provenance coverage, universal transient/internal-write absence, ordinary successful-result state outside selected guards, broad P6, P9-P16, independent runtime/performance, device, and release gates remain OPEN or NOT_RUN. Preserve P8 -> P9-P12 -> P13/P14 -> P15 -> P16.
+
+## Historical Phase C1b nullable scalar ordering qualification (2026-10-28)
 
 This owner-approved host-only tests/docs candidate extends the selected C1 ordering evidence to Nullable<Bool>, Nullable<DecimalU64>, Nullable<F64Finite> and Nullable<Utf8>; Nullable<I64> remains the C1 control. It adds one test to tests/hql2_g4_scalar_counter_tests.rs and reconciles these six existing governance documents. Runtime, API and normative contract behavior are unchanged.
 

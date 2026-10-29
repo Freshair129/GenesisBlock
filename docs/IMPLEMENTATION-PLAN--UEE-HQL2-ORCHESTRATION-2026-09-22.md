@@ -1,9 +1,9 @@
 ---
-version: "0.9.5b"
+version: "0.9.6b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-28T19:02:18+07:00,Codex"
+last_update: "2026-10-29T09:43:02+07:00,Codex"
 status: beta
 superseded_by: null
 attributes:
@@ -15,7 +15,17 @@ attributes:
   owner: "Boss (Founder / Product Authority)"
 ---
 
-## Current C1b nullable scalar ordering qualification (2026-10-28)
+## Current Phase C2 composed scalar pipeline qualification (2026-10-29)
+
+Phase C2 is an owner-approved, host-only tests/docs qualification against main baseline `e954b9eae663149255733bbe8a807b7eae2c1f91`. It adds one test to the existing `tests/hql2_g4_scalar_counter_tests.rs` target and updates six existing governance documents. Runtime, API, normative contract, P6, WAL, hash, schema, ACL, P7, and error-contract changes are excluded.
+
+The test pairs HQL2 and typed IR over five nullable scalar fixtures (I64, Bool, DecimalU64, F64Finite, Utf8) through `Values -> Filter -> Project -> Distinct -> Sort -> Offset -> Take -> Project`. It asserts literal output schema/rows and every operator's measured input/output row counts. P7 is used only where its value model represents the type; DecimalU64 is literal-only. Nulls are rejected by the self-equality filter and duplicate keys are removed before a single-key Sort. The matrix therefore does not specify tie behavior or multi-key order.
+
+Acceptance on the author host: focused test 1/1 and complete scalar-counter target 20/20 after formatting, zero failed/ignored. Strict core/default all-target Clippy, formatting, docs validation (0/244), version validation (0.2.10), and diff checks passed. The request matrix contains 80 queries (30 successes, 30 namespace denials, 20 byte-budget failures) and 60 observed Plan/error state comparisons. Plan assertions run before result requests or explicit publication; successful execution separately checks Plan/Analyze consistency and per-node counters. Raw commands/logs are under `D:/GenesisBlock_Dev/local-cleanup-backups/20261019T030925Z-genesisblock/branch-review/g4-composed-scalar-pipeline-20261029`.
+
+This finite phase does not close G4/P8. Exhaustive scalar/source types, order and composition, provenance, universal no-write and ordinary-success state, independent runtime/performance, broad P6, device/release, and P9-P16 gates remain OPEN or NOT_RUN. Preserve P8 -> P9-P12 -> P13/P14 -> P15 -> P16.
+
+## Historical Phase C1b nullable scalar ordering qualification (2026-10-28)
 
 This owner-approved host-only tests/docs candidate extends the selected C1 ordering evidence to Nullable<Bool>, Nullable<DecimalU64>, Nullable<F64Finite> and Nullable<Utf8>; Nullable<I64> remains the C1 control. It adds one test to tests/hql2_g4_scalar_counter_tests.rs and reconciles these six existing governance documents. Runtime, API and normative contract behavior are unchanged.
 
