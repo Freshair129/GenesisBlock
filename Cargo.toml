@@ -61,6 +61,9 @@ serde_json = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.0", features = ["v4", "serde"] }
 tokio = { version = "1", features = ["full"] }
+# H1-T: inspect/configure the bound Tokio socket through a safe borrowed handle.
+# Already locked transitively; keep this promotion free of version churn.
+socket2 = "=0.6.4"
 md5 = "0.7"
 regex = "1"
 dashmap = "6.0"

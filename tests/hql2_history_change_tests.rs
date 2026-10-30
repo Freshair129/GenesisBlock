@@ -2327,6 +2327,135 @@ fn explain_plan_tx_as_of_obeys_generation_frontier_without_publishing_or_writing
     );
 }
 
+fn h1_plan_files(root: &Path) -> BTreeMap<String, Vec<u8>> {
+    fn visit(root: &Path, dir: &Path, files: &mut BTreeMap<String, Vec<u8>>) {
+        for entry in fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            let relative = path
+                .strip_prefix(root)
+                .unwrap()
+                .to_string_lossy()
+                .into_owned();
+            if path.is_dir() {
+                visit(root, &path, files);
+            } else if path
+                .file_name()
+                .is_some_and(|name| name == "genesis.lock" || name == "projection.sqlite-shm")
+            {
+                // Lock/SHM contents are process coordination, not byte-identity evidence.
+                files.insert(
+                    format!("{relative}:size"),
+                    fs::metadata(path).unwrap().len().to_le_bytes().to_vec(),
+                );
+            } else {
+                files.insert(relative, fs::read(path).unwrap());
+            }
+        }
+    }
+    let mut files = BTreeMap::new();
+    visit(root, root, &mut files);
+    files
+}
+
+#[test]
+fn plan_uses_candidate_frontier_after_generation_becomes_stale() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    add_node(&storage);
+    storage.save_state().unwrap();
+
+    let mut published = None;
+    for phase in ["fresh", "current", "stale"] {
+        if phase == "current" {
+            published = Some(storage.publish_generation().unwrap());
+        } else if phase == "stale" {
+            storage
+                .add_node(NodeInput {
+                    id: Some("after-publication".into()),
+                    labels: vec!["Document".into()],
+                    props: Some(json!({"title":"later"})),
+                    embedding: None,
+                    lang: None,
+                    valid_from: Some("2010-01-01T00:00:00Z".into()),
+                    caused_by: None,
+                    ttl: None,
+                    collection: None,
+                })
+                .unwrap();
+            assert!(storage.stable_frontier() > published.as_ref().unwrap().publication_seq);
+        }
+        let frontier = storage.stable_frontier();
+        let upper = if phase == "current" {
+            let generation = published.as_ref().unwrap();
+            assert_eq!(frontier, generation.publication_seq);
+            generation.wal_frontier
+        } else {
+            frontier
+        };
+        let before = h1_plan_files(dir.path());
+        assert!(before.contains_key("state.json"));
+        assert!(before.keys().any(|name| name.ends_with("active.gwal")));
+
+        for frontend in ["hql", "ir"] {
+            for (boundary, tx) in [
+                ("inclusive", upper),
+                ("future", upper.checked_add(1).unwrap()),
+                ("max", u64::MAX),
+            ] {
+                let request_id = format!("h1-{phase}-{frontend}-{boundary}");
+                let request: QueryRequestV2 = if frontend == "hql" {
+                    serde_json::from_value(json!({
+                        "contract_version":"genesis.api.v2", "request_id":request_id,
+                        "namespace":"default", "language_version":"hql.v2", "params":{},
+                        "hql":format!("EXPLAIN USE default AT TX {tx} AT VALID \"2020-01-01T00:00:00Z\" FROM NODES Document AS n |> RETURN n.id AS id")
+                    })).unwrap()
+                } else {
+                    let mut request: QueryRequestV2 = serde_json::from_value(json!({
+                        "contract_version":"genesis.api.v2", "request_id":request_id,
+                        "namespace":"default", "params":{},
+                        "temporal":{"valid_at":"2020-01-01T00:00:00Z","tx_as_of":tx.to_string()},
+                        "ir":{"contract_version":"query-ir.v2", "parameter_types":{}, "root":"scan",
+                            "nodes":[{"id":"scan","op":"NodeScan","inputs":[],"config":{"as":"n","label":"Document"}}]}
+                    })).unwrap();
+                    request.explain = Some(ExplainV2::Plan);
+                    request
+                };
+                let outcome = storage.query_v2(access(), request);
+                if boundary == "inclusive" {
+                    let QueryOutcomeV2::Plan(plan) = outcome.unwrap() else {
+                        panic!("{request_id}: Plan executed rows");
+                    };
+                    assert_eq!(plan.catalog.observed_frontier, frontier, "{request_id}");
+                    assert!(plan
+                        .plan
+                        .iter()
+                        .all(|node| node.actual.is_none() && node.estimates.is_none()));
+                } else {
+                    let error = outcome.unwrap_err();
+                    let (code, reason) = if phase == "current" && boundary == "future" {
+                        ("BEYOND_HORIZON", "retention_horizon")
+                    } else {
+                        ("BIND_ERROR", "future_snapshot")
+                    };
+                    assert_eq!(error.code, code, "{request_id}");
+                    assert_eq!(error.stage, "bind", "{request_id}");
+                    assert_eq!(
+                        error.detail.as_ref().unwrap()["reason"],
+                        reason,
+                        "{request_id}"
+                    );
+                }
+                assert_eq!(storage.stable_frontier(), frontier, "{request_id}");
+                assert_eq!(
+                    h1_plan_files(dir.path()),
+                    before,
+                    "{request_id}: durable state changed"
+                );
+            }
+        }
+    }
+}
+
 #[test]
 fn empty_history_sources_report_measured_zero_in_both_frontends() {
     let dir = TempDir::new().unwrap();
