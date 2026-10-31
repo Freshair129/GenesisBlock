@@ -1,0 +1,143 @@
+{
+  "pid": 28188,
+  "exit_code": 0,
+  "killed_by_guard": false,
+  "kill_reason": null,
+  "elapsed_seconds": 978.529,
+  "peak_working_set_seen_bytes": 588922880,
+  "peak_private_seen_bytes": 922132480,
+  "binary_sha256": "959DFA8F6348082046BCBFAD744A422E2BD7F5A43C702C2DBA7D2D86D26AEAF1",
+  "query_budget_default_elapsed_ms": 5000,
+  "rss_limit_bytes": 2147483648,
+  "global_cpu_samples": [
+    {
+      "timestamp": "2026-10-31T14:16:50.3240000+07:00",
+      "cpu_percent": 17.429
+    },
+    {
+      "timestamp": "2026-10-31T14:17:22.1990000+07:00",
+      "cpu_percent": 17.709
+    },
+    {
+      "timestamp": "2026-10-31T14:17:54.0700000+07:00",
+      "cpu_percent": 17.876
+    },
+    {
+      "timestamp": "2026-10-31T14:18:20.8040000+07:00",
+      "cpu_percent": 17.977
+    },
+    {
+      "timestamp": "2026-10-31T14:18:52.6450000+07:00",
+      "cpu_percent": 16.942
+    },
+    {
+      "timestamp": "2026-10-31T14:19:19.3260000+07:00",
+      "cpu_percent": 17.931
+    },
+    {
+      "timestamp": "2026-10-31T14:19:51.1650000+07:00",
+      "cpu_percent": 17.724
+    },
+    {
+      "timestamp": "2026-10-31T14:20:23.0730000+07:00",
+      "cpu_percent": 17.266
+    },
+    {
+      "timestamp": "2026-10-31T14:20:49.7970000+07:00",
+      "cpu_percent": 17.837
+    },
+    {
+      "timestamp": "2026-10-31T14:21:21.6860000+07:00",
+      "cpu_percent": 19.038
+    },
+    {
+      "timestamp": "2026-10-31T14:21:53.5930000+07:00",
+      "cpu_percent": 17.333
+    },
+    {
+      "timestamp": "2026-10-31T14:22:20.3540000+07:00",
+      "cpu_percent": 17.851
+    },
+    {
+      "timestamp": "2026-10-31T14:22:52.2270000+07:00",
+      "cpu_percent": 18.426
+    },
+    {
+      "timestamp": "2026-10-31T14:23:24.0850000+07:00",
+      "cpu_percent": 18.644
+    },
+    {
+      "timestamp": "2026-10-31T14:23:50.7980000+07:00",
+      "cpu_percent": 18.637
+    },
+    {
+      "timestamp": "2026-10-31T14:24:22.6250000+07:00",
+      "cpu_percent": 18.566
+    },
+    {
+      "timestamp": "2026-10-31T14:24:49.3410000+07:00",
+      "cpu_percent": 27.048
+    },
+    {
+      "timestamp": "2026-10-31T14:25:21.1810000+07:00",
+      "cpu_percent": 17.285
+    },
+    {
+      "timestamp": "2026-10-31T14:25:53.0610000+07:00",
+      "cpu_percent": 17.289
+    },
+    {
+      "timestamp": "2026-10-31T14:26:19.7780000+07:00",
+      "cpu_percent": 18.444
+    },
+    {
+      "timestamp": "2026-10-31T14:26:51.6200000+07:00",
+      "cpu_percent": 17.061
+    },
+    {
+      "timestamp": "2026-10-31T14:27:23.4580000+07:00",
+      "cpu_percent": 16.501
+    },
+    {
+      "timestamp": "2026-10-31T14:27:50.1530000+07:00",
+      "cpu_percent": 17.044
+    },
+    {
+      "timestamp": "2026-10-31T14:28:22.0310000+07:00",
+      "cpu_percent": 22.878
+    },
+    {
+      "timestamp": "2026-10-31T14:28:53.9230000+07:00",
+      "cpu_percent": 17.019
+    },
+    {
+      "timestamp": "2026-10-31T14:29:20.6390000+07:00",
+      "cpu_percent": 17.565
+    },
+    {
+      "timestamp": "2026-10-31T14:29:52.5230000+07:00",
+      "cpu_percent": 16.757
+    },
+    {
+      "timestamp": "2026-10-31T14:30:24.3770000+07:00",
+      "cpu_percent": 20.434
+    },
+    {
+      "timestamp": "2026-10-31T14:30:51.1090000+07:00",
+      "cpu_percent": 18.193
+    },
+    {
+      "timestamp": "2026-10-31T14:31:22.9700000+07:00",
+      "cpu_percent": 29.397
+    },
+    {
+      "timestamp": "2026-10-31T14:31:49.6790000+07:00",
+      "cpu_percent": 18.534
+    },
+    {
+      "timestamp": "2026-10-31T14:32:21.5280000+07:00",
+      "cpu_percent": 17.312
+    }
+  ],
+  "global_cpu_average_percent": 18.623
+}

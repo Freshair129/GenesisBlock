@@ -1,0 +1,12 @@
+
+running 7 tests
+test chunk_node_count ... ok
+test chunk_node_props_preserved ... ok
+test chunk_with_embedding ... ok
+test document_hierarchy_graph ... ok
+test duplicate_content_hash_both_stored ... ok
+test source_pointer_file_path ... ok
+test source_pointer_sql_row ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.51s
+

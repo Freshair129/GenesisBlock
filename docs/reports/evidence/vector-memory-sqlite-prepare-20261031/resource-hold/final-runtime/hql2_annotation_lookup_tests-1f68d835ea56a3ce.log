@@ -1,0 +1,12 @@
+
+running 7 tests
+test annotation_lookup_uses_the_selected_transaction_frontier ... ok
+test hql_and_ir_annotation_lookup_match_independent_p7_bags ... ok
+test hql_annotation_lookup_distinguishes_optional_and_required_stages ... ok
+test live_annotation_target_resolves_at_the_query_snapshot ... ok
+test lookup_diagnostic_counters_preserve_p7_bags_and_empty_inputs ... ok
+test lookup_matches_targets_but_not_evidence_and_keeps_optional_rows ... ok
+test lookup_preserves_duplicate_input_paths ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.49s
+

@@ -1,0 +1,157 @@
+{
+  "collections_after_ingest": [
+    {
+      "arena_allocated_bytes": 67108864,
+      "arena_resident_bytes": 46145536,
+      "count": 11266,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "bench",
+        "extra_count": 0,
+        "indexed_count": 11266,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 11266,
+        "source_frontier": 48,
+        "state": "UNVERIFIED",
+        "validated": false
+      },
+      "dim": 1024,
+      "ef_search": null,
+      "hnsw_vector_bytes": 46145536,
+      "index_lag": 0,
+      "indexed": 11266,
+      "metric": "Cosine",
+      "model": "bge-m3-repository-fixture",
+      "name": "bench",
+      "quant": "none",
+      "rerank": false,
+      "sidecar_cache_bytes": 0,
+      "sidecar_disk_bytes": 0,
+      "sidecar_resident_bytes": 0
+    },
+    {
+      "arena_allocated_bytes": 0,
+      "arena_resident_bytes": 0,
+      "count": 0,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "default",
+        "extra_count": 0,
+        "indexed_count": 0,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 0,
+        "source_frontier": 0,
+        "state": "UNVERIFIED",
+        "validated": false
+      },
+      "dim": 1024,
+      "ef_search": null,
+      "hnsw_vector_bytes": 0,
+      "index_lag": 0,
+      "indexed": 0,
+      "metric": "L2",
+      "model": "default",
+      "name": "default",
+      "quant": "none",
+      "rerank": false,
+      "sidecar_cache_bytes": 0,
+      "sidecar_disk_bytes": 0,
+      "sidecar_resident_bytes": 0
+    }
+  ],
+  "collections_after_search": [
+    {
+      "arena_allocated_bytes": 67108864,
+      "arena_resident_bytes": 46145536,
+      "count": 11266,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "bench",
+        "extra_count": 0,
+        "indexed_count": 11266,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 11266,
+        "source_frontier": 48,
+        "state": "UNVERIFIED",
+        "validated": false
+      },
+      "dim": 1024,
+      "ef_search": null,
+      "hnsw_vector_bytes": 46145536,
+      "index_lag": 0,
+      "indexed": 11266,
+      "metric": "Cosine",
+      "model": "bge-m3-repository-fixture",
+      "name": "bench",
+      "quant": "none",
+      "rerank": false,
+      "sidecar_cache_bytes": 0,
+      "sidecar_disk_bytes": 0,
+      "sidecar_resident_bytes": 0
+    },
+    {
+      "arena_allocated_bytes": 0,
+      "arena_resident_bytes": 0,
+      "count": 0,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "default",
+        "extra_count": 0,
+        "indexed_count": 0,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 0,
+        "source_frontier": 0,
+        "state": "UNVERIFIED",
+        "validated": false
+      },
+      "dim": 1024,
+      "ef_search": null,
+      "hnsw_vector_bytes": 0,
+      "index_lag": 0,
+      "indexed": 0,
+      "metric": "L2",
+      "model": "default",
+      "name": "default",
+      "quant": "none",
+      "rerank": false,
+      "sidecar_cache_bytes": 0,
+      "sidecar_disk_bytes": 0,
+      "sidecar_resident_bytes": 0
+    }
+  ],
+  "dim": 1024,
+  "idle_rss_bytes": 12107776,
+  "ingest": {
+    "before_rss_bytes": 12120064,
+    "peak_rss_bytes": 341286912,
+    "process_rss_bytes": 174895104,
+    "seconds": 73.1446877
+  },
+  "n": 11266,
+  "quant": "none",
+  "rebuild": {
+    "before_rss_bytes": 174907392,
+    "peak_rss_bytes": 248913920,
+    "process_rss_bytes": 186028032,
+    "seconds": 47.290486
+  },
+  "rerank": false,
+  "search10": {
+    "k": 10,
+    "p50_us": 4521.200000000001,
+    "p95_us": 5170.9,
+    "p99_us": 5586.599999999999,
+    "recall": 0.9875
+  },
+  "search100": {
+    "k": 100,
+    "p50_us": 6357.0,
+    "p95_us": 7173.8,
+    "p99_us": 7267.7,
+    "recall": 0.9791666666666666
+  }
+}

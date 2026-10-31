@@ -1,0 +1,17 @@
+{
+  "exit": 0,
+  "reason": null,
+  "seconds": 73.9430269,
+  "peak_rss": 1196187648,
+  "peak_private": 1414037504,
+  "pids": [
+    30616,
+    13636,
+    22752,
+    34856,
+    30120
+  ],
+  "admission_cpu": 68.54545454545455,
+  "admission_free": 7167385600.0,
+  "remaining": []
+}

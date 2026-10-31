@@ -1,0 +1,243 @@
+{
+  "collections": [
+    {
+      "arena_allocated_bytes": 0,
+      "arena_resident_bytes": 0,
+      "count": 0,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "default",
+        "extra_count": 0,
+        "indexed_count": 0,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 0,
+        "source_frontier": 0,
+        "state": "READY",
+        "validated": true
+      },
+      "dim": 1024,
+      "ef_search": null,
+      "hnsw_vector_bytes": 0,
+      "index_lag": 0,
+      "indexed": 0,
+      "metric": "L2",
+      "model": "default",
+      "name": "default",
+      "quant": "none",
+      "rerank": false,
+      "sidecar_cache_bytes": 0,
+      "sidecar_disk_bytes": 0,
+      "sidecar_resident_bytes": 0
+    },
+    {
+      "arena_allocated_bytes": 46145536,
+      "arena_resident_bytes": 46145536,
+      "count": 11266,
+      "coverage": {
+        "built_frontier": 48,
+        "collection": "bench",
+        "extra_count": 0,
+        "indexed_count": 11266,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 11266,
+        "source_frontier": 48,
+        "state": "READY",
+        "validated": true
+      },
+      "dim": 1024,
+      "ef_search": null,
+      "hnsw_vector_bytes": 46145536,
+      "index_lag": 0,
+      "indexed": 11266,
+      "metric": "Cosine",
+      "model": "bge-m3-repository-fixture",
+      "name": "bench",
+      "quant": "none",
+      "rerank": false,
+      "sidecar_cache_bytes": 0,
+      "sidecar_disk_bytes": 0,
+      "sidecar_resident_bytes": 0
+    }
+  ],
+  "coverage": {
+    "collections": [
+      {
+        "built_frontier": 0,
+        "collection": "default",
+        "extra_count": 0,
+        "indexed_count": 0,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 0,
+        "source_frontier": 0,
+        "state": "READY",
+        "validated": true
+      },
+      {
+        "built_frontier": 48,
+        "collection": "bench",
+        "extra_count": 0,
+        "indexed_count": 11266,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 11266,
+        "source_frontier": 48,
+        "state": "READY",
+        "validated": true
+      }
+    ],
+    "state": "ok"
+  },
+  "coverage_memory": {
+    "before_rss_bytes": 153440256,
+    "peak_rss_bytes": 153726976,
+    "process_rss_bytes": 153726976,
+    "seconds": 0.0015623
+  },
+  "error": null,
+  "memory": {
+    "before_rss_bytes": 15060992,
+    "peak_rss_bytes": 208961536,
+    "process_rss_bytes": 153440256,
+    "seconds": 68.9986566
+  },
+  "metadata_summary": {
+    "collection": "bench",
+    "event": "metadata_summary",
+    "metadata_count": 11266,
+    "metadata_samples": [
+      {
+        "arena_id": 0,
+        "node_id": "0",
+        "node_u32": 0,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 1,
+        "node_id": "1",
+        "node_u32": 1,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 2,
+        "node_id": "2",
+        "node_u32": 2,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 3,
+        "node_id": "3",
+        "node_u32": 3,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 4,
+        "node_id": "4",
+        "node_u32": 4,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 5,
+        "node_id": "5",
+        "node_u32": 5,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 6,
+        "node_id": "6",
+        "node_u32": 6,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 7,
+        "node_id": "7",
+        "node_u32": 7,
+        "retired_seq": 0,
+        "visible_current": true
+      }
+    ],
+    "missing_current_node_count": 0,
+    "missing_node_count": 0,
+    "missing_node_samples": [],
+    "node_count": 11266,
+    "retired_count": 0,
+    "visible_current_count": 11266
+  },
+  "metadata_summary_memory": {
+    "before_rss_bytes": 153722880,
+    "peak_rss_bytes": 153739264,
+    "process_rss_bytes": 153739264,
+    "seconds": 0.0044814
+  },
+  "open_mode": "read_only",
+  "open_path": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\projection-props-split-20261031T151315\\output\\gdb",
+  "query": {
+    "completed_queries": 1,
+    "first_hits": [
+      {
+        "id": "5932",
+        "score": 0.6553812026977539
+      },
+      {
+        "id": "8217",
+        "score": 0.22530394792556763
+      },
+      {
+        "id": "5920",
+        "score": 0.18013900518417358
+      },
+      {
+        "id": "3613",
+        "score": 0.15906399488449097
+      },
+      {
+        "id": "5916",
+        "score": 0.15643668174743652
+      },
+      {
+        "id": "3748",
+        "score": 0.15410155057907104
+      },
+      {
+        "id": "5914",
+        "score": 0.14726018905639648
+      },
+      {
+        "id": "3611",
+        "score": 0.14215636253356934
+      }
+    ],
+    "input": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\inputs\\real-11266-1024",
+    "input_dim": 1024,
+    "input_n": 11266,
+    "query_index": 0,
+    "requested_queries": 1,
+    "result_count": 10,
+    "state": "ok"
+  },
+  "query_memory": {
+    "before_rss_bytes": 153714688,
+    "peak_rss_bytes": 153739264,
+    "process_rss_bytes": 153735168,
+    "seconds": 0.0196474
+  },
+  "read_only": true,
+  "rss_limit_bytes": "2147483648",
+  "storage_drop_memory": {
+    "before_rss_bytes": 153722880,
+    "peak_rss_bytes": 153722880,
+    "process_rss_bytes": 20680704,
+    "seconds": 0.0314668
+  },
+  "storage_drop_seconds": 0.0314668,
+  "vector_dim": null
+}

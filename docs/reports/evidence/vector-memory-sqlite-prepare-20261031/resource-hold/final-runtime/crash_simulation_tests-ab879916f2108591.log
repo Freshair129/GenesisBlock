@@ -1,0 +1,22 @@
+
+running 17 tests
+test corrupt_edges_bin_no_panic ... ok
+test corrupt_meta_bin_no_panic ... ok
+test corrupt_nodes_bin_recovers_via_wal ... ok
+test corrupt_state_json_falls_back_to_wal ... ok
+test double_crash_recovery ... ok
+test edge_recovery_from_wal ... ok
+test empty_wal_without_schema_evidence_fails_closed ... ok
+test markerless_v5_wal_only_recovery_keeps_legacy_schema ... ok
+test missing_state_json_falls_back_to_wal ... ok
+test missing_vec_bin_recovers_nodes_without_vectors ... ok
+test oversized_garbage_wal_entry_is_rejected_before_recovery ... ok
+test post_snapshot_wal_entries_survive ... ok
+test schema6_wal_only_recovery_selects_schema_before_revision_replay ... ok
+test stale_temp_save_dir_no_interference ... ok
+test truncated_vec_bin_no_panic ... ok
+test truncated_wal_recovers_intact_entries ... ok
+test vector_search_works_after_wal_recovery ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.71s
+

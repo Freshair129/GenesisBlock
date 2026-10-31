@@ -1,0 +1,187 @@
+{
+  "source_version": "candidate-final-proof-sharing",
+  "runner_complete": true,
+  "targets_attempted": 159,
+  "completed_targets": 153,
+  "counts_in_completed_targets": {
+    "passed": 1271,
+    "failed": 0,
+    "ignored": 6
+  },
+  "limited_targets": [
+    {
+      "target": "concurrency-948a29ec82ad9112.exe",
+      "args": [
+        "--test-threads=1"
+      ],
+      "exit_code": 1,
+      "reason": "timeout_300s",
+      "peak_rss_bytes": 104570880,
+      "seconds": 300.26,
+      "log": "concurrency-948a29ec82ad9112.log"
+    },
+    {
+      "target": "consensus_checkpoint_race_tests-23a17829175f7dbc.exe",
+      "args": [
+        "--test-threads=1"
+      ],
+      "exit_code": 1,
+      "reason": "timeout_300s",
+      "peak_rss_bytes": 17027072,
+      "seconds": 300.228,
+      "log": "consensus_checkpoint_race_tests-23a17829175f7dbc.log"
+    },
+    {
+      "target": "hql_cypher_tests-cf7711df2414f595.exe",
+      "args": [
+        "--test-threads=1"
+      ],
+      "exit_code": 1,
+      "reason": "timeout_300s",
+      "peak_rss_bytes": 108130304,
+      "seconds": 300.389,
+      "log": "hql_cypher_tests-cf7711df2414f595.log"
+    },
+    {
+      "target": "journal_format_tests-fe6b4cd9fa0e01d3.exe",
+      "args": [
+        "--test-threads=1"
+      ],
+      "exit_code": 1,
+      "reason": "timeout_300s",
+      "peak_rss_bytes": 66207744,
+      "seconds": 300.263,
+      "log": "journal_format_tests-fe6b4cd9fa0e01d3.log"
+    },
+    {
+      "target": "rebuild_from_truth_tests-afd2a683c957236a.exe",
+      "args": [
+        "--test-threads=1"
+      ],
+      "exit_code": 1,
+      "reason": "timeout_300s",
+      "peak_rss_bytes": 77361152,
+      "seconds": 300.401,
+      "log": "rebuild_from_truth_tests-afd2a683c957236a.log"
+    },
+    {
+      "target": "wal_compaction_tests-ffe0c42405136a71.exe",
+      "args": [
+        "--test-threads=1"
+      ],
+      "exit_code": 1,
+      "reason": "timeout_300s",
+      "peak_rss_bytes": 46436352,
+      "seconds": 300.326,
+      "log": "wal_compaction_tests-ffe0c42405136a71.log"
+    }
+  ],
+  "failed_targets": [],
+  "node_full": {
+    "passed": 88,
+    "failed": 0,
+    "status": "0"
+  },
+  "qualification": {
+    "default": 0,
+    "core": 0,
+    "mobile": 0
+  },
+  "dts_status": "0",
+  "native_smoke_status": "0",
+  "focused_concurrency": {
+    "complete": true,
+    "cases": [
+      {
+        "reason": null,
+        "test": "concurrent_read_while_write",
+        "seconds": 13.8121661,
+        "exit_code": 0,
+        "peak_rss_bytes": 21512192
+      },
+      {
+        "reason": null,
+        "test": "concurrent_search_while_write",
+        "seconds": 0.6410328,
+        "exit_code": 0,
+        "peak_rss_bytes": 14376960
+      },
+      {
+        "reason": null,
+        "test": "concurrent_node_writes",
+        "seconds": 72.7219224,
+        "exit_code": 0,
+        "peak_rss_bytes": 47894528
+      },
+      {
+        "reason": null,
+        "test": "concurrent_edge_writes",
+        "seconds": 30.1054897,
+        "exit_code": 0,
+        "peak_rss_bytes": 28770304
+      }
+    ]
+  },
+  "focused_recovery": {
+    "complete": true,
+    "counts_in_completed_subsets": {
+      "passed": 31,
+      "failed": 0,
+      "ignored": 0
+    },
+    "cases": [
+      {
+        "target": "journal_format_tests-fe6b4cd9fa0e01d3.exe",
+        "args": [
+          "--test-threads=1",
+          "--skip",
+          "journal_compresses_authenticated_compaction_proofs"
+        ],
+        "exit_code": 0,
+        "reason": null,
+        "peak_rss_bytes": 15138816,
+        "seconds": 23.021,
+        "log": "journal_format_tests-fe6b4cd9fa0e01d3.log"
+      },
+      {
+        "target": "rebuild_from_truth_tests-afd2a683c957236a.exe",
+        "args": [
+          "--test-threads=1",
+          "--skip",
+          "large_batch_roundtrip"
+        ],
+        "exit_code": 0,
+        "reason": null,
+        "peak_rss_bytes": 18792448,
+        "seconds": 69.562,
+        "log": "rebuild_from_truth_tests-afd2a683c957236a.log"
+      },
+      {
+        "target": "hql_cypher_tests-cf7711df2414f595.exe",
+        "args": [
+          "--test-threads=1",
+          "--skip",
+          "cypher_id_anchor"
+        ],
+        "exit_code": 0,
+        "reason": null,
+        "peak_rss_bytes": 16789504,
+        "seconds": 7.388,
+        "log": "hql_cypher_tests-cf7711df2414f595.log"
+      },
+      {
+        "target": "consensus_checkpoint_race_tests-23a17829175f7dbc.exe",
+        "args": [
+          "--test-threads=1",
+          "--skip",
+          "consensus_commits_survive_concurrent_compact"
+        ],
+        "exit_code": 1,
+        "reason": "timeout_180s",
+        "peak_rss_bytes": 16203776,
+        "seconds": 180.328,
+        "log": "consensus_checkpoint_race_tests-23a17829175f7dbc.log"
+      }
+    ]
+  }
+}

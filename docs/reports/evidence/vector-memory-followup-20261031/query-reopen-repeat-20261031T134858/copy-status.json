@@ -1,0 +1,16 @@
+[
+  {
+    "name": "old",
+    "destination": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-repeat-20261031T134858\\old\\gdb",
+    "robocopy_exit_code": 1,
+    "duration_seconds": 6.797,
+    "log": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-repeat-20261031T134858\\old-robocopy.log"
+  },
+  {
+    "name": "new",
+    "destination": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-repeat-20261031T134858\\new\\gdb",
+    "robocopy_exit_code": 1,
+    "duration_seconds": 7.344,
+    "log": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-repeat-20261031T134858\\new-robocopy.log"
+  }
+]

@@ -1,0 +1,54 @@
+{
+  "status": "read_only_source_audit",
+  "runtime_started": false,
+  "source": "candidate-repeat-vector_memory.rs",
+  "source_sha256": "5BFDE2C3B897C316BED557FC3037AE9A44D9EEAD07053DB4F835BF1BD7D27C62",
+  "baseline_source_same_path": "frozen-pre-candidate/repeat-vector_memory.rs",
+  "baseline_source_sha256": "5BFDE2C3B897C316BED557FC3037AE9A44D9EEAD07053DB4F835BF1BD7D27C62",
+  "baseline_binary_sha256": "D3956B12359B73458BB3483F78D951D0F0C767C39F441E64BEF1C7BCE1392172",
+  "candidate_binary_sha256": "959DFA8F6348082046BCBFAD744A422E2BD7F5A43C702C2DBA7D2D86D26AEAF1",
+  "baseline_querytrace_patch_sha256": "8701347412337BE797259DDA53F5FD0347589094129241B60163FC0E892393C3",
+  "querytrace_added_and_removed_lines_match": true,
+  "pre_query_sequence": [
+    "Storage::open RW full-retention; no benchmark metadata summary call in open path",
+    "Pass 1: skip validate_index_coverage; parse the input meta.json and read exactly query row 0 from queries.f32",
+    "Take process/host resource counters only",
+    "Call storage.hybrid_search once for q0 (k=10, ef=200, alpha=0)",
+    "Pass 2 only: run the original validate_index_coverage before q0, matching the original reopened flow",
+    "No warm search or diagnostic_vector_metadata_summary call before q0"
+  ],
+  "allowed_prequery_work": [
+    "pass-2 validate_index_coverage",
+    "read input metadata JSON and first query vector",
+    "read host/process resource counters"
+  ],
+  "post_query_sequence": [
+    "Only after successful q0 on pass 2, optional cyclic warm sweep (default 24; trace disabled during sweep)",
+    "diagnostic_vector_metadata_summary at source line 546",
+    "Storage::drop"
+  ],
+  "post_query_code_lines": {
+    "drop": "553-555",
+    "warm_sweep_gate": "487-539",
+    "metadata_summary": "545-552"
+  },
+  "query0_code_lines": {
+    "hybrid_search_q0": "436-445",
+    "resource_sample_after": "447",
+    "open_options": "368-390",
+    "input_metadata": "412-425",
+    "coverage_exception": "395-410",
+    "resource_sample_before": "430",
+    "repeat_pass_function": "355",
+    "query_complete": "469-485"
+  },
+  "normal_open_only_code_lines": {
+    "coverage": "644",
+    "metadata_summary_after_query": "710",
+    "q0_hybrid_search": "671"
+  },
+  "no_full_metadata_scan_before_q0": true,
+  "no_warm_query_before_q0": true,
+  "no_props_hydration_before_q0": true,
+  "note": "Pass-2 coverage is the only database-wide pre-q0 scan and is explicitly retained to match the original reopen path; full metadata visibility summary and any sample queries are after q0."
+}

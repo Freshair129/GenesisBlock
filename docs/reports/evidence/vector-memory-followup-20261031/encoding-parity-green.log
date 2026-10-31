@@ -1,0 +1,63 @@
+   Compiling genesis-block-native v0.2.10 (D:\GenesisBlock_Dev\GenesisBlock)
+    Finished `test` profile [unoptimized] target(s) in 24.23s
+     Running unittests src\lib.rs (C:\Users\suanr\genesis-vector-memory-20261031\napi-target\x86_64-pc-windows-msvc\debug\deps\genesis_block_native-b7af0321854b0aac.exe)
+
+running 55 tests
+test api_error::tests::query_contract_json_decode_errors_are_validation_envelopes ... ok
+test api_error::tests::query_success_serializes_direct_plan_payload_without_enum_wrapper ... ok
+test api_error::tests::stable_codes_are_one_to_one_with_categories ... ok
+test api_error::tests::query_error_mapping_uses_structured_codes ... ok
+test api_error::tests::untyped_storage_errors_default_to_internal_without_message_classification ... ok
+test api_error::tests::query_error_result_keeps_stable_and_legacy_codes_separate ... ok
+test compacted_master_proof_effective_state_tests::batch_proof_uses_lww_and_retraction_tie_breaking ... ok
+test compacted_master_proof_effective_state_tests::node_proof_rejects_relay_selected_embedding ... ok
+test api_error::tests::napi_result_helper_serializes_the_six_category_contract ... ok
+test compacted_master_proof_effective_state_tests::historical_user_proof_cannot_authorize_changed_payload_or_higher_clock ... ok
+test compacted_master_proof_effective_state_tests::transaction_retraction_invalidates_same_identity_node_proof ... ok
+test gossip_socket_capacity_tests::constrained_ipv4_and_ipv6_sockets_deliver_existing_size_replies ... ok
+test api_error_contract_tests::transaction_contract_maps_recovery_guard_to_durability ... ok
+test journal_authorization_budget_tests::bounded_active_journal_read_accepts_a_not_yet_created_wal ... ok
+test compacted_row_revision_binding_tests::compacted_row_checkpoint_binds_after_image_to_insert_and_update ... ok
+test api_error_contract_tests::transaction_contract_maps_explicit_frontier_conflict ... ok
+test api_error_contract_tests::transaction_contract_maps_relational_payload_validation_to_validation ... ok
+test journal_authorization_budget_tests::journal_preflight_rechecks_limits_after_count_source_changes ... ok
+test journal_authorization_budget_tests::journal_preflight_rejects_record_growth_within_source_byte_bound ... ok
+test journal_authorization_budget_tests::membership_open_budget_fails_before_replay_or_projection_creation ... ok
+test journal_authorization_budget_tests::budget_counts_jsonl_segments_framed_segments_and_active_wal ... ok
+test p6_sync_progress_receipt_tests::explicit_trusted_key_requires_exact_outer_sequence ... ok
+test journal_authorization_budget_tests::source_length_guard_precedes_active_wal_read_and_max_frame_fits_overhead ... ok
+test p6_sync_progress_receipt_tests::receipt_verification_binds_peer_request_range_and_signature ... ok
+test query::hql2::exec::vector_distance_tests::cosine_distance_scales_finite_extreme_and_subnormal_values ... ok
+test query::hql2::lower::json_literal_size_tests::json_string_size_matches_escaped_serialization ... ok
+test query::hql2::lower::json_literal_size_tests::primitive_json_array_below_the_literal_size_limit_is_preserved ... ok
+test journal_authorization_budget_tests::late_membership_budget_failure_rolls_back_staged_roster ... ok
+test compacted_row_revision_binding_tests::frontier_only_backup_rejects_user_update_after_master_promotion ... ok
+test query::hql2::lower::json_literal_size_tests::primitive_json_array_cannot_exceed_the_literal_size_limit ... ok
+test query::hql2::source::hydration_batch_tests::exec_batch_checks_typed_columns_rows_and_stable_keys ... ok
+test query::hql2::result::counter_contract_tests::counter_wire_contract_keeps_zero_unknown_and_overflow_distinct ... ok
+test journal_authorization_budget_tests::backup_restore_budget_failure_does_not_publish_target ... ok
+test vector_memory_tests::arena_allocated_bytes_include_capacity_in_every_mode ... ok
+test router::error_contract_tests::recovery_required_write_returns_durability_envelope ... ok
+test projection_rebuild_tests::failed_replay_keeps_original_projection_and_connection ... ok
+test router::error_contract_tests::typed_transaction_contract_returns_durability_envelope ... ok
+test vector_memory_tests::profile_large_batch_compaction_phases ... ignored, manual CPU phase diagnostic; no timing acceptance threshold
+test vector_memory_tests::rebuild_preserves_calibrated_sq8_and_centered_binary_codes_without_rerank ... ok
+test vector_memory_tests::rebuild_preserves_native_codes_and_f16_rounding_including_binary_tail ... ok
+test compacted_row_revision_binding_tests::reconcile_rejects_forged_compacted_row_after_image_before_wal_write ... ok
+test compacted_row_revision_binding_tests::compacted_revision_source_proof_uses_prior_batch_master_state ... ok
+test vector_memory_tests::checkpoint_reuses_identical_signature_math_within_one_operation ... ok
+test compacted_row_revision_binding_tests::backup_restore_requires_roster_for_remote_revision_checkpoint ... ok
+test vector_memory_tests::streamed_arena_bytes_match_independent_little_endian_encoding ... ok
+test compacted_row_revision_binding_tests::compacted_revision_checkpoint_proof_advances_batch_master_state ... ok
+test vector_memory_tests::checkpoint_proof_maps_share_one_source_and_keep_signed_bytes ... ok
+test vector_memory_tests::signature_math_cache_is_exact_bounded_and_operation_local ... ok
+test vector_memory_tests::reopen_verification_stays_fresh_and_checkpoint_cache_is_released ... ok
+test vector_memory_tests::revision_binding_work_is_linear_and_tampering_stays_rejected ... ok
+test compacted_row_revision_binding_tests::frontier_only_backup_rejects_user_update_in_post_base_history ... ok
+test vector_memory_tests::checkpoint_shared_source_encoding_work_is_bounded ... ok
+test vector_memory_tests::cached_compaction_bytes_preserve_all_graph_envelopes_and_bounds ... ok
+test compacted_row_revision_binding_tests::backup_restore_with_membership_authenticates_remote_journal_before_publish ... ok
+test projection_rebuild_tests::busy_publication_keeps_original_projection_and_connection ... ok
+
+test result: ok. 54 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 6.63s
+

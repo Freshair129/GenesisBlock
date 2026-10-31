@@ -1,0 +1,298 @@
+{
+  "batch_rows": 256,
+  "collections_after_ingest": [
+    {
+      "arena_resident_bytes": 0,
+      "count": 0,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "default",
+        "extra_count": 0,
+        "indexed_count": 0,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 0,
+        "source_frontier": 0,
+        "state": "UNVERIFIED",
+        "validated": false
+      },
+      "dim": 1024,
+      "ef_search": null,
+      "index_lag": 0,
+      "indexed": 0,
+      "metric": "L2",
+      "model": "default",
+      "name": "default",
+      "quant": "none",
+      "rerank": false,
+      "sidecar_disk_bytes": 0,
+      "sidecar_resident_bytes": 0
+    },
+    {
+      "arena_resident_bytes": 11536384,
+      "count": 11266,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "bench",
+        "extra_count": 0,
+        "indexed_count": 11266,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 11266,
+        "source_frontier": 48,
+        "state": "UNVERIFIED",
+        "validated": false
+      },
+      "dim": 1024,
+      "ef_search": null,
+      "index_lag": 0,
+      "indexed": 11266,
+      "metric": "Cosine",
+      "model": "bge-m3-repository-fixture",
+      "name": "bench",
+      "quant": "sq8",
+      "rerank": true,
+      "sidecar_disk_bytes": 46145536,
+      "sidecar_resident_bytes": 0
+    }
+  ],
+  "collections_after_search": [
+    {
+      "arena_resident_bytes": 0,
+      "count": 0,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "default",
+        "extra_count": 0,
+        "indexed_count": 0,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 0,
+        "source_frontier": 0,
+        "state": "UNVERIFIED",
+        "validated": false
+      },
+      "dim": 1024,
+      "ef_search": null,
+      "index_lag": 0,
+      "indexed": 0,
+      "metric": "L2",
+      "model": "default",
+      "name": "default",
+      "quant": "none",
+      "rerank": false,
+      "sidecar_disk_bytes": 0,
+      "sidecar_resident_bytes": 0
+    },
+    {
+      "arena_resident_bytes": 11536384,
+      "count": 11266,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "bench",
+        "extra_count": 0,
+        "indexed_count": 11266,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 11266,
+        "source_frontier": 48,
+        "state": "UNVERIFIED",
+        "validated": false
+      },
+      "dim": 1024,
+      "ef_search": null,
+      "index_lag": 0,
+      "indexed": 11266,
+      "metric": "Cosine",
+      "model": "bge-m3-repository-fixture",
+      "name": "bench",
+      "quant": "sq8",
+      "rerank": true,
+      "sidecar_disk_bytes": 46145536,
+      "sidecar_resident_bytes": 0
+    }
+  ],
+  "compaction": {
+    "before_rss_bytes": 147173376,
+    "peak_rss_bytes": 193097728,
+    "process_rss_bytes": 126750720,
+    "seconds": 87.1739505
+  },
+  "coverage": [
+    {
+      "built_frontier": 0,
+      "collection": "default",
+      "extra_count": 0,
+      "indexed_count": 0,
+      "missing_count": 0,
+      "pending_count": 0,
+      "source_count": 0,
+      "source_frontier": 0,
+      "state": "READY",
+      "validated": true
+    },
+    {
+      "built_frontier": 48,
+      "collection": "bench",
+      "extra_count": 0,
+      "indexed_count": 11266,
+      "missing_count": 0,
+      "pending_count": 0,
+      "source_count": 11266,
+      "source_frontier": 48,
+      "state": "READY",
+      "validated": true
+    }
+  ],
+  "dim": 1024,
+  "disk_bytes": 1512716909,
+  "ef_construction": 200,
+  "ef_search": 200,
+  "fresh_reopen": {
+    "collections": [
+      {
+        "arena_resident_bytes": 11536384,
+        "count": 11266,
+        "coverage": {
+          "built_frontier": 0,
+          "collection": "bench",
+          "extra_count": 0,
+          "indexed_count": 11266,
+          "missing_count": 0,
+          "pending_count": 0,
+          "source_count": 11266,
+          "source_frontier": 48,
+          "state": "UNVERIFIED",
+          "validated": false
+        },
+        "dim": 1024,
+        "ef_search": null,
+        "index_lag": 0,
+        "indexed": 11266,
+        "metric": "Cosine",
+        "model": "bge-m3-repository-fixture",
+        "name": "bench",
+        "quant": "sq8",
+        "rerank": true,
+        "sidecar_disk_bytes": 46145536,
+        "sidecar_resident_bytes": 0
+      },
+      {
+        "arena_resident_bytes": 0,
+        "count": 0,
+        "coverage": {
+          "built_frontier": 0,
+          "collection": "default",
+          "extra_count": 0,
+          "indexed_count": 0,
+          "missing_count": 0,
+          "pending_count": 0,
+          "source_count": 0,
+          "source_frontier": 0,
+          "state": "UNVERIFIED",
+          "validated": false
+        },
+        "dim": 1024,
+        "ef_search": null,
+        "index_lag": 0,
+        "indexed": 0,
+        "metric": "L2",
+        "model": "default",
+        "name": "default",
+        "quant": "none",
+        "rerank": false,
+        "sidecar_disk_bytes": 0,
+        "sidecar_resident_bytes": 0
+      }
+    ],
+    "coverage": [
+      {
+        "built_frontier": 48,
+        "collection": "bench",
+        "extra_count": 0,
+        "indexed_count": 11266,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 11266,
+        "source_frontier": 48,
+        "state": "READY",
+        "validated": true
+      },
+      {
+        "built_frontier": 0,
+        "collection": "default",
+        "extra_count": 0,
+        "indexed_count": 0,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 0,
+        "source_frontier": 0,
+        "state": "READY",
+        "validated": true
+      }
+    ],
+    "error": null,
+    "memory": {
+      "before_rss_bytes": 14794752,
+      "peak_rss_bytes": 214155264,
+      "process_rss_bytes": 81416192,
+      "seconds": 150.0945473
+    }
+  },
+  "idle_rss_bytes": 12922880,
+  "index_rebuild_peak_rss_bytes": 147263488,
+  "ingest": {
+    "before_rss_bytes": 12914688,
+    "peak_rss_bytes": 277032960,
+    "process_rss_bytes": 110891008,
+    "seconds": 116.5695381
+  },
+  "method": "20ms sampled working set; same-process and fresh-process reopen",
+  "model": "bge-m3-repository-fixture",
+  "n": 11266,
+  "q": 24,
+  "quant": "sq8",
+  "rebuild": {
+    "before_rss_bytes": 110891008,
+    "peak_rss_bytes": 147263488,
+    "process_rss_bytes": 128806912,
+    "seconds": 74.2649506
+  },
+  "reopen": {
+    "before_rss_bytes": 22233088,
+    "peak_rss_bytes": 288923648,
+    "process_rss_bytes": 113410048,
+    "seconds": 206.347826
+  },
+  "reopen_error": null,
+  "reopen_search10": {
+    "k": 10,
+    "p50_us": 19484.7,
+    "p95_us": 35500.4,
+    "p99_us": 4485576.6,
+    "recall": 0.9875
+  },
+  "rerank": true,
+  "retention": "full",
+  "search10": {
+    "k": 10,
+    "p50_us": 12217.8,
+    "p95_us": 16257.9,
+    "p99_us": 16682.6,
+    "recall": 0.9916666666666667
+  },
+  "search100": {
+    "k": 100,
+    "p50_us": 39088.7,
+    "p95_us": 46916.100000000006,
+    "p99_us": 47394.7,
+    "recall": 0.98875
+  },
+  "snapshot": {
+    "before_rss_bytes": 145534976,
+    "peak_rss_bytes": 150638592,
+    "process_rss_bytes": 147189760,
+    "seconds": 14.8866519
+  },
+  "snapshot_error": null
+}

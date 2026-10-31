@@ -1,0 +1,9 @@
+{
+  "at": "2026-10-31T22:11:24.0585904+07:00",
+  "status_exit": 0,
+  "original_monitor_error": "The property 'Sum' cannot be found on this object. Verify that the property exists.",
+  "identities_checked": 118,
+  "remaining_owned": 0,
+  "global_compiler_benchmark_count": 0,
+  "policy": "Original failed monitor receipt preserved; fresh PID+birth absence proof permits only private-clone continuation."
+}

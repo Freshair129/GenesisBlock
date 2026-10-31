@@ -1,0 +1,8 @@
+
+running 3 tests
+test a_data_root_has_exactly_one_storage_owner ... ok
+test read_only_open_does_not_modify_durable_database_payloads ... ok
+test read_only_open_still_requires_exclusive_process_ownership ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+

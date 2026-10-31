@@ -1,0 +1,4 @@
+
+thread 'main' (25696) panicked at benches\vbench_genesis.rs:39:44:
+set GB_VBENCH to the bench dir: NotPresent
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

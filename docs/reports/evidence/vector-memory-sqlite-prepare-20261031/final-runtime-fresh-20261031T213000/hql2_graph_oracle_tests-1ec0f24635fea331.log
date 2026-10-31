@@ -1,0 +1,44 @@
+
+running 39 tests
+test annotation_authorization_cycles_need_an_independently_authorized_target ... ok
+test annotation_edge_targets_require_endpoint_permissions_recursively ... ok
+test annotation_optional_permission_intersection_and_no_status_bypass ... ok
+test change_scan_uses_explicit_events_order_window_and_subject_permissions ... ok
+test change_subject_edges_require_endpoint_permissions_recursively ... ok
+test compound_optional_null_extends_once_and_uniqueness_spans_segments ... ok
+test correction_is_immutable_and_splits_half_open_valid_intervals ... ok
+test current_permissions_filter_historical_sources_and_tombstones_hide_current_nodes ... ok
+test cycle_modes_distinguish_edge_and_vertex_reuse ... ok
+test direction_parallel_edges_zero_hop_and_named_edge_types ... ok
+test distinct_spans_on_same_frozen_revision_yield_one_annotation_per_input ... ok
+test edge_and_annotation_scans_are_typed_composable_sources ... ok
+test empty_transform_validates_schema_bounds_collisions_and_returns_output_schema ... ok
+test exhaustive_tiny_graphs_match_separate_cartesian_baseline ... ok
+test frozen_revision_never_drifts_to_live_identity ... ok
+test future_denied_and_out_of_window_events_do_not_add_change_history_dependencies ... ok
+test future_denied_and_retired_annotations_do_not_add_scan_history_dependencies ... ok
+test graph_annotation_composition_preserves_path_and_input_multiplicity ... ok
+test historical_traversal_enumerates_retired_edges_and_endpoints ... ok
+test history_capabilities_checked_even_for_empty_inputs ... ok
+test history_scan_enumerates_revisions_not_only_current_candidates ... ok
+test imported_paths_require_connected_edges_in_either_orientation ... ok
+test input_bags_preserve_order_and_optional_null_anchors_remain_null ... ok
+test invalid_bounds_aliases_and_resource_limits_reject_without_partial_output ... ok
+test invalid_intervals_overlap_and_imported_reference_namespace_are_rejected ... ok
+test live_span_drift_and_missing_frozen_revision_fail_without_retargeting ... ok
+test metered_empty_stage_and_empty_input_calls_charge_validation_work ... ok
+test metered_execute_reports_work_and_preserves_results_at_exact_budget ... ok
+test metered_transform_exhausts_shared_remaining_work_across_individually_fitting_calls ... ok
+test namespace_mismatch_and_duplicate_targets_fail_closed ... ok
+test nested_annotation_and_event_subjects_cannot_bypass_denied_leaf_scope ... ok
+test predicates_and_relation_constraints_are_inside_the_optional_pattern ... ok
+test recursive_authorization_depth_has_a_bounded_failure ... ok
+test scan_has_explicit_rows_order_and_namespace_kind_revision_identity ... ok
+test sha256_is_pinned_to_independent_known_answers ... ok
+test shortest_is_one_per_anchored_pair_with_edge_identity_tie_break ... ok
+test unicode_scalar_offsets_and_source_metadata_are_validated ... ok
+test vector_history_uses_h2_d11_identity_and_owner_read_permission ... ok
+test zero_hop_shortest_preserves_anchored_end_and_optional_failure_preserves_bindings ... ok
+
+test result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+

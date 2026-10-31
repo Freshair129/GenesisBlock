@@ -1,0 +1,9 @@
+
+running 4 tests
+test compacted_quantizers_and_empty_definitions_survive_journal_only ... ok
+test legacy_manifest_upgrade_survives_later_journal_only_rebuild ... ok
+test unknown_crc_valid_event_is_rejected_without_rewriting ... ok
+test unsupported_active_version_is_rejected_without_rewriting ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.50s
+

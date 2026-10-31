@@ -1,0 +1,7 @@
+
+running 2 tests
+test schema6_primary_and_secondary_vectors_have_durable_revision_identity ... ok
+test schema6_rejects_unversioned_vector_events_before_wal_append ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+

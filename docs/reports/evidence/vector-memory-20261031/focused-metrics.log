@@ -1,0 +1,10 @@
+
+running 5 tests
+test all_modes_report_distinct_arena_and_hnsw_widths_and_rebuild_search ... ok
+test cache_metric_is_bounded_under_concurrent_reads_and_reopen_starts_cold ... ok
+test compacting_the_last_vector_releases_the_old_index ... ok
+test compaction_does_not_reserve_global_node_count_for_empty_collections ... ok
+test reports_cache_payload_and_arena_capacity_without_counting_disk_as_ram ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.27s
+

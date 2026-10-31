@@ -1,0 +1,129 @@
+{
+  "passed_contents_and_source_integrity": true,
+  "mechanism_observed": true,
+  "source_sha256": "c9bee7777ff99c1632eabf64ffc46bbbea7970655f67902727a838a9c3ceb77b",
+  "binary_sha256": "2afb2581f48600f8951131f3c7ce929e6ace614d00fd215dd84ac1241a9cd31b",
+  "cases": [
+    {
+      "mode": "direct",
+      "seconds_including_backup_and_connection_lifecycle": 0.12544760000309907,
+      "first": {
+        "prepare_us": 1469,
+        "row_us": 56,
+        "finalize_us": 0,
+        "payload": "{}"
+      },
+      "second": {
+        "prepare_us": 12,
+        "row_us": 12,
+        "finalize_us": 0,
+        "payload": "{}"
+      },
+      "after_backup": null,
+      "before_first_prepare": {
+        "mx_frame": 0,
+        "n_backfill": 0
+      },
+      "after_first_prepare": {
+        "mx_frame": 0,
+        "n_backfill": 0
+      },
+      "publication_maintenance_us": null,
+      "after_publication_maintenance": null
+    },
+    {
+      "mode": "backup",
+      "seconds_including_backup_and_connection_lifecycle": 8.67365720000089,
+      "first": {
+        "prepare_us": 2902725,
+        "row_us": 62,
+        "finalize_us": 1,
+        "payload": "{}"
+      },
+      "second": {
+        "prepare_us": 26,
+        "row_us": 25,
+        "finalize_us": 1,
+        "payload": "{}"
+      },
+      "after_backup": {
+        "mx_frame": 248368,
+        "n_backfill": 0
+      },
+      "before_first_prepare": {
+        "mx_frame": 248368,
+        "n_backfill": 0
+      },
+      "after_first_prepare": {
+        "mx_frame": 248368,
+        "n_backfill": 248368
+      },
+      "publication_maintenance_us": null,
+      "after_publication_maintenance": null
+    },
+    {
+      "mode": "backup-noauto",
+      "seconds_including_backup_and_connection_lifecycle": 8.889145400004054,
+      "first": {
+        "prepare_us": 262,
+        "row_us": 40,
+        "finalize_us": 0,
+        "payload": "{}"
+      },
+      "second": {
+        "prepare_us": 14,
+        "row_us": 15,
+        "finalize_us": 0,
+        "payload": "{}"
+      },
+      "after_backup": {
+        "mx_frame": 248368,
+        "n_backfill": 0
+      },
+      "before_first_prepare": {
+        "mx_frame": 248368,
+        "n_backfill": 0
+      },
+      "after_first_prepare": {
+        "mx_frame": 248368,
+        "n_backfill": 0
+      },
+      "publication_maintenance_us": null,
+      "after_publication_maintenance": null
+    },
+    {
+      "mode": "backup-checkpoint",
+      "seconds_including_backup_and_connection_lifecycle": 14.100073499997961,
+      "first": {
+        "prepare_us": 34,
+        "row_us": 67,
+        "finalize_us": 1,
+        "payload": "{}"
+      },
+      "second": {
+        "prepare_us": 28,
+        "row_us": 30,
+        "finalize_us": 1,
+        "payload": "{}"
+      },
+      "after_backup": {
+        "mx_frame": 248368,
+        "n_backfill": 0
+      },
+      "before_first_prepare": {
+        "mx_frame": 248368,
+        "n_backfill": 248368
+      },
+      "after_first_prepare": {
+        "mx_frame": 248368,
+        "n_backfill": 248368
+      },
+      "publication_maintenance_us": 4087699,
+      "after_publication_maintenance": {
+        "mx_frame": 248368,
+        "n_backfill": 248368
+      }
+    }
+  ],
+  "method": "Pinned SQLite only, no Genesis projection replay; fixed order, no OS cache reset, no SQL warmup. Second query is reported separately and never substitutes for the first."
+}

@@ -1,0 +1,8 @@
+{
+  "target": "x86_64-pc-windows-msvc",
+  "rustc": "1.96.0",
+  "type": "genesis_block_native::NodeMetadata",
+  "size_of_bytes": 96,
+  "method": "rustc constant evaluation in node_meta_layout.ll: ret i64 96",
+  "scope": "Vec backing capacity only; not RSS or per-row String/Vec heap contents"
+}

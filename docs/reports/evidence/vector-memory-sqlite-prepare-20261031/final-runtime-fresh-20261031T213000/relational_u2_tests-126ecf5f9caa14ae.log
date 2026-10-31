@@ -1,0 +1,10 @@
+
+running 5 tests
+test relational_batch_validation_prevents_partial_write ... ok
+test relational_offset_pages_partition_the_result_set ... ok
+test relational_projection_rebuilds_from_genesis_wal ... ok
+test relational_schema_rejects_downgrade_and_namespace_escape ... ok
+test relational_schema_rows_and_join_use_one_genesis_handle ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.46s
+

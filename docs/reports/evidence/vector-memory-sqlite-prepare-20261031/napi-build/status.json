@@ -1,0 +1,113 @@
+{
+  "exit": 0,
+  "reason": null,
+  "seconds": 63.334444,
+  "peak_rss": 1544253440,
+  "peak_private": 1735651328,
+  "identities": [
+    {
+      "ProcessId": 26812,
+      "ParentProcessId": 14220,
+      "CreationDate": "2026-10-31T21:46:20.646705+07:00",
+      "Name": "cargo.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.cargo\\bin\\cargo.exe"
+    },
+    {
+      "ProcessId": 27240,
+      "ParentProcessId": 28580,
+      "CreationDate": "2026-10-31T21:46:19.423495+07:00",
+      "Name": "cargo.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.cargo\\bin\\cargo.exe"
+    },
+    {
+      "ProcessId": 37140,
+      "ParentProcessId": 33480,
+      "CreationDate": "2026-10-31T21:46:21.473769+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 37680,
+      "ParentProcessId": 14424,
+      "CreationDate": "2026-10-31T21:47:16.040939+07:00",
+      "Name": "link.exe",
+      "ExecutablePath": "C:\\GenesisBlockW1Tools\\vs2022\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe"
+    },
+    {
+      "ProcessId": 25492,
+      "ParentProcessId": 11988,
+      "CreationDate": "2026-10-31T21:46:18.148764+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 14220,
+      "ParentProcessId": 25492,
+      "CreationDate": "2026-10-31T21:46:20.629032+07:00",
+      "Name": "cmd.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\cmd.exe"
+    },
+    {
+      "ProcessId": 33480,
+      "ParentProcessId": 26812,
+      "CreationDate": "2026-10-31T21:46:20.665526+07:00",
+      "Name": "cargo.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\cargo.exe"
+    },
+    {
+      "ProcessId": 18944,
+      "ParentProcessId": 25492,
+      "CreationDate": "2026-10-31T21:46:18.157585+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 28580,
+      "ParentProcessId": 25492,
+      "CreationDate": "2026-10-31T21:46:19.397336+07:00",
+      "Name": "cmd.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\cmd.exe"
+    },
+    {
+      "ProcessId": 37232,
+      "ParentProcessId": 27240,
+      "CreationDate": "2026-10-31T21:46:19.443984+07:00",
+      "Name": "cargo.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\cargo.exe"
+    },
+    {
+      "ProcessId": 16040,
+      "ParentProcessId": 37140,
+      "CreationDate": "2026-10-31T21:46:21.704028+07:00",
+      "Name": "link.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 14424,
+      "ParentProcessId": 33480,
+      "CreationDate": "2026-10-31T21:46:22.345454+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    }
+  ],
+  "excluded_build_helpers": [
+    {
+      "ProcessId": 8748,
+      "ParentProcessId": 16040,
+      "CreationDate": "2026-10-31T21:46:21.875861+07:00",
+      "Name": "vctip.exe",
+      "ExecutablePath": "C:\\GenesisBlockW1Tools\\vs2022\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\VCTIP.EXE",
+      "parent_creation": "2026-10-31T21:46:21.704028+07:00",
+      "parent_name": "link.exe",
+      "role": "non-compiling toolchain telemetry/PDB service"
+    }
+  ],
+  "helper_finished_parent_condition": true,
+  "helper_scope": "Helpers are not terminated; successful Cargo completion and stopped tracked compiler clients are required before private-source edits. No shared source/target mutation.",
+  "admission_cpu": 3.727272727272727,
+  "admission_free": 18661371904.0,
+  "remaining": [],
+  "cleanup_complete": true,
+  "monitor_error": null,
+  "rss_scope": "tracked processes; compiler telemetry/daemon helpers excluded"
+}

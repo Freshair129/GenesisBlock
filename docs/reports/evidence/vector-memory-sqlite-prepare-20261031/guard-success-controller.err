@@ -1,0 +1,5 @@
+Exception: C:\Users\suanr\genesis-sqlite-prepare-20261031\guard.ps1:6
+Line |
+   6 |  … f($active.Count){throw 'Concurrent compiler/benchmark blocks launch'}
+     |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | Concurrent compiler/benchmark blocks launch

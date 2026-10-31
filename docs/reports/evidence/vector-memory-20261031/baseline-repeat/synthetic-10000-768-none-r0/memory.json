@@ -1,0 +1,293 @@
+{
+  "batch_rows": 256,
+  "collections_after_ingest": [
+    {
+      "arena_resident_bytes": 30720000,
+      "count": 10000,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "bench",
+        "extra_count": 0,
+        "indexed_count": 10000,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 10000,
+        "source_frontier": 43,
+        "state": "UNVERIFIED",
+        "validated": false
+      },
+      "dim": 768,
+      "ef_search": null,
+      "index_lag": 0,
+      "indexed": 10000,
+      "metric": "Cosine",
+      "model": "synthetic-unit-seed42",
+      "name": "bench",
+      "quant": "none",
+      "rerank": false,
+      "sidecar_disk_bytes": 0,
+      "sidecar_resident_bytes": 0
+    },
+    {
+      "arena_resident_bytes": 0,
+      "count": 0,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "default",
+        "extra_count": 0,
+        "indexed_count": 0,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 0,
+        "source_frontier": 0,
+        "state": "UNVERIFIED",
+        "validated": false
+      },
+      "dim": 768,
+      "ef_search": null,
+      "index_lag": 0,
+      "indexed": 0,
+      "metric": "L2",
+      "model": "default",
+      "name": "default",
+      "quant": "none",
+      "rerank": false,
+      "sidecar_disk_bytes": 0,
+      "sidecar_resident_bytes": 0
+    }
+  ],
+  "collections_after_search": [
+    {
+      "arena_resident_bytes": 30720000,
+      "count": 10000,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "bench",
+        "extra_count": 0,
+        "indexed_count": 10000,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 10000,
+        "source_frontier": 43,
+        "state": "UNVERIFIED",
+        "validated": false
+      },
+      "dim": 768,
+      "ef_search": null,
+      "index_lag": 0,
+      "indexed": 10000,
+      "metric": "Cosine",
+      "model": "synthetic-unit-seed42",
+      "name": "bench",
+      "quant": "none",
+      "rerank": false,
+      "sidecar_disk_bytes": 0,
+      "sidecar_resident_bytes": 0
+    },
+    {
+      "arena_resident_bytes": 0,
+      "count": 0,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "default",
+        "extra_count": 0,
+        "indexed_count": 0,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 0,
+        "source_frontier": 0,
+        "state": "UNVERIFIED",
+        "validated": false
+      },
+      "dim": 768,
+      "ef_search": null,
+      "index_lag": 0,
+      "indexed": 0,
+      "metric": "L2",
+      "model": "default",
+      "name": "default",
+      "quant": "none",
+      "rerank": false,
+      "sidecar_disk_bytes": 0,
+      "sidecar_resident_bytes": 0
+    }
+  ],
+  "compaction": null,
+  "coverage": [
+    {
+      "built_frontier": 43,
+      "collection": "bench",
+      "extra_count": 0,
+      "indexed_count": 10000,
+      "missing_count": 0,
+      "pending_count": 0,
+      "source_count": 10000,
+      "source_frontier": 43,
+      "state": "READY",
+      "validated": true
+    },
+    {
+      "built_frontier": 0,
+      "collection": "default",
+      "extra_count": 0,
+      "indexed_count": 0,
+      "missing_count": 0,
+      "pending_count": 0,
+      "source_count": 0,
+      "source_frontier": 0,
+      "state": "READY",
+      "validated": true
+    }
+  ],
+  "dim": 768,
+  "disk_bytes": 1019025424,
+  "ef_construction": 200,
+  "ef_search": 200,
+  "fresh_reopen": {
+    "collections": [
+      {
+        "arena_resident_bytes": 30720000,
+        "count": 10000,
+        "coverage": {
+          "built_frontier": 0,
+          "collection": "bench",
+          "extra_count": 0,
+          "indexed_count": 10000,
+          "missing_count": 0,
+          "pending_count": 0,
+          "source_count": 10000,
+          "source_frontier": 43,
+          "state": "UNVERIFIED",
+          "validated": false
+        },
+        "dim": 768,
+        "ef_search": null,
+        "index_lag": 0,
+        "indexed": 10000,
+        "metric": "Cosine",
+        "model": "synthetic-unit-seed42",
+        "name": "bench",
+        "quant": "none",
+        "rerank": false,
+        "sidecar_disk_bytes": 0,
+        "sidecar_resident_bytes": 0
+      },
+      {
+        "arena_resident_bytes": 0,
+        "count": 0,
+        "coverage": {
+          "built_frontier": 0,
+          "collection": "default",
+          "extra_count": 0,
+          "indexed_count": 0,
+          "missing_count": 0,
+          "pending_count": 0,
+          "source_count": 0,
+          "source_frontier": 0,
+          "state": "UNVERIFIED",
+          "validated": false
+        },
+        "dim": 768,
+        "ef_search": null,
+        "index_lag": 0,
+        "indexed": 0,
+        "metric": "L2",
+        "model": "default",
+        "name": "default",
+        "quant": "none",
+        "rerank": false,
+        "sidecar_disk_bytes": 0,
+        "sidecar_resident_bytes": 0
+      }
+    ],
+    "coverage": [
+      {
+        "built_frontier": 43,
+        "collection": "bench",
+        "extra_count": 0,
+        "indexed_count": 10000,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 10000,
+        "source_frontier": 43,
+        "state": "READY",
+        "validated": true
+      },
+      {
+        "built_frontier": 0,
+        "collection": "default",
+        "extra_count": 0,
+        "indexed_count": 0,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 0,
+        "source_frontier": 0,
+        "state": "READY",
+        "validated": true
+      }
+    ],
+    "error": null,
+    "memory": {
+      "before_rss_bytes": 14782464,
+      "peak_rss_bytes": 216027136,
+      "process_rss_bytes": 122077184,
+      "seconds": 120.0966734
+    }
+  },
+  "idle_rss_bytes": 16363520,
+  "index_rebuild_peak_rss_bytes": 202207232,
+  "ingest": {
+    "before_rss_bytes": 16359424,
+    "peak_rss_bytes": 287735808,
+    "process_rss_bytes": 143769600,
+    "seconds": 106.4850566
+  },
+  "method": "20ms sampled working set; same-process and fresh-process reopen",
+  "model": "synthetic-unit-seed42",
+  "n": 10000,
+  "q": 24,
+  "quant": "none",
+  "rebuild": {
+    "before_rss_bytes": 143773696,
+    "peak_rss_bytes": 202207232,
+    "process_rss_bytes": 155865088,
+    "seconds": 71.2055294
+  },
+  "reopen": {
+    "before_rss_bytes": 20852736,
+    "peak_rss_bytes": 327397376,
+    "process_rss_bytes": 134160384,
+    "seconds": 159.0631453
+  },
+  "reopen_error": null,
+  "reopen_search10": {
+    "k": 10,
+    "p50_us": 6691.8,
+    "p95_us": 8870.8,
+    "p99_us": 2457588.4,
+    "recall": 0.8666666666666667
+  },
+  "rerank": false,
+  "retention": "full",
+  "search10": {
+    "k": 10,
+    "p50_us": 7203.700000000001,
+    "p95_us": 10881.9,
+    "p99_us": 11746.8,
+    "recall": 0.85
+  },
+  "search100": {
+    "k": 100,
+    "p50_us": 14681.5,
+    "p95_us": 21214.0,
+    "p99_us": 21406.7,
+    "recall": 0.74375
+  },
+  "snapshot": {
+    "before_rss_bytes": 156254208,
+    "peak_rss_bytes": 187002880,
+    "process_rss_bytes": 159797248,
+    "seconds": 10.508323
+  },
+  "snapshot_error": null
+}

@@ -1,0 +1,18 @@
+
+running 13 tests
+test analyze_reports_measured_graph_expansion_work ... ok
+test analyze_reports_root_match_graph_work_and_budget_never_returns_partial_rows ... ok
+test graph_edge_budget_exhaustion_fails_without_returning_partial_rows ... ok
+test graph_operators_use_the_selected_transaction_frontier ... ok
+test hql_expand_uses_the_same_graph_operator_and_path_ordering ... ok
+test hql_shortest_match_keeps_the_lexically_first_parallel_edge ... ok
+test hql_structural_match_and_ir_use_the_same_root_operator ... ok
+test ir_expand_preserves_parallel_paths_and_orders_by_length_then_edge_identity ... ok
+test ir_root_match_enumerates_structural_paths_and_preserves_parallel_edges ... ok
+test ir_root_shortest_match_keeps_one_deterministic_path_per_endpoint_pair ... ok
+test optional_expand_null_extends_only_when_no_path_and_zero_hop_is_a_path ... ok
+test root_match_anchors_compare_exact_record_refs_and_reject_unmatched_revisions ... ok
+test root_match_applies_internal_node_anchors_before_shortest_deduplication ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.89s
+

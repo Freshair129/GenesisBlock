@@ -1,0 +1,14 @@
+{
+  "source": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\verify-src",
+  "source_head": "ad94aa2e46025b7729d117ff376ab281ac15c49d",
+  "target_dir": "D:\\GenesisBlock_Dev\\GenesisBlock\\target",
+  "command": "cargo build --locked --offline --release --no-default-features --features bins --bin vbench-genesis -j2",
+  "CARGO_PROFILE_RELEASE_LTO": "false",
+  "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "16",
+  "allowed_source_files": [
+    "src/lib.rs",
+    "benches/vector_memory.rs"
+  ],
+  "driver": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\proof-release-driver.ps1",
+  "target_cache_shared_with_parent_debug": false
+}

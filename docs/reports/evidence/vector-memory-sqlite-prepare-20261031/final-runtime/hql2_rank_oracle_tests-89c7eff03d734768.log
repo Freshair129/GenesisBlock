@@ -1,0 +1,42 @@
+
+running 37 tests
+test bm25_empty_terms_and_documents_have_no_nan_or_phantom_matches ... ok
+test bm25_finite_extreme_k1_retains_matching_row_and_expected_score ... ok
+test bm25_length_normalization_query_terms_and_cutoff_are_explicit ... ok
+test bm25_statistics_use_visible_corpus_not_filtered_candidate_bag ... ok
+test bm25_tiny_visible_corpus_matches_hand_computed_formula ... ok
+test canonical_thai_combining_marks_and_emoji_are_never_normalized ... ok
+test context_budget_counts_citations_and_separators_exactly ... ok
+test context_property_budgets_preserve_prefixes_and_duplicate_rows ... ok
+test context_unknown_tokenizer_rejects_even_empty_input ... ok
+test context_validates_revision_visibility_and_source_hash ... ok
+test context_zero_budget_and_marker_overhead_omit_whole_refs ... ok
+test duplicate_payloads_count_toward_k_with_stable_row_keys ... ok
+test filter_cutoff_order_is_observable_in_composed_pipeline ... ok
+test fingerprints_bind_query_and_each_original ... ok
+test finite_huge_and_subnormal_cosine_inputs_do_not_overflow ... ok
+test huge_finite_negdot_query_is_valid_without_evaluating_self_dot ... ok
+test invalid_vectors_are_rejected_even_with_empty_input_and_top_zero ... ok
+test invalid_visible_originals_are_checked_before_zero_cutoff ... ok
+test knn_removes_missing_vector_rows_but_rerank_requires_originals ... ok
+test l2_and_negative_dot_have_explicit_conventions_and_overflow_errors ... ok
+test lexical_profile_errors_and_empty_corpus_are_explicit ... ok
+test multi_digit_citation_overhead_is_counted_at_boundary ... ok
+test negdot_cancellation_does_not_reverse_knn_or_rerank_winner ... ok
+test negdot_cancellation_keeps_unit_residual_in_all_permutations ... ok
+test rerank_keeps_approximation_lineage_through_filter_take_and_context ... ok
+test revision_owner_is_not_substituted_and_bad_keys_fail ... ok
+test rrf_conflicting_payloads_for_the_same_row_key_are_rejected ... ok
+test rrf_rejects_mixed_snapshots_repeated_source_and_invalid_parameters ... ok
+test rrf_representative_payload_and_downstream_filter_are_branch_order_independent ... ok
+test rrf_ties_lineage_and_branch_order_are_deterministic ... ok
+test snapshot_visibility_is_half_open_and_gates_owners_before_ranking ... ok
+test source_cutoffs_rrf_and_context_are_actual_stage_composition ... ok
+test source_rank_survives_cutoff_without_renumbering ... ok
+test stable_ties_do_not_depend_on_fixture_input_order ... ok
+test standalone_adapter_entrypoints_compose_and_top_zero_is_valid ... ok
+test unsupported_same_source_rrf_duplicates_fail_without_silent_deduplication ... ok
+test visible_originals_are_required_for_exact_rerank ... ok
+
+test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

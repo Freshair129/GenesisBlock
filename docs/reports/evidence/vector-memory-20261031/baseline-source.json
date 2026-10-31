@@ -1,0 +1,20 @@
+{
+  "head": "ad94aa2e46025b7729d117ff376ab281ac15c49d",
+  "files": {
+    "src/lib.rs": "ae2f5ccbaee699a334f621fbf346caef74b56a97d2a6a453637286968447fc6f",
+    "Cargo.toml": "5e6e99ba49618e88ca868bf8a45e1143ccae465a9b3b8a5e97625334cf51ad38",
+    "Cargo.lock": "eda5bfa67c1077c96f2b84e44f740273e695c87a1a51b352cf18f2a031a4f8d2",
+    "benchmark/fixtures/corpus_bge_m3.f32": "20978d757c33a29dcd8e89e5708762738b10fc8da0f01358bcb325741f2f6057",
+    "benches/vbench_genesis.rs": "2f73000dfc60fd6d4e01f24b7670ff94987e4d5e76acebabf3f20ea28ee4c6c5",
+    "benches/vector_memory.rs": "d19e258234ece0ebfcb34013c9a26fd776d0ef16a3dabcc4164d897834a1de63"
+  },
+  "preserved_staged": {
+    "docs/C4--GENESISDB-ARCHITECTURE.md": "f59da3a406ebee3bda603466fbba28632f52c3559b6cc28e9531fb1a4112e67b",
+    "docs/DOC-REGISTRY.md": "3822ebf4c70dab6449e54da588565efd34017e939fb1ef8af015ce76e306f386",
+    "docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md": "d771af9d3ac741136dc128d7b89ba629d3416c8658f65ac9e52d0afd68cc5059",
+    "docs/MASTER-SPEC--GENESIS-DB.md": "e5aa75f2d3da8eba332a119f08c80f3876df7b4137567735ea86e8f3c30aaa0a",
+    "docs/REPORT--HQL2-P8-CORE-2026-09-28.md": "59bfffe733631df0bc8516fe59e3abbf886ad581119ea22dab42c41ecd3be442",
+    "docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md": "a1574145aa72b278f58981f309d94d08f6661d9ea68231abff299e957043f16d",
+    "tests/hql2_g4_scalar_counter_tests.rs": "89b0cc5f71161cbf5e09106e7238ee114edc1b6878b14d73375c862413a6785e"
+  }
+}

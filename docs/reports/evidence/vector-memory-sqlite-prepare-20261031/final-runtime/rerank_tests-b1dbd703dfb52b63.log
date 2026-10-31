@@ -1,0 +1,11 @@
+
+running 6 tests
+test bq_rerank_distinguishes_magnitude ... ok
+test missing_sidecar_recovers_from_journal ... ok
+test no_rerank_writes_no_sidecar ... ok
+test rerank_survives_compaction ... ok
+test rerank_survives_reload ... ok
+test sq8_rerank_finds_exact_match ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.96s
+

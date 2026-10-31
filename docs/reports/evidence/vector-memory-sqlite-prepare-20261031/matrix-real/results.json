@@ -1,0 +1,61 @@
+{
+  "source": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\projection-props-split-20261031T151315\\output\\gdb\\projection.sqlite",
+  "source_sha256_before": "c9bee7777ff99c1632eabf64ffc46bbbea7970655f67902727a838a9c3ceb77b",
+  "binary_sha256": "2afb2581f48600f8951131f3c7ce929e6ace614d00fd215dd84ac1241a9cd31b",
+  "cases": [
+    {
+      "mode": "direct",
+      "copy_seconds": 0,
+      "seconds": 0.12544760000309907,
+      "exit": 0,
+      "args": [
+        "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\reproducer-target\\release\\sqlite-prepare-reproducer.exe",
+        "direct",
+        "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\projection-props-split-20261031T151315\\output\\gdb\\projection.sqlite",
+        "5932"
+      ]
+    },
+    {
+      "mode": "backup",
+      "copy_seconds": 0.4070812000063597,
+      "seconds": 8.67365720000089,
+      "exit": 0,
+      "args": [
+        "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\reproducer-target\\release\\sqlite-prepare-reproducer.exe",
+        "backup",
+        "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\projection-props-split-20261031T151315\\output\\gdb\\projection.sqlite",
+        "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\matrix-real\\backup.sqlite",
+        "5932"
+      ]
+    },
+    {
+      "mode": "backup-noauto",
+      "copy_seconds": 0.5570303999993484,
+      "seconds": 8.889145400004054,
+      "exit": 0,
+      "args": [
+        "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\reproducer-target\\release\\sqlite-prepare-reproducer.exe",
+        "backup-noauto",
+        "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\projection-props-split-20261031T151315\\output\\gdb\\projection.sqlite",
+        "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\matrix-real\\backup-noauto.sqlite",
+        "5932"
+      ]
+    },
+    {
+      "mode": "backup-checkpoint",
+      "copy_seconds": 0.4917236000037519,
+      "seconds": 14.100073499997961,
+      "exit": 0,
+      "args": [
+        "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\reproducer-target\\release\\sqlite-prepare-reproducer.exe",
+        "backup-checkpoint",
+        "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\projection-props-split-20261031T151315\\output\\gdb\\projection.sqlite",
+        "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\matrix-real\\backup-checkpoint.sqlite",
+        "5932"
+      ]
+    }
+  ],
+  "no_genesis_replay": true,
+  "source_sha256_after": "c9bee7777ff99c1632eabf64ffc46bbbea7970655f67902727a838a9c3ceb77b",
+  "source_unchanged": true
+}

@@ -1,0 +1,7 @@
+{
+  "exit_code": 0,
+  "start_local": "2026-10-31T13:04:24.4774884+07:00",
+  "end_local": "2026-10-31T13:08:56.0292558+07:00",
+  "elapsed_seconds": 271.552,
+  "command": "cargo build --locked --offline --lib -j1"
+}

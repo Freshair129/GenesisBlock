@@ -1,0 +1,6 @@
+{
+  "status": "not_applied_pending_runtime_reproducer_and_RED",
+  "base_lib_sha256": "812afdbe74e96aee4f0c08b93488dda4ac5a6c0e4784b72bb9f615d30c7877a9",
+  "candidate_lib_sha256": "5b8bb9bed5dde5fa6e7d4d255da3acce6c1bfe892092456133adb65a78998fdd",
+  "risk": "MEDIUM; publication maintenance and explicit post-commit error; no persistence format or API signature changes"
+}

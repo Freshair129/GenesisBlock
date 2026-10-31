@@ -1,0 +1,15 @@
+
+running 10 tests
+test dynamic_property_names_use_typed_hydration_and_preserve_presence ... ok
+test edge_scan_filters_relations_and_returns_revision_bound_entities ... ok
+test entity_identity_fields_and_properties_use_typed_projection ... ok
+test hql_and_ir_source_scans_match_independent_p7_bags ... ok
+test label_filtered_scan_charges_payload_before_loading_it ... ok
+test node_scan_filters_labels_and_returns_revision_bound_entities ... ok
+test row_scan_rejects_a_selected_frontier_below_its_history_floor ... ok
+test row_scan_rejects_tables_outside_the_authorized_catalog ... ok
+test row_scan_returns_registry_identity_from_the_same_revision_projection ... ok
+test unmatched_left_join_entity_fields_and_properties_propagate_null ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.47s
+

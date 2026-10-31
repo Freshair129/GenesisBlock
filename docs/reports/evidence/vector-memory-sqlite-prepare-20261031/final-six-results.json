@@ -1,0 +1,74 @@
+{
+  "source": "5b8bb9bed5dde5fa6e7d4d255da3acce6c1bfe892092456133adb65a78998fdd",
+  "tests": "e69dc7dd5cbc5043aa5ed9c717e449e50246a8fbd8ad56ac95ed135718c99be2",
+  "per_target_cap_s": 300,
+  "per_target_rss_cap_bytes": 4294967296,
+  "targets": [
+    {
+      "target": "concurrency-d39b1179de3f2047.exe",
+      "args": [
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 345182208,
+      "seconds": 67.177,
+      "log": "final-runtime-fresh-20261031T213000\\concurrency-d39b1179de3f2047.log"
+    },
+    {
+      "target": "consensus_checkpoint_race_tests-4028d1334adb472a.exe",
+      "args": [
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 19947520,
+      "seconds": 41.522,
+      "log": "final-runtime-fresh-20261031T213000\\consensus_checkpoint_race_tests-4028d1334adb472a.log"
+    },
+    {
+      "target": "hql_cypher_tests-0a96672a3c154a17.exe",
+      "args": [
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 326811648,
+      "seconds": 155.21,
+      "log": "final-runtime-fresh-20261031T213000\\hql_cypher_tests-0a96672a3c154a17.log"
+    },
+    {
+      "target": "journal_format_tests-db402d7edf72c286.exe",
+      "args": [
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 108347392,
+      "seconds": 27.344,
+      "log": "final-runtime-fresh-20261031T213000\\journal_format_tests-db402d7edf72c286.log"
+    },
+    {
+      "target": "rebuild_from_truth_tests-466f03d07e0264b0.exe",
+      "args": [
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 117379072,
+      "seconds": 58.174,
+      "log": "final-runtime-fresh-20261031T213000\\rebuild_from_truth_tests-466f03d07e0264b0.log"
+    },
+    {
+      "target": "wal_compaction_tests-a811d805cfcd8a3f.exe",
+      "args": [
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 59731968,
+      "seconds": 20.697,
+      "log": "final-runtime-fresh-20261031T213000\\wal_compaction_tests-a811d805cfcd8a3f.log"
+    }
+  ]
+}

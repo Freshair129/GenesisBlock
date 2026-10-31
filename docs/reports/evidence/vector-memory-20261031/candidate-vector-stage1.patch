@@ -1,0 +1,283 @@
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -242,6 +242,8 @@
+ mod journal_authorization_budget_tests;
+ #[cfg(test)]
+ mod projection_rebuild_tests;
++#[cfg(test)]
++mod vector_memory_tests;
+ 
+ // --- Types (PROTOCOL §3) ---
+ 
+@@ -1519,23 +1521,31 @@
+     pub ef_search: Option<u32>,
+     /// Whether this (quantized) collection keeps an f32 sidecar for exact rerank.
+     pub rerank: bool,
+-    /// Ops/credibility (P2c): resident (RAM) bytes held by the exact-f32 rerank
+-    /// sidecar. **≈0 post-P0**: the sidecar is on-disk (`fvec_<name>.bin`) behind a
+-    /// positioned-read `SidecarReader`, not a resident `Vec<f32>`, so its vector
+-    /// data consumes no heap. This field exists to PROVE the P0 RAM win (see
+-    /// docs/RCA--VECTOR-QUANTIZATION.md); a non-zero value here would mean the
+-    /// resident-sidecar regression came back. (`i64` not `u64`: byte counts fit a
+-    /// JS-safe integer and NAPI maps `i64`→JS number; `u64` would force BigInt.)
++    /// Legacy full-file sidecar residency (0 for the positioned-read backing).
++    /// Excludes the bounded decoded-row cache: see `sidecar_cache_bytes`.
++    /// This is not process RSS or filesystem page-cache residency.
+     pub sidecar_resident_bytes: i64,
++    /// Allocated f32 row payload in the bounded sidecar cache (capacity * 4).
++    /// Excludes HashMap/VecDeque bookkeeping and transient caller-owned clones.
++    #[serde(default)]
++    pub sidecar_cache_bytes: i64,
+     /// Ops/credibility (P2c): on-disk bytes of the rerank sidecar
+     /// (`len_rows * dim * 4`), i.e. where the exact-f32 vectors actually live now.
+     /// `0` when the collection has no sidecar. Shows RAM → disk is where the bytes
+     /// went, not that they vanished.
+     pub sidecar_disk_bytes: i64,
+-    /// Ops/credibility (P2c): resident (RAM) bytes of this collection's vector
+-    /// arena (`arena.byte_size()` — f32=4B/elem, SQ8=1B/elem, BQ=1bit/elem).
+-    /// Context for the residency story: this is the RAM the quantized arena costs.
++    /// Legacy logical arena payload (length * element width), not physical RSS.
++    /// Excludes spare capacity; overlaps `arena_allocated_bytes`, so do not add them.
+     pub arena_resident_bytes: i64,
++    /// Arena Vec allocation (capacity * element width), excluding allocator overhead.
++    /// Allocated capacity is not a measurement of physically resident pages.
++    #[serde(default)]
++    pub arena_allocated_bytes: i64,
++    /// HNSW vector payload only: indexed points * per-row element bytes. F16 uses
++    /// f32 here; BQ rounds dim up to u64 words. Excludes graph links, point/table
++    /// allocations and allocator overhead: this is a lower bound, not total HNSW RAM.
++    #[serde(default)]
++    pub hnsw_vector_bytes: i64,
+     /// Ops/credibility (P2c): engine-global async-indexing backlog
+     /// (`Storage::index_lag()`) — vectors staged into the arena but not yet
+     /// inserted into HNSW. Not per-collection (one indexing thread serves all
+@@ -3631,7 +3641,7 @@
+             ArenaStore::F16(v) => v.len(),
+         }
+     }
+-    /// Actual heap bytes consumed by the vector data.
++    /// Logical vector payload bytes; excludes spare Vec capacity and overhead.
+     pub fn byte_size(&self) -> usize {
+         match self {
+             ArenaStore::F32(v) => v.len() * 4,
+@@ -3640,6 +3650,15 @@
+             ArenaStore::F16(v) => v.len() * 2,
+         }
+     }
++    /// Vec allocation bytes, including spare capacity, excluding allocator overhead.
++    pub fn allocated_bytes(&self) -> usize {
++        match self {
++            ArenaStore::F32(v) => v.capacity() * 4,
++            ArenaStore::U8 { data, .. } => data.capacity(),
++            ArenaStore::Binary { data, .. } => data.capacity() * 8,
++            ArenaStore::F16(v) => v.capacity() * 2,
++        }
++    }
+     pub fn is_empty(&self) -> bool {
+         self.len() == 0
+     }
+@@ -3649,13 +3668,6 @@
+         if let ArenaStore::U8 { scale, bias, .. } = self {
+             *scale = s;
+             *bias = b;
+-        }
+-    }
+-    /// This arena's SQ8 (scale, bias), or `SQ8_FIXED` for non-U8 arenas.
+-    fn sq8_scale(&self) -> (f32, f32) {
+-        match self {
+-            ArenaStore::U8 { scale, bias, .. } => (*scale, *bias),
+-            _ => SQ8_FIXED,
+         }
+     }
+     /// Append a prepared f32 vector, quantizing per mode. `center` is the BQ
+@@ -3727,15 +3739,33 @@
+             _ => {} // a collection never mixes variants
+         }
+     }
+-    /// Raw little-endian bytes for the `vec_<name>.bin` snapshot.
+-    fn to_bytes(&self) -> Vec<u8> {
++    /// Stream the existing little-endian snapshot layout with at most 8 KiB of
++    /// encoding scratch. No full-arena byte Vec, unsafe cast or file-format change.
++    fn write_bytes(&self, writer: &mut impl std::io::Write) -> std::io::Result<()> {
++        fn encoded<T, const N: usize>(
++            values: &[T],
++            writer: &mut impl std::io::Write,
++            encode: impl Fn(&T) -> [u8; N],
++        ) -> std::io::Result<()> {
++            let mut buffer = [0u8; 8192];
++            for chunk in values.chunks(buffer.len() / N) {
++                for (value, bytes) in chunk.iter().zip(buffer.chunks_exact_mut(N)) {
++                    bytes.copy_from_slice(&encode(value));
++                }
++                writer.write_all(&buffer[..chunk.len() * N])?;
++            }
++            Ok(())
++        }
+         match self {
+-            ArenaStore::F32(v) => {
+-                unsafe { std::slice::from_raw_parts(v.as_ptr() as *const u8, v.len() * 4) }.to_vec()
+-            }
+-            ArenaStore::U8 { data, .. } => data.clone(),
+-            ArenaStore::Binary { data, .. } => data.iter().flat_map(|w| w.to_le_bytes()).collect(),
+-            ArenaStore::F16(v) => v.iter().flat_map(|b| b.to_le_bytes()).collect(),
++            ArenaStore::F32(v) => encoded(v, writer, |v| v.to_le_bytes()),
++            ArenaStore::U8 { data, .. } => {
++                for chunk in data.chunks(8192) {
++                    writer.write_all(chunk)?;
++                }
++                Ok(())
++            }
++            ArenaStore::Binary { data, .. } => encoded(data, writer, |v| v.to_le_bytes()),
++            ArenaStore::F16(v) => encoded(v, writer, |v| v.to_le_bytes()),
+         }
+     }
+     fn from_bytes(data: &[u8], q: Quant, dim: usize) -> Self {
+@@ -4054,6 +4084,16 @@
+ }
+ 
+ impl SidecarReader {
++    /// Allocated decoded-row payload only; excludes cache container overhead and
++    /// caller-owned copies. Taking this metric never reads or populates the file.
++    pub fn cache_bytes(&self) -> usize {
++        self.cache
++            .lock()
++            .map
++            .values()
++            .map(|row| row.capacity() * 4)
++            .sum()
++    }
+     /// `pub` (not just `pub(crate)`) so `tests/*.rs` integration crates — which
+     /// link against this crate as an external dependency — can construct a
+     /// reader directly against a hand-written `fvec_<name>.bin` fixture. Query
+@@ -4486,22 +4526,39 @@
+     fn rehydrate(&self, ef_c: usize) {
+         let meta = self.metadata.read();
+         if meta.is_empty() {
++            // Compaction may have removed the final row. Retaining the old graph
++            // here would keep every old vector/link allocated and fail coverage.
++            *self.hnsw.write() = None;
++            *self.coverage.write() = None;
+             return;
+         }
+         let index = VecIndex::build(self.quant, ef_c, meta.len());
+         let arena = self.arena.read();
+-        // SQ8: re-quantize with the ARENA's own scale (what f32_at just dequantized
+-        // with), so the rehydrated HNSW codes match the arena exactly.
+-        let sq8 = arena.sq8_scale();
+         for m in meta.iter() {
+             let start = m.embedding_offset as usize;
+             let len = m.vector_dim as usize;
+             if start + len <= arena.len() {
+-                let v = arena.f32_at(start, len);
+-                // The arena already holds centered BQ codes; `f32_at` returns them
+-                // as ±1, so re-packing must NOT center again (pass `None`) — the
+-                // sign of ±1 reproduces the stored centered code exactly.
+-                index.insert_f32(&v, m.arena_id as usize, None, sq8);
++                let id = m.arena_id as usize;
++                // insert copies its input before returning (hnsw_rs 0.3.4).
++                // Borrow only while the arena guard is held; no shared lifetime.
++                match (&index, &*arena) {
++                    (VecIndex::F32(h), ArenaStore::F32(data)) => {
++                        h.insert((&data[start..start + len], id))
++                    }
++                    (VecIndex::U8(h), ArenaStore::U8 { data, .. }) => {
++                        h.insert((&data[start..start + len], id))
++                    }
++                    (VecIndex::Binary(h), ArenaStore::Binary { data, dim, .. }) => {
++                        let words = bq_words(*dim);
++                        let offset = (start / *dim) * words;
++                        h.insert((&data[offset..offset + words], id));
++                    }
++                    (VecIndex::F16(h), ArenaStore::F16(_)) => {
++                        // Decode f16 once; hnsw_rs still owns an f32 point copy.
++                        h.insert((&arena.f32_at(start, len), id));
++                    }
++                    _ => unreachable!("index and arena quantization must agree"),
++                }
+             }
+         }
+         *self.hnsw.write() = Some(index);
+@@ -4600,15 +4657,21 @@
+     /// `Storage::list_collections()` so every entry carries it — `info()` lives on
+     /// the collection and has no view of the Storage-wide indexing backlog.
+     fn info(&self, index_lag: u32) -> CollectionInfo {
+-        // Sidecar is ON DISK post-P0: its vector data is not resident, so resident
+-        // bytes are 0. On-disk bytes = live rows * dim * 4 (fixed dim).
+-        let (sidecar_resident_bytes, sidecar_disk_bytes) = match &self.f32_sidecar {
+-            Some(s) => {
+-                let rows = s.read().len_rows() as i64;
+-                (0i64, rows * (self.dim as i64) * 4)
+-            }
+-            None => (0i64, 0i64),
+-        };
++        // Preserve legacy full-file residency semantics and report the bounded
++        // cache separately. Neither value is process RSS.
++        let (sidecar_resident_bytes, sidecar_disk_bytes, sidecar_cache_bytes) =
++            match &self.f32_sidecar {
++                Some(s) => {
++                    let reader = s.read();
++                    let rows = reader.len_rows() as i64;
++                    (
++                        0i64,
++                        rows * (self.dim as i64) * 4,
++                        reader.cache_bytes() as i64,
++                    )
++                }
++                None => (0i64, 0i64, 0i64),
++            };
+         let indexed = self
+             .hnsw
+             .read()
+@@ -4616,6 +4679,12 @@
+             .map(|h| h.point_count() as u32)
+             .unwrap_or(0);
+         let coverage = self.coverage_report(index_lag);
++        let row_bytes = match self.quant {
++            Quant::None | Quant::F16 => self.dim as usize * 4,
++            Quant::ScalarU8 => self.dim as usize,
++            Quant::Binary => bq_words(self.dim as usize) * 8,
++        };
++        let arena = self.arena.read();
+ 
+         CollectionInfo {
+             name: self.name.clone(),
+@@ -4628,8 +4697,11 @@
+             ef_search: self.ef_search,
+             rerank: self.f32_sidecar.is_some(),
+             sidecar_resident_bytes,
++            sidecar_cache_bytes,
+             sidecar_disk_bytes,
+-            arena_resident_bytes: self.arena.read().byte_size() as i64,
++            arena_resident_bytes: arena.byte_size() as i64,
++            arena_allocated_bytes: arena.allocated_bytes() as i64,
++            hnsw_vector_bytes: indexed as i64 * row_bytes as i64,
+             index_lag,
+             coverage,
+         }
+@@ -25984,11 +26056,12 @@
+         for c in self.collections.iter() {
+             let coll = c.value();
+             let arena = coll.arena.read();
+-            fs::write(
+-                temp_dir.join(format!("vec_{}.bin", coll.name)),
+-                arena.to_bytes(),
+-            )
+-            .map_err(|e| Error::from_reason(e.to_string()))?;
++            let mut arena_file = File::create(temp_dir.join(format!("vec_{}.bin", coll.name)))
++                .map_err(|e| Error::from_reason(e.to_string()))?;
++            arena
++                .write_bytes(&mut arena_file)
++                .map_err(|e| Error::from_reason(e.to_string()))?;
++            drop(arena_file);
+             let meta = coll.metadata.read();
+             let meta_data = encode_metadata_snapshot(&meta)?;
+             fs::write(temp_dir.join(format!("meta_{}.bin", coll.name)), meta_data)
+@@ -28285,7 +28358,7 @@
+             let sidecar_guard = coll.f32_sidecar.as_ref().map(|s| s.write());
+             let dim = coll.dim as usize;
+ 
+-            let mut new_meta = Vec::with_capacity(live_nodes.len());
++            let mut new_meta = Vec::with_capacity(meta_arena.len().min(live_nodes.len()));
+             let mut new_vec = ArenaStore::new(coll.quant, coll.dim as usize);
+             // Old arena row indices of the survivors, in new-arena order.
+             let mut surviving_old_rows: Vec<usize> = Vec::new();

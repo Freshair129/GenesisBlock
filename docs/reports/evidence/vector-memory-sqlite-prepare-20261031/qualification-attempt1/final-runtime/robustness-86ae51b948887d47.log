@@ -1,0 +1,17 @@
+
+running 12 tests
+test concurrent_save_state ... ok
+test emoji_in_props ... ok
+test empty_edge_rel ... ok
+test empty_node_id ... ok
+test huge_vector_wrong_dim ... ok
+test large_props_100kb ... ok
+test missing_labels ... ok
+test null_props_fields ... ok
+test special_chars_in_id ... ok
+test unicode_thai_node ... ok
+test very_long_id ... ok
+test zero_dim_vector ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.53s
+

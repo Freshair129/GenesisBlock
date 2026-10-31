@@ -1,0 +1,201 @@
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1823,21 +1823,23 @@
+ 
+ #[derive(Default)]
+ struct CompactedBaseMaterializationProofs {
+-    nodes: HashMap<String, SignedEvent>,
+-    edges: HashMap<String, SignedEvent>,
+-    vectors: HashMap<String, SignedEvent>,
++    // A transaction can justify thousands of leaves. Share its immutable source
++    // in memory; the public SignedEvent and encoded proof envelopes stay owned.
++    nodes: HashMap<String, Arc<SignedEvent>>,
++    edges: HashMap<String, Arc<SignedEvent>>,
++    vectors: HashMap<String, Arc<SignedEvent>>,
+ }
+ 
+ #[derive(Default)]
+ struct CompactedMasterAuthorityProofs {
+-    master_nodes: HashMap<String, SignedEvent>,
+-    user_nodes: HashMap<String, (NodeOutput, SignedEvent)>,
+-    retractions: HashMap<String, SignedEvent>,
+-    master_vectors: HashMap<(String, String), SignedEvent>,
++    master_nodes: HashMap<String, Arc<SignedEvent>>,
++    user_nodes: HashMap<String, (NodeOutput, Arc<SignedEvent>)>,
++    retractions: HashMap<String, Arc<SignedEvent>>,
++    master_vectors: HashMap<(String, String), Arc<SignedEvent>>,
+ }
+ 
+ enum CompactedMasterIdentityAction {
+-    Node(Box<NodeOutput>, Box<SignedEvent>),
++    Node(Box<NodeOutput>, Arc<SignedEvent>),
+     Retraction(NodeRetractionEvent),
+ }
+ 
+@@ -29004,10 +29006,10 @@
+         fn record_vector_source(
+             owner_id: &str,
+             collection: Option<&str>,
+-            proof: &SignedEvent,
++            proof: &Arc<SignedEvent>,
+             default_collection: &str,
+             order: &mut u64,
+-            latest: &mut HashMap<(String, String), (u64, SignedEvent)>,
++            latest: &mut HashMap<(String, String), (u64, Arc<SignedEvent>)>,
+         ) {
+             *order = order.saturating_add(1);
+             latest.insert(
+@@ -29021,10 +29023,10 @@
+ 
+         fn record_vector_sources(
+             event: &Event,
+-            proof: &SignedEvent,
++            proof: &Arc<SignedEvent>,
+             default_collection: &str,
+             order: &mut u64,
+-            latest: &mut HashMap<(String, String), (u64, SignedEvent)>,
++            latest: &mut HashMap<(String, String), (u64, Arc<SignedEvent>)>,
+         ) {
+             match event {
+                 Event::Vector(vector) | Event::VectorMaterialized(vector) => {
+@@ -29082,7 +29084,7 @@
+ 
+         fn record_actions(
+             event: &Event,
+-            proof: &SignedEvent,
++            proof: &Arc<SignedEvent>,
+             order: &mut u64,
+             latest: &mut HashMap<String, (u64, CompactedMasterIdentityAction)>,
+         ) {
+@@ -29151,7 +29153,7 @@
+                             &node.id,
+                             CompactedMasterIdentityAction::Node(
+                                 Box::new(node.clone()),
+-                                Box::new(proof.clone()),
++                                Arc::clone(proof),
+                             ),
+                             order,
+                             latest,
+@@ -29198,7 +29200,7 @@
+                                     *order,
+                                     CompactedMasterIdentityAction::Node(
+                                         Box::new(node.clone()),
+-                                        Box::new(proof.clone()),
++                                        Arc::clone(proof),
+                                     ),
+                                 ),
+                             );
+@@ -29219,8 +29221,8 @@
+             }
+         }
+ 
+-        let mut latest_proofs: HashMap<String, (u64, SignedEvent)> = HashMap::new();
+-        let mut latest_master_vectors: HashMap<(String, String), (u64, SignedEvent)> =
++        let mut latest_proofs: HashMap<String, (u64, Arc<SignedEvent>)> = HashMap::new();
++        let mut latest_master_vectors: HashMap<(String, String), (u64, Arc<SignedEvent>)> =
+             HashMap::new();
+         let mut vector_source_order = 0u64;
+         let mut latest_actions: HashMap<String, (u64, CompactedMasterIdentityAction)> =
+@@ -29247,6 +29249,7 @@
+             let Some(proof) = proof else {
+                 return;
+             };
++            let proof = Arc::new(proof);
+             record_vector_sources(
+                 &proof.event,
+                 &proof,
+@@ -29328,7 +29331,7 @@
+                 {
+                     proofs
+                         .user_nodes
+-                        .insert(node.id.clone(), ((**proof_node).clone(), (**proof).clone()));
++                        .insert(node.id.clone(), ((**proof_node).clone(), Arc::clone(proof)));
+                 }
+                 Some(_) => missing.push(format!(
+                     "MASTER-authorized USER transition for node {}",
+@@ -29378,6 +29381,7 @@
+             {
+                 return;
+             }
++            let proof = Arc::new(proof);
+             let Event::Transaction(transaction) = &proof.event else {
+                 return;
+             };
+@@ -29425,7 +29429,7 @@
+                 baseline.embedding = None;
+                 let event = Event::Node(baseline);
+                 if let Some(proof) = self.schema6_migration_revision_proof_for(&event)? {
+-                    proofs.nodes.insert(node.id.clone(), proof);
++                    proofs.nodes.insert(node.id.clone(), Arc::new(proof));
+                 }
+             }
+             for entry in self.edges.iter() {
+@@ -29435,7 +29439,7 @@
+                 }
+                 let event = Event::Edge(edge.clone());
+                 if let Some(proof) = self.schema6_migration_revision_proof_for(&event)? {
+-                    proofs.edges.insert(edge.id.clone(), proof);
++                    proofs.edges.insert(edge.id.clone(), Arc::new(proof));
+                 }
+             }
+         }
+@@ -29506,7 +29510,7 @@
+             let signed = self.sign_compacted_master_materialization(
+                 &event,
+                 proof,
+-                base_proofs.nodes.get(id),
++                base_proofs.nodes.get(id).map(Arc::as_ref),
+             )?;
+             let json =
+                 serde_json::to_vec(&signed).map_err(|e| Error::from_reason(e.to_string()))?;
+@@ -29610,7 +29614,7 @@
+                     materializations.push(self.sign_compacted_master_materialization(
+                         &transition_event,
+                         master_proof,
+-                        base_proofs.nodes.get(&node.id),
++                        base_proofs.nodes.get(&node.id).map(Arc::as_ref),
+                     )?);
+                     if !node_base_projection_matches_proof(&node, &transition) {
+                         if node.clock <= transition.clock {
+@@ -29619,7 +29623,7 @@
+                                 node.id
+                             )));
+                         }
+-                        let proof = base_proofs.nodes.get(&node.id);
++                        let proof = base_proofs.nodes.get(&node.id).map(Arc::as_ref);
+                         let current_source = proof
+                             .and_then(|proof| find_base_proof_node(&proof.event, &node))
+                             .ok_or_else(|| {
+@@ -29635,7 +29639,7 @@
+                             .push(self.sign_compacted_base_materialization(&event, proof)?);
+                     }
+                 } else {
+-                    let proof = base_proofs.nodes.get(&node.id);
++                    let proof = base_proofs.nodes.get(&node.id).map(Arc::as_ref);
+                     let mut source = proof
+                         .and_then(|proof| find_base_proof_node(&proof.event, &node))
+                         .ok_or_else(|| {
+@@ -29673,7 +29677,7 @@
+             };
+             if keep {
+                 let event = Event::Edge(edge.clone());
+-                let proof = base_proofs.edges.get(&edge.id);
++                let proof = base_proofs.edges.get(&edge.id).map(Arc::as_ref);
+                 let signed = self.sign_compacted_base_materialization(&event, proof)?;
+                 let json = serde_json::to_string(&signed)
+                     .map_err(|error| Error::from_reason(error.to_string()))?;
+@@ -29732,12 +29736,13 @@
+                     arena.f32_at(m.embedding_offset as usize, m.vector_dim as usize)
+                 };
+                 let vector_id = Self::vector_revision_record_id(&node.id, &c.name)?;
+-                let proof = base_proofs.vectors.get(&vector_id);
++                let proof = base_proofs.vectors.get(&vector_id).map(Arc::as_ref);
+                 let master_proof = if Self::labels_are_master(&node.labels) {
+                     Some(
+                         authority_proofs
+                             .master_vectors
+                             .get(&(node.id.clone(), c.name.clone()))
++                            .map(Arc::as_ref)
+                             .ok_or_else(|| {
+                                 Error::from_reason(format!(
+                                     "COMPACTION_MASTER_AUTHORITY_PROOF_MISSING: vector mapping {}/{}",

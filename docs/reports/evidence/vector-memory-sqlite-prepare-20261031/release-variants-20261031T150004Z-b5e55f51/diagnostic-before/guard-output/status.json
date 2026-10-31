@@ -1,0 +1,844 @@
+{
+  "exit": 0,
+  "reason": "monitor_error",
+  "seconds": 592.087509,
+  "peak_rss": 2102841344,
+  "peak_private": 2294820864,
+  "identities": [
+    {
+      "ProcessId": 9256,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:00:45.112547+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 13344,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:06:24.645015+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 10436,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:01:57.745178+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 31300,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:01:51.681544+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 37620,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:04:50.269043+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 20676,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:01:01.248504+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 37420,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:03:03.46311+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 26976,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:02:27.70476+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 8260,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:03:50.14648+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 28156,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:00:30.965483+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 19288,
+      "ParentProcessId": 21268,
+      "CreationDate": "2026-10-31T22:00:29.573207+07:00",
+      "Name": "cargo.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.cargo\\bin\\cargo.exe"
+    },
+    {
+      "ProcessId": 32880,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:02:25.658726+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 37184,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:05:28.989283+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 37212,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:04:51.659496+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 25588,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:06:22.541078+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 33664,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:01:49.547379+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 32388,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:04:58.672829+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 36812,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:05:15.459433+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 11200,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:01:49.285645+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 29520,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:02:46.636713+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 36592,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:03:10.070568+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 33456,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:01:38.905182+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 15528,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:05:21.611569+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 33452,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:03:54.930615+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 3768,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:04:48.84231+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 2324,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:00:55.955084+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 30948,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:06:14.135853+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 17848,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:04:02.742946+07:00",
+      "Name": "build-script-build.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 13352,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:03:05.383317+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 37188,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:02:45.467266+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 36596,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:01:46.812463+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 11576,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:02:21.56097+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 16500,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:04:56.18409+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 24764,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:03:15.959827+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 23984,
+      "ParentProcessId": 19288,
+      "CreationDate": "2026-10-31T22:00:29.582478+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 31468,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:04:07.567638+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 30896,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:05:13.632643+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 6644,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:06:33.007794+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 36388,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:05:06.739759+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 27128,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:00:43.096809+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 37764,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:02:41.802819+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 28440,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:01:43.28272+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 34016,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:02:00.150631+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 37364,
+      "ParentProcessId": 10436,
+      "CreationDate": "2026-10-31T22:01:58.827523+07:00",
+      "Name": "link.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 16480,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:02:02.525488+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 23152,
+      "ParentProcessId": 6644,
+      "CreationDate": "2026-10-31T22:10:04.946889+07:00",
+      "Name": "link.exe",
+      "ExecutablePath": "C:\\GenesisBlockW1Tools\\vs2022\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe"
+    },
+    {
+      "ProcessId": 668,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:02:33.964605+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 8392,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:02:22.563721+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 37544,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:00:49.208626+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 7204,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:01:54.069994+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 31936,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:04:52.238873+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 32812,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:02:38.498618+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 16364,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:02:51.210413+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 24336,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:02:48.230095+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 34860,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:03:50.96021+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 37336,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:01:44.931937+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 30444,
+      "ParentProcessId": 17848,
+      "CreationDate": "2026-10-31T22:04:02.761665+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 12904,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:00:51.704671+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 31224,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:03:36.23671+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 34220,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:04:54.240119+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 12828,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:06:25.538917+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 37408,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:03:58.491548+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 4664,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:06:13.207461+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 35788,
+      "ParentProcessId": 25680,
+      "CreationDate": "2026-10-31T22:10:19.448332+07:00",
+      "Name": "link.exe",
+      "ExecutablePath": "C:\\GenesisBlockW1Tools\\vs2022\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe"
+    },
+    {
+      "ProcessId": 15452,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:01:38.474545+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 13284,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:04:01.506477+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 18992,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:01:01.501693+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 37312,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:02:01.092698+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 21748,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:05:03.663925+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 23520,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:00:32.23857+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 35928,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:00:59.750908+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 8740,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:01:41.501495+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 25680,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:10:06.026869+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 31564,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:04:03.556063+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 26860,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:04:57.872443+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 37296,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:03:18.980753+07:00",
+      "Name": "build-script-build.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\release-target\\20261031T150004Z-b5e55f51\\release\\build\\libsqlite3-sys-e87f5b8e84d572cb\\build-script-build.exe"
+    },
+    {
+      "ProcessId": 652,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:00:54.973943+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 25276,
+      "ParentProcessId": 37296,
+      "CreationDate": "2026-10-31T22:03:19.013201+07:00",
+      "Name": "cl.exe",
+      "ExecutablePath": "C:\\GenesisBlockW1Tools\\vs2022\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\cl.exe"
+    },
+    {
+      "ProcessId": 27244,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:01:47.091029+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 24880,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:01:44.107+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 36896,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:06:20.085312+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 13452,
+      "ParentProcessId": 19288,
+      "CreationDate": "2026-10-31T22:00:29.63045+07:00",
+      "Name": "cargo.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\cargo.exe"
+    },
+    {
+      "ProcessId": 35976,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:05:30.278458+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 29800,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:06:30.570497+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 19752,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:03:04.973502+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 36496,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:01:18.828674+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 26644,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:02:43.621731+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 33340,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:02:36.950506+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 26700,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:06:21.617355+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 37868,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:03:46.499826+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 16348,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:01:08.433099+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 18756,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:02:28.726852+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 5556,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:04:55.072811+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 1612,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:05:02.436661+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 23084,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:03:09.569531+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 21704,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:03:45.785514+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 19044,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:02:50.66158+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 23868,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:00:37.938469+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 24440,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:02:30.212594+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 30760,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:03:43.226719+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 26500,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:05:01.354944+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 32136,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:02:04.911827+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 27588,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:06:11.730582+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 29088,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:01:09.254175+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 7112,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:02:31.236985+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 3368,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:03:49.58087+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 25628,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:00:40.574889+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 33072,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:06:32.433103+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 31796,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:02:25.358229+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 4544,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:00:53.90837+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 32320,
+      "ParentProcessId": 2324,
+      "CreationDate": "2026-10-31T22:00:58.86205+07:00",
+      "Name": "link.exe",
+      "ExecutablePath": "C:\\GenesisBlockW1Tools\\vs2022\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe"
+    },
+    {
+      "ProcessId": 24044,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:03:44.76434+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 18920,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:02:32.509805+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 17540,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:06:29.516896+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 37632,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:03:35.159333+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 37040,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:03:38.496579+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 30536,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:05:00.075322+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 19700,
+      "ParentProcessId": 13452,
+      "CreationDate": "2026-10-31T22:04:00.120612+07:00",
+      "Name": "build-script-build.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\release-target\\20261031T150004Z-b5e55f51\\release\\build\\unicode-general-category-b93bf77bf2f1b36a\\build-script-build.exe"
+    }
+  ],
+  "excluded_build_helpers": [],
+  "helper_finished_parent_condition": false,
+  "helper_scope": "Helpers are not terminated; successful Cargo completion and stopped tracked compiler clients are required before private-source edits. No shared source/target mutation.",
+  "admission_cpu": 8.909090909090908,
+  "admission_free": 19017531392.0,
+  "remaining": [],
+  "cleanup_complete": false,
+  "monitor_error": "The property 'Sum' cannot be found on this object. Verify that the property exists.",
+  "rss_scope": "tracked processes; compiler telemetry/daemon helpers excluded"
+}

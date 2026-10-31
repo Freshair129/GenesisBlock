@@ -1,0 +1,74 @@
+{
+  "exit": 0,
+  "reason": null,
+  "seconds": 41.2613106,
+  "peak_rss": 51638272,
+  "peak_private": 19369984,
+  "identities": [
+    {
+      "ProcessId": 16268,
+      "ParentProcessId": 31284,
+      "CreationDate": "2026-10-31T22:26:03.303912+07:00",
+      "Name": "sqlite-prepare-reproducer.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\reproducer-target\\release\\sqlite-prepare-reproducer.exe"
+    },
+    {
+      "ProcessId": 32348,
+      "ParentProcessId": 7340,
+      "CreationDate": "2026-10-31T22:25:44.698178+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 7340,
+      "ParentProcessId": 31284,
+      "CreationDate": "2026-10-31T22:25:44.690505+07:00",
+      "Name": "sqlite-prepare-reproducer.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\reproducer-target\\release\\sqlite-prepare-reproducer.exe"
+    },
+    {
+      "ProcessId": 19884,
+      "ParentProcessId": 31284,
+      "CreationDate": "2026-10-31T22:25:53.921475+07:00",
+      "Name": "sqlite-prepare-reproducer.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\reproducer-target\\release\\sqlite-prepare-reproducer.exe"
+    },
+    {
+      "ProcessId": 30576,
+      "ParentProcessId": 16268,
+      "CreationDate": "2026-10-31T22:26:03.315417+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 18520,
+      "ParentProcessId": 19884,
+      "CreationDate": "2026-10-31T22:25:53.929062+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 31284,
+      "ParentProcessId": 37868,
+      "CreationDate": "2026-10-31T22:25:41.384514+07:00",
+      "Name": "python.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\Python\\Python314\\python.exe"
+    },
+    {
+      "ProcessId": 35804,
+      "ParentProcessId": 31284,
+      "CreationDate": "2026-10-31T22:25:41.391893+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    }
+  ],
+  "excluded_build_helpers": [],
+  "helper_finished_parent_condition": true,
+  "helper_scope": "Helpers are not terminated; successful Cargo completion and stopped tracked compiler clients are required before private-source edits. No shared source/target mutation.",
+  "admission_cpu": 4.818181818181818,
+  "admission_free": 19073863680.0,
+  "remaining": [],
+  "cleanup_complete": true,
+  "monitor_error": null,
+  "rss_scope": "tracked owned process tree"
+}

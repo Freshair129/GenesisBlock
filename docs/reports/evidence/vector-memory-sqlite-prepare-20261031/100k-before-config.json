@@ -1,0 +1,9 @@
+{
+  "binary_path": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\diagnostic-before.exe",
+  "binary_sha256": "6af6471f1a80476cccc8f2fe50b5b3c11d4b95507167826d89bdaff79c61d5db",
+  "case_path": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\100k-cases\\before",
+  "input_path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\inputs\\synthetic-100000-1024",
+  "expected_engine_state": "error",
+  "expected_query0_state": "error",
+  "args": []
+}

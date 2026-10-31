@@ -1,0 +1,59 @@
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -13946,24 +13946,38 @@
+         // SQLite holds the destination write transaction until the backup
+         // reaches SQLITE_DONE. Dropping an unfinished rusqlite Backup calls
+         // sqlite3_backup_finish, which rolls that transaction back on errors.
+-        let backup = rusqlite::backup::Backup::new(source, &mut destination)
+-            .map_err(Self::projection_backup_error)?;
+-        loop {
+-            match backup.step(256).map_err(Self::projection_backup_error)? {
+-                rusqlite::backup::StepResult::Done => return Ok(()),
+-                rusqlite::backup::StepResult::More => {}
+-                rusqlite::backup::StepResult::Busy | rusqlite::backup::StepResult::Locked => {
+-                    return Err(Error::from_reason(
+-                        "PROJECTION_REBUILD_BUSY: projection publication could not acquire SQLite locks",
+-                    ));
+-                }
+-                _ => {
+-                    return Err(Error::from_reason(
+-                        "PROJECTION_REBUILD_FAILED: SQLite backup returned an unsupported step state",
+-                    ));
+-                }
+-            }
+-        }
++        {
++            let backup = rusqlite::backup::Backup::new(source, &mut destination)
++                .map_err(Self::projection_backup_error)?;
++            loop {
++                match backup.step(256).map_err(Self::projection_backup_error)? {
++                    rusqlite::backup::StepResult::Done => break,
++                    rusqlite::backup::StepResult::More => {}
++                    rusqlite::backup::StepResult::Busy | rusqlite::backup::StepResult::Locked => {
++                        return Err(Error::from_reason(
++                            "PROJECTION_REBUILD_BUSY: projection publication could not acquire SQLite locks",
++                        ));
++                    }
++                    _ => {
++                        return Err(Error::from_reason(
++                            "PROJECTION_REBUILD_FAILED: SQLite backup returned an unsupported step state",
++                        ));
++                    }
++                }
++            }
++        }
++        // Backup commits below SQLite's SQL executor and resets the schema.
++        // Its pending WAL hook would otherwise checkpoint the published pages
++        // during schema loading in the first query's prepare. Complete that
++        // maintenance here, after Backup::drop releases the destination handle.
++        // PASSIVE preserves pinned reader snapshots and accepts partial progress.
++        destination
++            .execute_batch("PRAGMA wal_checkpoint(PASSIVE);")
++            .map_err(|error| {
++                Error::from_reason(format!(
++                    "PROJECTION_CHECKPOINT_FAILED: projection publication committed; {error}"
++                ))
++            })
+     }
+ 
+     fn projection_backup_error(error: rusqlite::Error) -> Error {

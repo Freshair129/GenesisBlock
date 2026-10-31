@@ -1,0 +1,35 @@
+
+running 30 tests
+test committed_proposals_are_idempotent_after_restart_and_reimport ... ok
+test compacted_master_proof_does_not_replay_a_stale_nested_retraction ... ok
+test compacted_master_vectors_keep_authority_and_schema5_schema6_relay ... ok
+test compaction_keeps_later_user_update_after_master_declassification ... ok
+test compaction_preserves_master_signatures_for_nodes_and_retractions ... ok
+test consensus_quorum_uses_the_fixed_roster_not_discovered_peers ... ok
+test consensus_vote_cannot_be_replayed_for_a_different_event_under_the_same_id ... ok
+test consensus_vote_is_one_shot_and_identical_replays_are_idempotent ... ok
+test current_schema_accepts_authenticated_compacted_graph_materializations ... ok
+test durable_vote_locks_survive_restart_and_reject_stale_conflicting_signatures ... ok
+test exported_proposal_can_be_imported_and_voted_on_by_an_authorized_member ... ok
+test externally_injected_public_vote_entries_cannot_count_toward_quorum ... ok
+test late_membership_configuration_preflights_compacted_master_history ... ok
+test late_membership_configuration_preflights_replayed_journal ... ok
+test local_direct_writes_respect_master_authority_for_live_and_retracted_ids ... ok
+test local_peer_id_does_not_skip_signature_verification_and_batch_preflight_is_atomic ... ok
+test master_authority_covers_nested_batches_transactions_and_retractions ... ok
+test master_vector_mutations_require_authority_for_schema5_and_schema6 ... ok
+test membership_open_rejects_legacy_master_event_from_nonmaster_member ... ok
+test membership_open_rejects_legacy_master_event_from_unrostered_signer ... ok
+test membership_open_replays_legacy_master_event_from_authorized_member ... ok
+test reconcile_batch_cannot_downgrade_master_state_with_a_later_nonmaster_event ... ok
+test retracted_identity_cannot_be_resurrected_by_a_nonmaster_peer ... ok
+test roster_member_can_sync_ordinary_state_but_only_master_member_can_sync_master_state ... ok
+test roster_rejects_a_peer_id_that_does_not_match_its_key ... ok
+test schema6_consensus_rejects_malformed_revision_envelope_before_admission ... ok
+test schema6_consensus_rejects_raw_graph_events_before_voting ... ok
+test signed_gossip_requires_roster_identity_digest_and_pinned_endpoint ... ok
+test unknown_valid_signer_cannot_enter_sync_or_change_the_wal ... ok
+test vector_before_master_creation_in_same_batch_requires_master_authority ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.40s
+

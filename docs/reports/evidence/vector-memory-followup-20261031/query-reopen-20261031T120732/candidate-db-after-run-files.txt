@@ -1,0 +1,18 @@
+
+Name                      Length LastWriteTimeUtc
+----                      ------ ----------------
+edges_retired.bin              2 10/31/2026 3:17:21 AM
+edges.bin                      2 10/31/2026 3:17:21 AM
+genesis.lock                   0 10/31/2026 2:45:27 AM
+identity.bin                  32 10/31/2026 2:45:27 AM
+meta_bench.bin           2616662 10/31/2026 3:17:21 AM
+meta_default.bin               5 10/31/2026 3:17:21 AM
+nodes.bin               25227518 10/31/2026 3:17:21 AM
+projection.sqlite     9006981120 10/31/2026 3:17:20 AM
+projection.sqlite-shm      32768 10/31/2026 5:20:08 AM
+projection.sqlite-wal          0 10/31/2026 3:22:25 AM
+state.json                  2470 10/31/2026 3:18:52 AM
+vec_bench.bin           12800000 10/31/2026 3:17:21 AM
+vec_default.bin                0 10/31/2026 3:17:21 AM
+
+

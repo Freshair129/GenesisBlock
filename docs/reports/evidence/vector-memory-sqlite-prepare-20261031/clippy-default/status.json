@@ -1,0 +1,389 @@
+{
+  "exit": 0,
+  "reason": null,
+  "seconds": 100.6807208,
+  "peak_rss": 1068949504,
+  "peak_private": 1157136384,
+  "identities": [
+    {
+      "ProcessId": 20860,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:18.655356+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 36220,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:05.198148+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 25092,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:15.560187+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 33696,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:32.430052+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 27320,
+      "ParentProcessId": 13796,
+      "CreationDate": "2026-10-31T21:43:34.29422+07:00",
+      "Name": "cargo.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\cargo.exe"
+    },
+    {
+      "ProcessId": 8620,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:30.952732+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 20988,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:27.421628+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 32020,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:17.298794+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 17868,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:01.379098+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 25476,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:04.957385+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 30900,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:38.477213+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 19556,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:13.793026+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 27120,
+      "ParentProcessId": 23452,
+      "CreationDate": "2026-10-31T21:43:34.223966+07:00",
+      "Name": "cargo.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\cargo.exe"
+    },
+    {
+      "ProcessId": 18664,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:34.797966+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 32636,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:39.621398+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 35572,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:50.956427+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 28184,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:45.587343+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 4068,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:57.032963+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 25156,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:03.724124+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 30672,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:24.850239+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 17676,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:43:37.658736+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 33516,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:51.483533+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 37164,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:43.49603+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 23812,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:22.206469+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 36364,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:58.712738+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 5920,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:02.51178+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 23452,
+      "ParentProcessId": 11988,
+      "CreationDate": "2026-10-31T21:43:34.169361+07:00",
+      "Name": "cargo.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.cargo\\bin\\cargo.exe"
+    },
+    {
+      "ProcessId": 13344,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:53.451385+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 37848,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:40.691974+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 18680,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:48.407634+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 1996,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:08.779588+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 36616,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:47.2459+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 17560,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:11.221182+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 29672,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:12.514234+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 30544,
+      "ParentProcessId": 27120,
+      "CreationDate": "2026-10-31T21:43:34.253069+07:00",
+      "Name": "cargo-clippy.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.cargo\\bin\\cargo-clippy.exe"
+    },
+    {
+      "ProcessId": 23084,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:21.101102+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 26020,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:09.52879+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 16584,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:58.453401+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 33280,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:43:54.065784+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 6968,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:44.402856+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 19912,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:33.321442+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 7236,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:26.162827+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 33664,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:15.026422+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 31616,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:54.531878+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 29924,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:36.124679+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 27616,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:49.646574+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 7048,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:43:58.916893+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 25912,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:23.763761+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 33120,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:37.223049+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 13796,
+      "ParentProcessId": 30544,
+      "CreationDate": "2026-10-31T21:43:34.272693+07:00",
+      "Name": "cargo-clippy.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\cargo-clippy.exe"
+    },
+    {
+      "ProcessId": 8904,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:19.949719+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 19124,
+      "ParentProcessId": 27320,
+      "CreationDate": "2026-10-31T21:44:55.130805+07:00",
+      "Name": "clippy-driver.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\clippy-driver.exe"
+    },
+    {
+      "ProcessId": 1336,
+      "ParentProcessId": 23452,
+      "CreationDate": "2026-10-31T21:43:34.177393+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    }
+  ],
+  "excluded_build_helpers": [],
+  "helper_finished_parent_condition": true,
+  "helper_scope": "Helpers are not terminated; successful Cargo completion and stopped tracked compiler clients are required before private-source edits. No shared source/target mutation.",
+  "admission_cpu": 3.4545454545454546,
+  "admission_free": 18620686336.0,
+  "remaining": [],
+  "cleanup_complete": true,
+  "monitor_error": null,
+  "rss_scope": "tracked processes; compiler telemetry/daemon helpers excluded"
+}

@@ -1,0 +1,27 @@
+{
+  "pid": 35496,
+  "start": "2026-10-31T21:47:37.6624148+07:00",
+  "config": {
+    "kind": "functional_test",
+    "exe": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe",
+    "args": [
+      "C:\\Users\\suanr\\genesis-vector-memory-20261031\\verify-src\\scripts\\check-dts-freshness.mjs",
+      "C:\\Users\\suanr\\genesis-vector-memory-20261031\\verify-src",
+      "C:\\Users\\suanr\\genesis-vector-memory-20261031\\verify-src\\target\\sqlite-prepare-napi"
+    ],
+    "cwd": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\verify-src",
+    "output": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\dts-freshness",
+    "env": {
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_TARGET_DIR": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_BUILD_JOBS": "1"
+    },
+    "cap_seconds": 300
+  },
+  "query_deadline_ms": 5000,
+  "cap_seconds": 300,
+  "rss_cap": 2147483648,
+  "identity": "PID+CreationDate+path+name; require live matching parent and child born after root"
+}

@@ -1,0 +1,7 @@
+{
+  "at": "2026-10-31T19:31:00.5688080+07:00",
+  "old_waiting_driver": 22272,
+  "stopped": true,
+  "remaining": [],
+  "correction": "Previous stop request compared JSON-parsed DateTime to formatted string and did not match. Old process was only waiting, no tests ran. Verified commandline+birth interval before actual stop."
+}

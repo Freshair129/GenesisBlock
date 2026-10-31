@@ -1,0 +1,14 @@
+{
+  "exe": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\red-library-tests.exe",
+  "cwd": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\verify-src",
+  "cap_seconds": 300,
+  "output": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\red-run",
+  "env": {},
+  "args": [
+    "projection_rebuild_tests::first_read_does_not_run_deferred_publication_checkpoint",
+    "--exact",
+    "--nocapture",
+    "--test-threads=1"
+  ],
+  "kind": "functional_test"
+}

@@ -1,0 +1,23 @@
+
+running 18 tests
+test all_23_configs_decode_to_typed_owned_nodes ... ok
+test all_closed_enumerations_match_the_wire_spelling ... ok
+test all_nested_closed_objects_reject_extras_and_required_omissions ... ok
+test bounded_literal_json_does_not_impersonate_expression_nodes ... ok
+test dag_depth_is_longest_path_not_visit_order_and_limit_is_inclusive ... ok
+test dag_rejects_duplicate_cycle_missing_orphan_invalid_id_and_version ... ok
+test every_config_rejects_unknown_and_missing_required_fields_and_wrong_arity ... ok
+test expression_depth_is_checked_before_recursive_deserialization ... ok
+test expression_order_and_all_discriminators_survive_decoding ... ok
+test expression_variants_are_closed_recursively ... ok
+test nested_pattern_and_call_depth_limits_do_not_count_json_wrappers ... ok
+test node_limit_rejects_ten_thousand_and_one_before_traversal ... ok
+test patterns_validate_all_nested_shapes_and_bounds ... ok
+test scalar_bounds_and_symbols_reject_without_coercion ... ok
+test schema_examples_and_origin_boundary_remain_distinct_from_binding ... ok
+test ten_thousand_reachable_nodes_are_allowed ... ok
+test topological_order_is_deterministic_and_preserves_ordered_duplicate_inputs ... ok
+test very_deep_constructed_json_is_rejected_and_disposed_without_recursion ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+

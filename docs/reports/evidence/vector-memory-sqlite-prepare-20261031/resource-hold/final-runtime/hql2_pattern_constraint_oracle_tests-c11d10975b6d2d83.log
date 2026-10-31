@@ -1,0 +1,16 @@
+
+running 11 tests
+test constrained_single_step_expand_matches_hql_and_typed_ir ... ok
+test hql_and_typed_ir_sequence_id_and_labels_match_independent_p7_bag ... ok
+test hql_sequence_id_parameter_is_bound_as_utf8 ... ok
+test missing_ids_and_unmatched_properties_return_no_rows ... ok
+test optional_sequence_constraint_miss_preserves_input_and_null_extends_new_aliases ... ok
+test optional_sequence_edge_property_miss_matches_hql_typed_ir_and_p7 ... ok
+test optional_sequence_property_miss_matches_hql_typed_ir_and_p7 ... ok
+test sequence_label_snapshot_exhaustion_returns_no_partial_result ... ok
+test sequence_nested_json_properties_match_hql_typed_ir_and_p7_bag ... ok
+test sequence_node_and_edge_properties_match_independent_p7_bag ... ok
+test sequence_node_labels_filter_before_shortest_path_deduplication ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.68s
+

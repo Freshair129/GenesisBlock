@@ -1,0 +1,18 @@
+
+running 13 tests
+test add_edge ... ok
+test add_node_and_query ... ok
+test add_vector ... ok
+test bulk_nodes ... ok
+test create_and_list_collections ... ok
+test hql_body_limit ... ok
+test hql_raw_string ... ok
+test hybrid_search ... ok
+test malformed_json_returns_error ... ok
+test missing_required_field ... ok
+test query_edges ... ok
+test status_endpoint ... ok
+test version_endpoint ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.93s
+

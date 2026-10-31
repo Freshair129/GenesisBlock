@@ -1,0 +1,11 @@
+{
+  "env": {},
+  "output": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\matrix-isolated-guard-attempt2",
+  "exe": "C:\\Users\\suanr\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
+  "args": [
+    "-u",
+    "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\run-matrix.py",
+    "matrix-isolated"
+  ],
+  "cwd": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031"
+}

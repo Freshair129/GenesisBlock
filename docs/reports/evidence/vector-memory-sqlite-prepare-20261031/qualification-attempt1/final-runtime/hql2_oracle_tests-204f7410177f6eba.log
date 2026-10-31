@@ -1,0 +1,34 @@
+
+running 29 tests
+test p7_aggregates_skip_nulls_without_losing_duplicate_rows ... ok
+test p7_all_three_valued_truth_table_cells ... ok
+test p7_bounded_collect_errors_instead_of_silent_truncation ... ok
+test p7_checked_arithmetic_and_no_implicit_casts ... ok
+test p7_context_value_projects_and_compares_without_domain_ordering ... ok
+test p7_context_value_validates_budget_recursively_without_guessing_tokenizer ... ok
+test p7_declared_plan_depth_bound_is_enforced ... ok
+test p7_empty_global_aggregate_and_grouped_input_differ ... ok
+test p7_empty_right_outer_join_produces_one_null_extended_row ... ok
+test p7_entity_equality_keeps_namespace_kind_and_revision ... ok
+test p7_exhaustive_small_bag_join_cardinalities ... ok
+test p7_fields_and_optional_properties_are_distinct ... ok
+test p7_filter_and_topk_have_distinct_expected_answers ... ok
+test p7_filter_retains_true_only ... ok
+test p7_grouping_preserves_null_group_and_distinct_key_counts ... ok
+test p7_joins_preserve_duplicates_and_do_not_match_null_keys ... ok
+test p7_knn_preserves_bag_rows_until_explicit_distinct ... ok
+test p7_projection_replaces_scope_and_rejects_duplicate_outputs ... ok
+test p7_reference_rejects_nonfinite_fixture_values ... ok
+test p7_review_graph_equality_does_not_enable_domain_ordering ... ok
+test p7_review_knn_depth_excludes_internal_sort ... ok
+test p7_review_neg_dot_cancellation_preserves_distance_and_rank ... ok
+test p7_review_neg_dot_query_validation_does_not_score_self ... ok
+test p7_review_project_rejects_nested_nonfinite_literals ... ok
+test p7_sort_null_placement_independent_of_direction ... ok
+test p7_stable_ties_do_not_depend_on_input_permutation ... ok
+test p7_take_zero_and_offset_preserve_pipeline_order ... ok
+test p7_union_all_and_distinct_treat_null_as_duplicate_value ... ok
+test p7_vector_validation_happens_even_for_empty_input ... ok
+
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

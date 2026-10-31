@@ -1,0 +1,15 @@
+
+thread 'projection_rebuild_tests::checkpoint_failure_reports_already_committed_publication' (3812) panicked at src\projection_rebuild_tests.rs:421:24:
+called `Result::unwrap_err()` on an `Ok` value: ()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+publication_hook_calls=0 publication_frames=-1 publication_log_frames=-1 publication_checkpointed_frames=-1 first_read_hook_calls=1
+
+thread 'projection_rebuild_tests::first_read_does_not_run_deferred_publication_checkpoint' (27228) panicked at src\projection_rebuild_tests.rs:293:5:
+assertion `left == right` failed: first projection read ran the deferred default WAL checkpoint
+  left: 1
+ right: 0
+
+thread 'projection_rebuild_tests::passive_publication_checkpoint_preserves_active_reader_snapshot' (28152) panicked at src\projection_rebuild_tests.rs:379:5:
+assertion `left == right` failed: first live read after releasing the old snapshot ran a deferred checkpoint
+  left: 1
+ right: 0

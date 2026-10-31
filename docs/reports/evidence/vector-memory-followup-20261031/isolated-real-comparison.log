@@ -1,0 +1,272 @@
+{
+  "recorded_at": "2026-10-31T14:47:49.730663+07:00",
+  "run": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\followuproot\\vector-real-release-controller\\runs\\real-bge-release-pair-20261031T073308Z",
+  "status": "complete",
+  "scope": "one serial real-embedding F32 pair; 24 fixed queries; not statistical tail or semantic-label qualification",
+  "vector_files": {
+    "baseline": {
+      "bytes": 46145536,
+      "sha256": "f83b5bc3b3d1057f01114196cd37ac95ecbeefe2f04ad0168d723e0860af3133"
+    },
+    "candidate": {
+      "bytes": 46145536,
+      "sha256": "f83b5bc3b3d1057f01114196cd37ac95ecbeefe2f04ad0168d723e0860af3133"
+    }
+  },
+  "vector_bytes_equal": true,
+  "comparison": {
+    "ingest_s": {
+      "before": 64.1108434,
+      "after": 63.0799539,
+      "delta_percent": -1.6079799380708137
+    },
+    "rebuild_s": {
+      "before": 42.4539875,
+      "after": 42.2376563,
+      "delta_percent": -0.5095662686573244
+    },
+    "compaction_s": {
+      "before": 42.7543074,
+      "after": 42.4131372,
+      "delta_percent": -0.7979785447302046
+    },
+    "snapshot_s": {
+      "before": 8.6304449,
+      "after": 8.5743065,
+      "delta_percent": -0.6504693634044267
+    },
+    "reopen_s": {
+      "before": 97.9501003,
+      "after": 96.0168424,
+      "delta_percent": -1.9737171213493943
+    },
+    "fresh_read_only_reopen_s": {
+      "before": 69.2539527,
+      "after": 68.5096995,
+      "delta_percent": -1.074672521905029
+    },
+    "ingest_peak_rss_bytes": {
+      "before": 344154112,
+      "after": 346988544,
+      "delta_percent": 0.8235938206660132
+    },
+    "rebuild_peak_rss_bytes": {
+      "before": 251387904,
+      "after": 254230528,
+      "delta_percent": 1.1307719881382905
+    },
+    "compaction_peak_rss_bytes": {
+      "before": 256299008,
+      "after": 265457664,
+      "delta_percent": 3.573426238153843
+    },
+    "snapshot_peak_rss_bytes": {
+      "before": 202145792,
+      "after": 204357632,
+      "delta_percent": 1.094180580320958
+    },
+    "reopen_peak_rss_bytes": {
+      "before": 352120832,
+      "after": 358457344,
+      "delta_percent": 1.7995277257552234
+    },
+    "search10_p50_us": {
+      "before": 4165.5,
+      "after": 4184.5,
+      "delta_percent": 0.45612771576042377
+    },
+    "search10_p95_us": {
+      "before": 4540.299999999999,
+      "after": 4655.900000000001,
+      "delta_percent": 2.5460872629562203
+    },
+    "search10_p99_us": {
+      "before": 4689.8,
+      "after": 4676.8,
+      "delta_percent": -0.2771973218474111
+    },
+    "search100_p50_us": {
+      "before": 5876.700000000001,
+      "after": 6321.6,
+      "delta_percent": 7.570575322885276
+    },
+    "search100_p95_us": {
+      "before": 6435.7,
+      "after": 6916.5,
+      "delta_percent": 7.470826794288121
+    },
+    "search100_p99_us": {
+      "before": 6631.9,
+      "after": 6971.7,
+      "delta_percent": 5.123720200847415
+    },
+    "search10_recall": {
+      "before": 0.975,
+      "after": 0.975,
+      "delta_percent": 0.0
+    },
+    "search100_recall": {
+      "before": 0.9783333333333334,
+      "after": 0.9783333333333334,
+      "delta_percent": 0.0
+    },
+    "reopen_search10_recall": {
+      "before": 0.9791666666666666,
+      "after": 0.9833333333333333,
+      "delta_percent": 0.42553191489360653
+    },
+    "disk_bytes": {
+      "before": 1501142299,
+      "after": 1501160987,
+      "delta_percent": 0.001244918620479929
+    }
+  },
+  "jobs": {
+    "baseline": {
+      "status": "complete",
+      "elapsed_seconds": 345.914,
+      "admission": {
+        "sample_count": 11,
+        "observed_window_seconds": 10,
+        "average_total_cpu_percent": 11.090909090909092,
+        "minimum_free_physical_bytes": 18922319872,
+        "cpu_gate_passed": true,
+        "memory_gate_passed": true,
+        "samples": [
+          {
+            "at_utc": "2026-10-31T07:33:16.9336783Z",
+            "total_cpu_percent": 14.0,
+            "free_physical_bytes": 18937106432
+          },
+          {
+            "at_utc": "2026-10-31T07:33:18.3419021Z",
+            "total_cpu_percent": 10.0,
+            "free_physical_bytes": 18953248768
+          },
+          {
+            "at_utc": "2026-10-31T07:33:19.7463575Z",
+            "total_cpu_percent": 19.0,
+            "free_physical_bytes": 18922319872
+          },
+          {
+            "at_utc": "2026-10-31T07:33:21.1416058Z",
+            "total_cpu_percent": 7.0,
+            "free_physical_bytes": 18929917952
+          },
+          {
+            "at_utc": "2026-10-31T07:33:22.5368253Z",
+            "total_cpu_percent": 12.0,
+            "free_physical_bytes": 18938621952
+          },
+          {
+            "at_utc": "2026-10-31T07:33:23.9375724Z",
+            "total_cpu_percent": 11.0,
+            "free_physical_bytes": 18937962496
+          },
+          {
+            "at_utc": "2026-10-31T07:33:25.3296337Z",
+            "total_cpu_percent": 11.0,
+            "free_physical_bytes": 18942042112
+          },
+          {
+            "at_utc": "2026-10-31T07:33:26.7487997Z",
+            "total_cpu_percent": 8.0,
+            "free_physical_bytes": 18927345664
+          },
+          {
+            "at_utc": "2026-10-31T07:33:28.1515505Z",
+            "total_cpu_percent": 9.0,
+            "free_physical_bytes": 18934616064
+          },
+          {
+            "at_utc": "2026-10-31T07:33:29.5452571Z",
+            "total_cpu_percent": 14.0,
+            "free_physical_bytes": 18937552896
+          },
+          {
+            "at_utc": "2026-10-31T07:33:30.9431168Z",
+            "total_cpu_percent": 7.0,
+            "free_physical_bytes": 18929410048
+          }
+        ]
+      },
+      "peak_process_tree_working_set_bytes": 307359744,
+      "peak_process_tree_private_bytes": 378429440,
+      "root_pid": 21352,
+      "os_root_peak_working_set_bytes": 360493056
+    },
+    "candidate": {
+      "status": "complete",
+      "elapsed_seconds": 342.135,
+      "admission": {
+        "sample_count": 11,
+        "observed_window_seconds": 10,
+        "average_total_cpu_percent": 8.454545454545455,
+        "minimum_free_physical_bytes": 18860421120,
+        "cpu_gate_passed": true,
+        "memory_gate_passed": true,
+        "samples": [
+          {
+            "at_utc": "2026-10-31T07:39:17.8671549Z",
+            "total_cpu_percent": 15.0,
+            "free_physical_bytes": 18860421120
+          },
+          {
+            "at_utc": "2026-10-31T07:39:19.2638347Z",
+            "total_cpu_percent": 4.0,
+            "free_physical_bytes": 18879315968
+          },
+          {
+            "at_utc": "2026-10-31T07:39:20.6675140Z",
+            "total_cpu_percent": 7.0,
+            "free_physical_bytes": 18888519680
+          },
+          {
+            "at_utc": "2026-10-31T07:39:22.0558657Z",
+            "total_cpu_percent": 4.0,
+            "free_physical_bytes": 18883887104
+          },
+          {
+            "at_utc": "2026-10-31T07:39:23.4837231Z",
+            "total_cpu_percent": 5.0,
+            "free_physical_bytes": 18888339456
+          },
+          {
+            "at_utc": "2026-10-31T07:39:24.8896909Z",
+            "total_cpu_percent": 9.0,
+            "free_physical_bytes": 18889379840
+          },
+          {
+            "at_utc": "2026-10-31T07:39:26.2781984Z",
+            "total_cpu_percent": 15.0,
+            "free_physical_bytes": 18890588160
+          },
+          {
+            "at_utc": "2026-10-31T07:39:27.6679076Z",
+            "total_cpu_percent": 9.0,
+            "free_physical_bytes": 18903207936
+          },
+          {
+            "at_utc": "2026-10-31T07:39:29.0705659Z",
+            "total_cpu_percent": 10.0,
+            "free_physical_bytes": 18878451712
+          },
+          {
+            "at_utc": "2026-10-31T07:39:30.4628933Z",
+            "total_cpu_percent": 6.0,
+            "free_physical_bytes": 18882736128
+          },
+          {
+            "at_utc": "2026-10-31T07:39:31.8592249Z",
+            "total_cpu_percent": 9.0,
+            "free_physical_bytes": 18880270336
+          }
+        ]
+      },
+      "peak_process_tree_working_set_bytes": 313716736,
+      "peak_process_tree_private_bytes": 379195392,
+      "root_pid": 28972,
+      "os_root_peak_working_set_bytes": 361287680
+    }
+  }
+}

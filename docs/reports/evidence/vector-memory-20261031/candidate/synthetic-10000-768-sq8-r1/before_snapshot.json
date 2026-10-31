@@ -1,0 +1,157 @@
+{
+  "collections_after_ingest": [
+    {
+      "arena_allocated_bytes": 12582912,
+      "arena_resident_bytes": 7680000,
+      "count": 10000,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "bench",
+        "extra_count": 0,
+        "indexed_count": 10000,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 10000,
+        "source_frontier": 43,
+        "state": "UNVERIFIED",
+        "validated": false
+      },
+      "dim": 768,
+      "ef_search": null,
+      "hnsw_vector_bytes": 7680000,
+      "index_lag": 0,
+      "indexed": 10000,
+      "metric": "Cosine",
+      "model": "synthetic-unit-seed42",
+      "name": "bench",
+      "quant": "sq8",
+      "rerank": true,
+      "sidecar_cache_bytes": 0,
+      "sidecar_disk_bytes": 30720000,
+      "sidecar_resident_bytes": 0
+    },
+    {
+      "arena_allocated_bytes": 0,
+      "arena_resident_bytes": 0,
+      "count": 0,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "default",
+        "extra_count": 0,
+        "indexed_count": 0,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 0,
+        "source_frontier": 0,
+        "state": "UNVERIFIED",
+        "validated": false
+      },
+      "dim": 768,
+      "ef_search": null,
+      "hnsw_vector_bytes": 0,
+      "index_lag": 0,
+      "indexed": 0,
+      "metric": "L2",
+      "model": "default",
+      "name": "default",
+      "quant": "none",
+      "rerank": false,
+      "sidecar_cache_bytes": 0,
+      "sidecar_disk_bytes": 0,
+      "sidecar_resident_bytes": 0
+    }
+  ],
+  "collections_after_search": [
+    {
+      "arena_allocated_bytes": 12582912,
+      "arena_resident_bytes": 7680000,
+      "count": 10000,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "bench",
+        "extra_count": 0,
+        "indexed_count": 10000,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 10000,
+        "source_frontier": 43,
+        "state": "UNVERIFIED",
+        "validated": false
+      },
+      "dim": 768,
+      "ef_search": null,
+      "hnsw_vector_bytes": 7680000,
+      "index_lag": 0,
+      "indexed": 10000,
+      "metric": "Cosine",
+      "model": "synthetic-unit-seed42",
+      "name": "bench",
+      "quant": "sq8",
+      "rerank": true,
+      "sidecar_cache_bytes": 12582912,
+      "sidecar_disk_bytes": 30720000,
+      "sidecar_resident_bytes": 0
+    },
+    {
+      "arena_allocated_bytes": 0,
+      "arena_resident_bytes": 0,
+      "count": 0,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "default",
+        "extra_count": 0,
+        "indexed_count": 0,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 0,
+        "source_frontier": 0,
+        "state": "UNVERIFIED",
+        "validated": false
+      },
+      "dim": 768,
+      "ef_search": null,
+      "hnsw_vector_bytes": 0,
+      "index_lag": 0,
+      "indexed": 0,
+      "metric": "L2",
+      "model": "default",
+      "name": "default",
+      "quant": "none",
+      "rerank": false,
+      "sidecar_cache_bytes": 0,
+      "sidecar_disk_bytes": 0,
+      "sidecar_resident_bytes": 0
+    }
+  ],
+  "dim": 768,
+  "idle_rss_bytes": 12087296,
+  "ingest": {
+    "before_rss_bytes": 12103680,
+    "peak_rss_bytes": 242745344,
+    "process_rss_bytes": 91611136,
+    "seconds": 94.5258619
+  },
+  "n": 10000,
+  "quant": "sq8",
+  "rebuild": {
+    "before_rss_bytes": 91623424,
+    "peak_rss_bytes": 127184896,
+    "process_rss_bytes": 100438016,
+    "seconds": 68.7140054
+  },
+  "rerank": true,
+  "search10": {
+    "k": 10,
+    "p50_us": 10435.4,
+    "p95_us": 14806.8,
+    "p99_us": 17815.600000000002,
+    "recall": 0.8666666666666667
+  },
+  "search100": {
+    "k": 100,
+    "p50_us": 38091.9,
+    "p95_us": 44452.0,
+    "p99_us": 50779.0,
+    "recall": 0.9433333333333334
+  }
+}

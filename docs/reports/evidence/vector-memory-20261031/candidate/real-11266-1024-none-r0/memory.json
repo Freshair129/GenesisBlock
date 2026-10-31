@@ -1,0 +1,316 @@
+{
+  "batch_rows": 256,
+  "collections_after_ingest": [
+    {
+      "arena_allocated_bytes": 67108864,
+      "arena_resident_bytes": 46145536,
+      "count": 11266,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "bench",
+        "extra_count": 0,
+        "indexed_count": 11266,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 11266,
+        "source_frontier": 48,
+        "state": "UNVERIFIED",
+        "validated": false
+      },
+      "dim": 1024,
+      "ef_search": null,
+      "hnsw_vector_bytes": 46145536,
+      "index_lag": 0,
+      "indexed": 11266,
+      "metric": "Cosine",
+      "model": "bge-m3-repository-fixture",
+      "name": "bench",
+      "quant": "none",
+      "rerank": false,
+      "sidecar_cache_bytes": 0,
+      "sidecar_disk_bytes": 0,
+      "sidecar_resident_bytes": 0
+    },
+    {
+      "arena_allocated_bytes": 0,
+      "arena_resident_bytes": 0,
+      "count": 0,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "default",
+        "extra_count": 0,
+        "indexed_count": 0,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 0,
+        "source_frontier": 0,
+        "state": "UNVERIFIED",
+        "validated": false
+      },
+      "dim": 1024,
+      "ef_search": null,
+      "hnsw_vector_bytes": 0,
+      "index_lag": 0,
+      "indexed": 0,
+      "metric": "L2",
+      "model": "default",
+      "name": "default",
+      "quant": "none",
+      "rerank": false,
+      "sidecar_cache_bytes": 0,
+      "sidecar_disk_bytes": 0,
+      "sidecar_resident_bytes": 0
+    }
+  ],
+  "collections_after_search": [
+    {
+      "arena_allocated_bytes": 67108864,
+      "arena_resident_bytes": 46145536,
+      "count": 11266,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "bench",
+        "extra_count": 0,
+        "indexed_count": 11266,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 11266,
+        "source_frontier": 48,
+        "state": "UNVERIFIED",
+        "validated": false
+      },
+      "dim": 1024,
+      "ef_search": null,
+      "hnsw_vector_bytes": 46145536,
+      "index_lag": 0,
+      "indexed": 11266,
+      "metric": "Cosine",
+      "model": "bge-m3-repository-fixture",
+      "name": "bench",
+      "quant": "none",
+      "rerank": false,
+      "sidecar_cache_bytes": 0,
+      "sidecar_disk_bytes": 0,
+      "sidecar_resident_bytes": 0
+    },
+    {
+      "arena_allocated_bytes": 0,
+      "arena_resident_bytes": 0,
+      "count": 0,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "default",
+        "extra_count": 0,
+        "indexed_count": 0,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 0,
+        "source_frontier": 0,
+        "state": "UNVERIFIED",
+        "validated": false
+      },
+      "dim": 1024,
+      "ef_search": null,
+      "hnsw_vector_bytes": 0,
+      "index_lag": 0,
+      "indexed": 0,
+      "metric": "L2",
+      "model": "default",
+      "name": "default",
+      "quant": "none",
+      "rerank": false,
+      "sidecar_cache_bytes": 0,
+      "sidecar_disk_bytes": 0,
+      "sidecar_resident_bytes": 0
+    }
+  ],
+  "compaction": {
+    "before_rss_bytes": 190025728,
+    "peak_rss_bytes": 251531264,
+    "process_rss_bytes": 192884736,
+    "seconds": 47.8401084
+  },
+  "coverage": [
+    {
+      "built_frontier": 0,
+      "collection": "default",
+      "extra_count": 0,
+      "indexed_count": 0,
+      "missing_count": 0,
+      "pending_count": 0,
+      "source_count": 0,
+      "source_frontier": 0,
+      "state": "READY",
+      "validated": true
+    },
+    {
+      "built_frontier": 48,
+      "collection": "bench",
+      "extra_count": 0,
+      "indexed_count": 11266,
+      "missing_count": 0,
+      "pending_count": 0,
+      "source_count": 11266,
+      "source_frontier": 48,
+      "state": "READY",
+      "validated": true
+    }
+  ],
+  "dim": 1024,
+  "disk_bytes": 1501161782,
+  "ef_construction": 200,
+  "ef_search": 200,
+  "fresh_reopen": {
+    "collections": [
+      {
+        "arena_allocated_bytes": 0,
+        "arena_resident_bytes": 0,
+        "count": 0,
+        "coverage": {
+          "built_frontier": 0,
+          "collection": "default",
+          "extra_count": 0,
+          "indexed_count": 0,
+          "missing_count": 0,
+          "pending_count": 0,
+          "source_count": 0,
+          "source_frontier": 0,
+          "state": "UNVERIFIED",
+          "validated": false
+        },
+        "dim": 1024,
+        "ef_search": null,
+        "hnsw_vector_bytes": 0,
+        "index_lag": 0,
+        "indexed": 0,
+        "metric": "L2",
+        "model": "default",
+        "name": "default",
+        "quant": "none",
+        "rerank": false,
+        "sidecar_cache_bytes": 0,
+        "sidecar_disk_bytes": 0,
+        "sidecar_resident_bytes": 0
+      },
+      {
+        "arena_allocated_bytes": 46145536,
+        "arena_resident_bytes": 46145536,
+        "count": 11266,
+        "coverage": {
+          "built_frontier": 0,
+          "collection": "bench",
+          "extra_count": 0,
+          "indexed_count": 11266,
+          "missing_count": 0,
+          "pending_count": 0,
+          "source_count": 11266,
+          "source_frontier": 48,
+          "state": "UNVERIFIED",
+          "validated": false
+        },
+        "dim": 1024,
+        "ef_search": null,
+        "hnsw_vector_bytes": 46145536,
+        "index_lag": 0,
+        "indexed": 11266,
+        "metric": "Cosine",
+        "model": "bge-m3-repository-fixture",
+        "name": "bench",
+        "quant": "none",
+        "rerank": false,
+        "sidecar_cache_bytes": 0,
+        "sidecar_disk_bytes": 0,
+        "sidecar_resident_bytes": 0
+      }
+    ],
+    "coverage": [
+      {
+        "built_frontier": 0,
+        "collection": "default",
+        "extra_count": 0,
+        "indexed_count": 0,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 0,
+        "source_frontier": 0,
+        "state": "READY",
+        "validated": true
+      },
+      {
+        "built_frontier": 48,
+        "collection": "bench",
+        "extra_count": 0,
+        "indexed_count": 11266,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 11266,
+        "source_frontier": 48,
+        "state": "READY",
+        "validated": true
+      }
+    ],
+    "error": null,
+    "memory": {
+      "before_rss_bytes": 11583488,
+      "peak_rss_bytes": 210075648,
+      "process_rss_bytes": 150982656,
+      "seconds": 75.8623418
+    }
+  },
+  "idle_rss_bytes": 12107776,
+  "index_rebuild_peak_rss_bytes": 248913920,
+  "ingest": {
+    "before_rss_bytes": 12120064,
+    "peak_rss_bytes": 341286912,
+    "process_rss_bytes": 174895104,
+    "seconds": 73.1446877
+  },
+  "method": "20ms sampled working set; same-process and fresh-process reopen",
+  "model": "bge-m3-repository-fixture",
+  "n": 11266,
+  "q": 24,
+  "quant": "none",
+  "rebuild": {
+    "before_rss_bytes": 174907392,
+    "peak_rss_bytes": 248913920,
+    "process_rss_bytes": 186028032,
+    "seconds": 47.290486
+  },
+  "reopen": {
+    "before_rss_bytes": 17256448,
+    "peak_rss_bytes": 348946432,
+    "process_rss_bytes": 177889280,
+    "seconds": 103.5921705
+  },
+  "reopen_error": null,
+  "reopen_search10": {
+    "k": 10,
+    "p50_us": 4554.5,
+    "p95_us": 5709.2,
+    "p99_us": 2740393.3,
+    "recall": 0.9875
+  },
+  "rerank": false,
+  "retention": "full",
+  "search10": {
+    "k": 10,
+    "p50_us": 4521.200000000001,
+    "p95_us": 5170.9,
+    "p99_us": 5586.599999999999,
+    "recall": 0.9875
+  },
+  "search100": {
+    "k": 100,
+    "p50_us": 6357.0,
+    "p95_us": 7173.8,
+    "p99_us": 7267.7,
+    "recall": 0.9791666666666666
+  },
+  "snapshot": {
+    "before_rss_bytes": 186388480,
+    "peak_rss_bytes": 193482752,
+    "process_rss_bytes": 190042112,
+    "seconds": 9.1440733
+  },
+  "snapshot_error": null
+}

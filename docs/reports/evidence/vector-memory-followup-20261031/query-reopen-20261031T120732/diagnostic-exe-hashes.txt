@@ -1,0 +1,7 @@
+
+Algorithm Hash                                                             Path
+--------- ----                                                             ----
+SHA256    A3AE43B60BE1C8F2E77A39D6D0A18589BB00F53B67C1123C7656A1D48B23035E D:\GenesisBlock_Dev\GenesisBlock\target\rele…
+SHA256    A3AE43B60BE1C8F2E77A39D6D0A18589BB00F53B67C1123C7656A1D48B23035E C:\Users\suanr\genesis-vector-memory-followu…
+
+

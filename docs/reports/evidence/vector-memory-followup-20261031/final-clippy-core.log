@@ -1,0 +1,6 @@
+   Compiling genesis-block-native v0.2.10 (D:\GenesisBlock_Dev\GenesisBlock)
+    Checking curve25519-dalek v4.1.3
+    Checking sha2 v0.10.9
+    Checking lz4_flex v0.11.6
+    Checking ed25519-dalek v2.2.0
+    Finished `dev` profile [unoptimized] target(s) in 2m 09s

@@ -1,0 +1,311 @@
+{
+  "batch_rows": 256,
+  "collections_after_ingest": [
+    {
+      "arena_allocated_bytes": 100663296,
+      "arena_resident_bytes": 61440000,
+      "count": 10000,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "bench",
+        "extra_count": 0,
+        "indexed_count": 10000,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 10000,
+        "source_frontier": 43,
+        "state": "UNVERIFIED",
+        "validated": false
+      },
+      "dim": 1536,
+      "ef_search": null,
+      "hnsw_vector_bytes": 61440000,
+      "index_lag": 0,
+      "indexed": 10000,
+      "metric": "Cosine",
+      "model": "synthetic-unit-seed42",
+      "name": "bench",
+      "quant": "none",
+      "rerank": false,
+      "sidecar_cache_bytes": 0,
+      "sidecar_disk_bytes": 0,
+      "sidecar_resident_bytes": 0
+    },
+    {
+      "arena_allocated_bytes": 0,
+      "arena_resident_bytes": 0,
+      "count": 0,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "default",
+        "extra_count": 0,
+        "indexed_count": 0,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 0,
+        "source_frontier": 0,
+        "state": "UNVERIFIED",
+        "validated": false
+      },
+      "dim": 1536,
+      "ef_search": null,
+      "hnsw_vector_bytes": 0,
+      "index_lag": 0,
+      "indexed": 0,
+      "metric": "L2",
+      "model": "default",
+      "name": "default",
+      "quant": "none",
+      "rerank": false,
+      "sidecar_cache_bytes": 0,
+      "sidecar_disk_bytes": 0,
+      "sidecar_resident_bytes": 0
+    }
+  ],
+  "collections_after_search": [
+    {
+      "arena_allocated_bytes": 100663296,
+      "arena_resident_bytes": 61440000,
+      "count": 10000,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "bench",
+        "extra_count": 0,
+        "indexed_count": 10000,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 10000,
+        "source_frontier": 43,
+        "state": "UNVERIFIED",
+        "validated": false
+      },
+      "dim": 1536,
+      "ef_search": null,
+      "hnsw_vector_bytes": 61440000,
+      "index_lag": 0,
+      "indexed": 10000,
+      "metric": "Cosine",
+      "model": "synthetic-unit-seed42",
+      "name": "bench",
+      "quant": "none",
+      "rerank": false,
+      "sidecar_cache_bytes": 0,
+      "sidecar_disk_bytes": 0,
+      "sidecar_resident_bytes": 0
+    },
+    {
+      "arena_allocated_bytes": 0,
+      "arena_resident_bytes": 0,
+      "count": 0,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "default",
+        "extra_count": 0,
+        "indexed_count": 0,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 0,
+        "source_frontier": 0,
+        "state": "UNVERIFIED",
+        "validated": false
+      },
+      "dim": 1536,
+      "ef_search": null,
+      "hnsw_vector_bytes": 0,
+      "index_lag": 0,
+      "indexed": 0,
+      "metric": "L2",
+      "model": "default",
+      "name": "default",
+      "quant": "none",
+      "rerank": false,
+      "sidecar_cache_bytes": 0,
+      "sidecar_disk_bytes": 0,
+      "sidecar_resident_bytes": 0
+    }
+  ],
+  "compaction": null,
+  "coverage": [
+    {
+      "built_frontier": 0,
+      "collection": "default",
+      "extra_count": 0,
+      "indexed_count": 0,
+      "missing_count": 0,
+      "pending_count": 0,
+      "source_count": 0,
+      "source_frontier": 0,
+      "state": "READY",
+      "validated": true
+    },
+    {
+      "built_frontier": 43,
+      "collection": "bench",
+      "extra_count": 0,
+      "indexed_count": 10000,
+      "missing_count": 0,
+      "pending_count": 0,
+      "source_count": 10000,
+      "source_frontier": 43,
+      "state": "READY",
+      "validated": true
+    }
+  ],
+  "dim": 1536,
+  "disk_bytes": 1980078742,
+  "ef_construction": 200,
+  "ef_search": 200,
+  "fresh_reopen": {
+    "collections": [
+      {
+        "arena_allocated_bytes": 0,
+        "arena_resident_bytes": 0,
+        "count": 0,
+        "coverage": {
+          "built_frontier": 0,
+          "collection": "default",
+          "extra_count": 0,
+          "indexed_count": 0,
+          "missing_count": 0,
+          "pending_count": 0,
+          "source_count": 0,
+          "source_frontier": 0,
+          "state": "UNVERIFIED",
+          "validated": false
+        },
+        "dim": 1536,
+        "ef_search": null,
+        "hnsw_vector_bytes": 0,
+        "index_lag": 0,
+        "indexed": 0,
+        "metric": "L2",
+        "model": "default",
+        "name": "default",
+        "quant": "none",
+        "rerank": false,
+        "sidecar_cache_bytes": 0,
+        "sidecar_disk_bytes": 0,
+        "sidecar_resident_bytes": 0
+      },
+      {
+        "arena_allocated_bytes": 61440000,
+        "arena_resident_bytes": 61440000,
+        "count": 10000,
+        "coverage": {
+          "built_frontier": 0,
+          "collection": "bench",
+          "extra_count": 0,
+          "indexed_count": 10000,
+          "missing_count": 0,
+          "pending_count": 0,
+          "source_count": 10000,
+          "source_frontier": 43,
+          "state": "UNVERIFIED",
+          "validated": false
+        },
+        "dim": 1536,
+        "ef_search": null,
+        "hnsw_vector_bytes": 61440000,
+        "index_lag": 0,
+        "indexed": 10000,
+        "metric": "Cosine",
+        "model": "synthetic-unit-seed42",
+        "name": "bench",
+        "quant": "none",
+        "rerank": false,
+        "sidecar_cache_bytes": 0,
+        "sidecar_disk_bytes": 0,
+        "sidecar_resident_bytes": 0
+      }
+    ],
+    "coverage": [
+      {
+        "built_frontier": 0,
+        "collection": "default",
+        "extra_count": 0,
+        "indexed_count": 0,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 0,
+        "source_frontier": 0,
+        "state": "READY",
+        "validated": true
+      },
+      {
+        "built_frontier": 43,
+        "collection": "bench",
+        "extra_count": 0,
+        "indexed_count": 10000,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 10000,
+        "source_frontier": 43,
+        "state": "READY",
+        "validated": true
+      }
+    ],
+    "error": null,
+    "memory": {
+      "before_rss_bytes": 11575296,
+      "peak_rss_bytes": 220516352,
+      "process_rss_bytes": 180404224,
+      "seconds": 114.625835
+    }
+  },
+  "idle_rss_bytes": 12132352,
+  "index_rebuild_peak_rss_bytes": 304709632,
+  "ingest": {
+    "before_rss_bytes": 12144640,
+    "peak_rss_bytes": 438947840,
+    "process_rss_bytes": 216518656,
+    "seconds": 106.8823557
+  },
+  "method": "20ms sampled working set; same-process and fresh-process reopen",
+  "model": "synthetic-unit-seed42",
+  "n": 10000,
+  "q": 24,
+  "quant": "none",
+  "rebuild": {
+    "before_rss_bytes": 216526848,
+    "peak_rss_bytes": 304709632,
+    "process_rss_bytes": 234835968,
+    "seconds": 77.4023792
+  },
+  "reopen": {
+    "before_rss_bytes": 18477056,
+    "peak_rss_bytes": 399331328,
+    "process_rss_bytes": 223928320,
+    "seconds": 157.34519
+  },
+  "reopen_error": null,
+  "reopen_search10": {
+    "k": 10,
+    "p50_us": 10836.800000000001,
+    "p95_us": 11683.199999999999,
+    "p99_us": 3936499.6,
+    "recall": 0.825
+  },
+  "rerank": false,
+  "retention": "full",
+  "search10": {
+    "k": 10,
+    "p50_us": 10112.9,
+    "p95_us": 11296.300000000001,
+    "p99_us": 11656.3,
+    "recall": 0.7875
+  },
+  "search100": {
+    "k": 100,
+    "p50_us": 11544.4,
+    "p95_us": 12932.5,
+    "p99_us": 13019.0,
+    "recall": 0.6820833333333334
+  },
+  "snapshot": {
+    "before_rss_bytes": 229580800,
+    "peak_rss_bytes": 235954176,
+    "process_rss_bytes": 232906752,
+    "seconds": 12.1828382
+  },
+  "snapshot_error": null
+}

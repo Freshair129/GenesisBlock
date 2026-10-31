@@ -1,0 +1,43 @@
+{
+  "binary": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\red2-library-tests.exe",
+  "sha256": "3dd1c68aa1a1ec5c7d11ab87835dd48d9508a0ae209bad95ebfe5f51fc8d8400",
+  "lib_sha256": "812afdbe74e96aee4f0c08b93488dda4ac5a6c0e4784b72bb9f615d30c7877a9",
+  "test_sha256": "40c4a131c4137304764b38a61d5d4a1482893796fd5e032d8292653a966cd342",
+  "artifact": {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///C:/Users/suanr/genesis-vector-memory-20261031/verify-src#genesis-block-native@0.2.10",
+    "manifest_path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\verify-src\\Cargo.toml",
+    "target": {
+      "kind": [
+        "cdylib",
+        "staticlib",
+        "rlib"
+      ],
+      "crate_types": [
+        "cdylib",
+        "staticlib",
+        "rlib"
+      ],
+      "name": "genesis_block_native",
+      "src_path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\verify-src\\src\\lib.rs",
+      "edition": "2021",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\genesis_block_native-cd8246c766c42fca.exe",
+      "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\genesis_block_native-cd8246c766c42fca.pdb"
+    ],
+    "executable": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\genesis_block_native-cd8246c766c42fca.exe",
+    "fresh": false
+  }
+}

@@ -1,0 +1,54 @@
+[
+  {
+    "target": "journal_format_tests-fe6b4cd9fa0e01d3.exe",
+    "args": [
+      "--test-threads=1",
+      "--skip",
+      "journal_compresses_authenticated_compaction_proofs"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 15138816,
+    "seconds": 23.021,
+    "log": "journal_format_tests-fe6b4cd9fa0e01d3.log"
+  },
+  {
+    "target": "rebuild_from_truth_tests-afd2a683c957236a.exe",
+    "args": [
+      "--test-threads=1",
+      "--skip",
+      "large_batch_roundtrip"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 18792448,
+    "seconds": 69.562,
+    "log": "rebuild_from_truth_tests-afd2a683c957236a.log"
+  },
+  {
+    "target": "hql_cypher_tests-cf7711df2414f595.exe",
+    "args": [
+      "--test-threads=1",
+      "--skip",
+      "cypher_id_anchor"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 16789504,
+    "seconds": 7.388,
+    "log": "hql_cypher_tests-cf7711df2414f595.log"
+  },
+  {
+    "target": "consensus_checkpoint_race_tests-23a17829175f7dbc.exe",
+    "args": [
+      "--test-threads=1",
+      "--skip",
+      "consensus_commits_survive_concurrent_compact"
+    ],
+    "exit_code": 1,
+    "reason": "timeout_180s",
+    "peak_rss_bytes": 16203776,
+    "seconds": 180.328,
+    "log": "consensus_checkpoint_race_tests-23a17829175f7dbc.log"
+  }
+]

@@ -1,0 +1,16 @@
+
+running 11 tests
+test a_parameter_containing_sql_is_bound_not_executed ... ok
+test a_read_only_pragma_is_denied_by_the_authorizer_alone ... ok
+test a_runaway_read_is_interrupted_by_the_deadline ... ok
+test a_second_statement_is_refused_rather_than_silently_dropped ... ok
+test a_valueless_pragma_that_writes_is_still_denied ... ok
+test duplicate_result_column_names_are_refused_rather_than_collapsed ... ok
+test every_write_shaped_statement_is_refused_and_changes_nothing ... ok
+test exceeding_the_row_cap_errors_rather_than_truncating ... ok
+test input_with_no_statement_says_so ... ok
+test schema_introspection_pragmas_are_allowed_in_both_forms ... ok
+test sql_surface_does_what_the_relational_ir_cannot ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.05s
+

@@ -1,0 +1,16 @@
+snapshot: attempting instant load from binary state...
+snapshot: loading 100000 nodes
+snapshot: loading 0 edges
+snapshot: instant load complete in 83.7453022s
+ setting number of points 50000 
+ setting number of points 100000 
+snapshot: state persisted successfully to C:\Users\suanr\genesis-vector-memory-followup-20261031\query-reopen-repeat-20261031T134858\old\gdb
+shutdown: graceful shutdown, state saved.
+snapshot: attempting instant load from binary state...
+snapshot: loading 100000 nodes
+snapshot: loading 0 edges
+snapshot: instant load complete in 83.4576681s
+ setting number of points 50000 
+ setting number of points 100000 
+snapshot: state persisted successfully to C:\Users\suanr\genesis-vector-memory-followup-20261031\query-reopen-repeat-20261031T134858\old\gdb
+shutdown: graceful shutdown, state saved.

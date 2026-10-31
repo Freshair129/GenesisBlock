@@ -1,0 +1,94 @@
+--- before-traced-lib.rs
++++ after-traced-lib.rs
+@@ -14112,36 +14112,62 @@
+         // SQLite holds the destination write transaction until the backup
+         // reaches SQLITE_DONE. Dropping an unfinished rusqlite Backup calls
+         // sqlite3_backup_finish, which rolls that transaction back on errors.
+-        let backup = rusqlite::backup::Backup::new(source, &mut destination)
+-            .map_err(Self::projection_backup_error)?;
+-        loop {
+-            match backup.step(256).map_err(Self::projection_backup_error)? {
+-                rusqlite::backup::StepResult::Done => {
+-                    if let Some(started) = backup_started {
+-                        projection_query_diag_snapshot(
+-                            "projection_publish_backup_done",
+-                            &self.projection_path,
+-                            serde_json::json!({
+-                                "backup_elapsed_us": started.elapsed().as_micros(),
+-                                "publication_variant": "before_maintenance",
+-                            }),
+-                        );
++        {
++            let backup = rusqlite::backup::Backup::new(source, &mut destination)
++                .map_err(Self::projection_backup_error)?;
++            loop {
++                match backup.step(256).map_err(Self::projection_backup_error)? {
++                    rusqlite::backup::StepResult::Done => {
++                        if let Some(started) = backup_started {
++                            projection_query_diag_snapshot(
++                                "projection_publish_backup_done",
++                                &self.projection_path,
++                                serde_json::json!({
++                                    "backup_elapsed_us": started.elapsed().as_micros(),
++                                    "publication_variant": "after_maintenance",
++                                }),
++                            );
++                        }
++                        break;
++                    },
++                    rusqlite::backup::StepResult::More => {}
++                    rusqlite::backup::StepResult::Busy | rusqlite::backup::StepResult::Locked => {
++                        return Err(Error::from_reason(
++                            "PROJECTION_REBUILD_BUSY: projection publication could not acquire SQLite locks",
++                        ));
+                     }
+-                    return Ok(());
+-                },
+-                rusqlite::backup::StepResult::More => {}
+-                rusqlite::backup::StepResult::Busy | rusqlite::backup::StepResult::Locked => {
+-                    return Err(Error::from_reason(
+-                        "PROJECTION_REBUILD_BUSY: projection publication could not acquire SQLite locks",
+-                    ));
+-                }
+-                _ => {
+-                    return Err(Error::from_reason(
+-                        "PROJECTION_REBUILD_FAILED: SQLite backup returned an unsupported step state",
+-                    ));
+-                }
+-            }
+-        }
++                    _ => {
++                        return Err(Error::from_reason(
++                            "PROJECTION_REBUILD_FAILED: SQLite backup returned an unsupported step state",
++                        ));
++                    }
++                }
++            }
++        }
++        // Backup commits below SQLite's SQL executor and resets the schema.
++        // Its pending WAL hook would otherwise checkpoint the published pages
++        // during schema loading in the first query's prepare. Complete that
++        // maintenance here, after Backup::drop releases the destination handle.
++        // PASSIVE preserves pinned reader snapshots and accepts partial progress.
++        let maintenance_started = diagnostics.then(Instant::now);
++        let maintenance_result = destination.execute_batch("PRAGMA wal_checkpoint(PASSIVE);");
++        if let Some(started) = maintenance_started {
++            projection_query_diag_snapshot(
++                "projection_publish_maintenance_done",
++                &self.projection_path,
++                serde_json::json!({
++                    "maintenance_elapsed_us": started.elapsed().as_micros(),
++                    "maintenance_status": if maintenance_result.is_ok() { "ok" } else { "error" },
++                    "maintenance_error": maintenance_result.as_ref().err().map(|error| error.to_string()),
++                    "publication_variant": "after_maintenance",
++                }),
++            );
++        }
++        maintenance_result.map_err(|error| {
++            Error::from_reason(format!(
++                "PROJECTION_CHECKPOINT_FAILED: projection publication committed; {error}"
++            ))
++        })
+     }
+ 
+     fn projection_backup_error(error: rusqlite::Error) -> Error {

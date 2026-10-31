@@ -1,0 +1,11 @@
+
+running 6 tests
+test match_in_collection_scopes ... ok
+test search_in_bare_identifier_collection ... ok
+test search_in_quoted_collection_scopes ... ok
+test search_in_unknown_collection_errors ... ok
+test search_in_with_language_and_as_of_parses ... ok
+test search_without_in_uses_default ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.99s
+

@@ -1,0 +1,10 @@
+
+running 5 tests
+test consensus_committed_edge_is_traversable ... ok
+test consensus_committed_vector_is_searchable ... ok
+test consensus_proposal_signature_covers_the_revision_envelope ... ok
+test recommit_after_quorum_does_not_repersist ... ok
+test stale_consensus_revision_is_rejected_before_wal_append ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.76s
+

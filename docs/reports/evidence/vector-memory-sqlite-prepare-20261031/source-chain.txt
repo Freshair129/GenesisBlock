@@ -1,0 +1,72 @@
+# SQLite projection prepare latency: source chain and bounded verification plan
+
+Date: 2026-10-31  
+Repository: D:/GenesisBlock_Dev/GenesisBlock  
+Status: **source-supported, awaits runtime confirmation**
+
+This note records a read-only source investigation. No repository files or database files were changed, and no build, test, or runtime open was performed. The proposed cause is conditional on candidate publication into the live WAL-mode projection and a pending WAL callback at the time of the first post-publication SQL statement.
+
+## Observed timing
+
+The saved diagnostic at:
+
+C:/Users/suanr/genesis-vector-memory-followup-20261031/projection-props-split-20261031T151315/split-stage-result.json:51-67
+
+records prepare_us = 2,631,425, query_row_us = 37, and lock_acquire_us = 0 for SELECT payload FROM props WHERE node_u32 = ?1. Its interpretation says the timer localizes the delay to Connection::prepare but does not identify which internal SQLite work took the time. The saved projection file is 1,017,315,328 bytes. The copied run's WAL sidecar was 0 bytes at final capture; that is consistent with a checkpoint having completed but does not establish when or why it ran.
+
+## Pinned prepare path
+
+- Repo D:/GenesisBlock_Dev/GenesisBlock/Cargo.toml:72 enables rusqlite bundled, hooks, limits, and backup features.
+- Cargo.lock:1407-1409 pins libsqlite3-sys 0.30.1; Cargo.lock:2028-2031 pins rusqlite 0.32.1.
+- Bundled source is C:/Users/suanr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libsqlite3-sys-0.30.1/sqlite3/sqlite3.c, SQLite 3.46.0, source ID at lines 462-464.
+- rusqlite/src/lib.rs:696 implements Connection::query_row by calling self.prepare(sql). rusqlite/src/lib.rs:770-781 routes prepare through prepare_with_flags. The bundled feature enables modern SQLite; rusqlite/src/inner_connection.rs:291 calls sqlite3_prepare_v3 with default flags. SQLite's sqlite3_prepare_v3 enters sqlite3LockAndPrepare at sqlite3.c:142753 and :142636.
+- GenesisBlock's query is src/lib.rs:14324-14336, projection_props_unlocked, and is a single query_row against props. The diagnostic split therefore measures inside SQLite preparation before stepping/fetching the row.
+
+## Conditional source-supported chain
+
+1. Writable projection open configures the live connection for WAL. Repo src/lib.rs:11162 opens it read-write; init_projection_schema begins at :11171 and sets PRAGMA journal_mode = WAL in its schema batch.
+2. On writable open, projection_sync_on_open (:14088) compares the stored journal fingerprint with the current journal hash. A normal marker miss reaches the candidate synchronization path after the early return at :14107; projection_sync_existing_candidate (:14122) or projection_rebuild_fresh_candidate (:14140) eventually calls projection_publish_candidate (:13940).
+3. projection_publish_candidate runs rusqlite Backup from the candidate into self.projection_db, the already-open live destination connection. SQLite's sqlite3_backup_step resets the destination connection's schemas on completion (sqlite3.c:82439) and commits the destination through sqlite3BtreeCommitPhaseTwo (:82548, implementation :74899). This low-level backup path does not execute doWalCallbacks. If the destination is in WAL mode, sqlite3WalFrames records the commit frame in pWal->iCallback (:69124); sqlite3WalCallback is the function that later returns and clears that pending value (:69297).
+4. The first subsequent SQL prepare on that same connection must reload the reset schema. sqlite3LockAndPrepare calls the prepare machinery; sqlite3InitOne (:141992) reads schema entries by executing a nested SELECT * FROM main.sqlite_schema ORDER BY rowid through sqlite3_exec (:142165-142174), then calls sqlite3AnalysisLoad. sqlite3_exec steps the nested VDBE to completion. In SQLite 3.46.0, sqlite3Step starts at sqlite3.c:91128; after VDBE execution returns SQLITE_DONE, sqlite3Step calls doWalCallbacks for autocommit at :91237. doWalCallbacks (:91098) reads/clears the pending WAL callback and invokes the registered hook.
+5. SQLite's bundled default threshold is 1,000 WAL frames (:13871-13872), and open registers that default with sqlite3_wal_autocheckpoint (:183343). The default hook (:182201-182209) calls sqlite3_wal_checkpoint when nFrame >= threshold. SQLite documents/implements that function as PASSIVE mode (:182339-182342), equivalent to sqlite3_wal_checkpoint_v2(..., SQLITE_CHECKPOINT_PASSIVE, ...).
+6. Therefore, conditionally, a large candidate publication into the live WAL can defer a PASSIVE checkpoint until the first post-publication prepare. The nested schema SELECT then executes during sqlite3_prepare_v3, so checkpoint time is charged to prepare_us; the actual point lookup can still take 37 microseconds. A 1 GB destination makes a large backfill plausible.
+
+This chain is **not runtime-confirmed**. For the saved run, verify that (a) the normal marker missed, (b) projection_publish_candidate completed on the same live connection, (c) the destination WAL had at least 1,000 frames after backup completion, and (d) no intervening SQL statement consumed the callback before the measured props prepare.
+
+Other prepare-time work remains possible if those conditions are false or if the delay persists with auto-checkpoint disabled: schema object parsing and sqliteAnalysisLoad of sqlite_stat tables are explicit in sqlite3InitOne; cold filesystem/VFS I/O is also not excluded by the current timing split.
+
+## Snapshot-manifest caveat for forcing a marker miss
+
+A direct SQL update to the marker in projection.sqlite is **not** a valid way to create the normal incremental marker-miss case when state.json has a P6 manifest:
+
+- The P6 manifest records each snapshot component's byte length and SHA-256, including projection.sqlite. Snapshot creation copies the projection at src/lib.rs:26543 and hashes every component at :26691 before assembling the P6 manifest at :26706.
+- Open validation compares the current projection bytes/hash with that manifest at src/lib.rs:26119-26123. A manual marker-row edit changes projection.sqlite bytes, so validation returns projection_valid = false.
+- try_load_state then returns LoadedProjectionNeedsRebuild rather than Loaded (src/lib.rs:28150 and :28545-28548). Open sets projection_snapshot_untrusted true for any outcome other than Loaded (:16175-16177), then calls projection_sync_on_open(force_rebuild=true) (:16186). That enters the force-rebuild branch (:14098-14101), creating a fresh replay candidate instead of the normal incremental marker-miss path. It can still publish by backup, but it tests snapshot-digest recovery plus publication, not the ordinary marker-miss candidate-copy/replay path.
+
+If a separate forced-digest-recovery control is desired on a disposable copy, the marker key is src/lib.rs:186, journal_projection_fingerprint_v1, and projection_state is declared at :11197. This SQL is only for that separately labeled path:
+
+    INSERT INTO projection_state(key, value)
+    VALUES ('journal_projection_fingerprint_v1', 'forced-stale-bench-copy')
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+
+Do not call that an ordinary marker miss and do not repair/re-hash the manifest by hand.
+
+## Minimal 100k normal marker-miss verification design
+
+1. Start with a quiescent, self-consistent 100,000-node benchmark fixture containing the 2-byte {} props rows, matching Genesis journal files, and all other required snapshot files. Keep the source closed and untouched; freeze source hashes. Work only under the external benchmark root.
+2. Preserve a matching-marker path control from the baseline snapshot. A writable open with no new Genesis event should load a valid P6 snapshot and take the fingerprint-match early return. Instrument and record that publication was skipped; this control is expected not to reproduce the publication callback.
+3. Create a second benchmark copy using the normal Storage API. Open the baseline, apply one valid Node mutation that writes a {} props row and a corresponding Genesis journal event, then create a fresh normal snapshot after that mutation and close cleanly. The event changes the journal hash and projection.sqlite, while the stored journal fingerprint remains from the previous sync: projection_store_journal_fingerprint has only one call site, in projection_sync_candidate at src/lib.rs:13872, and snapshot generation does not update it. Normal snapshot generation at :26543 and :26691-26706 records the post-mutation projection bytes in P6, so the projection component digest remains valid. Do not edit the journal, marker, state.json, or P6 manifest by hand.
+4. On the next writable open of that second copy, confirm the snapshot outcome is Loaded, projection_snapshot_untrusted is false, and the current journal hash differs from the retained marker. Confirm that the normal existing-candidate path runs and that projection_publish_candidate is invoked. If schema conditions divert the copy to the fresh rebuild branch, report that and do not label it the existing-candidate path.
+5. In a diagnostic-only benchmark build, timestamp Backup::step returning Done, backup-object drop, WAL byte length, publication return, every first post-publication SQL statement, the first props prepare start/end, and row-read start/end. Do not issue PRAGMA, a warm-up query, or any SQL diagnostic between backup completion and the first measured query: that would consume the pending callback. Capture WAL size with filesystem metadata or a diagnostic hook.
+6. Confirm the WAL frame count at publication is at least 1,000. If the 100k fixture does not produce that many frames, increase only the benchmark copy enough to cross the threshold while staying below 2 GiB; do not run the full-main corpus. Keep the existing 5-second query bound, 1,200-second overall ceiling, and 2 GiB RSS cap unchanged.
+7. Causal pair on two identical valid-snapshot marker-miss copies: default auto-checkpoint; versus a test-only direct FFI call to sqlite3_wal_autocheckpoint(db, 0) immediately after backup publication and before any SQL on that connection. Connection::handle() is available at rusqlite/src/lib.rs:937 but is unsafe. If disabling the hook removes the first-prepare delay while WAL remains large, that supports the deferred-checkpoint cause. If it stays slow, investigate schema/stat loading and VFS I/O. This intervention is only for disposable benchmark copies.
+8. This 100k pass verifies the normal marker-miss/publication callback path and threshold; it need not reproduce the exact 2.63 s seen on the 1 GB artifact. A matching-marker control skips publication and must not be used to claim the mechanism was disproved.
+
+## Checkpoint handling implications for a later bounded fix
+
+- Run any explicit checkpoint only after Backup::step returns Done and the rusqlite Backup object has been dropped; then the destination write transaction is over and the mutable borrow is released. The Rust projection mutex is already held for publication.
+- PASSIVE is the mode SQLite's default auto-checkpoint uses. It does not wait for readers/writers or invoke the busy handler; it may backfill only safe frames when readers hold snapshots, and it does not truncate the WAL. Partial/busy is a valid outcome; the committed data remains available through WAL and existing read-only snapshots remain valid.
+- A direct sqlite3_wal_checkpoint_v2(...PASSIVE...) does not itself clear pWal->iCallback. A later sqlite3Step completion will still consume the pending callback. After a complete explicit pass that later callback is generally a cheap empty pass; if readers pinned frames and the checkpoint was partial, a later callback may make further progress.
+- SQL PRAGMA wal_checkpoint(PASSIVE) at the publication boundary causes schema initialization on its own first prepare. That can consume the pending callback there, and the PRAGMA then makes its explicit PASSIVE attempt. This intentionally moves checkpoint work into publication; it does not eliminate the page I/O.
+- A checkpoint runs after backup commit/publication, so it cannot make an already-published backup roll back. Do not report a checkpoint error as if publication were rolled back; define post-commit maintenance error handling separately. Do not use FULL, RESTART, or TRUNCATE for this nonblocking publication boundary.
+

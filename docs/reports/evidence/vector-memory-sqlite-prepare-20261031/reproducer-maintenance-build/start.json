@@ -1,0 +1,23 @@
+{
+  "pid": 29288,
+  "start": "2026-10-31T19:01:26.8065507+07:00",
+  "config": {
+    "env": {
+      "CARGO_TARGET_DIR": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\reproducer-target"
+    },
+    "exe": "C:\\Users\\suanr\\.cargo\\bin\\cargo.exe",
+    "args": [
+      "build",
+      "--release",
+      "--locked",
+      "--offline",
+      "-j1"
+    ],
+    "cwd": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\reproducer",
+    "output": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\reproducer-maintenance-build",
+    "kind": "build_preparation"
+  },
+  "query_deadline_ms": 5000,
+  "cap_seconds": 1200,
+  "rss_cap": 2147483648
+}

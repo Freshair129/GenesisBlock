@@ -1,0 +1,743 @@
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1733,10 +1733,18 @@
+ ) -> Result<Vec<u8>> {
+     let json =
+         serde_json::to_vec(envelope).map_err(|error| Error::from_reason(error.to_string()))?;
++    encode_compacted_envelope_json(magic, &json, max_uncompressed_bytes)
++}
++
++fn encode_compacted_envelope_json(
++    magic: &[u8],
++    json: &[u8],
++    max_uncompressed_bytes: usize,
++) -> Result<Vec<u8>> {
+     if json.len() > max_uncompressed_bytes {
+         return Err(Error::from_reason("COMPACTION_PROOF_TOO_LARGE"));
+     }
+-    let compressed = lz4_flex::compress_prepend_size(&json);
++    let compressed = lz4_flex::compress_prepend_size(json);
+     if compressed.len() > max_uncompressed_bytes.saturating_add(4) {
+         return Err(Error::from_reason("COMPACTION_PROOF_TOO_LARGE"));
+     }
+@@ -1819,6 +1827,298 @@
+     expected_revision_id: Option<&'a str>,
+     predecessor_revision_id: Option<&'a str>,
+     payload: &'a Value,
++}
++
++// References tie cached encodings to the exact immutable source for this build.
++// No verification/authorization decision is cached here. Full caches fall back.
++const COMPACTION_ENCODING_CACHE_MAX_BYTES: usize = 8 * 1024 * 1024;
++const COMPACTION_ENCODING_CACHE_MAX_ENTRIES: usize = 4096;
++struct SerializedCompactionProof<'a> {
++    source: &'a SignedEvent,
++    canonical: Box<[u8]>,
++    json: Box<[u8]>,
++}
++
++#[derive(Default)]
++struct CompactionProofBytesCache<'a> {
++    entries: HashMap<usize, SerializedCompactionProof<'a>>,
++    bytes: usize,
++    admission_closed: bool,
++}
++
++impl<'a> CompactionProofBytesCache<'a> {
++    fn prepare(
++        &mut self,
++        source: &'a SignedEvent,
++    ) -> Result<Option<&SerializedCompactionProof<'a>>> {
++        let identity = std::ptr::from_ref(source) as usize;
++        if self.entries.contains_key(&identity) {
++            return Ok(self.entries.get(&identity));
++        }
++        if self.admission_closed
++            || self.bytes >= COMPACTION_ENCODING_CACHE_MAX_BYTES
++            || self.entries.len() >= COMPACTION_ENCODING_CACHE_MAX_ENTRIES
++        {
++            return Ok(None);
++        }
++        let canonical = canonical_event_bytes(&source.event)
++            .map_err(|error| Error::from_reason(error.to_string()))?;
++        let json =
++            serde_json::to_vec(source).map_err(|error| Error::from_reason(error.to_string()))?;
++        let bytes = canonical.len().saturating_add(json.len());
++        if bytes > COMPACTION_ENCODING_CACHE_MAX_BYTES.saturating_sub(self.bytes) {
++            // Retained hits remain usable. Stop probing new admissions so a
++            // shared over-budget source is not serialized twice on every leaf.
++            self.admission_closed = true;
++            return Ok(None);
++        }
++        self.entries.insert(
++            identity,
++            SerializedCompactionProof {
++                source,
++                canonical: canonical.into_boxed_slice(),
++                json: json.into_boxed_slice(),
++            },
++        );
++        self.bytes += bytes;
++        Ok(self.entries.get(&identity))
++    }
++}
++
++// Pure signature math may repeat across journal preflight, proof discovery and
++// materialization. Reuse only inside one synchronous checkpoint on this thread.
++// Membership/key resolution and stateful authorization always run at each caller.
++const SIGNATURE_CACHE_MAX_ENTRIES: usize = 16_384;
++const SIGNATURE_CACHE_MAX_PAYLOAD_BYTES: usize = 8 * 1024 * 1024;
++type SignatureVerificationKey = ([u8; 32], [u8; 64], [u8; 32]);
++
++struct SignatureVerificationEntry {
++    payload: Box<[u8]>,
++    valid: bool,
++}
++
++#[derive(Default)]
++struct SignatureVerificationCache {
++    entries: HashMap<SignatureVerificationKey, SignatureVerificationEntry>,
++    payload_bytes: usize,
++}
++
++impl SignatureVerificationCache {
++    fn remember(&mut self, identity: SignatureVerificationKey, payload: &[u8], valid: bool) {
++        if self.entries.len() >= SIGNATURE_CACHE_MAX_ENTRIES
++            || payload.len() > SIGNATURE_CACHE_MAX_PAYLOAD_BYTES.saturating_sub(self.payload_bytes)
++            || self.entries.contains_key(&identity)
++        {
++            return;
++        }
++        self.entries.insert(
++            identity,
++            SignatureVerificationEntry {
++                payload: payload.into(),
++                valid,
++            },
++        );
++        self.payload_bytes += payload.len();
++    }
++}
++
++thread_local! {
++    static SIGNATURE_VERIFICATION_CACHE: std::cell::RefCell<Option<SignatureVerificationCache>> = const { std::cell::RefCell::new(None) };
++}
++
++struct SignatureVerificationScope {
++    owns_cache: bool,
++    // A guard must be destroyed on the thread whose cache it owns.
++    _thread_bound: std::marker::PhantomData<std::rc::Rc<()>>,
++}
++
++impl SignatureVerificationScope {
++    fn enter() -> Self {
++        let owns_cache = SIGNATURE_VERIFICATION_CACHE.with(|slot| {
++            let mut slot = slot.borrow_mut();
++            if slot.is_some() {
++                false
++            } else {
++                *slot = Some(SignatureVerificationCache::default());
++                true
++            }
++        });
++        Self {
++            owns_cache,
++            _thread_bound: std::marker::PhantomData,
++        }
++    }
++}
++
++impl Drop for SignatureVerificationScope {
++    fn drop(&mut self) {
++        if self.owns_cache {
++            SIGNATURE_VERIFICATION_CACHE.with(|slot| {
++                slot.borrow_mut().take();
++            });
++        }
++    }
++}
++
++fn verify_signature_math(key: &VerifyingKey, payload: &[u8], signature: &Signature) -> bool {
++    let identity = SIGNATURE_VERIFICATION_CACHE.with(|slot| {
++        if slot.borrow().is_none() {
++            return None;
++        }
++        Some((
++            key.to_bytes(),
++            signature.to_bytes(),
++            Sha256::digest(payload).into(),
++        ))
++    });
++    if let Some(identity) = &identity {
++        let cached = SIGNATURE_VERIFICATION_CACHE.with(|slot| {
++            let slot = slot.borrow();
++            // The digest is only a lookup accelerator. Exact bytes are checked
++            // too, so a digest collision cannot reuse a different message's result.
++            slot.as_ref()?
++                .entries
++                .get(identity)
++                .filter(|entry| entry.payload.as_ref() == payload)
++                .map(|entry| entry.valid)
++        });
++        if let Some(valid) = cached {
++            return valid;
++        }
++    }
++    #[cfg(test)]
++    vector_memory_tests::record_signature_verification(key, payload, signature);
++    let valid = key.verify(payload, signature).is_ok();
++    if let Some(identity) = identity {
++        SIGNATURE_VERIFICATION_CACHE.with(|slot| {
++            if let Some(cache) = slot.borrow_mut().as_mut() {
++                cache.remember(identity, payload, valid);
++            }
++        });
++    }
++    valid
++}
++
++/// Borrowed lookup indexes preserve first-match order and duplicate identity counts.
++/// Tiny transactions stay allocation-free; large batches avoid scans per leaf.
++struct RevisionBindingIndex<'a> {
++    mutations: &'a [uee_v2::RecordRevisionMutationV1],
++    indexed: Option<IndexedRevisionBindings<'a>>,
++}
++
++#[derive(Default)]
++struct IndexedRevisionBindings<'a> {
++    identities: HashMap<(&'static str, &'a str), (&'a uee_v2::RecordRevisionMutationV1, usize)>,
++    owners: HashMap<&'a str, &'a uee_v2::RecordRevisionMutationV1>,
++    vectors: HashMap<&'a str, Vec<&'a uee_v2::RecordRevisionMutationV1>>,
++}
++
++impl<'a> RevisionBindingIndex<'a> {
++    fn new(mutations: &'a [uee_v2::RecordRevisionMutationV1]) -> Self {
++        let indexed = (mutations.len() >= 16).then(|| {
++            let mut index = IndexedRevisionBindings::default();
++            for mutation in mutations {
++                #[cfg(test)]
++                vector_memory_tests::record_revision_binding_visit();
++                index
++                    .identities
++                    .entry((
++                        Storage::revision_kind_name(&mutation.kind),
++                        mutation.id.as_str(),
++                    ))
++                    .and_modify(|(_, count)| *count += 1)
++                    .or_insert((mutation, 1));
++                if mutation.kind == uee_v2::RecordKindV2::Node && mutation.namespace == "default" {
++                    index.owners.entry(mutation.id.as_str()).or_insert(mutation);
++                }
++                if mutation.kind == uee_v2::RecordKindV2::Vector
++                    && mutation.namespace == "default"
++                    && mutation.operation == uee_v2::RevisionOperationV1::Upsert
++                {
++                    if let Some(owner) = mutation.payload["owner_id"].as_str() {
++                        index.vectors.entry(owner).or_default().push(mutation);
++                    }
++                }
++            }
++            index
++        });
++        Self { mutations, indexed }
++    }
++
++    fn first(
++        &self,
++        kind: &uee_v2::RecordKindV2,
++        id: &str,
++    ) -> Option<&'a uee_v2::RecordRevisionMutationV1> {
++        if let Some(index) = &self.indexed {
++            return index
++                .identities
++                .get(&(Storage::revision_kind_name(kind), id))
++                .map(|(first, _)| *first);
++        }
++        self.mutations.iter().find(|mutation| {
++            #[cfg(test)]
++            vector_memory_tests::record_revision_binding_visit();
++            mutation.kind == *kind && mutation.id == id
++        })
++    }
++
++    fn unique(
++        &self,
++        kind: &uee_v2::RecordKindV2,
++        id: &str,
++    ) -> Option<&'a uee_v2::RecordRevisionMutationV1> {
++        if let Some(index) = &self.indexed {
++            return index
++                .identities
++                .get(&(Storage::revision_kind_name(kind), id))
++                .and_then(|(first, count)| (*count == 1).then_some(*first));
++        }
++        let mut matches = self.mutations.iter().filter(|mutation| {
++            #[cfg(test)]
++            vector_memory_tests::record_revision_binding_visit();
++            mutation.kind == *kind && mutation.id == id
++        });
++        let first = matches.next()?;
++        matches.next().is_none().then_some(first)
++    }
++
++    fn owner(&self, id: &str) -> Option<&'a uee_v2::RecordRevisionMutationV1> {
++        if let Some(index) = &self.indexed {
++            return index.owners.get(id).copied();
++        }
++        self.mutations.iter().find(|candidate| {
++            candidate.kind == uee_v2::RecordKindV2::Node
++                && candidate.namespace == "default"
++                && candidate.id == id
++        })
++    }
++
++    fn matching_vector(
++        &self,
++        owner: &str,
++        embedding: &Value,
++        lang: &str,
++    ) -> Option<&'a uee_v2::RecordRevisionMutationV1> {
++        let matches = |mutation: &&uee_v2::RecordRevisionMutationV1| {
++            #[cfg(test)]
++            vector_memory_tests::record_revision_binding_visit();
++            mutation.payload["embedding"] == *embedding
++                && mutation.payload["lang"].as_str() == Some(lang)
++        };
++        if let Some(index) = &self.indexed {
++            return index.vectors.get(owner)?.iter().copied().find(matches);
++        }
++        self.mutations
++            .iter()
++            .filter(|mutation| {
++                mutation.kind == uee_v2::RecordKindV2::Vector
++                    && mutation.namespace == "default"
++                    && mutation.operation == uee_v2::RevisionOperationV1::Upsert
++                    && mutation.payload["owner_id"].as_str() == Some(owner)
++            })
++            .find(matches)
++    }
+ }
+ 
+ #[derive(Default)]
+@@ -2389,10 +2689,20 @@
+         if transaction.local_frame_seq.is_some() {
+             let mut canonical = transaction.clone();
+             canonical.local_frame_seq = None;
+-            return serde_json::to_vec(&Event::Transaction(canonical));
+-        }
+-    }
+-    serde_json::to_vec(event)
++            let bytes = serde_json::to_vec(&Event::Transaction(canonical));
++            #[cfg(test)]
++            if let Ok(bytes) = &bytes {
++                vector_memory_tests::record_source_encoding(bytes);
++            }
++            return bytes;
++        }
++    }
++    let bytes = serde_json::to_vec(event);
++    #[cfg(test)]
++    if let Ok(bytes) = &bytes {
++        vector_memory_tests::record_source_encoding(bytes);
++    }
++    bytes
+ }
+ 
+ fn compacted_master_proof_payload(
+@@ -2448,6 +2758,15 @@
+ ) -> serde_json::Result<Vec<u8>> {
+     let event_bytes = canonical_event_bytes(event)?;
+     let proof_bytes = serde_json::to_vec(proof)?;
++    compacted_base_event_payload_bytes(relay_peer_id, &event_bytes, &proof_bytes, envelope_version)
++}
++
++fn compacted_base_event_payload_bytes(
++    relay_peer_id: &str,
++    event_bytes: &[u8],
++    proof_bytes: &[u8],
++    envelope_version: u32,
++) -> serde_json::Result<Vec<u8>> {
+     let version_bytes = envelope_version.to_le_bytes();
+     let mut payload = match envelope_version {
+         1 => b"genesis-block/compacted-base-event/v1\0".to_vec(),
+@@ -2459,16 +2778,12 @@
+         }
+     };
+     let parts: Vec<&[u8]> = if envelope_version == 1 {
+-        vec![
+-            relay_peer_id.as_bytes(),
+-            event_bytes.as_slice(),
+-            proof_bytes.as_slice(),
+-        ]
++        vec![relay_peer_id.as_bytes(), event_bytes, proof_bytes]
+     } else {
+         vec![
+             relay_peer_id.as_bytes(),
+-            event_bytes.as_slice(),
+-            proof_bytes.as_slice(),
++            event_bytes,
++            proof_bytes,
+             &version_bytes,
+         ]
+     };
+@@ -8073,6 +8388,7 @@
+         transaction
+             .validate()
+             .map_err(|error| Error::from_reason(error.to_string()))?;
++        let index = RevisionBindingIndex::new(&transaction.mutations);
+         let mut seen = HashSet::new();
+         for mutation in &transaction.mutations {
+             if mutation.kind == uee_v2::RecordKindV2::Artifact {
+@@ -8118,11 +8434,7 @@
+                 {
+                     return Err(Error::from_reason("HQL2_VECTOR_REVISION_INVALID"));
+                 }
+-                let owner_mutation = transaction.mutations.iter().find(|candidate| {
+-                    candidate.kind == uee_v2::RecordKindV2::Node
+-                        && candidate.namespace == "default"
+-                        && candidate.id == owner_id
+-                });
++                let owner_mutation = index.owner(owner_id);
+                 let owner_is_valid = if let Some(owner_mutation) = owner_mutation {
+                     owner_mutation.operation == uee_v2::RevisionOperationV1::Upsert
+                         && owner_mutation.revision_id == owner_revision_id
+@@ -16075,6 +16387,7 @@
+                 Err(Error::from_reason("REVISION_ENVELOPE_REQUIRED"))
+             };
+         };
++        let index = RevisionBindingIndex::new(&revisions.mutations);
+         let graph_revision_count = revisions
+             .mutations
+             .iter()
+@@ -16093,10 +16406,8 @@
+                         operation: uee_v2::RevisionOperationV1,
+                         payload: Value|
+          -> Result<()> {
+-            let mutation = revisions
+-                .mutations
+-                .iter()
+-                .find(|mutation| mutation.kind == kind && mutation.id == id)
++            let mutation = index
++                .first(&kind, id)
+                 .ok_or_else(|| Error::from_reason("REVISION_EVENT_MISMATCH"))?;
+             if mutation.namespace != "default"
+                 || mutation.operation != operation
+@@ -16157,16 +16468,10 @@
+             if !vector_targets.insert(id.clone()) {
+                 return Err(Error::from_reason("REVISION_DUPLICATE_TARGET"));
+             }
+-            let mutation = revisions
+-                .mutations
+-                .iter()
+-                .find(|mutation| mutation.kind == uee_v2::RecordKindV2::Vector && mutation.id == id)
++            let mutation = index
++                .first(&uee_v2::RecordKindV2::Vector, &id)
+                 .ok_or_else(|| Error::from_reason("REVISION_EVENT_MISMATCH"))?;
+-            let owner_revision = revisions.mutations.iter().find(|candidate| {
+-                candidate.kind == uee_v2::RecordKindV2::Node
+-                    && candidate.namespace == "default"
+-                    && candidate.id == owner_id
+-            });
++            let owner_revision = index.owner(owner_id);
+             if mutation.namespace != "default"
+                 || mutation.operation != uee_v2::RevisionOperationV1::Upsert
+                 || mutation.schema_ref.as_deref() != Some(collection.name.as_str())
+@@ -16515,6 +16820,31 @@
+         event: &Event,
+         proof: Option<&SignedEvent>,
+     ) -> Result<SignedEvent> {
++        self.sign_compacted_base_materialization_impl(event, proof, None)
++    }
++
++    fn sign_compacted_base_materialization_cached<'a>(
++        &self,
++        event: &Event,
++        proof: Option<&'a SignedEvent>,
++        cache: &mut CompactionProofBytesCache<'a>,
++    ) -> Result<SignedEvent> {
++        match proof {
++            Some(proof) => self.sign_compacted_base_materialization_impl(
++                event,
++                Some(proof),
++                cache.prepare(proof)?,
++            ),
++            None => self.sign_compacted_base_materialization(event, None),
++        }
++    }
++
++    fn sign_compacted_base_materialization_impl(
++        &self,
++        event: &Event,
++        proof: Option<&SignedEvent>,
++        prepared: Option<&SerializedCompactionProof<'_>>,
++    ) -> Result<SignedEvent> {
+         if !matches!(
+             event,
+             Event::Node(_) | Event::Edge(_) | Event::VectorMaterialized(_)
+@@ -16536,7 +16866,11 @@
+                 })?;
+             return self.sign_compacted_base_materialization(event, Some(&proof));
+         };
+-        if !self.verify_raw_event_signature(proof) {
++        let prepared = prepared.filter(|encoded| std::ptr::eq(encoded.source, proof));
++        if !self.verify_raw_event_signature_with_canonical(
++            proof,
++            prepared.map(|encoded| encoded.canonical.as_ref()),
++        ) {
+             return Err(Error::from_reason(
+                 "COMPACTION_BASE_EVENT_PROOF_INVALID: source signature is invalid",
+             ));
+@@ -16562,19 +16896,48 @@
+                 "COMPACTION_BASE_EVENT_PROOF_INVALID: source event does not bind {target}"
+             )));
+         }
+-        let payload = compacted_base_event_payload(&self.local_peer_id, event, proof, 2)
+-            .map_err(|error| Error::from_reason(error.to_string()))?;
++        let payload = match prepared {
++            Some(encoded) => {
++                let event_bytes = canonical_event_bytes(event)
++                    .map_err(|error| Error::from_reason(error.to_string()))?;
++                compacted_base_event_payload_bytes(
++                    &self.local_peer_id,
++                    &event_bytes,
++                    &encoded.json,
++                    2,
++                )
++            }
++            None => compacted_base_event_payload(&self.local_peer_id, event, proof, 2),
++        }
++        .map_err(|error| Error::from_reason(error.to_string()))?;
+         let relay_signature = self.signing_key.sign(&payload).to_bytes().to_vec();
+-        let envelope = CompactedBaseEventEnvelope {
+-            version: 2,
+-            proof: proof.clone(),
+-            relay_signature,
++        let signature = if let Some(encoded) = prepared {
++            // Exact serde struct field order, with the already encoded immutable
++            // proof inserted verbatim. Caps/compression share the existing encoder.
++            let mut json = Vec::with_capacity(encoded.json.len() + 512);
++            json.extend_from_slice(br#"{"version":2,"proof":"#);
++            json.extend_from_slice(&encoded.json);
++            json.extend_from_slice(br#","relay_signature":"#);
++            serde_json::to_writer(&mut json, &relay_signature)
++                .map_err(|error| Error::from_reason(error.to_string()))?;
++            json.push(b'}');
++            encode_compacted_envelope_json(
++                COMPACTED_BASE_EVENT_V2_MAGIC,
++                &json,
++                COMPACTED_BASE_EVENT_MAX_BYTES,
++            )?
++        } else {
++            let envelope = CompactedBaseEventEnvelope {
++                version: 2,
++                proof: proof.clone(),
++                relay_signature,
++            };
++            encode_compacted_envelope(
++                COMPACTED_BASE_EVENT_V2_MAGIC,
++                &envelope,
++                COMPACTED_BASE_EVENT_MAX_BYTES,
++            )?
+         };
+-        let signature = encode_compacted_envelope(
+-            COMPACTED_BASE_EVENT_V2_MAGIC,
+-            &envelope,
+-            COMPACTED_BASE_EVENT_MAX_BYTES,
+-        )?;
+         let signed = SignedEvent {
+             event: event.clone(),
+             signature,
+@@ -18569,19 +18932,33 @@
+     }
+ 
+     fn verify_raw_event_signature(&self, se: &SignedEvent) -> bool {
++        self.verify_raw_event_signature_with_canonical(se, None)
++    }
++
++    fn verify_raw_event_signature_with_canonical(
++        &self,
++        se: &SignedEvent,
++        canonical: Option<&[u8]>,
++    ) -> bool {
+         let vkey = match self.peer_verifying_key(&se.signer_peer_id) {
+             Some(k) => k,
+             None => return false,
+         };
+-        let data = match canonical_event_bytes(&se.event) {
+-            Ok(d) => d,
+-            Err(_) => return false,
++        let owned;
++        let data = if let Some(canonical) = canonical {
++            canonical
++        } else {
++            owned = match canonical_event_bytes(&se.event) {
++                Ok(data) => data,
++                Err(_) => return false,
++            };
++            &owned
+         };
+         let sig = match Signature::from_slice(&se.signature) {
+             Ok(s) => s,
+             Err(_) => return false,
+         };
+-        vkey.verify(&data, &sig).is_ok()
++        verify_signature_math(&vkey, data, &sig)
+     }
+ 
+     fn verify_compacted_base_materialization_with_collection_definitions(
+@@ -18626,7 +19003,7 @@
+         let Ok(signature) = Signature::from_slice(&envelope.relay_signature) else {
+             return false;
+         };
+-        key.verify(&payload, &signature).is_ok()
++        verify_signature_math(&key, &payload, &signature)
+     }
+ 
+     fn compacted_row_revision_schemas(
+@@ -19449,7 +19826,7 @@
+         let Ok(signature) = Signature::from_slice(&envelope.relay_signature) else {
+             return false;
+         };
+-        key.verify(&payload, &signature).is_ok()
++        verify_signature_math(&key, &payload, &signature)
+     }
+ 
+     /// Projection replay runs before an operator can restore the in-memory
+@@ -19583,6 +19960,7 @@
+             return false;
+         }
+ 
++        let index = RevisionBindingIndex::new(&revisions.mutations);
+         let graph_revision_count = revisions
+             .mutations
+             .iter()
+@@ -19605,17 +19983,12 @@
+                                        operation: uee_v2::RevisionOperationV1,
+                                        payload: Value|
+          -> bool {
+-            let mut matching = revisions
+-                .mutations
+-                .iter()
+-                .filter(|mutation| mutation.kind == kind && mutation.id == id);
+-            let Some(mutation) = matching.next() else {
++            let Some(mutation) = index.unique(&kind, id) else {
+                 return false;
+             };
+             mutation.namespace == "default"
+                 && mutation.operation == operation
+                 && mutation.payload == payload
+-                && matching.next().is_none()
+         };
+ 
+         let mut graph_ids = HashSet::new();
+@@ -19689,14 +20062,9 @@
+             let Ok(embedding_payload) = serde_json::to_value(embedding) else {
+                 return false;
+             };
+-            let Some(mutation) = revisions.mutations.iter().find(|mutation| {
+-                mutation.kind == uee_v2::RecordKindV2::Vector
+-                    && mutation.namespace == "default"
+-                    && mutation.operation == uee_v2::RevisionOperationV1::Upsert
+-                    && mutation.payload["owner_id"].as_str() == Some(owner_id)
+-                    && mutation.payload["embedding"] == embedding_payload
+-                    && mutation.payload["lang"].as_str() == Some(lang.unwrap_or("en"))
+-            }) else {
++            let Some(mutation) =
++                index.matching_vector(owner_id, &embedding_payload, lang.unwrap_or("en"))
++            else {
+                 return false;
+             };
+             let Some(collection) = mutation.payload["collection"].as_str() else {
+@@ -19716,11 +20084,7 @@
+                 return false;
+             }
+             if let Some(owner_valid_from) = owner_valid_from {
+-                if let Some(owner) = revisions.mutations.iter().find(|candidate| {
+-                    candidate.kind == uee_v2::RecordKindV2::Node
+-                        && candidate.namespace == "default"
+-                        && candidate.id == owner_id
+-                }) {
++                if let Some(owner) = index.owner(owner_id) {
+                     if owner.operation != uee_v2::RevisionOperationV1::Upsert
+                         || mutation.payload["owner_revision_id"].as_str()
+                             != Some(owner.revision_id.as_str())
+@@ -20191,7 +20555,9 @@
+         )
+         .ok()?;
+         let relay_signature = Signature::from_slice(&envelope.relay_signature).ok()?;
+-        key.verify(&payload, &relay_signature).ok()?;
++        if !verify_signature_math(&key, &payload, &relay_signature) {
++            return None;
++        }
+         Some(envelope.proof)
+     }
+ 
+@@ -29454,6 +29820,7 @@
+     /// live state cannot move between the build and the fold).
+     fn build_compacted_wal(&self) -> Result<(Vec<u8>, usize)> {
+         self.ensure_writable()?;
++        let _signature_scope = SignatureVerificationScope::enter();
+         // The current projection is final state, so validate source proofs by
+         // their retained journal order before creating checkpoints. Checking
+         // each historical source against the live MASTER state would reject
+@@ -29483,6 +29850,7 @@
+             CompactedBaseMaterializationProofs::default()
+         };
+         let authority_proofs = self.compacted_master_authority_proofs(&now)?;
++        let mut serialized_proofs = CompactionProofBytesCache::default();
+ 
+         // Sign only the current protected projection and carry the original
+         // MASTER event as detached signature evidence. Replaying the original
+@@ -29635,8 +30003,11 @@
+                         let mut current_source = current_source;
+                         current_source.embedding = None;
+                         let event = Event::Node(current_source);
+-                        materializations
+-                            .push(self.sign_compacted_base_materialization(&event, proof)?);
++                        materializations.push(self.sign_compacted_base_materialization_cached(
++                            &event,
++                            proof,
++                            &mut serialized_proofs,
++                        )?);
+                     }
+                 } else {
+                     let proof = base_proofs.nodes.get(&node.id).map(Arc::as_ref);
+@@ -29650,7 +30021,11 @@
+                         })?;
+                     source.embedding = None;
+                     let event = Event::Node(source);
+-                    materializations.push(self.sign_compacted_base_materialization(&event, proof)?);
++                    materializations.push(self.sign_compacted_base_materialization_cached(
++                        &event,
++                        proof,
++                        &mut serialized_proofs,
++                    )?);
+                 }
+                 for signed in materializations {
+                     let json = serde_json::to_vec(&signed)
+@@ -29678,7 +30053,11 @@
+             if keep {
+                 let event = Event::Edge(edge.clone());
+                 let proof = base_proofs.edges.get(&edge.id).map(Arc::as_ref);
+-                let signed = self.sign_compacted_base_materialization(&event, proof)?;
++                let signed = self.sign_compacted_base_materialization_cached(
++                    &event,
++                    proof,
++                    &mut serialized_proofs,
++                )?;
+                 let json = serde_json::to_string(&signed)
+                     .map_err(|error| Error::from_reason(error.to_string()))?;
+                 buf.extend_from_slice(json.as_bytes());
+@@ -29780,7 +30159,11 @@
+                     }
+                     self.sign_compacted_master_materialization(&event, master_proof, proof)?
+                 } else {
+-                    self.sign_compacted_base_materialization(&event, proof)?
++                    self.sign_compacted_base_materialization_cached(
++                        &event,
++                        proof,
++                        &mut serialized_proofs,
++                    )?
+                 };
+                 let json =
+                     serde_json::to_vec(&signed).map_err(|e| Error::from_reason(e.to_string()))?;

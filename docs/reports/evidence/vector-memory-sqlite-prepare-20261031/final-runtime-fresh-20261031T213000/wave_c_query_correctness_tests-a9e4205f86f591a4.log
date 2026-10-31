@@ -1,0 +1,12 @@
+
+running 7 tests
+test batch_edge_preserves_valid_from ... ok
+test direct_vector_and_query_controls_fail_closed ... ok
+test filtered_ann_refills_after_retired_shortlist ... ok
+test filtered_ann_refills_large_collection_when_ef_is_smaller_than_fetch ... ok
+test filtered_ann_refills_quantized_rerank_candidates ... ok
+test grl_hides_retracted_edges_and_endpoints ... ok
+test temporal_search_normalizes_rfc3339_and_hides_future_nodes ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.67s
+

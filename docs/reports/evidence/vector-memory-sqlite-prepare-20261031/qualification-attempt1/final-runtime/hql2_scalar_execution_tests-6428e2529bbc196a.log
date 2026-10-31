@@ -1,0 +1,36 @@
+
+running 31 tests
+test aggregate_validates_every_arity_and_argument_on_empty ... ok
+test aggregates_ignore_null_except_collect_and_group_null_together ... ok
+test all_join_kinds_preserve_multiplicity_and_null_keys ... ok
+test average_preserves_checked_numeric_error_behavior_of_reference ... ok
+test binder_defends_internal_hql_graph_invariants ... ok
+test budget_includes_time_waiting_for_catalog_guard ... ok
+test budgets_error_instead_of_successful_partial_output ... ok
+test change_scan_binds_a_typed_change_event_source ... ok
+test checked_numerics_and_unicode_functions ... ok
+test checked_remainder_uses_truncating_quotient_and_propagates_null ... ok
+test closed_parameters_and_declaration_agreement ... ok
+test collect_obeys_row_budget_even_when_result_has_one_row ... ok
+test deadline_starts_at_budget_creation_before_execution ... ok
+test declarations_hql_inference_and_ir_mismatch ... ok
+test deeply_nested_scalar_expression_works_on_windows_sized_stack ... ok
+test differential_scalar_bags_order_and_aggregates_against_p7 ... ok
+test eager_boolean_evaluation_does_not_hide_division_error ... ok
+test empty_global_aggregates_and_grouped_empty ... ok
+test empty_input_still_checks_scope_and_types ... ok
+test exec::vector_distance_tests::cosine_distance_scales_finite_extreme_and_subnormal_values ... ok
+test explain_has_no_actuals_execution_has_measured_counters ... ok
+test filter_project_distinct_sort_offset_take_composition ... ok
+test float_invalid_results_fail_and_scalar_string_predicates_work ... ok
+test list_comparison_is_not_an_implicitly_registered_scalar_comparator ... ok
+test null_sort_order_independent_of_direction_and_list_order_rejected ... ok
+test replaced_scopes_duplicate_aliases_and_semi_right_are_rejected ... ok
+test result::counter_contract_tests::counter_wire_contract_keeps_zero_unknown_and_overflow_distinct ... ok
+test source::hydration_batch_tests::exec_batch_checks_typed_columns_rows_and_stable_keys ... ok
+test three_valued_boolean_truth_tables ... ok
+test union_requires_equal_scope_and_types_even_empty ... ok
+test values_preserve_bag_and_typed_nullable_elements ... ok
+
+test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+

@@ -1,0 +1,9 @@
+
+running 4 tests
+test hybrid_search_as_of_resolves_superseded_version ... ok
+test tx_as_of_below_horizon_fails_beyond_horizon ... ok
+test tx_as_of_drops_nodes_not_yet_committed ... ok
+test tx_as_of_resolves_historical_version ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+

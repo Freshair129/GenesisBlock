@@ -1,0 +1,11 @@
+
+running 6 tests
+test authentic_self_vote_reaches_quorum ... ok
+test malformed_signature_rejected ... ok
+test signature_is_bound_to_the_choice ... ok
+test tampered_signature_rejected ... ok
+test vote_from_unknown_peer_rejected ... ok
+test vote_signing_rejects_an_unknown_proposal ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.56s
+

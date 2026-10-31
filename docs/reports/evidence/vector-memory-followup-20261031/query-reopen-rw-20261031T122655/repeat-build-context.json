@@ -1,0 +1,18 @@
+{
+  "source": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\verify-src",
+  "source_head": "ad94aa2e46025b7729d117ff376ab281ac15c49d",
+  "source_hashes": {
+    "lib": "60DB70FBC9FE2B133BD345DC697A1E0D823654617F27F9754328B7DE19FF61FE",
+    "bench": "5BFDE2C3B897C316BED557FC3037AE9A44D9EEAD07053DB4F835BF1BD7D27C62",
+    "pre_repeat_bench": "124E6D906A62DC771029497607A1F35664D788ABE4A4F64D52A905A9453F09FE",
+    "prior_diagnostic_lib": "60DB70FBC9FE2B133BD345DC697A1E0D823654617F27F9754328B7DE19FF61FE",
+    "repeat_patch": "0DB4C646F931227CD443516F43123FDFA6310949AC899F350F1D7879C489CA2B",
+    "rayon_script": "C989F95BFA1795A874BE890AEA227B587D18C019F27FE8E54B098B52B9827BB3",
+    "repeat_source_head": "ad94aa2e46025b7729d117ff376ab281ac15c49d"
+  },
+  "target_dir": "D:\\GenesisBlock_Dev\\GenesisBlock\\target",
+  "command": "cargo build --locked --offline --release --no-default-features --features bins --bin vbench-genesis -j2",
+  "CARGO_PROFILE_RELEASE_LTO": "false",
+  "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "16",
+  "runtime_not_started": true
+}

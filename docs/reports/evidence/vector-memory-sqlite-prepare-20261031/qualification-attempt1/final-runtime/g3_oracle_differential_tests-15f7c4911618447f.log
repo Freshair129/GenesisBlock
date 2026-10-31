@@ -1,0 +1,8 @@
+
+running 3 tests
+test g3_oracle_matches_public_storage_before_and_after_wal_reopen ... ok
+test g3_oracle_preserves_relational_null_and_bag_semantics_after_reopen ... ok
+test materialized_removal_propagates_non_not_found_errors ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+

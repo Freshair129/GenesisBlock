@@ -1,0 +1,10 @@
+
+running 5 tests
+test query_ir_capabilities_disclose_wave_e_boundaries ... ok
+test query_ir_context_rejects_unknown_target_and_namespace_scope ... ok
+test query_ir_context_rejects_unsupported_seed_and_temporal_modes ... ok
+test query_ir_context_reports_compression_warning ... ok
+test query_ir_context_returns_bounded_packet ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s
+

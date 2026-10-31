@@ -1,0 +1,14 @@
+
+running 9 tests
+test direction_both_returns_union ... ok
+test direction_defaults_to_out_for_backcompat ... ok
+test direction_in_returns_predecessors_only ... ok
+test direction_is_case_insensitive ... ok
+test empty_rels_falls_back_to_rel ... ok
+test limit_still_honored_with_direction_both ... ok
+test rel_any_means_no_filter ... ok
+test rels_overrides_rel_when_both_given ... ok
+test rels_set_filters_to_chosen_types ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.03s
+

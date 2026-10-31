@@ -1,0 +1,9 @@
+{
+  "recorded_at": "2026-10-31T22:42:14.347807+07:00",
+  "status": "applied_to_worktree; final correctness qualified; isolated pinned causal matrix passed; 100k/real-pair pending resource admission",
+  "core_sha256": "5b8bb9bed5dde5fa6e7d4d255da3acce6c1bfe892092456133adb65a78998fdd",
+  "final_test_sha256": "e69dc7dd5cbc5043aa5ed9c717e449e50246a8fbd8ad56ac95ed135718c99be2",
+  "historical_design_status": "proposal-status-at-design.json",
+  "qualification_passed": true,
+  "qualification_scope": "Correctness only: 159 targets, 1328/0/7; all 8 static/native gates and Node 88/0/0; timed 100k not implied"
+}

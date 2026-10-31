@@ -1,0 +1,6 @@
+warning: in the working copy of 'Cargo.toml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'index.d.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/lib.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/projection_rebuild_tests.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/router.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/rest_api_tests.rs', LF will be replaced by CRLF the next time Git touches it

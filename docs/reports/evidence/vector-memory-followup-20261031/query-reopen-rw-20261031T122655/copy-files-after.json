@@ -1,0 +1,67 @@
+[
+  {
+    "Name": "edges_retired.bin",
+    "Length": 2,
+    "LastWriteTimeUtc": "2026-10-31T03:17:21.7352897Z"
+  },
+  {
+    "Name": "edges.bin",
+    "Length": 2,
+    "LastWriteTimeUtc": "2026-10-31T03:17:21.7352897Z"
+  },
+  {
+    "Name": "genesis.lock",
+    "Length": 0,
+    "LastWriteTimeUtc": "2026-10-31T02:45:27.8384706Z"
+  },
+  {
+    "Name": "identity.bin",
+    "Length": 32,
+    "LastWriteTimeUtc": "2026-10-31T02:45:27.8409746Z"
+  },
+  {
+    "Name": "meta_bench.bin",
+    "Length": 2616662,
+    "LastWriteTimeUtc": "2026-10-31T03:17:21.5423002Z"
+  },
+  {
+    "Name": "meta_default.bin",
+    "Length": 5,
+    "LastWriteTimeUtc": "2026-10-31T03:17:21.5432962Z"
+  },
+  {
+    "Name": "nodes.bin",
+    "Length": 25227518,
+    "LastWriteTimeUtc": "2026-10-31T03:17:21.7332842Z"
+  },
+  {
+    "Name": "projection.sqlite",
+    "Length": 9006981120,
+    "LastWriteTimeUtc": "2026-10-31T03:17:20.7446077Z"
+  },
+  {
+    "Name": "projection.sqlite-shm",
+    "Length": 32768,
+    "LastWriteTimeUtc": "2026-10-31T05:20:08.6864166Z"
+  },
+  {
+    "Name": "projection.sqlite-wal",
+    "Length": 0,
+    "LastWriteTimeUtc": "2026-10-31T03:22:25.6015657Z"
+  },
+  {
+    "Name": "state.json",
+    "Length": 2470,
+    "LastWriteTimeUtc": "2026-10-31T03:18:52.8760595Z"
+  },
+  {
+    "Name": "vec_bench.bin",
+    "Length": 12800000,
+    "LastWriteTimeUtc": "2026-10-31T03:17:21.5292863Z"
+  },
+  {
+    "Name": "vec_default.bin",
+    "Length": 0,
+    "LastWriteTimeUtc": "2026-10-31T03:17:21.5423002Z"
+  }
+]

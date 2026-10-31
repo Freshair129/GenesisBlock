@@ -1,0 +1,14 @@
+{"phase":"opened","elapsed_ms":80.38719999999999,"unix_time_ms":1793423341325,"open_ms":79.8627,"db_path":"C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\journal-2000-phase-diag-20261031T0508Z\\database","engine":"genesis-block","version":"0.2.10","schema_version":6}
+{"phase":"add_progress","elapsed_ms":876.9555,"unix_time_ms":1793423342121,"added":250,"total":2000,"add_elapsed_ms":782.7081,"latest_250_elapsed_ms":782.7074}
+{"phase":"add_progress","elapsed_ms":1749.3207000000002,"unix_time_ms":1793423342994,"added":500,"total":2000,"add_elapsed_ms":1655.0804,"latest_250_elapsed_ms":872.3723000000001}
+{"phase":"add_progress","elapsed_ms":2427.0402,"unix_time_ms":1793423343672,"added":750,"total":2000,"add_elapsed_ms":2332.8087,"latest_250_elapsed_ms":677.7282999999998}
+{"phase":"add_progress","elapsed_ms":3115.4651,"unix_time_ms":1793423344360,"added":1000,"total":2000,"add_elapsed_ms":3021.2262,"latest_250_elapsed_ms":688.4175}
+{"phase":"add_progress","elapsed_ms":3816.1215,"unix_time_ms":1793423345061,"added":1250,"total":2000,"add_elapsed_ms":3721.8882000000003,"latest_250_elapsed_ms":700.6620000000003}
+{"phase":"add_progress","elapsed_ms":4540.3968,"unix_time_ms":1793423345785,"added":1500,"total":2000,"add_elapsed_ms":4446.1594,"latest_250_elapsed_ms":724.2711999999997}
+{"phase":"add_progress","elapsed_ms":5255.9579,"unix_time_ms":1793423346500,"added":1750,"total":2000,"add_elapsed_ms":5161.7249,"latest_250_elapsed_ms":715.5655000000006}
+{"phase":"add_progress","elapsed_ms":5966.185,"unix_time_ms":1793423347211,"added":2000,"total":2000,"add_elapsed_ms":5871.9457999999995,"latest_250_elapsed_ms":710.2208999999993}
+{"phase":"add_complete","elapsed_ms":5967.2174,"unix_time_ms":1793423347212,"added":2000,"add_elapsed_ms":5872.9364}
+{"phase":"explicit_save_done","elapsed_ms":138174.7837,"unix_time_ms":1793423479419,"save_elapsed_ms":132206.52790000002,"save_done_elapsed_ms":138174.72689999998}
+{"phase":"drop_start","elapsed_ms":138176.18029999998,"unix_time_ms":1793423479420,"save_elapsed_ms":132206.52790000002,"save_done_elapsed_ms":138174.72689999998}
+{"phase":"native_wrapper_finalized","elapsed_ms":138179.88079999998,"note":"FinalizationRegistry callback; verify Storage Drop marker in stdout log"}
+{"phase":"drop_done","elapsed_ms":138180.557,"unix_time_ms":1793423479424,"drop_wait_ms":3.7312000000092667,"explicit_save_elapsed_ms":132206.52790000002,"save_done_elapsed_ms":138174.72689999998,"total_elapsed_ms":138180.5466,"storage_drop_marker_expected":"shutdown: graceful shutdown, state saved.","status":"complete"}

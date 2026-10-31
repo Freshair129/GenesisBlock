@@ -1,0 +1,11 @@
+
+running 6 tests
+test generation_record_survives_compact_and_reopen ... ok
+test invalid_component_manifest_falls_back_to_the_complete_wal_on_reopen ... ok
+test pin_generation_lazily_covers_a_committed_write ... ok
+test publication_covers_one_cross_domain_frontier_and_reuses_unchanged_generation ... ok
+test read_view_rejects_unsupported_transaction_time_selectors ... ok
+test snapshot_generation_must_match_its_signed_wal_materialization ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.76s
+

@@ -1,0 +1,13 @@
+snapshot: state persisted successfully to C:\Users\suanr\genesis-vector-memory-followup-20261031\followuproot\vector-real-release-controller\runs\real-bge-release-pair-20261031T073308Z\02-candidate\gdb
+snapshot: state persisted successfully to C:\Users\suanr\genesis-vector-memory-followup-20261031\followuproot\vector-real-release-controller\runs\real-bge-release-pair-20261031T073308Z\02-candidate\gdb
+compaction: starting index compaction...
+compaction: index compaction complete in 42.4115447s. Arenas resized to 11266 nodes.
+snapshot: state persisted successfully to C:\Users\suanr\genesis-vector-memory-followup-20261031\followuproot\vector-real-release-controller\runs\real-bge-release-pair-20261031T073308Z\02-candidate\gdb
+shutdown: graceful shutdown, state saved.
+snapshot: attempting instant load from binary state...
+snapshot: loading 11266 nodes
+snapshot: loading 0 edges
+snapshot: instant load complete in 9.606357s
+snapshot: state persisted successfully to C:\Users\suanr\genesis-vector-memory-followup-20261031\followuproot\vector-real-release-controller\runs\real-bge-release-pair-20261031T073308Z\02-candidate\gdb
+shutdown: graceful shutdown, state saved.
+memory audit: 11266x1024 none rerank=false: C:\Users\suanr\genesis-vector-memory-followup-20261031\followuproot\vector-real-release-controller\runs\real-bge-release-pair-20261031T073308Z\02-candidate

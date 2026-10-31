@@ -1,0 +1,9 @@
+
+running 4 tests
+test compacted_transaction_retry_keeps_original_local_frame_after_later_write ... ok
+test replicated_fold_receipt_uses_destination_frame_after_cold_reopen ... ok
+test unified_transaction_commits_row_graph_vector_and_recovers_idempotently ... ok
+test vector_materialization_failure_is_not_reported_as_stable_and_recovers ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.79s
+

@@ -1,0 +1,24 @@
+
+running 19 tests
+test fresh_database_is_initialized_as_schema6_ready ... ok
+test in_progress_schema6_migration_fails_closed_before_projection_open ... ok
+test schema5_legacy_writes_do_not_mark_the_database_as_schema6 ... ok
+test schema6_migration_authority_survives_fold_and_wal_only_projection_rebuild ... ok
+test schema6_migration_chunk_is_a_typed_journal_event ... ok
+test schema6_migration_commits_graph_baselines_and_reopens_only_with_proof ... ok
+test schema6_migration_creates_one_row_baseline_at_the_source_frontier ... ok
+test schema6_migration_dry_run_binds_the_v5_frontier_and_engine_backup ... ok
+test schema6_migration_events_are_rejected_recursively_at_peer_and_public_write_ingress ... ok
+test schema6_migration_finishes_cleanup_after_ready_state_before_sidecar_removal ... ok
+test schema6_migration_preserves_every_graph_revision_source_interval ... ok
+test schema6_migration_rejects_a_tampered_backup_before_cutover ... ok
+test schema6_migration_rerun_with_same_manifest_is_idempotent ... ok
+test schema6_migration_resume_rejects_a_different_manifest_id ... ok
+test schema6_migration_resumes_when_crash_left_only_the_exact_in_progress_marker ... ok
+test schema6_ordinary_open_rejects_ready_state_without_matching_signed_manifest ... ok
+test schema6_requires_a_recognized_upgrade_state_marker ... ok
+test unknown_complete_schema_control_event_fails_closed_on_open ... ok
+test unverified_legacy_transaction_projection_is_rebuilt_from_journal ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.04s
+

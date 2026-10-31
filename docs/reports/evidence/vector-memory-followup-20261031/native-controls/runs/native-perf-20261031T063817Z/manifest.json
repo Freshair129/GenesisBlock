@@ -1,0 +1,99 @@
+{
+  "gates": {
+    "global_cpu_average_10s_percent_below": 20,
+    "no_other_owned_build_test_benchmark": true,
+    "free_ram_bytes_at_least": 6442450944,
+    "clear_marker": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\followuproot\\native-perf-abbaab\\native-perf-clear"
+  },
+  "profiles": {
+    "baseline": {
+      "addon_path": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\baseline-profiled.node",
+      "sha256": "8BDE8388D401F82CB03D4A7C039EF45963AC77B8B39F7741DAECC260D08FF4C2",
+      "bytes": 33726976,
+      "optimized_dependencies": "same dev package on both; engineopt0 checks true, per parent",
+      "last_write_utc": "2026-10-31T06:08:53.7452723Z"
+    },
+    "candidate": {
+      "addon_path": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\candidate-profiled.node",
+      "sha256": "8E3AAC3A8BD6A33EADB5B170F27D1A8C345FD08EFFAD13E4396190B23F9CFBB5",
+      "bytes": 33804288,
+      "optimized_dependencies": "same dev package on both; engineopt0 checks true, per parent",
+      "last_write_utc": "2026-10-31T06:19:47.5088094Z"
+    }
+  },
+  "host": {
+    "power_shell_version": "7.6.5",
+    "os_build": "26300",
+    "os_version": "10.0.26300",
+    "computer_name": "FRESHAIR",
+    "logical_processors": 12,
+    "os_caption": "Microsoft Windows 11 Pro",
+    "total_ram_bytes": 34317889536,
+    "startup_free_ram_bytes": 18883690496
+  },
+  "caps": {
+    "wall_seconds_per_child": 300,
+    "rss_bytes_per_child": 4294967296
+  },
+  "measurement_class": "controlled native checkpoint benchmark; diagnostic, not release qualification",
+  "source_comparison": {
+    "relationship": "per parent: source-before/after differ only in binding/caches",
+    "candidate_source": {
+      "sha256": "812AFDBE74E96AEE4F0C08B93488DDA4AC5A6C0E4784B72BB9F615D30C7877A9",
+      "path": "D:\\GenesisBlock_Dev\\GenesisBlock\\src\\lib.rs",
+      "source_head": "ad94aa2e46025b7729d117ff376ab281ac15c49d"
+    },
+    "baseline_source": {
+      "sha256": "60DB70FBC9FE2B133BD345DC697A1E0D823654617F27F9754328B7DE19FF61FE",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\baseline-addon-profile-20261031T130406\\source-lib.rs",
+      "source_head": "ad94aa2e46025b7729d117ff376ab281ac15c49d"
+    }
+  },
+  "node_version": "recorded by each child from process.version",
+  "schedule": [
+    "A-baseline",
+    "B-candidate",
+    "B-candidate",
+    "A-baseline",
+    "A-baseline",
+    "B-candidate"
+  ],
+  "run_dir": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\followuproot\\native-perf-abbaab\\runs\\native-perf-20261031T063817Z",
+  "node_executable": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe",
+  "dependency_provenance": {
+    "engine_code_opt_level": 0,
+    "engineopt0_checks": "true, per parent",
+    "optimized_dependency_packages": [
+      "sha2",
+      "curve25519-dalek",
+      "lz4_flex"
+    ],
+    "cargo_manifest_sha256_both": "00550FBAC8EDB5C1316B5EB21983B078039604ED3C1460689515BA5539F30E25",
+    "cargo_lock_sha256_both": "EDA5BFA67C1077C96F2B84E44F740273E695C87A1A51B352CF18F2A031A4F8D2"
+  },
+  "workload": {
+    "operations": "individual addNode calls, one at a time",
+    "page_cache_mb": 32,
+    "props": {
+      "source": "session-2026-08-17",
+      "confidence": 0.87,
+      "text": "observation {i}: the user asked about journal segment retention and folding",
+      "tags": [
+        "journal",
+        "retention",
+        "wp-1.2"
+      ]
+    },
+    "node_count": 2000,
+    "id_format": "mem:{i}",
+    "embeddings": "none",
+    "retention": "default",
+    "lang": "en",
+    "labels": [
+      "Memory",
+      "Episodic"
+    ],
+    "vector_dim": 4
+  },
+  "created_utc": "2026-10-31T06:38:17.6446408Z"
+}

@@ -1,0 +1,22 @@
+{
+  "created_local": "2026-10-31T15:13:15.5335920+07:00",
+  "run_root": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\projection-props-split-20261031T151315",
+  "c_verify": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\verify-src",
+  "delivery_d": "D:\\GenesisBlock_Dev\\GenesisBlock",
+  "target_dir": "D:\\GenesisBlock_Dev\\GenesisBlock\\target",
+  "baseline_c_lib_sha256": "812afdbe74e96aee4f0c08b93488dda4ac5a6c0e4784b72bb9f615d30c7877a9",
+  "delivery_d_lib_sha256": "812afdbe74e96aee4f0c08b93488dda4ac5a6c0e4784b72bb9f615d30c7877a9",
+  "baseline_c_bench_sha256": "46694637e7e028f8a12c5c5f5eb83c8bac3ca33e7e276b1236e097f970f53c3f",
+  "delivery_d_bench_sha256": "46694637e7e028f8a12c5c5f5eb83c8bac3ca33e7e276b1236e097f970f53c3f",
+  "baseline_c_tests_sha256": "ffa1a7ab290dd9735414205ddb6169d28b409077a67b8a31b3a61c8938ddbd17",
+  "delivery_d_tests_sha256": "ffa1a7ab290dd9735414205ddb6169d28b409077a67b8a31b3a61c8938ddbd17",
+  "c_and_d_lib_match": true,
+  "c_and_d_bench_match": true,
+  "c_and_d_tests_match": true,
+  "cargo_toml_sha256": "00550fbac8edb5c1316b5eb21983b078039604ed3c1460689515ba5539f30e25",
+  "cargo_lock_sha256": "eda5bfa67c1077c96f2b84e44f740273e695c87a1a51b352cf18f2a031a4f8d2",
+  "frozen_querytrace_lib_sha256": "ae2d416af3f083ea8afbb68c6a7173a6580185a9cb48018685729d378ba80553",
+  "frozen_repeat_bench_sha256": "5bfde2c3b897c316bed557fc3037ae9a44d9eead07053db4f835bf1bd7d27c62",
+  "target_exe_before_sha256": "959dfa8f6348082046bcbfad744a422e2bd7f5a43c702c2dba7d2d86d26aeaf1",
+  "active_build_or_vbench_processes": []
+}

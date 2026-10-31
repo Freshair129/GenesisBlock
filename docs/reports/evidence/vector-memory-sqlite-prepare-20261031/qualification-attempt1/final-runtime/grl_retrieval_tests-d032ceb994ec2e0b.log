@@ -1,0 +1,15 @@
+
+running 10 tests
+test test_grl_budget_compression ... ok
+test test_grl_ceiling_signal_deep_graph ... ok
+test test_grl_ceiling_signal_shallow_graph ... ok
+test test_grl_context_retrieval_tiered ... ok
+test test_grl_coverage_h0_isolated_node_reports_complete ... ok
+test test_grl_coverage_h0_with_neighbor_reports_ceiling ... ok
+test test_grl_coverage_ignores_disconnected_components ... ok
+test test_grl_coverage_reports_truncation_under_budget ... ok
+test test_grl_tier_h6_ceiling ... ok
+test test_hql_context_command ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.46s
+

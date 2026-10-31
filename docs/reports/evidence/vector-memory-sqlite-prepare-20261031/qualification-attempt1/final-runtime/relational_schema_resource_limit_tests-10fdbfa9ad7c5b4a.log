@@ -1,0 +1,9 @@
+
+running 4 tests
+test rejected_schema_registration_preserves_sequencing_additive_and_hash_guards ... ok
+test table_resource_limit_accepts_64_66_128_and_rejects_129_without_commit ... ok
+test unchanged_named_query_column_primary_key_and_index_limits_remain_active ... ok
+test valid_expanded_schema_persists_and_reopens ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.31s
+

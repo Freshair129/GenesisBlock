@@ -1,0 +1,33 @@
+{
+  "passed": true,
+  "path": "C:/Users/suanr/genesis-vector-memory-20261031/napi-smoke-1Mh8t7",
+  "metrics": {
+    "name": "metric",
+    "model": "m",
+    "dim": 8,
+    "metric": "L2",
+    "quant": "sq8",
+    "count": 1,
+    "indexed": 1,
+    "rerank": true,
+    "sidecarResidentBytes": 0,
+    "sidecarCacheBytes": 32,
+    "sidecarDiskBytes": 32,
+    "arenaResidentBytes": 8,
+    "arenaAllocatedBytes": 8,
+    "hnswVectorBytes": 8,
+    "indexLag": 0,
+    "coverage": {
+      "collection": "metric",
+      "state": "UNVERIFIED",
+      "sourceCount": 1,
+      "indexedCount": 1,
+      "missingCount": 0,
+      "extraCount": 0,
+      "pendingCount": 0,
+      "sourceFrontier": 4,
+      "builtFrontier": 0,
+      "validated": false
+    }
+  }
+}

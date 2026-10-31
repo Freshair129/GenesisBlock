@@ -1,0 +1,10 @@
+{
+  "exit_code": 0,
+  "start_local": "2026-10-31T13:14:12.8011057+07:00",
+  "end_local": "2026-10-31T13:17:01.3614491+07:00",
+  "elapsed_seconds": 168.56,
+  "command": "cargo build --locked --offline --release --no-default-features --features bins --bin vbench-genesis -j2",
+  "CARGO_TARGET_DIR": "D:\\GenesisBlock_Dev\\GenesisBlock\\target",
+  "CARGO_PROFILE_RELEASE_LTO": "false",
+  "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "16"
+}

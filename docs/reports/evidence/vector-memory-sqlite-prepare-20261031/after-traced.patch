@@ -1,0 +1,253 @@
+--- patched-querytrace-lib.rs
++++ after-traced-lib.rs
+@@ -35,6 +35,67 @@
+ use roaring::RoaringBitmap;
+ use rusqlite::types::{Value as SqlValue, ValueRef};
+ use rusqlite::{params, params_from_iter, Connection, OpenFlags, OptionalExtension};
++
++fn projection_query_diag_emit(event: &str, fields: serde_json::Value) {
++    if std::env::var_os("GB_VECTOR_QUERY_DIAGNOSTICS").is_none() {
++        return;
++    }
++    let mut fields = match fields {
++        serde_json::Value::Object(fields) => fields,
++        other => {
++            let mut fields = serde_json::Map::new();
++            fields.insert("details".to_string(), other);
++            fields
++        }
++    };
++    fields.insert("event".to_string(), serde_json::Value::String(event.to_string()));
++    eprintln!("GB_VECTOR_QUERY_DIAG {}", serde_json::Value::Object(fields));
++}
++
++fn projection_query_diag_snapshot(event: &str, path: &Path, fields: serde_json::Value) {
++    if std::env::var_os("GB_VECTOR_QUERY_DIAGNOSTICS").is_none() {
++        return;
++    }
++    let sidecar_path = |suffix: &str| {
++        let mut path = path.as_os_str().to_os_string();
++        path.push(suffix);
++        PathBuf::from(path)
++    };
++    let wal_path = sidecar_path("-wal");
++    let shm_path = sidecar_path("-shm");
++    let main_bytes = fs::metadata(path).ok().map(|metadata| metadata.len());
++    let wal_bytes = fs::metadata(&wal_path).ok().map(|metadata| metadata.len());
++    let shm_bytes = fs::metadata(&shm_path).ok().map(|metadata| metadata.len());
++    let shm_header = (|| -> std::io::Result<[u8; 100]> {
++        let mut bytes = [0_u8; 100];
++        File::open(&shm_path)?.read_exact(&mut bytes)?;
++        Ok(bytes)
++    })();
++    let (mx_frame, n_backfill, shm_header_error) = match shm_header {
++        Ok(bytes) => (
++            Some(u32::from_le_bytes(bytes[16..20].try_into().unwrap())),
++            Some(u32::from_le_bytes(bytes[96..100].try_into().unwrap())),
++            None,
++        ),
++        Err(error) => (None, None, Some(error.to_string())),
++    };
++    let mut fields = match fields {
++        serde_json::Value::Object(fields) => fields,
++        other => {
++            let mut fields = serde_json::Map::new();
++            fields.insert("details".to_string(), other);
++            fields
++        }
++    };
++    fields.insert("main_bytes".to_string(), serde_json::json!(main_bytes));
++    fields.insert("wal_bytes".to_string(), serde_json::json!(wal_bytes));
++    fields.insert("shm_bytes".to_string(), serde_json::json!(shm_bytes));
++    fields.insert("shm_mx_frame_le_u32_at_16".to_string(), serde_json::json!(mx_frame));
++    fields.insert("shm_n_backfill_le_u32_at_96".to_string(), serde_json::json!(n_backfill));
++    fields.insert("shm_header_error".to_string(), serde_json::json!(shm_header_error));
++    projection_query_diag_emit(event, serde_json::Value::Object(fields));
++}
++
+ 
+ const GOSSIP_MAX_PEERS: usize = 256;
+ const GOSSIP_MAX_PENDING_SYNC_REQUESTS: usize = 256;
+@@ -13931,10 +13992,40 @@
+             std::mem::replace(&mut *projection, staged)
+         };
+ 
+-        let result = self
+-            .projection_replay_wal()
+-            .and_then(|()| self.rebuild_edge_history())
+-            .and_then(|()| self.projection_backfill_edges());
++        let diagnostics = std::env::var_os("GB_VECTOR_QUERY_DIAGNOSTICS").is_some();
++        let replay_started = diagnostics.then(Instant::now);
++        let replay_result = self.projection_replay_wal();
++        if let Some(started) = replay_started {
++            projection_query_diag_emit("projection_sync_candidate_stage", serde_json::json!({
++                "stage": "projection_replay_wal",
++                "elapsed_us": started.elapsed().as_micros(),
++                "status": if replay_result.is_ok() { "ok" } else { "error" },
++            }));
++        }
++        let history_result = replay_result.and_then(|()| {
++            let started = diagnostics.then(Instant::now);
++            let result = self.rebuild_edge_history();
++            if let Some(started) = started {
++                projection_query_diag_emit("projection_sync_candidate_stage", serde_json::json!({
++                    "stage": "rebuild_edge_history",
++                    "elapsed_us": started.elapsed().as_micros(),
++                    "status": if result.is_ok() { "ok" } else { "error" },
++                }));
++            }
++            result
++        });
++        let result = history_result.and_then(|()| {
++            let started = diagnostics.then(Instant::now);
++            let result = self.projection_backfill_edges();
++            if let Some(started) = started {
++                projection_query_diag_emit("projection_sync_candidate_stage", serde_json::json!({
++                    "stage": "projection_backfill_edges",
++                    "elapsed_us": started.elapsed().as_micros(),
++                    "status": if result.is_ok() { "ok" } else { "error" },
++                }));
++            }
++            result
++        });
+ 
+         let staged = {
+             let mut projection = self.projection_db.lock();
+@@ -14016,27 +14107,67 @@
+             .as_ref()
+             .ok_or_else(|| Error::from_reason("projection rebuild candidate is unavailable"))?;
+         let mut destination = self.projection_db.lock();
++        let diagnostics = std::env::var_os("GB_VECTOR_QUERY_DIAGNOSTICS").is_some();
++        let backup_started = diagnostics.then(Instant::now);
+         // SQLite holds the destination write transaction until the backup
+         // reaches SQLITE_DONE. Dropping an unfinished rusqlite Backup calls
+         // sqlite3_backup_finish, which rolls that transaction back on errors.
+-        let backup = rusqlite::backup::Backup::new(source, &mut destination)
+-            .map_err(Self::projection_backup_error)?;
+-        loop {
+-            match backup.step(256).map_err(Self::projection_backup_error)? {
+-                rusqlite::backup::StepResult::Done => return Ok(()),
+-                rusqlite::backup::StepResult::More => {}
+-                rusqlite::backup::StepResult::Busy | rusqlite::backup::StepResult::Locked => {
+-                    return Err(Error::from_reason(
+-                        "PROJECTION_REBUILD_BUSY: projection publication could not acquire SQLite locks",
+-                    ));
+-                }
+-                _ => {
+-                    return Err(Error::from_reason(
+-                        "PROJECTION_REBUILD_FAILED: SQLite backup returned an unsupported step state",
+-                    ));
+-                }
+-            }
+-        }
++        {
++            let backup = rusqlite::backup::Backup::new(source, &mut destination)
++                .map_err(Self::projection_backup_error)?;
++            loop {
++                match backup.step(256).map_err(Self::projection_backup_error)? {
++                    rusqlite::backup::StepResult::Done => {
++                        if let Some(started) = backup_started {
++                            projection_query_diag_snapshot(
++                                "projection_publish_backup_done",
++                                &self.projection_path,
++                                serde_json::json!({
++                                    "backup_elapsed_us": started.elapsed().as_micros(),
++                                    "publication_variant": "after_maintenance",
++                                }),
++                            );
++                        }
++                        break;
++                    },
++                    rusqlite::backup::StepResult::More => {}
++                    rusqlite::backup::StepResult::Busy | rusqlite::backup::StepResult::Locked => {
++                        return Err(Error::from_reason(
++                            "PROJECTION_REBUILD_BUSY: projection publication could not acquire SQLite locks",
++                        ));
++                    }
++                    _ => {
++                        return Err(Error::from_reason(
++                            "PROJECTION_REBUILD_FAILED: SQLite backup returned an unsupported step state",
++                        ));
++                    }
++                }
++            }
++        }
++        // Backup commits below SQLite's SQL executor and resets the schema.
++        // Its pending WAL hook would otherwise checkpoint the published pages
++        // during schema loading in the first query's prepare. Complete that
++        // maintenance here, after Backup::drop releases the destination handle.
++        // PASSIVE preserves pinned reader snapshots and accepts partial progress.
++        let maintenance_started = diagnostics.then(Instant::now);
++        let maintenance_result = destination.execute_batch("PRAGMA wal_checkpoint(PASSIVE);");
++        if let Some(started) = maintenance_started {
++            projection_query_diag_snapshot(
++                "projection_publish_maintenance_done",
++                &self.projection_path,
++                serde_json::json!({
++                    "maintenance_elapsed_us": started.elapsed().as_micros(),
++                    "maintenance_status": if maintenance_result.is_ok() { "ok" } else { "error" },
++                    "maintenance_error": maintenance_result.as_ref().err().map(|error| error.to_string()),
++                    "publication_variant": "after_maintenance",
++                }),
++            );
++        }
++        maintenance_result.map_err(|error| {
++            Error::from_reason(format!(
++                "PROJECTION_CHECKPOINT_FAILED: projection publication committed; {error}"
++            ))
++        })
+     }
+ 
+     fn projection_backup_error(error: rusqlite::Error) -> Error {
+@@ -14159,7 +14290,16 @@
+     }
+ 
+     fn projection_sync_on_open(&self, force_rebuild: bool) -> Result<()> {
++        let diagnostics = std::env::var_os("GB_VECTOR_QUERY_DIAGNOSTICS").is_some();
+         if self.read_only {
++            if diagnostics {
++                projection_query_diag_emit("projection_sync_on_open", serde_json::json!({
++                    "branch": if force_rebuild { "read_only_force_rebuild_rejected" } else { "read_only_no_sync" },
++                    "read_only": true,
++                    "force_rebuild": force_rebuild,
++                    "marker_match": null,
++                }));
++            }
+             if force_rebuild {
+                 return Err(Error::from_reason(
+                     "RECOVERY_REQUIRED: rejected snapshot requires a writable open to rebuild the projection",
+@@ -14169,6 +14309,14 @@
+         }
+         let journal_fingerprint = self.projection_journal_fingerprint()?;
+         if force_rebuild {
++            if diagnostics {
++                projection_query_diag_emit("projection_sync_on_open", serde_json::json!({
++                    "branch": "force_rebuild",
++                    "read_only": false,
++                    "force_rebuild": true,
++                    "marker_match": null,
++                }));
++            }
+             return self
+                 .projection_rebuild_fresh_candidate(&journal_fingerprint, None)
+                 .map_err(|error| {
+@@ -14177,7 +14325,18 @@
+                     ))
+                 });
+         }
+-        if self.projection_journal_fingerprint_matches(&journal_fingerprint) {
++        let marker_started = diagnostics.then(Instant::now);
++        let marker_match = self.projection_journal_fingerprint_matches(&journal_fingerprint);
++        if let Some(started) = marker_started {
++            projection_query_diag_emit("projection_sync_on_open", serde_json::json!({
++                "branch": if marker_match { "marker_match" } else { "marker_miss" },
++                "read_only": false,
++                "force_rebuild": false,
++                "marker_match": marker_match,
++                "marker_check_us": started.elapsed().as_micros(),
++            }));
++        }
++        if marker_match {
+             return Ok(());
+         }
+         // Lamport time is not a WAL cursor: distinct peers may emit equal clocks,

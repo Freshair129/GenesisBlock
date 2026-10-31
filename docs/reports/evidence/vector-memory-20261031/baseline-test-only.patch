@@ -1,0 +1,28 @@
+diff --git a/src/lib.rs b/src/lib.rs
+index 21b9129..88a2d3a 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -242,6 +242,8 @@ pub const ENGINE_VERSION: &str = env!("CARGO_PKG_VERSION");
+ mod journal_authorization_budget_tests;
+ #[cfg(test)]
+ mod projection_rebuild_tests;
++#[cfg(test)]
++mod vector_memory_tests;
+ 
+ // --- Types (PROTOCOL §3) ---
+ 
+@@ -3728,6 +3730,14 @@ impl ArenaStore {
+         }
+     }
+     /// Raw little-endian bytes for the `vec_<name>.bin` snapshot.
++    #[cfg(test)]
++    fn write_bytes(&self, writer: &mut impl std::io::Write) -> std::io::Result<()> {
++        writer.write_all(&self.to_bytes())
++    }
++    #[cfg(test)]
++    fn allocated_bytes(&self) -> usize {
++        self.byte_size()
++    }
+     fn to_bytes(&self) -> Vec<u8> {
+         match self {
+             ArenaStore::F32(v) => {

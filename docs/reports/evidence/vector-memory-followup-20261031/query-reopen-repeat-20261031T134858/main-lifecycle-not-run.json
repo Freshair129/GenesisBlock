@@ -1,0 +1,45 @@
+{
+  "created_local": "2026-10-31T14:35:33.9270292+07:00",
+  "decision": {
+    "status": "NOT_RUN",
+    "run_scope": "exact full original 100k BQ lifecycle",
+    "per_binary_runtime_cap_seconds": 1200,
+    "rss_cap_bytes": 2147483648,
+    "no_budget_changes": true,
+    "no_run_started": true,
+    "baseline_historical_phase_sum_excluding_drop_seconds": 2394.2840312,
+    "baseline_one_drop_proxy_seconds": 74.1978736,
+    "baseline_estimate_plus_drop_seconds": 2468.4819048,
+    "candidate_historical_phase_sum_excluding_drop_seconds": 2439.4524865,
+    "candidate_one_drop_proxy_seconds": 74.3763764,
+    "candidate_estimate_plus_drop_seconds": 2513.8288629,
+    "baseline_historical_memory_json_sha256": "F6F4C5FE348B399AD31BF367F4834FC9343D66784F20601B2323D01E95B16480",
+    "candidate_historical_memory_json_sha256": "70E369248ABFF5CEE92E27EEC5B225A07C6E679B7F35F10731B84F326376D4D0",
+    "contention_caveat": "historical phase measurements were collected under contention and may overstate isolated durations; they are not an isolated performance claim",
+    "decision": "Do not launch the full main lifecycle under the unchanged cap: measured historical phase sums already exceed the cap by about 2x, and the cap would likely stop during same-process reopen before the target post-reopen query. Do not split or omit phases.",
+    "original_main_failure": "UNRESOLVED"
+  },
+  "historical_phases": {
+    "baseline": {
+      "ingest_seconds": 472.4767308,
+      "same_process_reopen_seconds": 918.9680604,
+      "snapshot_seconds": 87.5527513,
+      "rebuild_seconds": 289.8167447,
+      "fresh_child_read_only_open_seconds": 625.469744
+    },
+    "candidate": {
+      "ingest_seconds": 538.194041,
+      "same_process_reopen_seconds": 867.778921,
+      "snapshot_seconds": 91.5669469,
+      "rebuild_seconds": 300.306794,
+      "fresh_child_read_only_open_seconds": 641.6057836
+    }
+  },
+  "historical_search_stats_not_summed": {
+    "baseline_search10_p50_us": 4175.7,
+    "candidate_search10_p50_us": 4474.900000000001,
+    "candidate_search100_p50_us": 7981.500000000001,
+    "baseline_search100_p50_us": 7959.799999999999
+  },
+  "followup_two_open_drop_proxy": "one same-process RW Drop duration from the matching isolated repeat diagnostic; the main full writer Drop may differ"
+}

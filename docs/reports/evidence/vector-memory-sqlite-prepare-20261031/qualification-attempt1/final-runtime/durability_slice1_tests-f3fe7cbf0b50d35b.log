@@ -1,0 +1,10 @@
+
+running 5 tests
+test expired_tombstone_is_gcd_at_fold ... ok
+test newer_upsert_clears_tombstone ... ok
+test retracted_edge_time_travel_survives_fold ... ok
+test stale_peer_push_does_not_resurrect_retracted_node ... ok
+test tombstone_survives_fold_snapshot_and_journal_only_reopen ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.02s
+

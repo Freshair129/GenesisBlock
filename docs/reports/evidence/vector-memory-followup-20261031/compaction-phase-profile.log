@@ -1,0 +1,18 @@
+   Compiling genesis-block-native v0.2.10 (D:\GenesisBlock_Dev\GenesisBlock)
+    Finished `test` profile [unoptimized] target(s) in 17.69s
+     Running unittests src\lib.rs (C:\Users\suanr\genesis-vector-memory-20261031\napi-target\x86_64-pc-windows-msvc\debug\deps\genesis_block_native-b7af0321854b0aac.exe)
+
+running 1 test
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmpHmo34k
+{"phase":"ingest","seconds":0.7008621}
+{"phase":"proof_collection","seconds":0.4474314}
+{"iterations":4,"phase":"raw_signature","seconds":0.3987932}
+{"iterations":4,"phase":"graph_binding","seconds":0.06198}
+{"iterations":4,"phase":"leaf_matching","seconds":0.058622}
+{"iterations":4,"phase":"signing","seconds":1.3946211}
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmpHmo34k
+shutdown: graceful shutdown, state saved.
+test vector_memory_tests::profile_large_batch_compaction_phases ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 52 filtered out; finished in 3.55s
+

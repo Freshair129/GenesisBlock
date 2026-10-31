@@ -1,0 +1,11 @@
+
+running 6 tests
+test corrupted_fvec_same_length_does_not_panic_or_empty ... ok
+test ondisk_rerank_parity_distinguishes_magnitude ... ok
+test ondisk_rerank_parity_sq8_exact_match ... ok
+test ondisk_rerank_survives_close_and_reopen ... ok
+test ondisk_rerank_survives_compaction_then_reopen ... ok
+test truncated_fvec_degrades_to_quantized_not_panic_not_empty ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.65s
+

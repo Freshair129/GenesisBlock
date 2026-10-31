@@ -1,0 +1,547 @@
+[
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\edges_retired.bin",
+    "Length": 2,
+    "LastWriteTimeUtc": "2026-10-31T05:41:21.6662416Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\edges.bin",
+    "Length": 2,
+    "LastWriteTimeUtc": "2026-10-31T05:41:21.6652344Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\genesis.lock",
+    "Length": 0,
+    "LastWriteTimeUtc": "2026-10-31T02:45:27.8384706Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\identity.bin",
+    "Length": 32,
+    "LastWriteTimeUtc": "2026-10-31T02:45:27.8409746Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\meta_bench.bin",
+    "Length": 2616662,
+    "LastWriteTimeUtc": "2026-10-31T05:41:21.5239659Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\meta_default.bin",
+    "Length": 5,
+    "LastWriteTimeUtc": "2026-10-31T05:41:21.5249722Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\nodes.bin",
+    "Length": 25227518,
+    "LastWriteTimeUtc": "2026-10-31T05:41:21.6642281Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\projection.sqlite",
+    "Length": 9006981120,
+    "LastWriteTimeUtc": "2026-10-31T03:17:20.7446077Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\state.json",
+    "Length": 2470,
+    "LastWriteTimeUtc": "2026-10-31T05:42:40.1050389Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\vec_bench.bin",
+    "Length": 12800000,
+    "LastWriteTimeUtc": "2026-10-31T05:41:21.5144549Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\vec_default.bin",
+    "Length": 0,
+    "LastWriteTimeUtc": "2026-10-31T05:41:21.5249722Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000001.gseg",
+    "Length": 37077914,
+    "LastWriteTimeUtc": "2026-10-31T02:45:31.5762648Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000008.gseg",
+    "Length": 37061353,
+    "LastWriteTimeUtc": "2026-10-31T02:45:35.2606834Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000012.gseg",
+    "Length": 37069773,
+    "LastWriteTimeUtc": "2026-10-31T02:45:38.9572494Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000016.gseg",
+    "Length": 37079949,
+    "LastWriteTimeUtc": "2026-10-31T02:45:43.0478419Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000020.gseg",
+    "Length": 37078117,
+    "LastWriteTimeUtc": "2026-10-31T02:45:47.2573558Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000024.gseg",
+    "Length": 37073048,
+    "LastWriteTimeUtc": "2026-10-31T02:45:51.6824618Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000028.gseg",
+    "Length": 37068229,
+    "LastWriteTimeUtc": "2026-10-31T02:45:56.7819383Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000032.gseg",
+    "Length": 37071553,
+    "LastWriteTimeUtc": "2026-10-31T02:46:00.6513788Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000036.gseg",
+    "Length": 37073184,
+    "LastWriteTimeUtc": "2026-10-31T02:46:04.6653508Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000040.gseg",
+    "Length": 37094828,
+    "LastWriteTimeUtc": "2026-10-31T02:46:08.9875558Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000044.gseg",
+    "Length": 37095182,
+    "LastWriteTimeUtc": "2026-10-31T02:46:13.4927447Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000048.gseg",
+    "Length": 37103756,
+    "LastWriteTimeUtc": "2026-10-31T02:46:18.0405464Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000052.gseg",
+    "Length": 37100118,
+    "LastWriteTimeUtc": "2026-10-31T02:46:22.8905842Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000056.gseg",
+    "Length": 37091233,
+    "LastWriteTimeUtc": "2026-10-31T02:46:29.0689903Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000060.gseg",
+    "Length": 37103108,
+    "LastWriteTimeUtc": "2026-10-31T02:46:35.0716631Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000064.gseg",
+    "Length": 37103913,
+    "LastWriteTimeUtc": "2026-10-31T02:46:40.7718191Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000068.gseg",
+    "Length": 37088159,
+    "LastWriteTimeUtc": "2026-10-31T02:46:45.9128577Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000072.gseg",
+    "Length": 37087643,
+    "LastWriteTimeUtc": "2026-10-31T02:46:51.2903529Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000076.gseg",
+    "Length": 37098121,
+    "LastWriteTimeUtc": "2026-10-31T02:46:56.618407Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000080.gseg",
+    "Length": 37087086,
+    "LastWriteTimeUtc": "2026-10-31T02:47:02.7807346Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000084.gseg",
+    "Length": 37084394,
+    "LastWriteTimeUtc": "2026-10-31T02:47:08.5441065Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000088.gseg",
+    "Length": 37095251,
+    "LastWriteTimeUtc": "2026-10-31T02:47:14.3625372Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000092.gseg",
+    "Length": 37107575,
+    "LastWriteTimeUtc": "2026-10-31T02:47:19.9142478Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000096.gseg",
+    "Length": 37096574,
+    "LastWriteTimeUtc": "2026-10-31T02:47:25.4053409Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000100.gseg",
+    "Length": 37097900,
+    "LastWriteTimeUtc": "2026-10-31T02:47:30.9051855Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000104.gseg",
+    "Length": 37076728,
+    "LastWriteTimeUtc": "2026-10-31T02:47:36.9965385Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000108.gseg",
+    "Length": 37100341,
+    "LastWriteTimeUtc": "2026-10-31T02:47:42.3771494Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000112.gseg",
+    "Length": 37097008,
+    "LastWriteTimeUtc": "2026-10-31T02:47:47.5029121Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000116.gseg",
+    "Length": 37095500,
+    "LastWriteTimeUtc": "2026-10-31T02:47:52.4739788Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000120.gseg",
+    "Length": 37084922,
+    "LastWriteTimeUtc": "2026-10-31T02:47:57.5651946Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000124.gseg",
+    "Length": 37091490,
+    "LastWriteTimeUtc": "2026-10-31T02:48:02.7130829Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000128.gseg",
+    "Length": 37097587,
+    "LastWriteTimeUtc": "2026-10-31T02:48:07.3754227Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000132.gseg",
+    "Length": 37085291,
+    "LastWriteTimeUtc": "2026-10-31T02:48:12.1789607Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000136.gseg",
+    "Length": 37090314,
+    "LastWriteTimeUtc": "2026-10-31T02:48:17.6695003Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000140.gseg",
+    "Length": 37097294,
+    "LastWriteTimeUtc": "2026-10-31T02:48:23.2677346Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000144.gseg",
+    "Length": 37082287,
+    "LastWriteTimeUtc": "2026-10-31T02:48:28.6651668Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000148.gseg",
+    "Length": 37093661,
+    "LastWriteTimeUtc": "2026-10-31T02:48:33.9750358Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000152.gseg",
+    "Length": 37082573,
+    "LastWriteTimeUtc": "2026-10-31T02:48:39.2680999Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000156.gseg",
+    "Length": 37088012,
+    "LastWriteTimeUtc": "2026-10-31T02:48:44.7982036Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000160.gseg",
+    "Length": 37077461,
+    "LastWriteTimeUtc": "2026-10-31T02:48:50.594151Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000164.gseg",
+    "Length": 37100407,
+    "LastWriteTimeUtc": "2026-10-31T02:48:56.5423333Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000168.gseg",
+    "Length": 37102667,
+    "LastWriteTimeUtc": "2026-10-31T02:49:02.3172782Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000172.gseg",
+    "Length": 37080593,
+    "LastWriteTimeUtc": "2026-10-31T02:49:07.4969014Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000176.gseg",
+    "Length": 37100195,
+    "LastWriteTimeUtc": "2026-10-31T02:49:12.7681622Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000180.gseg",
+    "Length": 37099616,
+    "LastWriteTimeUtc": "2026-10-31T02:49:18.212084Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000184.gseg",
+    "Length": 37094205,
+    "LastWriteTimeUtc": "2026-10-31T02:49:23.3225506Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000188.gseg",
+    "Length": 37097306,
+    "LastWriteTimeUtc": "2026-10-31T02:49:28.6630952Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000192.gseg",
+    "Length": 37091802,
+    "LastWriteTimeUtc": "2026-10-31T02:49:34.3593075Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000196.gseg",
+    "Length": 37090087,
+    "LastWriteTimeUtc": "2026-10-31T02:49:39.9427176Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000200.gseg",
+    "Length": 37079779,
+    "LastWriteTimeUtc": "2026-10-31T02:49:45.4743269Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000204.gseg",
+    "Length": 37089583,
+    "LastWriteTimeUtc": "2026-10-31T02:49:50.9327654Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000208.gseg",
+    "Length": 37089614,
+    "LastWriteTimeUtc": "2026-10-31T02:49:56.6769641Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000212.gseg",
+    "Length": 37092285,
+    "LastWriteTimeUtc": "2026-10-31T02:50:02.3250128Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000216.gseg",
+    "Length": 37085598,
+    "LastWriteTimeUtc": "2026-10-31T02:50:07.9962797Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000220.gseg",
+    "Length": 37094980,
+    "LastWriteTimeUtc": "2026-10-31T02:50:13.6550423Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000224.gseg",
+    "Length": 37095616,
+    "LastWriteTimeUtc": "2026-10-31T02:50:19.3821967Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000228.gseg",
+    "Length": 37090213,
+    "LastWriteTimeUtc": "2026-10-31T02:50:24.9618996Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000232.gseg",
+    "Length": 37064086,
+    "LastWriteTimeUtc": "2026-10-31T02:50:30.6261621Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000236.gseg",
+    "Length": 37093072,
+    "LastWriteTimeUtc": "2026-10-31T02:50:36.4432032Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000240.gseg",
+    "Length": 37090165,
+    "LastWriteTimeUtc": "2026-10-31T02:50:42.3317059Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000244.gseg",
+    "Length": 37095057,
+    "LastWriteTimeUtc": "2026-10-31T02:50:47.9914963Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000248.gseg",
+    "Length": 37090397,
+    "LastWriteTimeUtc": "2026-10-31T02:50:53.661748Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000252.gseg",
+    "Length": 37101685,
+    "LastWriteTimeUtc": "2026-10-31T02:50:59.4363872Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000256.gseg",
+    "Length": 37093334,
+    "LastWriteTimeUtc": "2026-10-31T02:51:05.1269098Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000260.gseg",
+    "Length": 37090293,
+    "LastWriteTimeUtc": "2026-10-31T02:51:10.7396235Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000264.gseg",
+    "Length": 37093560,
+    "LastWriteTimeUtc": "2026-10-31T02:51:16.1723318Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000268.gseg",
+    "Length": 37089267,
+    "LastWriteTimeUtc": "2026-10-31T02:51:21.70922Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000272.gseg",
+    "Length": 37098628,
+    "LastWriteTimeUtc": "2026-10-31T02:51:27.6403868Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000276.gseg",
+    "Length": 37096125,
+    "LastWriteTimeUtc": "2026-10-31T02:51:33.3771284Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000280.gseg",
+    "Length": 37092122,
+    "LastWriteTimeUtc": "2026-10-31T02:51:38.9928512Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000284.gseg",
+    "Length": 37086073,
+    "LastWriteTimeUtc": "2026-10-31T02:51:44.6806772Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000288.gseg",
+    "Length": 37098713,
+    "LastWriteTimeUtc": "2026-10-31T02:51:50.6104452Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000292.gseg",
+    "Length": 37092831,
+    "LastWriteTimeUtc": "2026-10-31T02:51:56.7623833Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000296.gseg",
+    "Length": 37096131,
+    "LastWriteTimeUtc": "2026-10-31T02:52:02.7751133Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000300.gseg",
+    "Length": 37083875,
+    "LastWriteTimeUtc": "2026-10-31T02:52:08.6548849Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000304.gseg",
+    "Length": 37091119,
+    "LastWriteTimeUtc": "2026-10-31T02:52:14.4391677Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000308.gseg",
+    "Length": 37092904,
+    "LastWriteTimeUtc": "2026-10-31T02:52:20.3073918Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000312.gseg",
+    "Length": 37093143,
+    "LastWriteTimeUtc": "2026-10-31T02:52:26.1205227Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000316.gseg",
+    "Length": 37095937,
+    "LastWriteTimeUtc": "2026-10-31T02:52:32.2723917Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000320.gseg",
+    "Length": 37102292,
+    "LastWriteTimeUtc": "2026-10-31T02:52:38.3363222Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000324.gseg",
+    "Length": 37087752,
+    "LastWriteTimeUtc": "2026-10-31T02:52:44.2804861Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000328.gseg",
+    "Length": 37099053,
+    "LastWriteTimeUtc": "2026-10-31T02:52:50.3515534Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000332.gseg",
+    "Length": 37095649,
+    "LastWriteTimeUtc": "2026-10-31T02:52:56.2700301Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000336.gseg",
+    "Length": 37091551,
+    "LastWriteTimeUtc": "2026-10-31T02:53:02.280838Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000340.gseg",
+    "Length": 37097219,
+    "LastWriteTimeUtc": "2026-10-31T02:53:08.3162886Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000344.gseg",
+    "Length": 37094506,
+    "LastWriteTimeUtc": "2026-10-31T02:53:14.4038241Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000348.gseg",
+    "Length": 37091684,
+    "LastWriteTimeUtc": "2026-10-31T02:53:20.4830112Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000352.gseg",
+    "Length": 37097324,
+    "LastWriteTimeUtc": "2026-10-31T02:53:26.7915158Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000356.gseg",
+    "Length": 37090632,
+    "LastWriteTimeUtc": "2026-10-31T02:53:32.6203855Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000360.gseg",
+    "Length": 37094055,
+    "LastWriteTimeUtc": "2026-10-31T02:53:38.697125Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000364.gseg",
+    "Length": 37108336,
+    "LastWriteTimeUtc": "2026-10-31T02:53:45.3641627Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000368.gseg",
+    "Length": 37093523,
+    "LastWriteTimeUtc": "2026-10-31T02:53:51.9149752Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000372.gseg",
+    "Length": 37088872,
+    "LastWriteTimeUtc": "2026-10-31T02:53:57.7926795Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000376.gseg",
+    "Length": 37088264,
+    "LastWriteTimeUtc": "2026-10-31T02:54:03.7360033Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000380.gseg",
+    "Length": 37096545,
+    "LastWriteTimeUtc": "2026-10-31T02:54:09.6765986Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000384.gseg",
+    "Length": 37101156,
+    "LastWriteTimeUtc": "2026-10-31T02:54:15.6395599Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\journal\\J000000000388.gseg",
+    "Length": 37089922,
+    "LastWriteTimeUtc": "2026-10-31T02:54:21.6310909Z"
+  },
+  {
+    "FullName": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb\\wal\\active.gwal",
+    "Length": 44337501,
+    "LastWriteTimeUtc": "2026-10-31T02:54:25.3762863Z"
+  }
+]

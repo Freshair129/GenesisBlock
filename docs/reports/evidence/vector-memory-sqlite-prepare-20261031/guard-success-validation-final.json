@@ -1,0 +1,12 @@
+{
+  "cap_seconds": 30,
+  "exe": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe",
+  "kind": "functional_test",
+  "env": {},
+  "args": [
+    "--test",
+    "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\guard-success-fixture.test.cjs"
+  ],
+  "output": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\guard-success-validation-final",
+  "cwd": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031"
+}

@@ -1,0 +1,25 @@
+{
+  "recorded_at": "2026-10-31T22:51:36.695866+07:00",
+  "source_files": 253,
+  "preserved_staged_files": 7,
+  "source_mismatches": [],
+  "protected_mismatches": [],
+  "noncompiled_document_paths": 8,
+  "noncompiled_document_differences": [
+    ".brain/rca/2026-10-31-vector-memory-allocations.md",
+    "docs/reports/GENESISDB-VECTOR-MEMORY-AUDIT.md"
+  ],
+  "scope_note": "Updated report/RCA are not compiled source; all seven original staged paths are checked independently. Attempt 1 incorrectly included evolving documents in code comparison.",
+  "passed": true,
+  "head": "ad94aa2e46025b7729d117ff376ab281ac15c49d",
+  "branch": "codex/g4-p8-h2a-nullable-multikey",
+  "staged_paths": [
+    "docs/C4--GENESISDB-ARCHITECTURE.md",
+    "docs/DOC-REGISTRY.md",
+    "docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md",
+    "docs/MASTER-SPEC--GENESIS-DB.md",
+    "docs/REPORT--HQL2-P8-CORE-2026-09-28.md",
+    "docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md",
+    "tests/hql2_g4_scalar_counter_tests.rs"
+  ]
+}

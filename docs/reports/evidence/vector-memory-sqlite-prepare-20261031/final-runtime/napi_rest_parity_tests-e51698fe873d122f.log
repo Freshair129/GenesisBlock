@@ -1,0 +1,15 @@
+
+running 10 tests
+test dts_extraction_sanity ... ok
+test every_declared_method_still_exists_in_the_rust_source ... ok
+test every_napi_free_function_is_declared_in_index_dts ... ok
+test every_napi_method_is_declared_in_index_dts ... ok
+test every_napi_method_is_in_the_table ... ok
+test every_napi_object_struct_is_declared_in_index_dts ... ok
+test every_none_entry_has_a_justifying_comment ... ok
+test every_table_key_is_a_real_napi_method ... ok
+test every_table_rest_path_still_exists_as_a_route ... ok
+test extraction_sanity_finds_known_methods ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+

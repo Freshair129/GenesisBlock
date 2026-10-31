@@ -1,0 +1,20 @@
+{
+  "phase": "complete",
+  "elapsed_ms": 10281.433099999998,
+  "unix_time_ms": 1793428922271,
+  "node_version": "v24.20.0",
+  "engine": "genesis-block",
+  "version": "0.2.10",
+  "schema_version": 6,
+  "node_count_written": 2000,
+  "require_ms": 2.995000000000001,
+  "open_ms": 41.67099999999999,
+  "ingest_elapsed_ms": 4059.5495,
+  "explicit_checkpoint_elapsed_ms": 6173.7167,
+  "frontier_after_ingest": 2002,
+  "frontier_after_save": 2002,
+  "serialization_error_observations": [],
+  "db_path": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\followuproot\\native-perf-abbaab\\runs\\native-perf-20261031T063931Z\\04-baseline\\database",
+  "status": "complete",
+  "drop_measured": false
+}

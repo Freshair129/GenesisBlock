@@ -1,0 +1,9 @@
+
+running 4 tests
+test test_crdt_conflict_resolution ... ok
+test test_cryptographic_forgery_rejection ... ok
+test test_logical_clock_convergence ... ok
+test test_reconcile_batch_remains_reentrant_under_lifecycle_barrier ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.56s
+

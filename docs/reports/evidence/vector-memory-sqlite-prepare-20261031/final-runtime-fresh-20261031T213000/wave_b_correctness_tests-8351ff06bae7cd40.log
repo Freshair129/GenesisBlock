@@ -1,0 +1,15 @@
+
+running 7 tests
+test collection_crash_child ... ok
+test collection_definition_survives_exit_without_checkpoint ... 
+running 1 test
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmpFlZx1x
+ok
+test invalid_definition_never_advances_frontier ... ok
+test losing_legacy_retraction_does_not_erase_edge_history ... ok
+test rebind_current_and_multiple_historical_endpoints ... ok
+test repeated_rebind_retraction_recreation_and_projection_rebuild ... ok
+test transaction_and_consensus_rebind_share_current_and_historical_endpoints ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.68s
+

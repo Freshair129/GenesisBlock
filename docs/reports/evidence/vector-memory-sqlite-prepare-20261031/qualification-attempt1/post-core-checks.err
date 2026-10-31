@@ -1,0 +1,5 @@
+Exception: C:\Users\suanr\genesis-sqlite-prepare-20261031\post-core-checks.ps1:16
+Line |
+  16 |  … f($status.exit -ne 0 -or $status.reason){throw "Check failed: $Name"}
+     |                                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | Check failed: clippy-core

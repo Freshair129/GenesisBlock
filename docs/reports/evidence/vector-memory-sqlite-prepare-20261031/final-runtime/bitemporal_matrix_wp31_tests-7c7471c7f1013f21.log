@@ -1,0 +1,12 @@
+
+running 7 tests
+test audit_chain_survives_reopen ... ok
+test audit_reconstruction_full_chain ... ok
+test correction_after_the_fact_retroactive_edge_retract ... ok
+test interval_boundaries_inclusive_start_exclusive_end ... ok
+test matrix_retraction_belief_before_still_serves ... ok
+test matrix_retraction_current_and_after_tx ... ok
+test matrix_valid_by_tx_four_quadrants ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.63s
+

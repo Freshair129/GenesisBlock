@@ -1,0 +1,10 @@
+
+running 5 tests
+test center_is_per_dim_mean_after_compaction ... ok
+test center_survives_reopen ... ok
+test centered_search_returns_true_nearest ... ok
+test centering_rebalances_the_codes ... ok
+test no_sidecar_means_no_center ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.71s
+

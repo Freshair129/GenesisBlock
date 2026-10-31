@@ -1,0 +1,11 @@
+{
+  "attempt": 2,
+  "state": "startup_failure_before_database_open",
+  "pid": 33688,
+  "exit_code": 101,
+  "binary_sha256": "959DFA8F6348082046BCBFAD744A422E2BD7F5A43C702C2DBA7D2D86D26AEAF1",
+  "failure": "outer vbench harness parsed synthetic meta.json.k before GB_MEMORY_AUDIT dispatch; k absent",
+  "source": "D:\\GenesisBlock_Dev\\GenesisBlock\\benches\\vbench_genesis.rs:34-45",
+  "gdb_opened": false,
+  "query_started": false
+}

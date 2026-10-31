@@ -1,0 +1,18 @@
+    Finished `test` profile [unoptimized] target(s) in 0.62s
+     Running unittests src\lib.rs (C:\Users\suanr\genesis-vector-memory-20261031\napi-target\x86_64-pc-windows-msvc\debug\deps\genesis_block_native-b7af0321854b0aac.exe)
+
+running 1 test
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmpLfHH94
+{"phase":"ingest","seconds":0.838463}
+{"phase":"proof_collection","seconds":0.5054248}
+{"iterations":4,"phase":"raw_signature","seconds":0.5858672}
+{"iterations":4,"phase":"graph_binding","seconds":0.0592963}
+{"iterations":4,"phase":"leaf_matching","seconds":0.0538871}
+{"iterations":4,"phase":"signing","seconds":1.6108615}
+{"iterations":4,"phase":"signing_cached","seconds":0.9758275}
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmpLfHH94
+shutdown: graceful shutdown, state saved.
+test vector_memory_tests::profile_large_batch_compaction_phases ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 54 filtered out; finished in 5.09s
+

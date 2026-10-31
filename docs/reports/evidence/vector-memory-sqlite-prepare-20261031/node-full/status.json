@@ -1,0 +1,3182 @@
+{
+  "exit": 0,
+  "reason": null,
+  "seconds": 203.0938993,
+  "peak_rss": 338546688,
+  "peak_private": 247734272,
+  "identities": [
+    {
+      "ProcessId": 34912,
+      "ParentProcessId": 27120,
+      "CreationDate": "2026-10-31T21:50:21.961683+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 4584,
+      "ParentProcessId": 33072,
+      "CreationDate": "2026-10-31T21:51:23.884898+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 33072,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:51:23.455435+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 10096,
+      "ParentProcessId": 23464,
+      "CreationDate": "2026-10-31T21:50:20.730373+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 14688,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:05.148173+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 18256,
+      "ParentProcessId": 10012,
+      "CreationDate": "2026-10-31T21:51:20.107214+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 4576,
+      "ParentProcessId": 22924,
+      "CreationDate": "2026-10-31T21:49:08.325981+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 18756,
+      "ParentProcessId": 31564,
+      "CreationDate": "2026-10-31T21:49:11.989201+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 31224,
+      "ParentProcessId": 5152,
+      "CreationDate": "2026-10-31T21:51:31.18315+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 21600,
+      "ParentProcessId": 5152,
+      "CreationDate": "2026-10-31T21:51:31.063122+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 24408,
+      "ParentProcessId": 1376,
+      "CreationDate": "2026-10-31T21:51:10.321887+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 29380,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:51:29.39813+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 27540,
+      "ParentProcessId": 37612,
+      "CreationDate": "2026-10-31T21:51:27.178033+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 12836,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:18.868841+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 29340,
+      "ParentProcessId": 18388,
+      "CreationDate": "2026-10-31T21:51:28.762786+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 29664,
+      "ParentProcessId": 9588,
+      "CreationDate": "2026-10-31T21:50:38.475911+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 21104,
+      "ParentProcessId": 30084,
+      "CreationDate": "2026-10-31T21:50:39.003042+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 27536,
+      "ParentProcessId": 31760,
+      "CreationDate": "2026-10-31T21:50:29.275927+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 21100,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:51.01951+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 35496,
+      "ParentProcessId": 37296,
+      "CreationDate": "2026-10-31T21:51:06.769802+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 36720,
+      "ParentProcessId": 4584,
+      "CreationDate": "2026-10-31T21:51:23.890101+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 37296,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:51:06.764181+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 10068,
+      "ParentProcessId": 29932,
+      "CreationDate": "2026-10-31T21:49:48.873439+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 28444,
+      "ParentProcessId": 16328,
+      "CreationDate": "2026-10-31T21:48:38.576054+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 36712,
+      "ParentProcessId": 24692,
+      "CreationDate": "2026-10-31T21:48:43.778949+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 27520,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:30.448338+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 22924,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:08.038042+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 7300,
+      "ParentProcessId": 10808,
+      "CreationDate": "2026-10-31T21:51:16.609416+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 2704,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:23.550628+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 37624,
+      "ParentProcessId": 13480,
+      "CreationDate": "2026-10-31T21:49:13.18705+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 24756,
+      "ParentProcessId": 12836,
+      "CreationDate": "2026-10-31T21:50:19.470474+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 32104,
+      "ParentProcessId": 2704,
+      "CreationDate": "2026-10-31T21:50:23.556616+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 4532,
+      "ParentProcessId": 17856,
+      "CreationDate": "2026-10-31T21:51:05.703947+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 33020,
+      "ParentProcessId": 27520,
+      "CreationDate": "2026-10-31T21:48:41.31743+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 27504,
+      "ParentProcessId": 7728,
+      "CreationDate": "2026-10-31T21:50:08.450023+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 37612,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:51:27.172527+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 14636,
+      "ParentProcessId": 36680,
+      "CreationDate": "2026-10-31T21:49:53.763858+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 13716,
+      "ParentProcessId": 16224,
+      "CreationDate": "2026-10-31T21:51:00.845311+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 27500,
+      "ParentProcessId": 26564,
+      "CreationDate": "2026-10-31T21:50:11.686198+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 26580,
+      "ParentProcessId": 27084,
+      "CreationDate": "2026-10-31T21:50:07.268853+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 20144,
+      "ParentProcessId": 8360,
+      "CreationDate": "2026-10-31T21:50:26.833785+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 33928,
+      "ParentProcessId": 14688,
+      "CreationDate": "2026-10-31T21:48:40.076935+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 35764,
+      "ParentProcessId": 31700,
+      "CreationDate": "2026-10-31T21:48:58.484928+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 29328,
+      "ParentProcessId": 22692,
+      "CreationDate": "2026-10-31T21:48:59.707893+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 17380,
+      "ParentProcessId": 37356,
+      "CreationDate": "2026-10-31T21:50:04.816523+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 15536,
+      "ParentProcessId": 12900,
+      "CreationDate": "2026-10-31T21:49:42.447919+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 36672,
+      "ParentProcessId": 9480,
+      "CreationDate": "2026-10-31T21:48:39.546177+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 11608,
+      "ParentProcessId": 29380,
+      "CreationDate": "2026-10-31T21:51:29.403793+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 19204,
+      "ParentProcessId": 35164,
+      "CreationDate": "2026-10-31T21:49:24.262173+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 10012,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:51:20.101725+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 1376,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:51:10.316383+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 33896,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:56.076334+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 25620,
+      "ParentProcessId": 22548,
+      "CreationDate": "2026-10-31T21:50:06.055917+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 6320,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:48:42.506615+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 12320,
+      "ParentProcessId": 37844,
+      "CreationDate": "2026-10-31T21:49:26.708286+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 36644,
+      "ParentProcessId": 29164,
+      "CreationDate": "2026-10-31T21:51:03.28183+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 14552,
+      "ParentProcessId": 29508,
+      "CreationDate": "2026-10-31T21:48:25.465313+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 5396,
+      "ParentProcessId": 416,
+      "CreationDate": "2026-10-31T21:51:02.042274+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 16100,
+      "ParentProcessId": 34272,
+      "CreationDate": "2026-10-31T21:50:59.644107+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 24692,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:48:43.250348+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 14580,
+      "ParentProcessId": 24692,
+      "CreationDate": "2026-10-31T21:48:43.256085+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 21212,
+      "ParentProcessId": 37788,
+      "CreationDate": "2026-10-31T21:49:41.463168+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 23084,
+      "ParentProcessId": 37536,
+      "CreationDate": "2026-10-31T21:50:36.579094+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 25604,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:48:55.371562+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 35712,
+      "ParentProcessId": 36188,
+      "CreationDate": "2026-10-31T21:49:04.630114+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 37728,
+      "ParentProcessId": 18096,
+      "CreationDate": "2026-10-31T21:50:42.670857+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 36628,
+      "ParentProcessId": 21100,
+      "CreationDate": "2026-10-31T21:49:51.301469+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 12912,
+      "ParentProcessId": 36556,
+      "CreationDate": "2026-10-31T21:51:01.923189+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 32192,
+      "ParentProcessId": 26312,
+      "CreationDate": "2026-10-31T21:49:21.783578+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 27432,
+      "ParentProcessId": 33548,
+      "CreationDate": "2026-10-31T21:49:34.114246+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 21916,
+      "ParentProcessId": 32636,
+      "CreationDate": "2026-10-31T21:48:38.867873+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 23752,
+      "ParentProcessId": 17488,
+      "CreationDate": "2026-10-31T21:49:07.08866+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 37628,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:32.14009+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 36616,
+      "ParentProcessId": 25320,
+      "CreationDate": "2026-10-31T21:49:54.976043+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 32020,
+      "ParentProcessId": 36680,
+      "CreationDate": "2026-10-31T21:49:53.744029+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 25584,
+      "ParentProcessId": 10800,
+      "CreationDate": "2026-10-31T21:50:01.76871+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 20988,
+      "ParentProcessId": 22776,
+      "CreationDate": "2026-10-31T21:49:32.899698+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 37528,
+      "ParentProcessId": 24440,
+      "CreationDate": "2026-10-31T21:48:36.185454+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 18228,
+      "ParentProcessId": 35164,
+      "CreationDate": "2026-10-31T21:49:24.281004+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 37524,
+      "ParentProcessId": 36348,
+      "CreationDate": "2026-10-31T21:49:35.340509+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 30316,
+      "ParentProcessId": 22548,
+      "CreationDate": "2026-10-31T21:50:05.937436+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 34764,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:27.898303+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 37520,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:48:48.137597+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 32004,
+      "ParentProcessId": 32388,
+      "CreationDate": "2026-10-31T21:50:55.988115+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 34196,
+      "ParentProcessId": 16224,
+      "CreationDate": "2026-10-31T21:51:00.826236+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 37704,
+      "ParentProcessId": 17812,
+      "CreationDate": "2026-10-31T21:50:41.182294+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 10856,
+      "ParentProcessId": 32192,
+      "CreationDate": "2026-10-31T21:49:21.789102+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 19124,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:51:21.271478+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 25556,
+      "ParentProcessId": 27324,
+      "CreationDate": "2026-10-31T21:49:15.645333+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 35664,
+      "ParentProcessId": 21316,
+      "CreationDate": "2026-10-31T21:48:36.42891+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 33824,
+      "ParentProcessId": 6788,
+      "CreationDate": "2026-10-31T21:51:04.50594+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 3748,
+      "ParentProcessId": 21176,
+      "CreationDate": "2026-10-31T21:50:53.462333+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 34740,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:22.991432+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 17812,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:41.176697+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 25544,
+      "ParentProcessId": 9596,
+      "CreationDate": "2026-10-31T21:50:57.207902+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 22784,
+      "ParentProcessId": 36812,
+      "CreationDate": "2026-10-31T21:50:40.14877+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 14512,
+      "ParentProcessId": 17856,
+      "CreationDate": "2026-10-31T21:51:11.733204+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 28296,
+      "ParentProcessId": 20844,
+      "CreationDate": "2026-10-31T21:49:18.116141+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 22776,
+      "ParentProcessId": 37628,
+      "CreationDate": "2026-10-31T21:49:32.877047+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 36560,
+      "ParentProcessId": 17812,
+      "CreationDate": "2026-10-31T21:50:41.412602+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 19096,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:48:36.680431+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 32880,
+      "ParentProcessId": 15328,
+      "CreationDate": "2026-10-31T21:49:37.413842+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 35632,
+      "ParentProcessId": 1876,
+      "CreationDate": "2026-10-31T21:48:53.603458+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 6784,
+      "ParentProcessId": 31700,
+      "CreationDate": "2026-10-31T21:48:46.246087+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 25520,
+      "ParentProcessId": 37092,
+      "CreationDate": "2026-10-31T21:50:35.37611+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 35628,
+      "ParentProcessId": 36388,
+      "CreationDate": "2026-10-31T21:49:02.847859+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 16328,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:48:38.570519+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 7136,
+      "ParentProcessId": 7764,
+      "CreationDate": "2026-10-31T21:50:31.707649+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 27352,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:48:54.769834+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 10808,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:51:15.212651+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 6212,
+      "ParentProcessId": 34288,
+      "CreationDate": "2026-10-31T21:49:29.21257+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 28344,
+      "ParentProcessId": 25240,
+      "CreationDate": "2026-10-31T21:50:36.334241+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 9884,
+      "ParentProcessId": 7136,
+      "CreationDate": "2026-10-31T21:50:31.712982+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 9396,
+      "ParentProcessId": 5396,
+      "CreationDate": "2026-10-31T21:50:43.833891+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 10800,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:01.763311+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 35608,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:48:45.035896+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 28024,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:49.527391+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 29068,
+      "ParentProcessId": 12996,
+      "CreationDate": "2026-10-31T21:50:48.696267+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 29172,
+      "ParentProcessId": 27616,
+      "CreationDate": "2026-10-31T21:49:16.910303+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 35404,
+      "ParentProcessId": 28216,
+      "CreationDate": "2026-10-31T21:50:17.054818+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 676,
+      "ParentProcessId": 19704,
+      "CreationDate": "2026-10-31T21:49:03.415567+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 36556,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:51:01.917737+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 27324,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:15.347785+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 25480,
+      "ParentProcessId": 29924,
+      "CreationDate": "2026-10-31T21:51:14.147366+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 17208,
+      "ParentProcessId": 10056,
+      "CreationDate": "2026-10-31T21:50:47.474147+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 23640,
+      "ParentProcessId": 18612,
+      "CreationDate": "2026-10-31T21:50:28.90004+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 37592,
+      "ParentProcessId": 15640,
+      "CreationDate": "2026-10-31T21:51:09.343756+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 1576,
+      "ParentProcessId": 19096,
+      "CreationDate": "2026-10-31T21:48:37.623014+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 33740,
+      "ParentProcessId": 34240,
+      "CreationDate": "2026-10-31T21:50:53.536918+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 8924,
+      "ParentProcessId": 1376,
+      "CreationDate": "2026-10-31T21:51:10.567471+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 7084,
+      "ParentProcessId": 34912,
+      "CreationDate": "2026-10-31T21:50:21.965289+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 2488,
+      "ParentProcessId": 35564,
+      "CreationDate": "2026-10-31T21:48:47.471678+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 648,
+      "ParentProcessId": 25604,
+      "CreationDate": "2026-10-31T21:48:57.247649+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 3404,
+      "ParentProcessId": 24636,
+      "CreationDate": "2026-10-31T21:51:24.953217+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 28216,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:16.694363+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 10056,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:47.468938+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 22700,
+      "ParentProcessId": 9820,
+      "CreationDate": "2026-10-31T21:50:28.029474+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 35564,
+      "ParentProcessId": 27520,
+      "CreationDate": "2026-10-31T21:50:30.453862+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 1556,
+      "ParentProcessId": 17016,
+      "CreationDate": "2026-10-31T21:50:13.156878+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 22692,
+      "ParentProcessId": 19388,
+      "CreationDate": "2026-10-31T21:48:59.702619+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 18096,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:42.647347+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 8904,
+      "ParentProcessId": 1576,
+      "CreationDate": "2026-10-31T21:48:37.626643+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 9820,
+      "ParentProcessId": 34764,
+      "CreationDate": "2026-10-31T21:50:28.025624+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 20844,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:17.767252+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 15328,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:37.408217+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 12564,
+      "ParentProcessId": 28296,
+      "CreationDate": "2026-10-31T21:49:18.12126+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 30520,
+      "ParentProcessId": 9276,
+      "CreationDate": "2026-10-31T21:51:29.983217+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 25428,
+      "ParentProcessId": 21100,
+      "CreationDate": "2026-10-31T21:49:51.024874+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 13480,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:13.103708+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 3368,
+      "ParentProcessId": 18752,
+      "CreationDate": "2026-10-31T21:50:10.93628+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 11636,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:27.259041+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 29096,
+      "ParentProcessId": 6964,
+      "CreationDate": "2026-10-31T21:49:39.011765+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 20824,
+      "ParentProcessId": 36616,
+      "CreationDate": "2026-10-31T21:49:54.999545+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 9276,
+      "ParentProcessId": 29380,
+      "CreationDate": "2026-10-31T21:51:29.979683+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 16224,
+      "ParentProcessId": 24200,
+      "CreationDate": "2026-10-31T21:51:00.82114+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 37360,
+      "ParentProcessId": 33228,
+      "CreationDate": "2026-10-31T21:50:52.32906+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 29088,
+      "ParentProcessId": 10056,
+      "CreationDate": "2026-10-31T21:50:47.493826+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 15036,
+      "ParentProcessId": 27908,
+      "CreationDate": "2026-10-31T21:51:08.134137+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 37356,
+      "ParentProcessId": 37716,
+      "CreationDate": "2026-10-31T21:50:04.811231+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 19356,
+      "ParentProcessId": 24440,
+      "CreationDate": "2026-10-31T21:48:09.787352+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 13456,
+      "ParentProcessId": 15068,
+      "CreationDate": "2026-10-31T21:50:44.869433+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 23028,
+      "ParentProcessId": 6980,
+      "CreationDate": "2026-10-31T21:51:25.095345+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 32752,
+      "ParentProcessId": 36420,
+      "CreationDate": "2026-10-31T21:50:32.620958+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 28156,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:51:18.391969+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 10692,
+      "ParentProcessId": 31224,
+      "CreationDate": "2026-10-31T21:51:31.186736+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 24476,
+      "ParentProcessId": 21680,
+      "CreationDate": "2026-10-31T21:49:14.238426+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 34584,
+      "ParentProcessId": 34456,
+      "CreationDate": "2026-10-31T21:50:34.160611+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 26312,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:21.048612+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 36420,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:32.617415+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 17856,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:51:11.07718+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 34272,
+      "ParentProcessId": 37308,
+      "CreationDate": "2026-10-31T21:50:59.640476+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 14360,
+      "ParentProcessId": 29924,
+      "CreationDate": "2026-10-31T21:51:14.02738+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 36348,
+      "ParentProcessId": 22552,
+      "CreationDate": "2026-10-31T21:49:35.315586+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 33656,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:47.160596+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 9760,
+      "ParentProcessId": 11636,
+      "CreationDate": "2026-10-31T21:49:27.960566+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 21704,
+      "ParentProcessId": 7764,
+      "CreationDate": "2026-10-31T21:50:31.091747+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 28136,
+      "ParentProcessId": 35404,
+      "CreationDate": "2026-10-31T21:50:17.060063+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 37436,
+      "ParentProcessId": 6980,
+      "CreationDate": "2026-10-31T21:51:25.075752+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 26296,
+      "ParentProcessId": 31508,
+      "CreationDate": "2026-10-31T21:49:36.423107+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 29048,
+      "ParentProcessId": 36560,
+      "CreationDate": "2026-10-31T21:50:41.417827+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 5152,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:51:31.059569+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 14340,
+      "ParentProcessId": 33228,
+      "CreationDate": "2026-10-31T21:50:52.347708+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 16176,
+      "ParentProcessId": 33656,
+      "CreationDate": "2026-10-31T21:49:47.164147+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 37308,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:57.615052+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 36388,
+      "ParentProcessId": 33516,
+      "CreationDate": "2026-10-31T21:49:50.047153+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 24440,
+      "ParentProcessId": 11988,
+      "CreationDate": "2026-10-31T21:48:09.58676+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 21680,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:14.232853+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 18000,
+      "ParentProcessId": 31064,
+      "CreationDate": "2026-10-31T21:48:49.892546+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 35460,
+      "ParentProcessId": 1912,
+      "CreationDate": "2026-10-31T21:48:52.381514+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 29944,
+      "ParentProcessId": 2324,
+      "CreationDate": "2026-10-31T21:50:23.165967+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 6968,
+      "ParentProcessId": 35460,
+      "CreationDate": "2026-10-31T21:48:52.385218+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 2372,
+      "ParentProcessId": 15328,
+      "CreationDate": "2026-10-31T21:49:37.775418+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 6964,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:43.942573+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 12476,
+      "ParentProcessId": 2488,
+      "CreationDate": "2026-10-31T21:48:47.476828+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 32692,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:31.148317+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 29932,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:55.786825+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 32688,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:30.440479+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 32684,
+      "ParentProcessId": 32856,
+      "CreationDate": "2026-10-31T21:51:26.334347+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 25280,
+      "ParentProcessId": 29932,
+      "CreationDate": "2026-10-31T21:50:55.790718+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 29924,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:51:14.021531+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 31760,
+      "ParentProcessId": 18612,
+      "CreationDate": "2026-10-31T21:50:29.270789+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 4188,
+      "ParentProcessId": 6788,
+      "CreationDate": "2026-10-31T21:51:03.426393+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 6944,
+      "ParentProcessId": 24928,
+      "CreationDate": "2026-10-31T21:49:46.373622+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 25320,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:54.697383+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 35428,
+      "ParentProcessId": 37624,
+      "CreationDate": "2026-10-31T21:49:13.192516+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 8776,
+      "ParentProcessId": 22552,
+      "CreationDate": "2026-10-31T21:49:35.139234+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 36344,
+      "ParentProcessId": 19204,
+      "CreationDate": "2026-10-31T21:49:02.193524+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 7916,
+      "ParentProcessId": 9820,
+      "CreationDate": "2026-10-31T21:50:28.04977+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 22556,
+      "ParentProcessId": 19124,
+      "CreationDate": "2026-10-31T21:51:22.653768+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 10616,
+      "ParentProcessId": 32460,
+      "CreationDate": "2026-10-31T21:49:09.542002+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 5092,
+      "ParentProcessId": 6320,
+      "CreationDate": "2026-10-31T21:48:42.512303+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 22552,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:35.133801+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 25308,
+      "ParentProcessId": 25120,
+      "CreationDate": "2026-10-31T21:50:32.911132+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 15368,
+      "ParentProcessId": 14512,
+      "CreationDate": "2026-10-31T21:51:11.757946+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 22548,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:05.931474+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 27128,
+      "ParentProcessId": 10808,
+      "CreationDate": "2026-10-31T21:51:17.802999+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 23464,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:20.725114+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 2324,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:23.160844+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 30084,
+      "ParentProcessId": 9588,
+      "CreationDate": "2026-10-31T21:50:38.980745+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 26132,
+      "ParentProcessId": 15068,
+      "CreationDate": "2026-10-31T21:50:45.043029+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 20700,
+      "ParentProcessId": 19388,
+      "CreationDate": "2026-10-31T21:49:00.947367+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 23456,
+      "ParentProcessId": 28024,
+      "CreationDate": "2026-10-31T21:50:49.532745+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 23452,
+      "ParentProcessId": 29096,
+      "CreationDate": "2026-10-31T21:49:39.015432+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 4152,
+      "ParentProcessId": 36812,
+      "CreationDate": "2026-10-31T21:50:40.221746+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 35852,
+      "ParentProcessId": 9288,
+      "CreationDate": "2026-10-31T21:50:26.045659+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 17016,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:13.151266+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 36068,
+      "ParentProcessId": 21212,
+      "CreationDate": "2026-10-31T21:49:41.467033+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 37004,
+      "ParentProcessId": 28780,
+      "CreationDate": "2026-10-31T21:49:59.921514+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 37868,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:45.114023+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 27120,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:21.132944+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 37844,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:56.431008+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 36308,
+      "ParentProcessId": 4152,
+      "CreationDate": "2026-10-31T21:50:40.227163+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 34468,
+      "ParentProcessId": 37724,
+      "CreationDate": "2026-10-31T21:49:48.173655+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 33548,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:33.984233+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 21904,
+      "ParentProcessId": 37520,
+      "CreationDate": "2026-10-31T21:48:48.143339+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 13328,
+      "ParentProcessId": 35456,
+      "CreationDate": "2026-10-31T21:51:28.368813+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 37220,
+      "ParentProcessId": 32460,
+      "CreationDate": "2026-10-31T21:49:09.152257+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 6980,
+      "ParentProcessId": 24636,
+      "CreationDate": "2026-10-31T21:51:25.071953+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 5052,
+      "ParentProcessId": 17016,
+      "CreationDate": "2026-10-31T21:50:13.371958+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 31700,
+      "ParentProcessId": 28156,
+      "CreationDate": "2026-10-31T21:51:18.397716+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 34456,
+      "ParentProcessId": 24636,
+      "CreationDate": "2026-10-31T21:50:34.137724+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 37212,
+      "ParentProcessId": 36948,
+      "CreationDate": "2026-10-31T21:49:19.347923+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 28020,
+      "ParentProcessId": 26132,
+      "CreationDate": "2026-10-31T21:50:45.048298+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 36288,
+      "ParentProcessId": 17856,
+      "CreationDate": "2026-10-31T21:51:11.082719+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 12904,
+      "ParentProcessId": 24948,
+      "CreationDate": "2026-10-31T21:48:11.027858+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 24336,
+      "ParentProcessId": 33392,
+      "CreationDate": "2026-10-31T21:51:27.544939+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 10544,
+      "ParentProcessId": 18388,
+      "CreationDate": "2026-10-31T21:51:28.744017+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 27084,
+      "ParentProcessId": 22548,
+      "CreationDate": "2026-10-31T21:50:07.265205+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 33516,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:50.040909+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 31676,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:09.425722+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 16052,
+      "ParentProcessId": 10012,
+      "CreationDate": "2026-10-31T21:51:20.225792+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 25240,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:36.328907+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 35348,
+      "ParentProcessId": 33072,
+      "CreationDate": "2026-10-31T21:51:23.461088+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 416,
+      "ParentProcessId": 36556,
+      "CreationDate": "2026-10-31T21:51:02.038702+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 36256,
+      "ParentProcessId": 9760,
+      "CreationDate": "2026-10-31T21:49:27.964392+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 1332,
+      "ParentProcessId": 1912,
+      "CreationDate": "2026-10-31T21:48:50.652851+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 7764,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:31.08614+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 16952,
+      "ParentProcessId": 2864,
+      "CreationDate": "2026-10-31T21:49:01.779146+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 9596,
+      "ParentProcessId": 37844,
+      "CreationDate": "2026-10-31T21:50:57.202502+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 19704,
+      "ParentProcessId": 36388,
+      "CreationDate": "2026-10-31T21:49:03.410533+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 22460,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:00.781023+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 8672,
+      "ParentProcessId": 26740,
+      "CreationDate": "2026-10-31T21:49:57.172272+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 8464,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:25.61277+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 9588,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:38.470132+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 11308,
+      "ParentProcessId": 28024,
+      "CreationDate": "2026-10-31T21:50:49.893571+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 15100,
+      "ParentProcessId": 2372,
+      "CreationDate": "2026-10-31T21:49:37.780703+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 25208,
+      "ParentProcessId": 34076,
+      "CreationDate": "2026-10-31T21:49:25.508404+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 23364,
+      "ParentProcessId": 2372,
+      "CreationDate": "2026-10-31T21:49:37.801434+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 22444,
+      "ParentProcessId": 15828,
+      "CreationDate": "2026-10-31T21:50:03.602188+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 24376,
+      "ParentProcessId": 35348,
+      "CreationDate": "2026-10-31T21:49:20.582909+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 23356,
+      "ParentProcessId": 30084,
+      "CreationDate": "2026-10-31T21:50:38.984215+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 29164,
+      "ParentProcessId": 36556,
+      "CreationDate": "2026-10-31T21:51:03.278108+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 7728,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:08.444367+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 32872,
+      "ParentProcessId": 20844,
+      "CreationDate": "2026-10-31T21:49:17.772744+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 18752,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:10.930613+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 35292,
+      "ParentProcessId": 37732,
+      "CreationDate": "2026-10-31T21:49:58.912554+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 37536,
+      "ParentProcessId": 25240,
+      "CreationDate": "2026-10-31T21:50:36.555217+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 5880,
+      "ParentProcessId": 31676,
+      "CreationDate": "2026-10-31T21:50:09.749805+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 15068,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:44.863712+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 6788,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:51:03.420587+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 31600,
+      "ParentProcessId": 16052,
+      "CreationDate": "2026-10-31T21:51:20.248419+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 26084,
+      "ParentProcessId": 27352,
+      "CreationDate": "2026-10-31T21:48:54.775532+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 10460,
+      "ParentProcessId": 1576,
+      "CreationDate": "2026-10-31T21:48:37.646232+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 32856,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:51:26.328555+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 37108,
+      "ParentProcessId": 34104,
+      "CreationDate": "2026-10-31T21:49:04.461473+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 36188,
+      "ParentProcessId": 34104,
+      "CreationDate": "2026-10-31T21:49:04.626564+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 36948,
+      "ParentProcessId": 20844,
+      "CreationDate": "2026-10-31T21:49:19.325661+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 25156,
+      "ParentProcessId": 26880,
+      "CreationDate": "2026-10-31T21:49:11.500527+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 18720,
+      "ParentProcessId": 10808,
+      "CreationDate": "2026-10-31T21:51:15.218251+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 28828,
+      "ParentProcessId": 34456,
+      "CreationDate": "2026-10-31T21:50:34.14127+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 27908,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:51:08.128306+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 8608,
+      "ParentProcessId": 32688,
+      "CreationDate": "2026-10-31T21:49:30.444068+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 15956,
+      "ParentProcessId": 17856,
+      "CreationDate": "2026-10-31T21:51:05.724283+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 37092,
+      "ParentProcessId": 36840,
+      "CreationDate": "2026-10-31T21:50:35.370832+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 33412,
+      "ParentProcessId": 1912,
+      "CreationDate": "2026-10-31T21:48:51.157901+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 37884,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:52.088616+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 13192,
+      "ParentProcessId": 16584,
+      "CreationDate": "2026-10-31T21:50:50.5002+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 26976,
+      "ParentProcessId": 34240,
+      "CreationDate": "2026-10-31T21:50:53.556292+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 26972,
+      "ParentProcessId": 22924,
+      "CreationDate": "2026-10-31T21:49:08.043616+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 37080,
+      "ParentProcessId": 37844,
+      "CreationDate": "2026-10-31T21:50:56.436713+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 31564,
+      "ParentProcessId": 26880,
+      "CreationDate": "2026-10-31T21:49:11.984043+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 13180,
+      "ParentProcessId": 32192,
+      "CreationDate": "2026-10-31T21:49:21.808661+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 32264,
+      "ParentProcessId": 29068,
+      "CreationDate": "2026-10-31T21:50:48.699787+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 33392,
+      "ParentProcessId": 37612,
+      "CreationDate": "2026-10-31T21:51:27.520647+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 25120,
+      "ParentProcessId": 36420,
+      "CreationDate": "2026-10-31T21:50:32.905991+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 24200,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:51:00.435928+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 26036,
+      "ParentProcessId": 27616,
+      "CreationDate": "2026-10-31T21:49:16.052054+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 18680,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:24.945612+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 6780,
+      "ParentProcessId": 26632,
+      "CreationDate": "2026-10-31T21:50:58.39777+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 16840,
+      "ParentProcessId": 11308,
+      "CreationDate": "2026-10-31T21:50:49.898738+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 9048,
+      "ParentProcessId": 9396,
+      "CreationDate": "2026-10-31T21:50:43.837548+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 18676,
+      "ParentProcessId": 37624,
+      "CreationDate": "2026-10-31T21:49:13.211464+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 32460,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:09.146957+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 31540,
+      "ParentProcessId": 25088,
+      "CreationDate": "2026-10-31T21:50:01.159302+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 28780,
+      "ParentProcessId": 37732,
+      "CreationDate": "2026-10-31T21:49:59.898729+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 9480,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:48:39.5407+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 17112,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:45.721265+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 35456,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:51:28.36332+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 34288,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:29.12393+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 32448,
+      "ParentProcessId": 12836,
+      "CreationDate": "2026-10-31T21:50:18.874652+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 24636,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:51:24.947614+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 25644,
+      "ParentProcessId": 18096,
+      "CreationDate": "2026-10-31T21:50:42.652341+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 18656,
+      "ParentProcessId": 24440,
+      "CreationDate": "2026-10-31T21:48:09.5926+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 25088,
+      "ParentProcessId": 22460,
+      "CreationDate": "2026-10-31T21:50:01.15422+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 23248,
+      "ParentProcessId": 16052,
+      "CreationDate": "2026-10-31T21:51:20.229266+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 34104,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:04.456066+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 26920,
+      "ParentProcessId": 33340,
+      "CreationDate": "2026-10-31T21:48:53.127349+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 32432,
+      "ParentProcessId": 32692,
+      "CreationDate": "2026-10-31T21:49:31.660305+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 37668,
+      "ParentProcessId": 5592,
+      "CreationDate": "2026-10-31T21:49:42.701857+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 29672,
+      "ParentProcessId": 26740,
+      "CreationDate": "2026-10-31T21:49:57.459565+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 31508,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:36.419569+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 33340,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:48:53.121646+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 22308,
+      "ParentProcessId": 25480,
+      "CreationDate": "2026-10-31T21:51:14.151586+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 10360,
+      "ParentProcessId": 37308,
+      "CreationDate": "2026-10-31T21:50:57.621155+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 27820,
+      "ParentProcessId": 30016,
+      "CreationDate": "2026-10-31T21:51:05.294736+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 248,
+      "ParentProcessId": 5052,
+      "CreationDate": "2026-10-31T21:50:13.3771+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 10356,
+      "ParentProcessId": 14512,
+      "CreationDate": "2026-10-31T21:50:15.827923+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 22300,
+      "ParentProcessId": 37736,
+      "CreationDate": "2026-10-31T21:50:24.394902+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 35164,
+      "ParentProcessId": 22776,
+      "CreationDate": "2026-10-31T21:49:32.880661+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 34240,
+      "ParentProcessId": 21176,
+      "CreationDate": "2026-10-31T21:50:53.531503+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 31452,
+      "ParentProcessId": 35552,
+      "CreationDate": "2026-10-31T21:48:56.067009+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 18612,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:28.89445+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 26880,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:11.494871+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 33312,
+      "ParentProcessId": 27432,
+      "CreationDate": "2026-10-31T21:49:34.117895+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 25040,
+      "ParentProcessId": 17488,
+      "CreationDate": "2026-10-31T21:49:07.069633+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 5740,
+      "ParentProcessId": 37356,
+      "CreationDate": "2026-10-31T21:48:44.991866+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 32388,
+      "ParentProcessId": 29932,
+      "CreationDate": "2026-10-31T21:50:55.982769+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 20440,
+      "ParentProcessId": 35404,
+      "CreationDate": "2026-10-31T21:50:17.079232+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 27788,
+      "ParentProcessId": 6212,
+      "CreationDate": "2026-10-31T21:49:29.217927+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 31064,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:48:49.886553+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 32380,
+      "ParentProcessId": 37868,
+      "CreationDate": "2026-10-31T21:49:45.119621+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 27784,
+      "ParentProcessId": 33896,
+      "CreationDate": "2026-10-31T21:49:56.082197+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 36972,
+      "ParentProcessId": 29672,
+      "CreationDate": "2026-10-31T21:49:57.464717+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 27776,
+      "ParentProcessId": 37712,
+      "CreationDate": "2026-10-31T21:49:36.54401+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 15828,
+      "ParentProcessId": 5996,
+      "CreationDate": "2026-10-31T21:50:03.597106+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 2864,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:01.77362+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 5996,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:03.305736+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 33280,
+      "ParentProcessId": 19124,
+      "CreationDate": "2026-10-31T21:51:21.453813+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 27764,
+      "ParentProcessId": 22556,
+      "CreationDate": "2026-10-31T21:51:22.657381+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 10676,
+      "ParentProcessId": 25120,
+      "CreationDate": "2026-10-31T21:50:32.929854+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 31436,
+      "ParentProcessId": 17112,
+      "CreationDate": "2026-10-31T21:50:45.726803+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 15812,
+      "ParentProcessId": 37356,
+      "CreationDate": "2026-10-31T21:48:45.010767+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 22244,
+      "ParentProcessId": 34764,
+      "CreationDate": "2026-10-31T21:50:27.903828+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 36588,
+      "ParentProcessId": 36840,
+      "CreationDate": "2026-10-31T21:50:35.300877+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 19388,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:48:59.34239+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 36024,
+      "ParentProcessId": 37520,
+      "CreationDate": "2026-10-31T21:48:48.694945+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 30508,
+      "ParentProcessId": 20700,
+      "CreationDate": "2026-10-31T21:49:00.970101+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 21316,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:48:36.42385+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 23152,
+      "ParentProcessId": 35608,
+      "CreationDate": "2026-10-31T21:48:45.041731+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 28664,
+      "ParentProcessId": 11308,
+      "CreationDate": "2026-10-31T21:50:49.917377+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 29036,
+      "ParentProcessId": 25556,
+      "CreationDate": "2026-10-31T21:49:15.670316+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 36932,
+      "ParentProcessId": 34076,
+      "CreationDate": "2026-10-31T21:49:25.489766+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 31448,
+      "ParentProcessId": 32636,
+      "CreationDate": "2026-10-31T21:48:38.848231+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 32636,
+      "ParentProcessId": 16328,
+      "CreationDate": "2026-10-31T21:48:38.842803+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 26632,
+      "ParentProcessId": 37308,
+      "CreationDate": "2026-10-31T21:50:58.392308+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 35552,
+      "ParentProcessId": 25604,
+      "CreationDate": "2026-10-31T21:48:56.063439+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 15788,
+      "ParentProcessId": 10356,
+      "CreationDate": "2026-10-31T21:50:15.850165+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 26812,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:51:12.766928+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 35996,
+      "ParentProcessId": 22196,
+      "CreationDate": "2026-10-31T21:48:41.117063+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 37752,
+      "ParentProcessId": 36948,
+      "CreationDate": "2026-10-31T21:49:19.32919+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 35992,
+      "ParentProcessId": 36616,
+      "CreationDate": "2026-10-31T21:49:54.981096+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 33228,
+      "ParentProcessId": 37884,
+      "CreationDate": "2026-10-31T21:50:52.323781+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 35064,
+      "ParentProcessId": 25240,
+      "CreationDate": "2026-10-31T21:50:37.799654+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 23116,
+      "ParentProcessId": 416,
+      "CreationDate": "2026-10-31T21:51:02.060939+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 22196,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:48:41.11175+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 24948,
+      "ParentProcessId": 24440,
+      "CreationDate": "2026-10-31T21:48:10.684408+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 20352,
+      "ParentProcessId": 18680,
+      "CreationDate": "2026-10-31T21:49:24.951633+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 26564,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:11.68046+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 12996,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:47.609731+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 19424,
+      "ParentProcessId": 37628,
+      "CreationDate": "2026-10-31T21:49:32.14581+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 11152,
+      "ParentProcessId": 33548,
+      "CreationDate": "2026-10-31T21:49:33.989805+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 37476,
+      "ParentProcessId": 31700,
+      "CreationDate": "2026-10-31T21:48:46.22723+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 35044,
+      "ParentProcessId": 27128,
+      "CreationDate": "2026-10-31T21:51:17.826025+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 24928,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:46.367629+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 8384,
+      "ParentProcessId": 5396,
+      "CreationDate": "2026-10-31T21:50:43.003795+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 37788,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:40.245625+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 36868,
+      "ParentProcessId": 37536,
+      "CreationDate": "2026-10-31T21:50:36.560409+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 35948,
+      "ParentProcessId": 25320,
+      "CreationDate": "2026-10-31T21:49:54.703648+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 24348,
+      "ParentProcessId": 19124,
+      "CreationDate": "2026-10-31T21:51:21.276931+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 36680,
+      "ParentProcessId": 25520,
+      "CreationDate": "2026-10-31T21:49:53.738986+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 19400,
+      "ParentProcessId": 27324,
+      "CreationDate": "2026-10-31T21:49:15.351396+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 29508,
+      "ParentProcessId": 32432,
+      "CreationDate": "2026-10-31T21:49:31.665379+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 17560,
+      "ParentProcessId": 10616,
+      "CreationDate": "2026-10-31T21:49:09.547275+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 9288,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:26.039979+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 35936,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:06.719966+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 8360,
+      "ParentProcessId": 9288,
+      "CreationDate": "2026-10-31T21:50:26.830202+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 22144,
+      "ParentProcessId": 10356,
+      "CreationDate": "2026-10-31T21:50:15.831392+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 1924,
+      "ParentProcessId": 36560,
+      "CreationDate": "2026-10-31T21:50:41.436817+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 14788,
+      "ParentProcessId": 12996,
+      "CreationDate": "2026-10-31T21:50:47.615776+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 32248,
+      "ParentProcessId": 5052,
+      "CreationDate": "2026-10-31T21:50:13.396173+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 20300,
+      "ParentProcessId": 5996,
+      "CreationDate": "2026-10-31T21:50:03.311003+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 36840,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:35.295384+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 5592,
+      "ParentProcessId": 12900,
+      "CreationDate": "2026-10-31T21:49:42.696421+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 13860,
+      "ParentProcessId": 19388,
+      "CreationDate": "2026-10-31T21:48:59.348188+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 1912,
+      "ParentProcessId": 17112,
+      "CreationDate": "2026-10-31T21:50:46.286097+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 34076,
+      "ParentProcessId": 18680,
+      "CreationDate": "2026-10-31T21:49:25.48452+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 29480,
+      "ParentProcessId": 34288,
+      "CreationDate": "2026-10-31T21:49:29.129713+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 30016,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:51:05.289006+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 29020,
+      "ParentProcessId": 33392,
+      "CreationDate": "2026-10-31T21:51:27.525758+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 33472,
+      "ParentProcessId": 14688,
+      "CreationDate": "2026-10-31T21:49:05.153925+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 35088,
+      "ParentProcessId": 37884,
+      "CreationDate": "2026-10-31T21:50:52.093902+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 36352,
+      "ParentProcessId": 25480,
+      "CreationDate": "2026-10-31T21:51:14.172268+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 30388,
+      "ParentProcessId": 33824,
+      "CreationDate": "2026-10-31T21:51:04.509487+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 14764,
+      "ParentProcessId": 33412,
+      "CreationDate": "2026-10-31T21:48:51.161399+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 34980,
+      "ParentProcessId": 27128,
+      "CreationDate": "2026-10-31T21:51:17.806644+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 37736,
+      "ParentProcessId": 2704,
+      "CreationDate": "2026-10-31T21:50:24.391232+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 34976,
+      "ParentProcessId": 19096,
+      "CreationDate": "2026-10-31T21:48:36.68617+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 37732,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:58.906861+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 36812,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:40.143084+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 34052,
+      "ParentProcessId": 24824,
+      "CreationDate": "2026-10-31T21:49:05.870669+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 29456,
+      "ParentProcessId": 36628,
+      "CreationDate": "2026-10-31T21:49:51.306604+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 24860,
+      "ParentProcessId": 36628,
+      "CreationDate": "2026-10-31T21:49:51.325875+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 27616,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:16.046572+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 37724,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:48.16807+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 16584,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:50.494809+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 26740,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:57.165854+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 21176,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:53.456897+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 1876,
+      "ParentProcessId": 33340,
+      "CreationDate": "2026-10-31T21:48:53.598077+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 37716,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:50:04.728639+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 12900,
+      "ParentProcessId": 37528,
+      "CreationDate": "2026-10-31T21:49:42.44231+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 37712,
+      "ParentProcessId": 31508,
+      "CreationDate": "2026-10-31T21:49:36.540288+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 17488,
+      "ParentProcessId": 35936,
+      "CreationDate": "2026-10-31T21:49:07.064424+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 35332,
+      "ParentProcessId": 35936,
+      "CreationDate": "2026-10-31T21:49:06.725471+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 37608,
+      "ParentProcessId": 14512,
+      "CreationDate": "2026-10-31T21:51:11.738385+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 27588,
+      "ParentProcessId": 26564,
+      "CreationDate": "2026-10-31T21:50:12.197681+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 15640,
+      "ParentProcessId": 27908,
+      "CreationDate": "2026-10-31T21:51:09.340224+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 34936,
+      "ParentProcessId": 25604,
+      "CreationDate": "2026-10-31T21:48:55.377228+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 34016,
+      "ParentProcessId": 24200,
+      "CreationDate": "2026-10-31T21:51:00.441567+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 24824,
+      "ParentProcessId": 14688,
+      "CreationDate": "2026-10-31T21:49:05.865597+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 18388,
+      "ParentProcessId": 35456,
+      "CreationDate": "2026-10-31T21:51:28.738792+07:00",
+      "Name": "git.exe",
+      "ExecutablePath": null
+    },
+    {
+      "ProcessId": 22980,
+      "ParentProcessId": 35564,
+      "CreationDate": "2026-10-31T21:48:47.154243+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 33084,
+      "ParentProcessId": 24756,
+      "CreationDate": "2026-10-31T21:50:19.473953+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": null
+    }
+  ],
+  "excluded_build_helpers": [],
+  "helper_finished_parent_condition": true,
+  "helper_scope": "Helpers are not terminated; successful Cargo completion and stopped tracked compiler clients are required before private-source edits. No shared source/target mutation.",
+  "admission_cpu": 2.727272727272727,
+  "admission_free": 18643476480.0,
+  "remaining": [],
+  "cleanup_complete": true,
+  "monitor_error": null,
+  "rss_scope": "tracked owned process tree"
+}

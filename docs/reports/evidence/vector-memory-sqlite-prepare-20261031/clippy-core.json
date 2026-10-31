@@ -1,0 +1,27 @@
+{
+  "kind": "build_preparation",
+  "exe": "C:\\Users\\suanr\\.cargo\\bin\\cargo.exe",
+  "args": [
+    "clippy",
+    "--locked",
+    "--offline",
+    "--target",
+    "x86_64-pc-windows-msvc",
+    "--no-default-features",
+    "--all-targets",
+    "-j1",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "cwd": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\verify-src",
+  "output": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\clippy-core",
+  "env": {
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_BUILD_JOBS": "1"
+  },
+  "cap_seconds": 1200
+}

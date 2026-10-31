@@ -1,0 +1,28 @@
+{
+  "phase": "read_only_reopen_verified",
+  "status": "complete",
+  "node_version": "v24.20.0",
+  "engine": "genesis-block",
+  "version": "0.2.10",
+  "schema_version": 6,
+  "db_path": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\followuproot\\native-perf-abbaab\\runs\\native-perf-20261031T063931Z\\01-baseline\\database",
+  "read_only": true,
+  "page_cache_mb": 32,
+  "vector_dim": 4,
+  "retention": "default",
+  "query": "MATCH (n:Memory) RETURN n.id, n.prop.text",
+  "query_row_count": 2000,
+  "unique_node_count": 2000,
+  "first_node": {
+    "id": "mem:0",
+    "text": "observation 0: the user asked about journal segment retention and folding"
+  },
+  "last_node": {
+    "id": "mem:1999",
+    "text": "observation 1999: the user asked about journal segment retention and folding"
+  },
+  "open_ms": 1976.1277,
+  "query_ms": 184.19469999999978,
+  "elapsed_ms": 2166.3851999999997,
+  "drop_measured": false
+}

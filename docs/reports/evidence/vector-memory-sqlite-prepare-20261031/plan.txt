@@ -1,0 +1,14 @@
+# SQLite prepare stall investigation
+Authorized follow-up: pinned SQLite reproducer; separate replay and backup; evidence-backed fix;100k reopen under existing contracts.
+Classification: C-2 diagnostic work; any publication/lifecycle code change MEDIUM or HIGH based on evidence.
+1. Freeze current source/staged identities. Check pinned SQLite3.46.0 and rusqlite0.32.1.
+2. Reproduce first prepare independently: direct open, backup publication without replay, replay without publication, combined path. Time prepare/step/finalize, record DB/WAL sizes and results. Source DBs opened read-only; disposable outputs only.
+3. Attribute time with pinned implementation counters or stack/IO evidence. No warm-up or query-deadline exclusion as fix.
+4. Write failing correctness/allocation regression, implement minimum justified cause fix; verify publication atomicity/replay and existing gates.
+5. Run controlled100k same-process reopen/query (5squery;1200sjob;2GiBRSS) with no query warm-up. Preserve full-lifecycle limitation if it cannot run under guard.
+6. Update existing report and portable evidence; protect seven staged files; no commit/deploy/production access.
+All CPU-intensive jobs serialized. Admission10s CPUavg<20%,freeRAM>=6GiB. No budget increase.
+
+Build preparation clarification: the standalone one-job compiler is bounded by the same1200s/2GiB and6GiBfreeRAM guard; CPUadmission does not qualify compiletimes. All actual reproducer andperformanceworkloadruns retain CPUavg<20% admission. This corrects an overbroad initial inclusion of compilation in benchmarkadmission; no runtime or querybudget changed.
+
+Functional-test clarification: callbackcount/contents regressions use no wallclockthreshold and may execute on a busyhost under unchanged300sperexecutable and2GiBstrictRSScap (withinexisting4GiBcoretestbudget). No testtimings from such runs are benchmarkevidence. All timed reproducer/100kperformancequalifications stillrequireoriginalidleCPUadmission.

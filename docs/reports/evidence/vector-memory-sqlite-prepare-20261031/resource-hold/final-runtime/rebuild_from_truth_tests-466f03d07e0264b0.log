@@ -1,0 +1,15 @@
+
+running 10 tests
+test edge_properties_survive_roundtrip ... ok
+test graph_indices_survive_roundtrip ... ok
+test idempotent_double_reload ... ok
+test labels_survive_roundtrip ... ok
+test large_batch_roundtrip ... ok
+test logical_clock_persists ... ok
+test node_properties_survive_roundtrip ... ok
+test snapshot_roundtrip_nodes_edges_vectors ... ok
+test superseded_node_chain_survives ... ok
+test wal_only_roundtrip ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 63.25s
+

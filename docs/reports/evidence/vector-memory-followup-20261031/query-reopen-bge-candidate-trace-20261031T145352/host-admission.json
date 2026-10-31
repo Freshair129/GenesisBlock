@@ -1,0 +1,78 @@
+{
+  "sample_count": 11,
+  "observed_window_seconds": 10,
+  "average_total_cpu_percent": 10.272727272727273,
+  "minimum_free_physical_bytes": 18837917696,
+  "minimum_free_gib": 17.544,
+  "cpu_gate_passed": true,
+  "memory_gate_passed": true,
+  "active_build_or_benchmark_processes": [],
+  "samples": [
+    {
+      "at_local": "2026-10-31T14:58:47.6044507+07:00",
+      "at_utc": "2026-10-31T07:58:47.6063477Z",
+      "total_cpu_percent": 9.0,
+      "free_physical_bytes": 18920873984
+    },
+    {
+      "at_local": "2026-10-31T14:58:49.0287422+07:00",
+      "at_utc": "2026-10-31T07:58:49.0288940Z",
+      "total_cpu_percent": 7.0,
+      "free_physical_bytes": 18909679616
+    },
+    {
+      "at_local": "2026-10-31T14:58:50.4309448+07:00",
+      "at_utc": "2026-10-31T07:58:50.4310830Z",
+      "total_cpu_percent": 6.0,
+      "free_physical_bytes": 18910281728
+    },
+    {
+      "at_local": "2026-10-31T14:58:51.8255913+07:00",
+      "at_utc": "2026-10-31T07:58:51.8258211Z",
+      "total_cpu_percent": 7.0,
+      "free_physical_bytes": 18913988608
+    },
+    {
+      "at_local": "2026-10-31T14:58:53.2278322+07:00",
+      "at_utc": "2026-10-31T07:58:53.2280528Z",
+      "total_cpu_percent": 7.0,
+      "free_physical_bytes": 18914189312
+    },
+    {
+      "at_local": "2026-10-31T14:58:54.6213825+07:00",
+      "at_utc": "2026-10-31T07:58:54.6214736Z",
+      "total_cpu_percent": 9.0,
+      "free_physical_bytes": 18917064704
+    },
+    {
+      "at_local": "2026-10-31T14:58:56.0193899+07:00",
+      "at_utc": "2026-10-31T07:58:56.0194735Z",
+      "total_cpu_percent": 13.0,
+      "free_physical_bytes": 18906378240
+    },
+    {
+      "at_local": "2026-10-31T14:58:57.4230039+07:00",
+      "at_utc": "2026-10-31T07:58:57.4230899Z",
+      "total_cpu_percent": 6.0,
+      "free_physical_bytes": 18910416896
+    },
+    {
+      "at_local": "2026-10-31T14:58:58.8252123+07:00",
+      "at_utc": "2026-10-31T07:58:58.8253347Z",
+      "total_cpu_percent": 7.0,
+      "free_physical_bytes": 18906112000
+    },
+    {
+      "at_local": "2026-10-31T14:59:00.2422040+07:00",
+      "at_utc": "2026-10-31T07:59:00.2422950Z",
+      "total_cpu_percent": 33.0,
+      "free_physical_bytes": 18837917696
+    },
+    {
+      "at_local": "2026-10-31T14:59:01.6381973+07:00",
+      "at_utc": "2026-10-31T07:59:01.6382605Z",
+      "total_cpu_percent": 9.0,
+      "free_physical_bytes": 18907074560
+    }
+  ]
+}

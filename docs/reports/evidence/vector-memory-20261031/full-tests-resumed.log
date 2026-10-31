@@ -1,0 +1,195 @@
+   Compiling genesis-block-native v0.2.10 (C:\Users\suanr\genesis-vector-memory-20261031\verify-src)
+    Finished `test` profile [unoptimized] target(s) in 9m 17s
+     Running unittests src\lib.rs (C:\Users\suanr\genesis-vector-memory-20261031\napi-target\x86_64-pc-windows-msvc\debug\deps\genesis_block_native-b7af0321854b0aac.exe)
+
+running 47 tests
+test api_error::tests::napi_result_helper_serializes_the_six_category_contract ... ok
+test api_error::tests::query_contract_json_decode_errors_are_validation_envelopes ... ok
+test api_error::tests::query_error_mapping_uses_structured_codes ... ok
+test api_error::tests::query_error_result_keeps_stable_and_legacy_codes_separate ... ok
+test api_error::tests::query_success_serializes_direct_plan_payload_without_enum_wrapper ... ok
+test api_error::tests::stable_codes_are_one_to_one_with_categories ... ok
+test api_error::tests::untyped_storage_errors_default_to_internal_without_message_classification ... ok
+test api_error_contract_tests::transaction_contract_maps_explicit_frontier_conflict ... ok
+test api_error_contract_tests::transaction_contract_maps_recovery_guard_to_durability ... ok
+test api_error_contract_tests::transaction_contract_maps_relational_payload_validation_to_validation ... ok
+test compacted_master_proof_effective_state_tests::batch_proof_uses_lww_and_retraction_tie_breaking ... ok
+test compacted_master_proof_effective_state_tests::historical_user_proof_cannot_authorize_changed_payload_or_higher_clock ... ok
+test compacted_master_proof_effective_state_tests::node_proof_rejects_relay_selected_embedding ... ok
+test compacted_master_proof_effective_state_tests::transaction_retraction_invalidates_same_identity_node_proof ... ok
+test compacted_row_revision_binding_tests::backup_restore_requires_roster_for_remote_revision_checkpoint ... ok
+test compacted_row_revision_binding_tests::backup_restore_with_membership_authenticates_remote_journal_before_publish ... ok
+test compacted_row_revision_binding_tests::compacted_revision_checkpoint_proof_advances_batch_master_state ... ok
+test compacted_row_revision_binding_tests::compacted_revision_source_proof_uses_prior_batch_master_state ... ok
+test compacted_row_revision_binding_tests::compacted_row_checkpoint_binds_after_image_to_insert_and_update ... ok
+test compacted_row_revision_binding_tests::frontier_only_backup_rejects_user_update_after_master_promotion ... ok
+test compacted_row_revision_binding_tests::frontier_only_backup_rejects_user_update_in_post_base_history ... ok
+test compacted_row_revision_binding_tests::reconcile_rejects_forged_compacted_row_after_image_before_wal_write ... ok
+test gossip_socket_capacity_tests::constrained_ipv4_and_ipv6_sockets_deliver_existing_size_replies ... ok
+test journal_authorization_budget_tests::backup_restore_budget_failure_does_not_publish_target ... ok
+test journal_authorization_budget_tests::bounded_active_journal_read_accepts_a_not_yet_created_wal ... ok
+test journal_authorization_budget_tests::budget_counts_jsonl_segments_framed_segments_and_active_wal ... ok
+test journal_authorization_budget_tests::journal_preflight_rechecks_limits_after_count_source_changes ... ok
+test journal_authorization_budget_tests::journal_preflight_rejects_record_growth_within_source_byte_bound ... ok
+test journal_authorization_budget_tests::late_membership_budget_failure_rolls_back_staged_roster ... ok
+test journal_authorization_budget_tests::membership_open_budget_fails_before_replay_or_projection_creation ... ok
+test journal_authorization_budget_tests::source_length_guard_precedes_active_wal_read_and_max_frame_fits_overhead ... ok
+test p6_sync_progress_receipt_tests::explicit_trusted_key_requires_exact_outer_sequence ... ok
+test p6_sync_progress_receipt_tests::receipt_verification_binds_peer_request_range_and_signature ... ok
+test projection_rebuild_tests::busy_publication_keeps_original_projection_and_connection ... ok
+test projection_rebuild_tests::failed_replay_keeps_original_projection_and_connection ... ok
+test query::hql2::exec::vector_distance_tests::cosine_distance_scales_finite_extreme_and_subnormal_values ... ok
+test query::hql2::lower::json_literal_size_tests::json_string_size_matches_escaped_serialization ... ok
+test query::hql2::lower::json_literal_size_tests::primitive_json_array_below_the_literal_size_limit_is_preserved ... ok
+test query::hql2::lower::json_literal_size_tests::primitive_json_array_cannot_exceed_the_literal_size_limit ... ok
+test query::hql2::result::counter_contract_tests::counter_wire_contract_keeps_zero_unknown_and_overflow_distinct ... ok
+test query::hql2::source::hydration_batch_tests::exec_batch_checks_typed_columns_rows_and_stable_keys ... ok
+test router::error_contract_tests::recovery_required_write_returns_durability_envelope ... ok
+test router::error_contract_tests::typed_transaction_contract_returns_durability_envelope ... ok
+test vector_memory_tests::arena_allocated_bytes_include_capacity_in_every_mode ... ok
+test vector_memory_tests::rebuild_preserves_calibrated_sq8_and_centered_binary_codes_without_rerank ... ok
+test vector_memory_tests::rebuild_preserves_native_codes_and_f16_rounding_including_binary_tail ... ok
+test vector_memory_tests::streamed_arena_bytes_match_independent_little_endian_encoding ... ok
+
+test result: ok. 47 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.02s
+
+     Running tests\add_vector_tests.rs (C:\Users\suanr\genesis-vector-memory-20261031\napi-target\x86_64-pc-windows-msvc\debug\deps\add_vector_tests-8137abe345f3c034.exe)
+
+running 6 tests
+test add_vector_dim_mismatch_errors ... ok
+test add_vector_to_missing_node_errors ... ok
+test add_vector_unknown_collection_errors ... ok
+test attached_vector_survives_wal_replay ... ok
+test node_carries_vectors_in_two_collections ... ok
+test readding_vector_does_not_duplicate_search_hits ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.15s
+
+     Running tests\anti_entropy_tests.rs (C:\Users\suanr\genesis-vector-memory-20261031\napi-target\x86_64-pc-windows-msvc\debug\deps\anti_entropy_tests-7b73579210c39dd1.exe)
+
+running 7 tests
+test compaction_preserves_secondary_vectors ... ok
+test events_since_filters_by_clock ... ok
+test events_since_seq_filters_by_frame_cursor ... ok
+test history_horizon_tracks_folds ... ok
+test pull_delta_converges_graph_state ... ok
+test pull_delta_syncs_secondary_vectors ... ok
+test reapplying_delta_is_safe ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.25s
+
+     Running tests\async_indexing_tests.rs (C:\Users\suanr\genesis-vector-memory-20261031\napi-target\x86_64-pc-windows-msvc\debug\deps\async_indexing_tests-489cf76cd09f295d.exe)
+
+running 4 tests
+test bulk_then_flush_indexes_all ... ok
+test flush_clears_index_lag ... ok
+test reopen_rebuilds_full_index ... ok
+test searchable_after_flush ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.42s
+
+     Running tests\backup_restore_u9_tests.rs (C:\Users\suanr\genesis-vector-memory-20261031\napi-target\x86_64-pc-windows-msvc\debug\deps\backup_restore_u9_tests-87b4eff04b931274.exe)
+
+running 8 tests
+test export_and_restore_reject_live_or_existing_destinations ... ok
+test export_then_clean_restore_preserves_graph_vector_and_manifest_identity ... ok
+test restore_accepts_older_engine_version_with_same_schema ... ok
+test restore_authenticates_truncated_bundle_before_extracting_artifacts ... ok
+test restore_rejects_duplicate_traversal_and_trailing_entries ... ok
+test restore_rejects_incompatible_engine_and_schema_without_creating_target ... ok
+test restore_rejects_incompatible_manifest_without_creating_target ... ok
+test restore_rejects_tampered_bundle_without_creating_target ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 28.79s
+
+     Running tests\batch_atomicity_tests.rs (C:\Users\suanr\genesis-vector-memory-20261031\napi-target\x86_64-pc-windows-msvc\debug\deps\batch_atomicity_tests-b59c27dd0f1299c0.exe)
+
+running 1 test
+test test_mark_ix_batch_atomicity ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s
+
+     Running tests\binary_quant_tests.rs (C:\Users\suanr\genesis-vector-memory-20261031\napi-target\x86_64-pc-windows-msvc\debug\deps\binary_quant_tests-aafcec5392e5fb0a.exe)
+
+running 3 tests
+test bq_disk_is_32x_smaller ... ok
+test bq_exact_match_is_top1 ... ok
+test bq_survives_reopen ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.78s
+
+     Running tests\bitemporal.rs (C:\Users\suanr\genesis-vector-memory-20261031\napi-target\x86_64-pc-windows-msvc\debug\deps\bitemporal-6e04e10f22af97fb.exe)
+
+running 10 tests
+test as_of_query_filters_by_time ... ok
+test edge_retract_sets_valid_to ... ok
+test edge_temporal_retract_as_of ... ok
+test logical_clock_monotonic ... ok
+test logical_clock_peer_id_stable ... ok
+test supersede_nonexistent_node_errors ... ok
+test supersede_preserves_labels ... ok
+test supersede_sets_caused_by ... ok
+test supersede_updates_current ... ok
+test ttl_sets_expires_at ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.25s
+
+     Running tests\bitemporal_matrix_wp31_tests.rs (C:\Users\suanr\genesis-vector-memory-20261031\napi-target\x86_64-pc-windows-msvc\debug\deps\bitemporal_matrix_wp31_tests-49504ee211035a70.exe)
+
+running 7 tests
+test audit_chain_survives_reopen ... ok
+test audit_reconstruction_full_chain ... ok
+test correction_after_the_fact_retroactive_edge_retract ... ok
+test interval_boundaries_inclusive_start_exclusive_end ... ok
+test matrix_retraction_belief_before_still_serves ... ok
+test matrix_retraction_current_and_after_tx ... ok
+test matrix_valid_by_tx_four_quadrants ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.78s
+
+     Running tests\bq_centering_tests.rs (C:\Users\suanr\genesis-vector-memory-20261031\napi-target\x86_64-pc-windows-msvc\debug\deps\bq_centering_tests-4dba8ceb5e31c128.exe)
+
+running 5 tests
+test center_is_per_dim_mean_after_compaction ... ok
+test center_survives_reopen ... ok
+test centered_search_returns_true_nearest ... ok
+test centering_rebalances_the_codes ... ok
+test no_sidecar_means_no_center ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.78s
+
+     Running tests\collection_ef_default_tests.rs (C:\Users\suanr\genesis-vector-memory-20261031\napi-target\x86_64-pc-windows-msvc\debug\deps\collection_ef_default_tests-e84c2a1e3359b860.exe)
+
+running 4 tests
+test collection_default_search_finds_exact ... ok
+test ef_default_survives_reload ... ok
+test info_exposes_ef_default ... ok
+test per_query_override_beats_collection_default ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.34s
+
+     Running tests\collection_name_validation_tests.rs (C:\Users\suanr\genesis-vector-memory-20261031\napi-target\x86_64-pc-windows-msvc\debug\deps\collection_name_validation_tests-f80d065a3ce41e19.exe)
+
+running 3 tests
+test hostile_peer_collection_name_is_inert ... ok
+test ordinary_names_still_work ... ok
+test traversal_names_are_rejected_and_write_nothing_outside_the_db ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.57s
+
+     Running tests\compaction_tests.rs (C:\Users\suanr\genesis-vector-memory-20261031\napi-target\x86_64-pc-windows-msvc\debug\deps\compaction_tests-f1d73b70ebadb0c8.exe)
+
+running 1 test
+test test_mark_ix_memory_reclamation_compaction ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.32s
+
+     Running tests\concurrency.rs (C:\Users\suanr\genesis-vector-memory-20261031\napi-target\x86_64-pc-windows-msvc\debug\deps\concurrency-948a29ec82ad9112.exe)
+
+running 6 tests
+error: test failed, to rerun pass `--test concurrency`
+
+Caused by:
+  process didn't exit successfully: `C:\Users\suanr\genesis-vector-memory-20261031\napi-target\x86_64-pc-windows-msvc\debug\deps\concurrency-948a29ec82ad9112.exe --test-threads=1` (exit code: 0xffffffff)
+note: test exited abnormally; to see the full output pass --no-capture to the harness.
+test bulk_add_edges_1000 ... 

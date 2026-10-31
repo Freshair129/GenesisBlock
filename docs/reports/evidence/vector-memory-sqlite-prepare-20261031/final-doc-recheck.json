@@ -1,0 +1,10 @@
+{
+  "at": "2026-10-31T22:54:57.7479883+07:00",
+  "docs_command": "node scripts/docs-validate.mjs",
+  "docs_exit": 0,
+  "docs_violations": 0,
+  "docs_files": 248,
+  "diff_command": "git diff --check",
+  "diff_exit": 0,
+  "scope": "Actual checks immediately after latest resource-hold report update; CRLF informational warnings only"
+}

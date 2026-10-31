@@ -1,0 +1,29 @@
+
+-------------------------------------------------------------------------------
+   ROBOCOPY     ::     Robust File Copy for Windows                              
+-------------------------------------------------------------------------------
+
+  Started : Saturday, October 31, 2026 1:49:13 PM
+   Source : C:\Users\suanr\genesis-vector-memory-followup-20261031\query-reopen-rw-20261031T122655\scratch-copy\gdb\
+     Dest : C:\Users\suanr\genesis-vector-memory-followup-20261031\query-reopen-repeat-20261031T134858\old\gdb\
+
+    Files : *.*
+	    
+  Options : *.* /NDL /NFL /S /E /DCOPY:DA /COPY:DAT /NP /MT:4 /R:0 /W:0 
+
+------------------------------------------------------------------------------
+
+
+------------------------------------------------------------------------------
+
+               Total    Copied   Skipped  Mismatch    FAILED    Extras
+    Dirs :         3         3         0         0         0         0
+   Files :       109       109         0         0         0         0
+   Bytes :  11.818 g  11.818 g         0         0         0         0
+   Times :   0:00:21   0:00:04                       0:00:00   0:00:02
+
+
+   Speed :           2,730,162,465 Bytes/sec.
+   Speed :             156,221.156 MegaBytes/min.
+   Ended : Saturday, October 31, 2026 1:49:20 PM
+

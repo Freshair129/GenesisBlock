@@ -1,0 +1,11 @@
+
+running 6 tests
+test bulk_add_edges_1000 ... ok
+test bulk_add_nodes_1000 ... ok
+test concurrent_edge_writes ... ok
+test concurrent_node_writes ... ok
+test concurrent_read_while_write ... ok
+test concurrent_search_while_write ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 66.59s
+

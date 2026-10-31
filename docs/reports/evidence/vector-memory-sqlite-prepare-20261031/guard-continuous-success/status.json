@@ -1,0 +1,25 @@
+{
+  "exit": 0,
+  "reason": null,
+  "seconds": 0.8686012,
+  "peak_rss": 0,
+  "peak_private": 0,
+  "identities": [
+    {
+      "ProcessId": 42200,
+      "ParentProcessId": 43744,
+      "CreationDate": "2026-10-31T22:31:30.483582+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": null
+    }
+  ],
+  "excluded_build_helpers": [],
+  "helper_finished_parent_condition": true,
+  "helper_scope": "Helpers are not terminated; successful Cargo completion and stopped tracked compiler clients are required before private-source edits. No shared source/target mutation.",
+  "admission_cpu": 27.363636363636363,
+  "admission_free": 12112269312.0,
+  "remaining": [],
+  "cleanup_complete": true,
+  "monitor_error": null,
+  "rss_scope": "tracked owned process tree"
+}

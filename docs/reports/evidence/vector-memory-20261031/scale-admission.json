@@ -1,0 +1,18 @@
+{
+  "decision": "NOT_RUN",
+  "tiers": [
+    500000,
+    1000000
+  ],
+  "basis": "Shared-host protocol admission, not engine scale failure or measured extrapolated RSS",
+  "default_process_cap_bytes": 4294967296,
+  "observed_100k_baseline_bq_rebuild_peak_bytes": 945156096,
+  "linear_screen_peak_bytes": {
+    "500000": 4725780480,
+    "1000000": 9451560960
+  },
+  "observed_100k_full_retention_disk_bytes": 12713605736,
+  "linear_1M_paired_disk_bytes": 254272114720,
+  "other_not_run": "All combinations outside the completed matrix; synthetic 10k/1024 prepared but real 11266/1024 selected instead.",
+  "safety": "No live DB experiment, unrelated workloads preserved."
+}

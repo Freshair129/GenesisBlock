@@ -1,0 +1,68 @@
+{
+  "recorded_at": "2026-10-31T22:49:30.545303+07:00",
+  "status": "resource_hold_not_complete",
+  "completed": [
+    "final immutable159-target correctness1328/0/7",
+    "Node88/0/0 and all8static/native gates",
+    "three private release variants",
+    "isolated pinnedSQLite causal matrix"
+  ],
+  "pending": [
+    "full100kcopy hash verification",
+    "actual100kbefore/after first-query deadline and correctness",
+    "new realBGEuntraced performance/recall/RSS pair"
+  ],
+  "latest_host_sample": {
+    "at": "2026-10-31T22:53:45.3343803+07:00",
+    "active_compilers": 0,
+    "cpu": 42,
+    "free_bytes": 14249512960
+  },
+  "admission_failures": [
+    {
+      "task": "matrix isolated attempt1",
+      "cpu_average_percent": 22.0909090909091
+    },
+    {
+      "task": "100kcopy verification attempt1",
+      "cpu_average_percent": 35.1818181818182
+    },
+    {
+      "task": "100kcopy verification attempt2",
+      "reason": "competing compiler preflight"
+    },
+    {
+      "task": "100kcopy verification attempt3",
+      "reason": "competing compiler arrived before admission sampling"
+    }
+  ],
+  "actual_arrival_hold": {
+    "status": "100k-copy-preparation-final/status.json",
+    "seconds": 80.1478792,
+    "reason": "resource_competition",
+    "owned_cleanup_complete": true
+  },
+  "case_copies": {
+    "each_file_count": 109,
+    "each_bytes": 12689795140,
+    "size_lists_equal": true,
+    "full_hash_qualified": false,
+    "database_opened": false
+  },
+  "limits_unchanged": {
+    "query_deadline_ms": 5000,
+    "timed_job_seconds": 1200,
+    "tree_rss_cap_bytes": 2147483648,
+    "admission_cpu_average_below_percent": 20,
+    "admission_window_s": 10,
+    "min_available_ram_bytes": 6442450944
+  },
+  "new_ram_savings_claimed": {
+    "MB": 0,
+    "percent": 0,
+    "reason": "Checkpoint I/O moved to publication, not eliminated"
+  },
+  "resume": "RESUME.txt; complete-100k-copy-verification.py then frozen case configs; no warmup, no unsafe dedup, no production DB or deployment",
+  "final_source": "final-full-source-recheck.json",
+  "final_owned_stop_proof": "final-owned-stop-proof.json"
+}

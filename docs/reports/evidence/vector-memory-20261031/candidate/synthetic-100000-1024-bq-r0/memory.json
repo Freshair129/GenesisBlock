@@ -1,0 +1,314 @@
+{
+  "batch_rows": 256,
+  "collections_after_ingest": [
+    {
+      "arena_allocated_bytes": 16777216,
+      "arena_resident_bytes": 12800000,
+      "count": 100000,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "bench",
+        "extra_count": 0,
+        "indexed_count": 100000,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 100000,
+        "source_frontier": 394,
+        "state": "UNVERIFIED",
+        "validated": false
+      },
+      "dim": 1024,
+      "ef_search": null,
+      "hnsw_vector_bytes": 12800000,
+      "index_lag": 0,
+      "indexed": 100000,
+      "metric": "Cosine",
+      "model": "synthetic-unit-seed42",
+      "name": "bench",
+      "quant": "bq",
+      "rerank": false,
+      "sidecar_cache_bytes": 0,
+      "sidecar_disk_bytes": 0,
+      "sidecar_resident_bytes": 0
+    },
+    {
+      "arena_allocated_bytes": 0,
+      "arena_resident_bytes": 0,
+      "count": 0,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "default",
+        "extra_count": 0,
+        "indexed_count": 0,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 0,
+        "source_frontier": 0,
+        "state": "UNVERIFIED",
+        "validated": false
+      },
+      "dim": 1024,
+      "ef_search": null,
+      "hnsw_vector_bytes": 0,
+      "index_lag": 0,
+      "indexed": 0,
+      "metric": "L2",
+      "model": "default",
+      "name": "default",
+      "quant": "none",
+      "rerank": false,
+      "sidecar_cache_bytes": 0,
+      "sidecar_disk_bytes": 0,
+      "sidecar_resident_bytes": 0
+    }
+  ],
+  "collections_after_search": [
+    {
+      "arena_allocated_bytes": 16777216,
+      "arena_resident_bytes": 12800000,
+      "count": 100000,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "bench",
+        "extra_count": 0,
+        "indexed_count": 100000,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 100000,
+        "source_frontier": 394,
+        "state": "UNVERIFIED",
+        "validated": false
+      },
+      "dim": 1024,
+      "ef_search": null,
+      "hnsw_vector_bytes": 12800000,
+      "index_lag": 0,
+      "indexed": 100000,
+      "metric": "Cosine",
+      "model": "synthetic-unit-seed42",
+      "name": "bench",
+      "quant": "bq",
+      "rerank": false,
+      "sidecar_cache_bytes": 0,
+      "sidecar_disk_bytes": 0,
+      "sidecar_resident_bytes": 0
+    },
+    {
+      "arena_allocated_bytes": 0,
+      "arena_resident_bytes": 0,
+      "count": 0,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "default",
+        "extra_count": 0,
+        "indexed_count": 0,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 0,
+        "source_frontier": 0,
+        "state": "UNVERIFIED",
+        "validated": false
+      },
+      "dim": 1024,
+      "ef_search": null,
+      "hnsw_vector_bytes": 0,
+      "index_lag": 0,
+      "indexed": 0,
+      "metric": "L2",
+      "model": "default",
+      "name": "default",
+      "quant": "none",
+      "rerank": false,
+      "sidecar_cache_bytes": 0,
+      "sidecar_disk_bytes": 0,
+      "sidecar_resident_bytes": 0
+    }
+  ],
+  "compaction": null,
+  "coverage": [
+    {
+      "built_frontier": 394,
+      "collection": "bench",
+      "extra_count": 0,
+      "indexed_count": 100000,
+      "missing_count": 0,
+      "pending_count": 0,
+      "source_count": 100000,
+      "source_frontier": 394,
+      "state": "READY",
+      "validated": true
+    },
+    {
+      "built_frontier": 0,
+      "collection": "default",
+      "extra_count": 0,
+      "indexed_count": 0,
+      "missing_count": 0,
+      "pending_count": 0,
+      "source_count": 0,
+      "source_frontier": 0,
+      "state": "READY",
+      "validated": true
+    }
+  ],
+  "dim": 1024,
+  "disk_bytes": 12713365308,
+  "ef_construction": 200,
+  "ef_search": 200,
+  "fresh_reopen": {
+    "collections": [
+      {
+        "arena_allocated_bytes": 12800000,
+        "arena_resident_bytes": 12800000,
+        "count": 100000,
+        "coverage": {
+          "built_frontier": 0,
+          "collection": "bench",
+          "extra_count": 0,
+          "indexed_count": 100000,
+          "missing_count": 0,
+          "pending_count": 0,
+          "source_count": 100000,
+          "source_frontier": 394,
+          "state": "UNVERIFIED",
+          "validated": false
+        },
+        "dim": 1024,
+        "ef_search": null,
+        "hnsw_vector_bytes": 12800000,
+        "index_lag": 0,
+        "indexed": 100000,
+        "metric": "Cosine",
+        "model": "synthetic-unit-seed42",
+        "name": "bench",
+        "quant": "bq",
+        "rerank": false,
+        "sidecar_cache_bytes": 0,
+        "sidecar_disk_bytes": 0,
+        "sidecar_resident_bytes": 0
+      },
+      {
+        "arena_allocated_bytes": 0,
+        "arena_resident_bytes": 0,
+        "count": 0,
+        "coverage": {
+          "built_frontier": 0,
+          "collection": "default",
+          "extra_count": 0,
+          "indexed_count": 0,
+          "missing_count": 0,
+          "pending_count": 0,
+          "source_count": 0,
+          "source_frontier": 0,
+          "state": "UNVERIFIED",
+          "validated": false
+        },
+        "dim": 1024,
+        "ef_search": null,
+        "hnsw_vector_bytes": 0,
+        "index_lag": 0,
+        "indexed": 0,
+        "metric": "L2",
+        "model": "default",
+        "name": "default",
+        "quant": "none",
+        "rerank": false,
+        "sidecar_cache_bytes": 0,
+        "sidecar_disk_bytes": 0,
+        "sidecar_resident_bytes": 0
+      }
+    ],
+    "coverage": [
+      {
+        "built_frontier": 394,
+        "collection": "bench",
+        "extra_count": 0,
+        "indexed_count": 100000,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 100000,
+        "source_frontier": 394,
+        "state": "READY",
+        "validated": true
+      },
+      {
+        "built_frontier": 0,
+        "collection": "default",
+        "extra_count": 0,
+        "indexed_count": 0,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 0,
+        "source_frontier": 0,
+        "state": "READY",
+        "validated": true
+      }
+    ],
+    "error": null,
+    "memory": {
+      "before_rss_bytes": 14774272,
+      "peak_rss_bytes": 530763776,
+      "process_rss_bytes": 530763776,
+      "seconds": 641.6057836
+    }
+  },
+  "idle_rss_bytes": 12894208,
+  "index_rebuild_peak_rss_bytes": 960618496,
+  "ingest": {
+    "before_rss_bytes": 12881920,
+    "peak_rss_bytes": 703574016,
+    "process_rss_bytes": 558694400,
+    "seconds": 538.194041
+  },
+  "method": "20ms sampled working set; same-process and fresh-process reopen",
+  "model": "synthetic-unit-seed42",
+  "n": 100000,
+  "q": 24,
+  "quant": "bq",
+  "rebuild": {
+    "before_rss_bytes": 558673920,
+    "peak_rss_bytes": 960618496,
+    "process_rss_bytes": 658702336,
+    "seconds": 300.306794
+  },
+  "reopen": {
+    "before_rss_bytes": 25985024,
+    "peak_rss_bytes": 731463680,
+    "process_rss_bytes": 563380224,
+    "seconds": 867.778921
+  },
+  "reopen_error": null,
+  "reopen_search10": {
+    "completed_queries": 0,
+    "error": "QUERY_BUDGET_EXCEEDED: reason=deadline",
+    "k": 10,
+    "p50_us": null,
+    "p95_us": null,
+    "p99_us": null,
+    "recall": null,
+    "requested_queries": 24
+  },
+  "rerank": false,
+  "retention": "full",
+  "search10": {
+    "k": 10,
+    "p50_us": 4474.900000000001,
+    "p95_us": 5814.599999999999,
+    "p99_us": 5886.200000000001,
+    "recall": 0.16666666666666666
+  },
+  "search100": {
+    "k": 100,
+    "p50_us": 7981.500000000001,
+    "p95_us": 11507.3,
+    "p99_us": 12377.4,
+    "recall": 0.09416666666666666
+  },
+  "snapshot": {
+    "before_rss_bytes": 659349504,
+    "peak_rss_bytes": 714502144,
+    "process_rss_bytes": 661794816,
+    "seconds": 91.5669469
+  },
+  "snapshot_error": null
+}

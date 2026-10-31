@@ -1,0 +1,85 @@
+{
+  "recorded_at": "2026-10-31T21:54:39.025092+07:00",
+  "core_source": {
+    "src/lib.rs": "5b8bb9bed5dde5fa6e7d4d255da3acce6c1bfe892092456133adb65a78998fdd",
+    "src/projection_rebuild_tests.rs": "e69dc7dd5cbc5043aa5ed9c717e449e50246a8fbd8ad56ac95ed135718c99be2",
+    "Cargo.toml": "00550fbac8edb5c1316b5eb21983b078039604ed3c1460689515ba5539f30e25",
+    "Cargo.lock": "eda5bfa67c1077c96f2b84e44f740273e695c87a1a51b352cf18f2a031a4f8d2",
+    "benches/vector_memory.rs": "46694637e7e028f8a12c5c5f5eb83c8bac3ca33e7e276b1236e097f970f53c3f"
+  },
+  "fresh_final_core": {
+    "targets": 159,
+    "counts": {
+      "passed": 1328,
+      "failed": 0,
+      "ignored": 7
+    },
+    "failed_targets": []
+  },
+  "static_native_checks": {
+    "clippy-core": {
+      "exit": 0,
+      "reason": null,
+      "seconds": 77.5095018,
+      "cleanup_complete": true
+    },
+    "clippy-default": {
+      "exit": 0,
+      "reason": null,
+      "seconds": 100.6807208,
+      "cleanup_complete": true
+    },
+    "mobile-host-check": {
+      "exit": 0,
+      "reason": null,
+      "seconds": 12.7672814,
+      "cleanup_complete": true
+    },
+    "doc-tests": {
+      "exit": 0,
+      "reason": null,
+      "seconds": 5.4355608,
+      "cleanup_complete": true
+    },
+    "napi-build": {
+      "exit": 0,
+      "reason": null,
+      "seconds": 63.334444,
+      "cleanup_complete": true
+    },
+    "dts-freshness": {
+      "exit": 0,
+      "reason": null,
+      "seconds": 0.5327407,
+      "cleanup_complete": true
+    },
+    "napi-smoke": {
+      "exit": 0,
+      "reason": null,
+      "seconds": 1.759361,
+      "cleanup_complete": true
+    },
+    "node-full": {
+      "exit": 0,
+      "reason": null,
+      "seconds": 203.0938993,
+      "cleanup_complete": true
+    }
+  },
+  "full_source_manifest_sha256": "ae9a146df069fa0c4ed3ebf0a78c19d36486c0a9cf7ee9f6f2efd412cc438222",
+  "full_source_paths": 287,
+  "historical_stages": [
+    "qualification-attempt1/",
+    "resource-hold/"
+  ],
+  "timed_sqlite_matrix": {
+    "status": "PASS",
+    "source": "matrix-isolated-analysis.json",
+    "guard": "matrix-isolated-guard-attempt2/status.json",
+    "historical_interfered_attempt": "matrix-real-interference.json"
+  },
+  "reopen_100k": "NOT_RUN: copies exist but full hash verification and engine run await resource admission",
+  "note": "Final immutable E69 suite freshly completed after resource hold; historical interrupted results are not summed into this result.",
+  "real_bge_current_pair": "NOT_RUN: source-bound configs/binaries ready, resource admission pending",
+  "latest_resource_hold": "latest-resource-hold.json"
+}

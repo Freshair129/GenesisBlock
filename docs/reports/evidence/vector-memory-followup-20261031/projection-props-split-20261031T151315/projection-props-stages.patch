@@ -1,0 +1,174 @@
+--- candidate-querytrace-lib.rs
++++ patched-querytrace-lib.rs
+@@ -14393,25 +14393,157 @@
+ 
+         self.projection_props_unlocked(node_u32)
+     }
+ 
+     fn projection_props_unlocked(&self, node_u32: u32) -> Result<Option<Value>> {
++        const SQL: &str = "SELECT payload FROM props WHERE node_u32 = ?1";
++        let diagnostics = std::env::var_os("GB_VECTOR_QUERY_DIAGNOSTICS").is_some();
++        if !diagnostics {
++            let conn = self.projection_db.lock();
++            let payload: Option<String> = conn
++                .query_row(SQL, [node_u32], |row| row.get(0))
++                .optional()
++                .map_err(|e| Error::from_reason(e.to_string()))?;
++            return match payload {
++                Some(raw) => serde_json::from_str(&raw)
++                    .map(Some)
++                    .map_err(|e| Error::from_reason(e.to_string())),
++                None => Ok(None),
++            };
++        }
++
++        let error_fields = |error: &rusqlite::Error| match error {
++            rusqlite::Error::SqliteFailure(failure, _) => (
++                format!("{:?}", failure.code),
++                Some(failure.extended_code),
++                error.to_string(),
++            ),
++            _ => (format!("{:?}", error), None, error.to_string()),
++        };
++
++        let lock_started = Instant::now();
+         let conn = self.projection_db.lock();
+-        let payload: Option<String> = conn
+-            .query_row(
+-                "SELECT payload FROM props WHERE node_u32 = ?1",
+-                [node_u32],
+-                |row| row.get(0),
+-            )
+-            .optional()
+-            .map_err(|e| Error::from_reason(e.to_string()))?;
+-        match payload {
+-            Some(raw) => serde_json::from_str(&raw)
+-                .map(Some)
+-                .map_err(|e| Error::from_reason(e.to_string())),
+-            None => Ok(None),
+-        }
++        let lock_acquire_us = lock_started.elapsed().as_micros();
++
++        let prepare_started = Instant::now();
++        let mut statement = match conn.prepare(SQL) {
++            Ok(statement) => statement,
++            Err(error) => {
++                let prepare_us = prepare_started.elapsed().as_micros();
++                let (error_code, extended_error_code, error_message) = error_fields(&error);
++                let result_error = Error::from_reason(error.to_string());
++                eprintln!(
++                    "GB_VECTOR_QUERY_DIAG {}",
++                    serde_json::json!({
++                        "event": "projection_props_stage",
++                        "node_u32": node_u32,
++                        "lock_acquire_us": lock_acquire_us,
++                        "prepare_status": "error",
++                        "prepare_us": prepare_us,
++                        "select_status": "not_run",
++                        "query_row_us": null,
++                        "statement_finalize_us": null,
++                        "payload_len_bytes": null,
++                        "select_error_code": error_code,
++                        "select_error_extended_code": extended_error_code,
++                        "select_error_message": error_message,
++                        "json_parse_status": "not_run",
++                        "json_parse_us": null,
++                        "json_parse_error": null,
++                    })
++                );
++                return Err(result_error);
++            }
++        };
++        let prepare_us = prepare_started.elapsed().as_micros();
++
++        let query_started = Instant::now();
++        let query_result = statement
++            .query_row([node_u32], |row| row.get::<_, String>(0))
++            .optional();
++        let query_row_us = query_started.elapsed().as_micros();
++        let payload_len_bytes = query_result
++            .as_ref()
++            .ok()
++            .and_then(|payload| payload.as_ref().map(String::len));
++        let select_status = match &query_result {
++            Ok(Some(_)) => "row",
++            Ok(None) => "no_row",
++            Err(_) => "error",
++        };
++
++        let finalize_started = Instant::now();
++        drop(statement);
++        let statement_finalize_us = finalize_started.elapsed().as_micros();
++
++        let payload = match query_result {
++            Ok(payload) => payload,
++            Err(error) => {
++                let (error_code, extended_error_code, error_message) = error_fields(&error);
++                let result_error = Error::from_reason(error.to_string());
++                drop(conn);
++                eprintln!(
++                    "GB_VECTOR_QUERY_DIAG {}",
++                    serde_json::json!({
++                        "event": "projection_props_stage",
++                        "node_u32": node_u32,
++                        "lock_acquire_us": lock_acquire_us,
++                        "prepare_status": "ok",
++                        "prepare_us": prepare_us,
++                        "select_status": select_status,
++                        "query_row_us": query_row_us,
++                        "statement_finalize_us": statement_finalize_us,
++                        "payload_len_bytes": null,
++                        "select_error_code": error_code,
++                        "select_error_extended_code": extended_error_code,
++                        "select_error_message": error_message,
++                        "json_parse_status": "not_run",
++                        "json_parse_us": null,
++                        "json_parse_error": null,
++                    })
++                );
++                return Err(result_error);
++            }
++        };
++
++        let (parse_result, json_parse_us): (Result<Option<Value>>, Option<u128>) = match payload {
++            Some(raw) => {
++                let parse_started = Instant::now();
++                let parsed = serde_json::from_str(&raw)
++                    .map(Some)
++                    .map_err(|error| Error::from_reason(error.to_string()));
++                (parsed, Some(parse_started.elapsed().as_micros()))
++            }
++            None => (Ok(None), None),
++        };
++        let (json_parse_status, json_parse_error) = match &parse_result {
++            Ok(Some(_)) => ("ok", None),
++            Ok(None) => ("not_run_no_row", None),
++            Err(error) => ("error", Some(error.to_string())),
++        };
++        drop(conn);
++        eprintln!(
++            "GB_VECTOR_QUERY_DIAG {}",
++            serde_json::json!({
++                "event": "projection_props_stage",
++                "node_u32": node_u32,
++                "lock_acquire_us": lock_acquire_us,
++                "prepare_status": "ok",
++                "prepare_us": prepare_us,
++                "select_status": select_status,
++                "query_row_us": query_row_us,
++                "statement_finalize_us": statement_finalize_us,
++                "payload_len_bytes": payload_len_bytes,
++                "select_error_code": null,
++                "select_error_extended_code": null,
++                "select_error_message": null,
++                "json_parse_status": json_parse_status,
++                "json_parse_us": json_parse_us,
++                "json_parse_error": json_parse_error,
++            })
++        );
++        parse_result
+     }
+ 
+     pub fn register_relational_schema(&self, package: RelationalSchemaPackage) -> Result<u32> {
+         self.ensure_writable()?;
+         let package = Self::normalize_schema_package(package)?;

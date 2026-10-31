@@ -1,0 +1,23 @@
+
+running 18 tests
+test cypher_anchor_only ... ok
+test cypher_as_of_temporal ... ok
+test cypher_both_direction ... ok
+test cypher_default_return_shape ... ok
+test cypher_does_not_break_hybrid_match ... ok
+test cypher_edge_variable ... ok
+test cypher_id_anchor_fast_path_full_rows ... ok
+test cypher_id_anchor_label_mismatch_is_empty ... ok
+test cypher_id_anchor_nonexistent_id_is_empty ... ok
+test cypher_id_anchor_numeric_falls_back_to_scan ... ok
+test cypher_id_anchor_retracted_edge_visibility ... ok
+test cypher_incoming_direction ... ok
+test cypher_inline_prop_constraint ... ok
+test cypher_label_constraints ... ok
+test cypher_order_by_limit ... ok
+test cypher_single_hop ... ok
+test cypher_two_hop_chain ... ok
+test cypher_where_prop_and_label ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 154.52s
+

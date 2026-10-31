@@ -1,0 +1,7 @@
+from pathlib import Path
+r=Path(__file__).parent
+p=Path(r'D:\GenesisBlock_Dev\GenesisBlock\docs\reports\GENESISDB-VECTOR-MEMORY-AUDIT.md');s=p.read_text();s=s.replace('Release\nbuild preparation uses an exclusive lock, source-bound gates and a private target\ndirectory; it cannot overwrite D\'s target executable or restore sources while an\nowned compiler may still be active.', 'Release\nbuild preparation uses an exclusive lock, source/gate-bound receipts, a fresh\nprivate source clone and a private target directory. It never edits/restores C/D\nsources or D target artifacts. Toolchain telemetry/PDB services are not killed or\nclaimed terminated; successful compiler-client completion is a separate condition\nfor subsequent edits inside the private clone.')
+p.write_text(s,newline='\n')
+p=r/'RESUME.txt';s=p.read_text();s=s.replace('It uses a private release target and restores C sources only after positive owned-process stop proof; failed ownership/cleanup must quarantine, never restore over a live compiler.', 'It uses private source+target and never modifies C/D sources or D target artifacts. Bind a complete compile-input/file-set manifest plus all four gate-file hashes to the qualification receipt; private-clone stage edits require successful compiler-client completion and positive owned-process stop proof.')
+s=s.replace('9. Restore/verify C=D code hashes,', '9. Verify C=D code hashes,')
+p.write_text(s,newline='\n')

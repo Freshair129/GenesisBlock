@@ -1,0 +1,11 @@
+
+running 6 tests
+test converged_peers_share_root ... ok
+test delimiter_laden_ids_dont_break_digest ... ok
+test divergent_state_differs ... ok
+test empty_state_hashes_default_collection_configuration ... ok
+test root_independent_of_apply_order ... ok
+test secondary_vector_changes_root ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.01s
+

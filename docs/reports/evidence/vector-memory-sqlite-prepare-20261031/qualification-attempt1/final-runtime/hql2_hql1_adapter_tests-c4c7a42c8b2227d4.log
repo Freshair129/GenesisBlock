@@ -1,0 +1,18 @@
+
+running 13 tests
+test actor_scoped_hql1_directed_one_hop_match_preserves_parallel_row_multiplicity ... ok
+test actor_scoped_hql1_one_hop_directions_and_untyped_edges_match_legacy_and_hql2 ... ok
+test actor_scoped_hql1_one_hop_id_equality_filter_matches_legacy_and_hql2 ... ok
+test actor_scoped_hql1_single_hop_traverse_matches_legacy_and_hql2 ... ok
+test actor_scoped_hql1_zero_hop_id_equality_basic_ids_matches_legacy_and_hql2 ... ok
+test actor_scoped_hql1_zero_hop_id_equality_matches_legacy_and_hql2 ... ok
+test actor_scoped_hql1_zero_hop_label_match_matches_legacy_and_hql2 ... ok
+test actor_scoped_hql1_zero_hop_match_matches_legacy_and_hql2 ... ok
+test authorized_malformed_hql1_reports_parse_error ... ok
+test broad_unlisted_hql1_pattern_is_bounded_before_legacy_ast_allowlist ... ok
+test hql1_namespace_read_denial_precedes_legacy_parse ... ok
+test hql1_request_namespace_mismatch_precedes_legacy_parse ... ok
+test valid_unlisted_hql1_form_fails_closed ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.25s
+

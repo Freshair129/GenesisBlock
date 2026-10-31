@@ -1,0 +1,13 @@
+{
+  "status": "monitor_fault_before_test_runtime",
+  "build_finished_message": "Finished test profile in8m44s",
+  "test_artifacts": 159,
+  "guard_stopped": 12992,
+  "waiting_test_driver_stopped": 22272,
+  "unrelated_helper_pid": 34016,
+  "unrelated_helper_created": "2026-10-31T18:57:10+07:00",
+  "build_started": "2026-10-31T19:13:25+07:00",
+  "unrelated_helper_untouched": true,
+  "cause": "PID reuse linked preexisting VCTIP via stale parent PID; monitor failed to track creation times",
+  "retry": "same cached locked offline build and fresh exit-code receipt, no source changes or budget expansion"
+}

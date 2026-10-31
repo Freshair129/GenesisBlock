@@ -1,0 +1,20 @@
+
+running 15 tests
+test broad_query_ir_read_requires_default_namespace_grant ... ok
+test community_insights_and_rebuild_fail_closed_without_access_context ... ok
+test disabled_policy_preserves_legacy_direct_reads ... ok
+test enforced_policy_denies_every_unscoped_result_read_entrypoint ... ok
+test enforced_policy_denies_unscoped_direct_reads ... ok
+test enforced_policy_fails_closed_legacy_unscoped_accessors ... ok
+test enforced_policy_survives_compact_and_reopen ... ok
+test exact_node_grant_is_point_scoped_and_does_not_authorize_query_ir ... ok
+test invalid_local_policy_signature_in_journal_fails_closed_on_replay ... ok
+test invalid_local_policy_signature_in_legacy_jsonl_fails_closed_on_replay ... ok
+test non_default_revision_zero_snapshot_policy_without_signed_wal_fails_closed ... ok
+test policy_change_revokes_leases_pinned_to_the_previous_acl_revision ... ok
+test policy_compare_and_swap_rejects_stale_expected_revision ... ok
+test read_view_scope_is_not_inherited_by_a_captured_storage_call ... ok
+test tampered_current_snapshot_policy_is_recovered_from_signed_wal ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.59s
+

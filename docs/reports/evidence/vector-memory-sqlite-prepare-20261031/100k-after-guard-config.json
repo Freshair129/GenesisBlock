@@ -1,0 +1,12 @@
+{
+  "exe": "C:\\Users\\suanr\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
+  "args": [
+    "-u",
+    "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\run-100k-case.py",
+    "--config",
+    "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\100k-after-config.json"
+  ],
+  "cwd": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031",
+  "output": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\100k-after-guard",
+  "env": {}
+}

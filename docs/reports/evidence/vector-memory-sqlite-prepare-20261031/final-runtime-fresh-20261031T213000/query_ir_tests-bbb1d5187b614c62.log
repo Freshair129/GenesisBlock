@@ -1,0 +1,16 @@
+
+running 11 tests
+test hql_and_query_ir_match_path_preserve_typed_path_results ... ok
+test hql_and_query_ir_preserve_context_result ... ok
+test hql_and_query_ir_preserve_search_hybrid_and_traverse_results ... ok
+test hql_and_query_ir_reject_missing_context_target_with_the_same_error ... ok
+test hql_and_query_ir_reject_zero_k_with_the_same_resource_error ... ok
+test query_ir_match_path_supports_clauses_and_rejects_tx_time_selectors ... ok
+test query_ir_rejects_unknown_version_and_fields ... ok
+test query_ir_rejects_unsupported_filter_and_lexical_modes ... ok
+test query_ir_search_can_use_target_node_embedding ... ok
+test query_ir_search_returns_versioned_envelope ... ok
+test query_ir_traverse_returns_neighbor ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.80s
+

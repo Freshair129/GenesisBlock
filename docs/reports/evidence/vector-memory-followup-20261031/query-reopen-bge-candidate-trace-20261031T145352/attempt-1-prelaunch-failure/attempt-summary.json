@@ -1,0 +1,13 @@
+{
+  "attempt": 1,
+  "state": "prelaunch_failure_no_candidate_spawn",
+  "driver_pid": 30020,
+  "candidate_pid": null,
+  "candidate_process_spawned": false,
+  "database_opened": false,
+  "query_started": false,
+  "reason": "Python hash compare was case-sensitive and PowerShell process-tree function assigned read-only automatic variable $PID; the driver rejected the binary hash before Popen, and the monitor then failed on reserved variable.",
+  "binary_sha256": "959DFA8F6348082046BCBFAD744A422E2BD7F5A43C702C2DBA7D2D86D26AEAF1",
+  "input_hashes_before": "recorded in process-start.json and controller manifest",
+  "evidence_folder": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-bge-candidate-trace-20261031T145352\\attempt-1-prelaunch-failure"
+}

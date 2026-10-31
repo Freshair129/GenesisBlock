@@ -1,0 +1,11 @@
+{
+  "pid": 2324,
+  "exe": "c:\\users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031t122655\\diagnostic-vbench-genesis-rw.exe",
+  "limit_bytes": 2147483648,
+  "peak_sampled_rss_bytes": 570404864,
+  "samples": 160,
+  "reason": "process_exit",
+  "started": "2026-10-31T12:42:09.6244921+07:00",
+  "completed": "2026-10-31T12:42:41.7462286+07:00",
+  "terminated_by_monitor": false
+}

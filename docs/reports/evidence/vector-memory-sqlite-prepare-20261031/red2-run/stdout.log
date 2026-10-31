@@ -1,0 +1,44 @@
+
+running 5 tests
+test projection_rebuild_tests::busy_publication_keeps_original_projection_and_connection ... snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmpEFFLAt
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmpEFFLAt
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmpEFFLAt
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmpEFFLAt
+shutdown: graceful shutdown, state saved.
+snapshot: attempting instant load from binary state...
+snapshot: loading 0 nodes
+snapshot: loading 0 edges
+snapshot: instant load complete in 3.7817ms
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmpEFFLAt
+shutdown: graceful shutdown, state saved.
+ok
+test projection_rebuild_tests::checkpoint_failure_reports_already_committed_publication ... snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmpvVCyxz
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmpvVCyxz
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmpvVCyxz
+shutdown: graceful shutdown, state saved.
+FAILED
+test projection_rebuild_tests::failed_replay_keeps_original_projection_and_connection ... snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmpXfAV00
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmpXfAV00
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmpXfAV00
+shutdown: graceful shutdown, state saved.
+ok
+test projection_rebuild_tests::first_read_does_not_run_deferred_publication_checkpoint ... snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmpehPIjg
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmpehPIjg
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmpehPIjg
+shutdown: graceful shutdown, state saved.
+FAILED
+test projection_rebuild_tests::passive_publication_checkpoint_preserves_active_reader_snapshot ... snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmpLXhWJI
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmpLXhWJI
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmpLXhWJI
+shutdown: graceful shutdown, state saved.
+FAILED
+
+failures:
+
+failures:
+    projection_rebuild_tests::checkpoint_failure_reports_already_committed_publication
+    projection_rebuild_tests::first_read_does_not_run_deferred_publication_checkpoint
+    projection_rebuild_tests::passive_publication_checkpoint_preserves_active_reader_snapshot
+
+test result: FAILED. 2 passed; 3 failed; 0 ignored; 0 measured; 53 filtered out; finished in 6.99s
+

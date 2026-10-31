@@ -1,0 +1,16 @@
+
+running 11 tests
+test hql_context_h0 ... ok
+test hql_depth_0 ... ok
+test hql_invalid_command ... ok
+test hql_malformed_syntax ... ok
+test hql_quoted_id_with_special_chars ... ok
+test hql_search_without_literal_vector_uses_target_embedding ... ok
+test hql_search_without_vector_errors_for_missing_embedding ... ok
+test hql_traverse_depth_1 ... ok
+test hql_traverse_direction_and_multi_rel_are_exposed ... ok
+test hql_traverse_valid ... ok
+test hql_unicode_thai_in_labels ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.88s
+

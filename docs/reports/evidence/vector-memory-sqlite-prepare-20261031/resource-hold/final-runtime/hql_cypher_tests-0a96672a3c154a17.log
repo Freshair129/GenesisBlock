@@ -1,0 +1,11 @@
+
+running 18 tests
+test cypher_anchor_only ... ok
+test cypher_as_of_temporal ... ok
+test cypher_both_direction ... ok
+test cypher_default_return_shape ... ok
+test cypher_does_not_break_hybrid_match ... ok
+test cypher_edge_variable ... ok
+test cypher_id_anchor_fast_path_full_rows ... ok
+test cypher_id_anchor_label_mismatch_is_empty ... ok
+test cypher_id_anchor_nonexistent_id_is_empty ... 

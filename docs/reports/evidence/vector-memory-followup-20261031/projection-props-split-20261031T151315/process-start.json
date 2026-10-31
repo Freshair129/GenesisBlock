@@ -1,0 +1,40 @@
+{
+  "driver_pid": 11040,
+  "started_at_local": "2026-10-31T15:23:01.4782561+07:00",
+  "binary": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\projection-props-split-20261031T151315\\projection-props-split-vbench.exe",
+  "binary_sha256": "43b25c6c8daa639595af0329f7b9a1e3a6572fa08ff7bd7fadbbaf61b52495a7",
+  "input_dir": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\inputs\\real-11266-1024",
+  "input_hashes_before": {
+    "corpus": "20978d757c33a29dcd8e89e5708762738b10fc8da0f01358bcb325741f2f6057",
+    "queries": "6ccad031b956c6111519e6b0dfe97e7c63bd85801d9934efe4438f76d152ca68",
+    "truth": "2c133fd68ed2b60345715c24667a830ebf3ab303528e8eec0300385125e37c9c",
+    "meta": "f79c423a069d8c4faa9a2bf8fff920d0dc4102261b28c35692544974137a89de"
+  },
+  "output_dir": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\projection-props-split-20261031T151315\\output",
+  "query_deadline_ms": 5000,
+  "rss_limit_bytes": 2147483648,
+  "runtime_cap_seconds": 1200,
+  "env_whitelist": {
+    "GB_VBENCH": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\inputs\\real-11266-1024",
+    "GB_QUANT": "none",
+    "GB_MEMORY_RETENTION": "full",
+    "GB_VEC_Q": "24",
+    "GB_MEMORY_AUDIT": "1",
+    "GB_MEMORY_OPEN_QUERY_SAMPLES": "0",
+    "RAYON_NUM_THREADS": "4",
+    "GB_VECTOR_QUERY_DIAGNOSTICS": "1",
+    "GB_MEMORY_OPEN_ONLY": null,
+    "GB_MEMORY_OPEN_READ_WRITE": null,
+    "GB_EF": "200",
+    "GB_MEMORY_OPEN_OUT": null,
+    "GB_MEMORY_RSS_LIMIT_BYTES": "2147483648",
+    "GB_MEMORY_INPUT": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\inputs\\real-11266-1024",
+    "GB_MEMORY_OPEN_REPEAT": "1",
+    "GB_RERANK": "0"
+  },
+  "extra_env": {
+    "GB_MEMORY_COMPACT": "1",
+    "GB_MEMORY_OUT": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\projection-props-split-20261031T151315\\output"
+  },
+  "diagnostic_method": "Python subprocess.Popen direct stdout/stderr file handles; Win32 process-tree monitor"
+}

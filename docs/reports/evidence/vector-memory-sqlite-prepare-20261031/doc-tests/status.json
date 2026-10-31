@@ -1,0 +1,46 @@
+{
+  "exit": 0,
+  "reason": null,
+  "seconds": 5.4355608,
+  "peak_rss": 297664512,
+  "peak_private": 509812736,
+  "identities": [
+    {
+      "ProcessId": 6488,
+      "ParentProcessId": 11988,
+      "CreationDate": "2026-10-31T21:45:57.8763+07:00",
+      "Name": "cargo.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.cargo\\bin\\cargo.exe"
+    },
+    {
+      "ProcessId": 37308,
+      "ParentProcessId": 6488,
+      "CreationDate": "2026-10-31T21:45:57.88241+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 23036,
+      "ParentProcessId": 9480,
+      "CreationDate": "2026-10-31T21:45:59.689615+07:00",
+      "Name": "rustdoc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustdoc.exe"
+    },
+    {
+      "ProcessId": 9480,
+      "ParentProcessId": 6488,
+      "CreationDate": "2026-10-31T21:45:57.929875+07:00",
+      "Name": "cargo.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\cargo.exe"
+    }
+  ],
+  "excluded_build_helpers": [],
+  "helper_finished_parent_condition": true,
+  "helper_scope": "Helpers are not terminated; successful Cargo completion and stopped tracked compiler clients are required before private-source edits. No shared source/target mutation.",
+  "admission_cpu": 4.636363636363637,
+  "admission_free": 18619576320.0,
+  "remaining": [],
+  "cleanup_complete": true,
+  "monitor_error": null,
+  "rss_scope": "tracked owned process tree"
+}

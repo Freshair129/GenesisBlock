@@ -1,0 +1,15 @@
+
+running 10 tests
+test as_of_query_filters_by_time ... ok
+test edge_retract_sets_valid_to ... ok
+test edge_temporal_retract_as_of ... ok
+test logical_clock_monotonic ... ok
+test logical_clock_peer_id_stable ... ok
+test supersede_nonexistent_node_errors ... ok
+test supersede_preserves_labels ... ok
+test supersede_sets_caused_by ... ok
+test supersede_updates_current ... ok
+test ttl_sets_expires_at ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.80s
+

@@ -1,0 +1,9 @@
+
+running 4 tests
+test none_finds_exact_match ... ok
+test sq8_disk_is_quarter_of_f32 ... ok
+test sq8_finds_exact_match ... ok
+test sq8_survives_reload ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.68s
+

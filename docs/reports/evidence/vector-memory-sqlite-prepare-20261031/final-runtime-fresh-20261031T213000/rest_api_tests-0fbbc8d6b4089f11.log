@@ -1,0 +1,53 @@
+
+running 48 tests
+test insight_routes_fail_closed_without_scoped_context ... ok
+test rest_error_categories_are_stable_across_representative_routes ... ok
+test test_add_edge_visible_in_query ... ok
+test test_add_node_round_trip ... ok
+test test_add_vector_wrong_dim_rejected ... ok
+test test_all_v1_routes_are_wired ... ok
+test test_api_key_gate_correct_key_passes ... ok
+test test_api_key_gate_missing_header_returns_401 ... ok
+test test_api_key_gate_wrong_key_returns_401 ... ok
+test test_batch_malformed_body_rejected ... ok
+test test_batch_round_trip_nodes_and_edges ... ok
+test test_bulk_add_nodes ... ok
+test test_consensus_sign_vote_returns_bytes ... ok
+test test_create_and_list_collections ... ok
+test test_duplicate_collection_returns_400 ... ok
+test test_hql_accepts_both_raw_and_wrapped_body ... ok
+test test_hql_body_shapes_preserve_results_and_typed_query_errors ... ok
+test test_hql_raw_json_string_body_succeeds ... ok
+test test_hql_traverse_finds_neighbor ... ok
+test test_hybrid_search_after_index_rebuild ... ok
+test test_hybrid_search_oversample_knob ... ok
+test test_insight_communities_returns_structure ... ok
+test test_insight_drift_endpoint ... ok
+test test_insight_rebuild_and_gaps ... ok
+test test_metrics_exposes_index_lag_and_rebuild_gauges ... ok
+test test_metrics_includes_per_collection_vectors ... ok
+test test_metrics_returns_ok_with_node_count ... ok
+test test_metrics_unauthenticated_even_with_api_key_set ... ok
+test test_no_key_passes_when_api_key_unset ... ok
+test test_query_ir_capabilities_report_partial_v1_support ... ok
+test test_query_ir_search_and_traverse ... ok
+test test_query_ir_validation_error_is_structured ... ok
+test test_reason_context_returns_ok ... ok
+test test_relational_u2_canonical_routes ... ok
+test test_retract_edge_hidden_from_current_view ... ok
+test test_retract_unknown_edge_returns_404 ... ok
+test test_retrieve_context_tiered ... ok
+test test_status_exposes_quant_ops ... ok
+test test_status_returns_open ... ok
+test test_supersede_node_updates_props ... ok
+test test_swarm_status_has_merkle_root ... ok
+test test_swarm_status_has_peer_id ... ok
+test test_version_route_reports_engine_version ... ok
+test v1_query_bitemporal_no_flags_backward_compat ... ok
+test v1_query_bitemporal_retracted_edge_as_of_and_current_view ... ok
+test v1_query_bitemporal_superseded_node_default_latest ... ok
+test wave_b_collection_validation_and_edge_history_parity ... ok
+test wave_c_core_query_and_batch_contract_reaches_rest_surface ... ok
+
+test result: ok. 48 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.45s
+

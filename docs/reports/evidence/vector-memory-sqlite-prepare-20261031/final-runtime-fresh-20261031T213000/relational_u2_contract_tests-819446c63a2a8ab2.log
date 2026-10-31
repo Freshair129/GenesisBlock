@@ -1,0 +1,10 @@
+
+running 5 tests
+test compacted_wal_rebuilds_rows_schema_and_mutation_identity ... ok
+test concurrent_mutation_identity_commits_only_one_payload ... ok
+test mutation_identity_is_idempotent_and_conflicting_reuse_fails ... ok
+test schema_identity_hash_and_exact_version_chain_are_enforced ... ok
+test typed_insert_update_and_named_left_join_are_bounded ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.47s
+

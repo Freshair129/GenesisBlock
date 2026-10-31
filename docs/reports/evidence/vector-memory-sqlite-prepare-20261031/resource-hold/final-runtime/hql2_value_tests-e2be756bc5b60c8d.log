@@ -1,0 +1,11 @@
+
+running 6 tests
+test entity_values_are_tagged_and_valid_record_refs_can_be_supplied_as_parameters ... ok
+test errors_use_unicode_scalar_columns_and_safe_reasons ... ok
+test nullable_lists_preserve_values_and_declared_types_on_empty_input ... ok
+test type_depth_is_bounded ... ok
+test typed_literals_reject_coercion_overflow_and_unknown_types ... ok
+test wire_values_tag_i64_without_precision_loss ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

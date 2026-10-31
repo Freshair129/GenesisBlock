@@ -1,0 +1,16 @@
+   Compiling genesis-block-native v0.2.10 (C:\Users\suanr\genesis-vector-memory-20261031\verify-src)
+error: manually constructing a nul-terminated string
+   --> src\projection_rebuild_tests.rs:345:17
+    |
+345 |                 b"main\0".as_ptr().cast(),
+    |                 ^^^^^^^^^ help: use a `c""` literal: `c"main"`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#manual_c_str_literals
+note: the lint level is defined here
+   --> src\lib.rs:5:9
+    |
+  5 | #![deny(clippy::all)]
+    |         ^^^^^^^^^^^
+    = note: `#[deny(clippy::manual_c_str_literals)]` implied by `#[deny(clippy::all)]`
+
+error: could not compile `genesis-block-native` (lib test) due to 1 previous error
