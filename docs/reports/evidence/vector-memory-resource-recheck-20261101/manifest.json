@@ -1,0 +1,47 @@
+[
+  {
+    "file": "admission.json",
+    "bytes": 729,
+    "sha256": "f1838a66f82864f0844eb0cdc2d9fc35d11d4f3a96294f6a504966814f6e68a6"
+  },
+  {
+    "file": "competition.json",
+    "bytes": 693,
+    "sha256": "b21b86e4be48d89072757c5194ad0836a6f1bb3c4699e072a0582fbdbcf91c9f"
+  },
+  {
+    "file": "fixture-preparation-nov01-recheck-wait-status.json",
+    "bytes": 492,
+    "sha256": "30e6eeec85ac9f80c548bac8ee36a1ceaf39a234aca3cc564ffb1db86e07189a"
+  },
+  {
+    "file": "fixture-preparation-nov01-wait-status.json",
+    "bytes": 504,
+    "sha256": "808899bbe38adf68278b506b2cf29ecd14a0bca6e29cbb29793b6285024bc1a3"
+  },
+  {
+    "file": "fixture-stderr.log",
+    "bytes": 181,
+    "sha256": "6ec821e645ea3653fe631134e7bee92e33e8f720750e4cfb267c58ad79baa411"
+  },
+  {
+    "file": "fixture-stdout.log",
+    "bytes": 226,
+    "sha256": "3569900ace412b5320e67e11e8f12ea45f44876f8aa3e40954125b60ac9b2aba"
+  },
+  {
+    "file": "start.json",
+    "bytes": 1078,
+    "sha256": "b755ff29cba0b384d9bf3e29461d281397cbf8f3dff3c45afe59d0ff56d705a0"
+  },
+  {
+    "file": "status.json",
+    "bytes": 1914,
+    "sha256": "6d2fde63708de2177eea6d5a8ed8b2b50e61077581cdd2b0442a6e24b2920b67"
+  },
+  {
+    "file": "timeline.jsonl",
+    "bytes": 149963,
+    "sha256": "7e58f4e76d0e5421f4ffead602f6be185cac72ea6667a9312b9ecf4bf0839886"
+  }
+]

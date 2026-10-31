@@ -287,6 +287,20 @@ New fixture/fresh-reopen and real-BGE results remain pending until their actual
 guarded executions complete. Recurrent unrelated Rust 1.99.1 compiler activity
 has blocked additional admissions; those processes were preserved.
 
+**2026-11-01 rerun:** A new admission passed at 18.45% average CPU and
+13,802,835,968 B minimum available memory. The 100k fixture preparation then
+stopped at 488.016 s because three external Cargo processes appeared during the
+run (`resource_competition`). Its sampled owned-tree peak RSS was 564,862,976 B;
+cleanup completed with no owned processes remaining. The log reached snapshot
+loading and index reconstruction, but not a completed open, marker insertion,
+normal close, or any query. This interrupted fixture must not be reused for the
+paired measurement. The fresh-reopen before/after and real BGE runs were not
+executed, so their deadline, recall and RSS remain unverified. The guard receipt,
+admission samples, competing-process identities and logs are preserved in
+`evidence/vector-memory-resource-recheck-20261101/`. No query warm-up or budget
+change was used; preparation must restart from a verified pristine copy when
+the host can remain uncontended.
+
 Latest post-commit resource disposition (2026-11-01): the bounded preparation
 wait ended after nine admission attempts without opening the relocated pristine
 fixture. Last 10-second admission averaged 32.73% CPU with
