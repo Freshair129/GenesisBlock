@@ -1,9 +1,9 @@
 ---
-version: "0.9.9b"
+version: "0.9.10b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-30T02:22:13+07:00,Codex"
+last_update: "2026-10-30T20:43:00+07:00,Codex"
 status: beta
 superseded_by: null
 attributes:
@@ -15,13 +15,23 @@ attributes:
   owner: "Boss (Founder / Product Authority)"
 ---
 
-## H1-T confirmed transport cause and repair candidate — 2026-10-30
+## Approved G4/P8 Phase H2a nullable multi-key qualification — 2026-10-30
+
+The owner-approved LOW/C-3 tests/docs slice has a seven-existing-file ceiling and is based on merged main `ad94aa2e46025b7729d117ff376ab281ac15c49d` / tree `b50341abfc211cdb07519e73286cd73999689f8d`. PR #278's pre-merge H1-T snapshot is retained below; that PR later merged normally at this baseline.
+
+The two added characterization tests cover the existing nullable two-key order path with paired typed-IR/HQL2 queries. The fixture composes two Values/Project inputs through UnionAll, Sort, optional Offset/Take and Project. Six unique complete `(x, bucket)` keys and sixteen literal permutations cover Bool, I64, DecimalU64, F64Finite and Utf8; full, paged and empty scenarios assert literal rows, schema, Plan topology/counters, Normal and Analyze output. P7 remains unchanged for four representable types; DecimalU64 is literal-only. Omitted HQL NULL placement is checked as NULLS LAST; typed IR keeps explicit placement. The matrix does not define equal-key ties.
+
+The tests make 1,500 requests: 480 Plan +480 Normal +480 Analyze for explicit profiles, plus 60 omitted-null HQL requests, giving 500 requests per mode. All Plan controls precede results/publication per fixture. Focused scalar target passed 22/22; full locked/offline test-target suite passed 1,309/0/6 across 158 top-level summaries (43 library-unit tests plus 157 integration targets), including 44 HQL2 targets at 472/0/1. Corrected-source independent same-host execution passed 27/27 across three targets, 0 failed/ignored/filtered, with raw names and source/binary hashes reconciled without runtime rerun. Counts overlap. Registry/cache and Windows machine were shared; target and OS TEMP were fresh.
+
+No runtime or normative contract work is included. This task advances only the selected H2a evidence; full-key tie rules, exhaustive types/order/composition/provenance, broader G4/P8 and P6, universal no-write, ordinary success state, P9-P16, other-machine/new-oracle, performance/device/release gates remain separate. Preserve P8 -> P9-P12 -> P13/P14 -> P15 -> P16. H2a evidence does not imply merge or release eligibility.
+
+## H1-T pre-merge candidate snapshot — 2026-10-30
 
 The owner-approved H1-T packet and explicit consumer-lock extension remain HIGH/C-3, at most17 files on the existing checkout/branch/PR278. Actual diagnostic head7858c03a3145e6110bd8b7d1e5feb5c8219ba2c6 macOS Tests40953668239/job123728076319 confirmed SO_SNDBUF=9,216, SO_RCVBUF=786,896 and a31,481-byte authenticated PushDelta rejected with raw errno40 (Darwin EMSGSIZE), while smaller replies succeeded. The original required prefix response remained RED. [Transport ../.brain/rca/2026-10-30-gossip-datagram-capacity.md](../.brain/rca/2026-10-30-gossip-datagram-capacity.md) freezes the raw log/hash before behavioral repair; old155 graph and same-host qualification remain historical at their recorded bytes.
 
 The private repair candidate borrows the bound Tokio socket through safe socket2=0.6.4, retains a larger host send capacity or increases a smaller one, then verifies effective capacity is at least65,535 before publishing nonzero gossip_port. Capacity setup errors return without advertising a usable port. Numeric binding, IPv4/IPv6, ownership, roster/authentication, API/error taxonomy and restart semantics remain unchanged. The selected65,535 socket allocation is not a protocol budget. Failed PushDelta sends retain bounded length/errno diagnostics without payloads or success-per-packet logging. No per-success capacity syscall was added.
 
-A real constrained-socket regression first failed at4,096 bytes with the observational stub, then exercises configured capacity and55,900-byte raw loopback delivery for numeric IPv4/IPv6. Original authenticated54,000/54,001 event and55,000/55,001 vector boundaries, three-second guards, prefix continuation/retry, graph/reopen, receipts/state checks and oversized-group bounded no-response controls remain intact. Corrected-source Windows focus passed80/80 (library43, history22, peer15), including the constrained IPv4/IPv6 regression and original authenticated prefix/byte-budget cases. These are overlapping selected tests, not80 independent obligations. The author final46-target run passed528 unique tests, zero failures and one existing ignored parser child explicitly invoked twice by its passing parent, at frozen246-path manifest SHA256d17cf339c32bf03f0931a155d8bf2599399fd0ce04e6e1ede73d5f7bef3c8896. Strict core/default all-target Clippy, fmt, docs244/0, version0.2.10 and diff checks passed. Fresh independent execution passed237 exact top-level tests across27 targets, zero failed/ignored/filtered, in one attempt without runtime retries. The root independently verified29 sealed artifacts,27 executed binaries, raw test identities and unchanged246 source paths. This Windows executor shared the target/registry and compile-time fixture scratch, with fresh OS TEMP; it is not a fresh build, filesystem sandbox, new machine, new oracle or blind study. Counts overlap the author selection and are not additive independent obligations. Architecture/evidence review and ALL new-head applicable CI remain PENDING; this is **NOT MERGE ELIGIBLE** and no repaired macOS acceptance is claimed. OS setup-failure branches are source-reviewed rather than fault-injected through unsafe/new test hooks; no universal reliability claim follows.
+A real constrained-socket regression first failed at4,096 bytes with the observational stub, then exercises configured capacity and55,900-byte raw loopback delivery for numeric IPv4/IPv6. Original authenticated54,000/54,001 event and55,000/55,001 vector boundaries, three-second guards, prefix continuation/retry, graph/reopen, receipts/state checks and oversized-group bounded no-response controls remain intact. Corrected-source Windows focus passed80/80 (library43, history22, peer15), including the constrained IPv4/IPv6 regression and original authenticated prefix/byte-budget cases. These are overlapping selected tests, not80 independent obligations. The author final46-target run passed528 unique tests, zero failures and one existing ignored parser child explicitly invoked twice by its passing parent, at frozen246-path manifest SHA256d17cf339c32bf03f0931a155d8bf2599399fd0ce04e6e1ede73d5f7bef3c8896. Strict core/default all-target Clippy, fmt, docs244/0, version0.2.10 and diff checks passed. Fresh independent execution passed237 exact top-level tests across27 targets, zero failed/ignored/filtered, in one attempt without runtime retries. The root independently verified29 sealed artifacts,27 executed binaries, raw test identities and unchanged246 source paths. This Windows executor shared the target/registry and compile-time fixture scratch, with fresh OS TEMP; it is not a fresh build, filesystem sandbox, new machine, new oracle or blind study. Counts overlap the author selection and are not additive independent obligations. This paragraph records the pre-merge candidate snapshot only. PR #278 later merged normally as commit `ad94aa2e46025b7729d117ff376ab281ac15c49d` (tree `b50341abfc211cdb07519e73286cd73999689f8d`); that merge record does not widen the claims in this section. OS setup-failure branches are source-reviewed rather than fault-injected through unsafe/new test hooks; no universal reliability claim follows.
 
 The owner explicitly approved the17-file extension for the two existing consumer lockfiles after actual Studio shell jobs on all three hosts rejected the stale lock under --locked. Both now add the genesis-block-native direct socket2 edge; Studio alone aligns its existing socket2 package0.6.5 to the owner-selected0.6.4/checksum, while mobile retains0.6.4. Parsed comparison covers590 Studio and543 mobile packages with no other package/version/checksum/edge changes. The root246 source/test/Cargo manifest is unchanged. Both full --locked offline resolutions passed. All five first-attempt local --locked --offline consumer commands passed: Studio test/build and mobile test/build/check. Studio ran14 unit tests; mobile lib/main/doc harnesses ran zero tests, so its evidence is compilation/build/check only. Ten actual test/build artifacts were hashed. Existing unchanged frontend dist assets were used locally; fresh hosted frontend builds, GUI/device acceptance and final hosted packaging remain separate gates; no --locked removal, unrelated dependency update or workflow change is allowed. Windows diagnostic library41/1 failed a pre-existing HISTORY-seal assertion; controlled exact1/1 and full42/42 runs at the same diagnostic bytes passed locally, which does not explain or erase the hosted failure. No unrelated WAL/fixture fix, assertion weakening or timeout increase is authorized.
 
@@ -1880,6 +1890,8 @@ correction, rerun Verify and Review before Final. Final PASS is not merge
 authorization.
 
 ## CHANGELOG
+Version diff 0.9.9b -> 0.9.10b: record the approved H2a nullable multi-key evidence and bounded host results; retain staged broader G4/P8, P6 and P9-P16 gates.
+
 
 Version diff 0.9.4b -> 0.9.5b: add selected C1b nullable-order host qualification and local results; retain broad G4/P8, P6 and P9-P16 work as open stages. No runtime, API or contract work is included.
 
@@ -2109,6 +2121,7 @@ Version diff `0.8.27b -> 0.8.28b`: implement approved D1-D5, record 9 focused pa
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.9.10b | 2026-10-30 | beta | Record H2a selected multi-key qualification; keep broader G4/P8, P6, P9-P16, device and release stages open | working-tree | Codex |
 | 0.9.1b | 2026-10-26 | beta | Record Phase B1 selected scalar type-admissibility candidate on PR271 main; keep broad G4/P8 and downstream gates staged | working-tree | Codex |
 | 0.9.0b | 2026-10-26 | beta | Reconcile PR #269 current-main evidence and retain staged G4/P8 through P9-P16 qualification gates | working-tree | Codex |
 | 0.8.85b | 2026-10-20 | beta | Approve tests-only G4 identity/golden matrix and reconcile hosted PR253 | working-tree | Codex |
