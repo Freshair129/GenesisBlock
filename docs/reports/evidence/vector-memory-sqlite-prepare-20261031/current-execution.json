@@ -1,0 +1,10 @@
+{
+  "at": "2026-10-31T23:34:20.5036272+07:00",
+  "commit": "f98a324c6ac9c16bbd98679622012519107628a3",
+  "source_qualification": "unchanged, audit-commit-receipt.json",
+  "preserved_staged_files": 7,
+  "copy_integrity": "PASS: 100k-copy-verification-postcommit/status.json + 100k-cases/copy-manifest.json",
+  "active_workload": "before100k, 100k-before-guard/status.json pending",
+  "caps": "1200s/2GiB/5000msquery unchanged",
+  "next": "Validate baseline observation, then fresh after100k and untraced realBGE pair; no warmup"
+}

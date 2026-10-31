@@ -1,0 +1,67 @@
+{
+  "exit": 0,
+  "reason": null,
+  "seconds": 288.3122377,
+  "peak_rss": 1419464704,
+  "peak_private": 1617870848,
+  "identities": [
+    {
+      "ProcessId": 24280,
+      "ParentProcessId": 16480,
+      "CreationDate": "2026-11-01T00:02:28.973313+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 11844,
+      "ParentProcessId": 29108,
+      "CreationDate": "2026-11-01T00:06:57.266173+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 24268,
+      "ParentProcessId": 29108,
+      "CreationDate": "2026-11-01T00:02:35.789016+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 16480,
+      "ParentProcessId": 34920,
+      "CreationDate": "2026-11-01T00:02:28.961611+07:00",
+      "Name": "cargo.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.cargo\\bin\\cargo.exe"
+    },
+    {
+      "ProcessId": 29108,
+      "ParentProcessId": 16480,
+      "CreationDate": "2026-11-01T00:02:29.019323+07:00",
+      "Name": "cargo.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\cargo.exe"
+    },
+    {
+      "ProcessId": 24772,
+      "ParentProcessId": 24268,
+      "CreationDate": "2026-11-01T00:06:54.50634+07:00",
+      "Name": "link.exe",
+      "ExecutablePath": "C:\\GenesisBlockW1Tools\\vs2022\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe"
+    },
+    {
+      "ProcessId": 41448,
+      "ParentProcessId": 11844,
+      "CreationDate": "2026-11-01T00:07:15.381431+07:00",
+      "Name": "link.exe",
+      "ExecutablePath": "C:\\GenesisBlockW1Tools\\vs2022\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe"
+    }
+  ],
+  "excluded_build_helpers": [],
+  "helper_finished_parent_condition": true,
+  "helper_scope": "Helpers are not terminated; successful Cargo completion and stopped tracked compiler clients are required before private-source edits. No shared source/target mutation.",
+  "admission_cpu": 12.0,
+  "admission_free": 16456921088.0,
+  "remaining": [],
+  "cleanup_complete": true,
+  "monitor_error": null,
+  "rss_scope": "tracked processes; compiler telemetry/daemon helpers excluded"
+}

@@ -1,0 +1,47 @@
+{
+  "qualification": {
+    "run_id": "genesis-sqlite-prepare-20261031",
+    "receipt_sha256": "93E09606C78FD56A8D79CE9463B37F60BF45F0081DAA313C8007ED06B4751DA6",
+    "completed_targets": 159,
+    "passed": true,
+    "gate_hashes": {
+      "final-runtime.status": "EEBBF6457E46A7F63ACDF9B97390F790BA443D60CFA44B607DA7E5C40AA1CC1D",
+      "final-runtime.json": "B43FCA8070A93B821373E21312E6AC09A882500BF9F1CDF778DB18A06EB6DC71",
+      "final-test-artifacts.json": "C0144A407B2B5B72C706B276D3BBA0F6B43C655AB49FFBBACA0FC546366813F4",
+      "post-checks.status": "833113AF457FA828527BDF3F54D6D3EC94D0E210DB1ED6521ABA91820567F9A3"
+    },
+    "full_source_manifest_sha256": "AE9A146DF069FA0C4ED3EBF0A78C19D36486C0A9CF7EE9F6F2EFD412CC438222",
+    "clone_source_manifest_sha256": "E333B4DAEDE72CACF6309D546FC9A37F35744C141FC1C34C2F2E6D42B1FFC24A",
+    "full_source_manifest_paths": 287,
+    "clone_source_files": 71
+  },
+  "metadata": {
+    "bench": {
+      "path": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\fresh-reopen-vector_memory.rs",
+      "sha256": "a0486cb80af74d8bf614b4fce7c8a806fb2245f95588855aa8a7ee9ae26b3c8e"
+    },
+    "sources": {
+      "before": {
+        "path": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\fresh-before-traced-lib.rs",
+        "sha256": "92d43798219447980dbc4b22df1bf41eb54c4dbee31fb90009211e8eec9266bc"
+      },
+      "after": {
+        "path": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\fresh-after-traced-lib.rs",
+        "sha256": "e63127ac96b2afa4f48a8a2b1b3c19992f17e45c7508d16a279db4f4e69b44b2"
+      }
+    },
+    "scope": "External diagnostic/harness only; production D/C engine unchanged. Identical new observer gate in both variants. No query/data/budget correctness gate removed.",
+    "old_workload": "Original same-process two-open1200s timeout retained, not qualified by these new workloads.",
+    "new_workloads": [
+      "fixture preparation: one open + add_node + normal Drop, zero queries",
+      "fresh-process RW reopen includes ALL snapshot/replay/backup/maintenance work, q0first,24k10/k100,coverage/count/marker checks,normal Drop"
+    ],
+    "caps": "Each workload1200s/2GiB; engine query5000ms; no warmup; no parent timer reset or full-two-open pass claim"
+  },
+  "production_commit": "f98a324c6ac9c16bbd98679622012519107628a3",
+  "source_clone": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\release-src\\20261031T150004Z-b5e55f51",
+  "target": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\release-target\\20261031T150004Z-b5e55f51",
+  "old_workload": "two-open1200s TIMEOUT retained, not relabeled",
+  "new_workload": "separate fixture setup and fresh RW reopen, original per-job/query/RSS caps",
+  "prod_source_mutation": "none"
+}

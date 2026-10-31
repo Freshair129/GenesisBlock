@@ -18,7 +18,7 @@ for directory,dirs,files in os.walk(r):
  for name in files:
   p=Path(directory)/name
   if p.suffix.lower() not in allow or any(x in name.lower() for x in ('keypair','identity','state.json')):continue
-  if p.name in ('proposed-publication-lib.rs','unrun-projection_rebuild_tests.rs'):continue
+  if p.name in ('proposed-publication-lib.rs','unrun-projection_rebuild_tests.rs','pre-audit-commit-staged.patch'):continue
   rel=p.relative_to(r); target=out/rel
   if p.suffix=='.md':target=target.with_suffix('.txt')
   size=p.stat().st_size

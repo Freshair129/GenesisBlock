@@ -1,0 +1,6 @@
+{
+  "commit": "f98a324c6ac9c16bbd98679622012519107628a3",
+  "same_process_two_open": "TIMEOUT, query not exercised",
+  "fresh_workloads": "pending; distinct scope, unchanged caps",
+  "production_source_mutation": "none"
+}

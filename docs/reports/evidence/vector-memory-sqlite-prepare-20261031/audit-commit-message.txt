@@ -1,0 +1,18 @@
+perf(storage): reduce vector memory peaks and own projection checkpoint work
+
+Stream arena snapshots, report bounded sidecar cache and HNSW vector payload,
+and reduce temporary vector copies and repeated checkpoint serialization,
+signature verification, and snapshot proof work.
+
+Finish pending SQLite WAL maintenance at projection publication so the first
+query prepare does not inherit the backup's deferred checkpoint. Preserve
+passive-reader behavior and explicit post-commit maintenance errors.
+
+Add regression coverage, streamed benchmark tooling, and byte-preserved audit
+evidence. Retain Arena/HNSW vector ownership and quantization/sidecar behavior.
+
+Recorded source qualification: 159 executables, 1328 passed/0 failed/7 ignored;
+Node 88 passed, static/native gates passed. These working-tree results include
+the pre-existing append-only H2a tests, which remain staged outside this commit.
+The pinned SQLite causal matrix passed; 100k and new real-BGE timing gates are
+still open due host resource admission. No release/performance completion claim.

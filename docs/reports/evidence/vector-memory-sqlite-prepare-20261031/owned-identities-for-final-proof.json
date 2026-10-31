@@ -3997,6 +3997,27 @@
     "ExecutablePath": null
   },
   {
+    "ProcessId": 16224,
+    "ParentProcessId": 33584,
+    "CreationDate": "2026-10-31T23:32:15.040343+07:00",
+    "Name": "diagnostic-before.exe",
+    "ExecutablePath": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\diagnostic-before.exe"
+  },
+  {
+    "ProcessId": 33584,
+    "ParentProcessId": 43920,
+    "CreationDate": "2026-10-31T23:32:13.306282+07:00",
+    "Name": "python.exe",
+    "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\Python\\Python314\\python.exe"
+  },
+  {
+    "ProcessId": 43360,
+    "ParentProcessId": 33584,
+    "CreationDate": "2026-10-31T23:32:13.315205+07:00",
+    "Name": "conhost.exe",
+    "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+  },
+  {
     "ProcessId": 36848,
     "ParentProcessId": 41552,
     "CreationDate": "2026-10-31T22:35:12.162021+07:00",
@@ -4007,6 +4028,20 @@
     "ProcessId": 22260,
     "ParentProcessId": 36848,
     "CreationDate": "2026-10-31T22:35:12.169658+07:00",
+    "Name": "conhost.exe",
+    "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+  },
+  {
+    "ProcessId": 32204,
+    "ParentProcessId": 39928,
+    "CreationDate": "2026-10-31T23:29:06.895112+07:00",
+    "Name": "python.exe",
+    "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\Python\\Python314\\python.exe"
+  },
+  {
+    "ProcessId": 24916,
+    "ParentProcessId": 32204,
+    "CreationDate": "2026-10-31T23:29:06.90363+07:00",
     "Name": "conhost.exe",
     "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
   },
@@ -7488,6 +7523,97 @@
     "CreationDate": "2026-10-31T22:04:00.120612+07:00",
     "Name": "build-script-build.exe",
     "ExecutablePath": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\release-target\\20261031T150004Z-b5e55f51\\release\\build\\unicode-general-category-b93bf77bf2f1b36a\\build-script-build.exe"
+  },
+  {
+    "ProcessId": 38128,
+    "ParentProcessId": 29484,
+    "CreationDate": "2026-11-01T00:16:23.940391+07:00",
+    "Name": "cargo.exe",
+    "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\cargo.exe"
+  },
+  {
+    "ProcessId": 10348,
+    "ParentProcessId": 38128,
+    "CreationDate": "2026-11-01T00:16:24.677859+07:00",
+    "Name": "rustc.exe",
+    "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+  },
+  {
+    "ProcessId": 40724,
+    "ParentProcessId": 23536,
+    "CreationDate": "2026-11-01T00:21:14.67215+07:00",
+    "Name": "link.exe",
+    "ExecutablePath": "C:\\GenesisBlockW1Tools\\vs2022\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe"
+  },
+  {
+    "ProcessId": 23536,
+    "ParentProcessId": 38128,
+    "CreationDate": "2026-11-01T00:20:57.584399+07:00",
+    "Name": "rustc.exe",
+    "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+  },
+  {
+    "ProcessId": 13028,
+    "ParentProcessId": 38128,
+    "CreationDate": "2026-11-01T00:16:23.949081+07:00",
+    "Name": "conhost.exe",
+    "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+  },
+  {
+    "ProcessId": 42284,
+    "ParentProcessId": 10348,
+    "CreationDate": "2026-11-01T00:20:56.13129+07:00",
+    "Name": "link.exe",
+    "ExecutablePath": "C:\\GenesisBlockW1Tools\\vs2022\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe"
+  },
+  {
+    "ProcessId": 24280,
+    "ParentProcessId": 16480,
+    "CreationDate": "2026-11-01T00:02:28.973313+07:00",
+    "Name": "conhost.exe",
+    "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+  },
+  {
+    "ProcessId": 11844,
+    "ParentProcessId": 29108,
+    "CreationDate": "2026-11-01T00:06:57.266173+07:00",
+    "Name": "rustc.exe",
+    "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+  },
+  {
+    "ProcessId": 24268,
+    "ParentProcessId": 29108,
+    "CreationDate": "2026-11-01T00:02:35.789016+07:00",
+    "Name": "rustc.exe",
+    "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+  },
+  {
+    "ProcessId": 16480,
+    "ParentProcessId": 34920,
+    "CreationDate": "2026-11-01T00:02:28.961611+07:00",
+    "Name": "cargo.exe",
+    "ExecutablePath": "C:\\Users\\suanr\\.cargo\\bin\\cargo.exe"
+  },
+  {
+    "ProcessId": 29108,
+    "ParentProcessId": 16480,
+    "CreationDate": "2026-11-01T00:02:29.019323+07:00",
+    "Name": "cargo.exe",
+    "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\cargo.exe"
+  },
+  {
+    "ProcessId": 24772,
+    "ParentProcessId": 24268,
+    "CreationDate": "2026-11-01T00:06:54.50634+07:00",
+    "Name": "link.exe",
+    "ExecutablePath": "C:\\GenesisBlockW1Tools\\vs2022\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe"
+  },
+  {
+    "ProcessId": 41448,
+    "ParentProcessId": 11844,
+    "CreationDate": "2026-11-01T00:07:15.381431+07:00",
+    "Name": "link.exe",
+    "ExecutablePath": "C:\\GenesisBlockW1Tools\\vs2022\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe"
   },
   {
     "ProcessId": 21752,

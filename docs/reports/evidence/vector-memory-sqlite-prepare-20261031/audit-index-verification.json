@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "parent": "ad94aa2e46025b7729d117ff376ab281ac15c49d",
+  "audit_changed_files": 1742,
+  "protected_staged_paths": 7,
+  "evidence_blobs_byte_exact": 1730,
+  "qualified_source_paths_unchanged": 287,
+  "protected_cached_patch_unchanged": true
+}

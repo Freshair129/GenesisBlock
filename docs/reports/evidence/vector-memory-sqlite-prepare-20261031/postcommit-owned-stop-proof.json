@@ -1,0 +1,8 @@
+{
+  "at": "2026-11-01T00:44:18.2044918+07:00",
+  "recorded_guard_identities": 1107,
+  "extra_owned_controllers_checked": 3,
+  "remaining": [],
+  "passed": true,
+  "scope": "Owned guard identities and new controllers by PID+birth; unrelated processes preserved"
+}

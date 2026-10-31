@@ -1,0 +1,7 @@
+{
+  "before_sha256": "ce48abe629659dc1d25b3be4e9817137c998130b55a7538953507324a7803cf6",
+  "after_sha256": "02035aa58f3dd1caa2c365c07589bcd81a139dc17079a7ea0c624e184f868c01",
+  "reason": "Explicit original defaults for inherited StrictMode; no budget change or DB launch in rejected attempts",
+  "kind": "benchmark",
+  "cap_seconds": 1200
+}

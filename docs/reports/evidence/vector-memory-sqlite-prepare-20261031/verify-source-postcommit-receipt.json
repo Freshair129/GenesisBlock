@@ -1,0 +1,10 @@
+{
+  "at": "2026-11-01T00:42:24.476177+07:00",
+  "passed": true,
+  "commit": "f98a324c6ac9c16bbd98679622012519107628a3",
+  "qualified_paths": 287,
+  "mirror_paths": 253,
+  "protected_staged_patch_unchanged": true,
+  "protected_staged_files": 7,
+  "scope": "Runtime/source identity bridge after authorized checkpoint commit; no new test execution claim; report/evidence may evolve separately."
+}

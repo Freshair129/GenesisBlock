@@ -78,8 +78,9 @@
     "guard": "matrix-isolated-guard-attempt2/status.json",
     "historical_interfered_attempt": "matrix-real-interference.json"
   },
-  "reopen_100k": "NOT_RUN: copies exist but full hash verification and engine run await resource admission",
+  "reopen_100k": "NOT_QUALIFIED: two-open TIMEOUT beforeq0; fresh-process fixture preparation not launched due resources",
   "note": "Final immutable E69 suite freshly completed after resource hold; historical interrupted results are not summed into this result.",
   "real_bge_current_pair": "NOT_RUN: source-bound configs/binaries ready, resource admission pending",
-  "latest_resource_hold": "latest-resource-hold.json"
+  "latest_resource_hold": "latest-resource-hold.json",
+  "postcommit_hold": "postcommit-resource-hold.json"
 }

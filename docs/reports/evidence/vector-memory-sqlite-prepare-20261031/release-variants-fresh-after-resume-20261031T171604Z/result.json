@@ -1,0 +1,136 @@
+{
+  "status": "complete",
+  "qualification": {
+    "run_id": "genesis-sqlite-prepare-20261031",
+    "receipt_sha256": "93E09606C78FD56A8D79CE9463B37F60BF45F0081DAA313C8007ED06B4751DA6",
+    "completed_targets": 159,
+    "passed": true,
+    "gate_hashes": {
+      "final-runtime.status": "EEBBF6457E46A7F63ACDF9B97390F790BA443D60CFA44B607DA7E5C40AA1CC1D",
+      "final-runtime.json": "B43FCA8070A93B821373E21312E6AC09A882500BF9F1CDF778DB18A06EB6DC71",
+      "final-test-artifacts.json": "C0144A407B2B5B72C706B276D3BBA0F6B43C655AB49FFBBACA0FC546366813F4",
+      "post-checks.status": "833113AF457FA828527BDF3F54D6D3EC94D0E210DB1ED6521ABA91820567F9A3"
+    },
+    "full_source_manifest_sha256": "AE9A146DF069FA0C4ED3EBF0A78C19D36486C0A9CF7EE9F6F2EFD412CC438222",
+    "clone_source_manifest_sha256": "E333B4DAEDE72CACF6309D546FC9A37F35744C141FC1C34C2F2E6D42B1FFC24A",
+    "full_source_manifest_paths": 287,
+    "clone_source_files": 71
+  },
+  "builds": [
+    {
+      "stage": "fresh-after",
+      "status": "passed",
+      "actual_exit": 0,
+      "reason": null,
+      "seconds": 293.2843192,
+      "peak_rss": 1403531264,
+      "admission_free": 15587663872,
+      "qualification": {
+        "run_id": "genesis-sqlite-prepare-20261031",
+        "receipt_sha256": "93E09606C78FD56A8D79CE9463B37F60BF45F0081DAA313C8007ED06B4751DA6",
+        "completed_targets": 159,
+        "passed": true,
+        "gate_hashes": {
+          "final-runtime.status": "EEBBF6457E46A7F63ACDF9B97390F790BA443D60CFA44B607DA7E5C40AA1CC1D",
+          "final-runtime.json": "B43FCA8070A93B821373E21312E6AC09A882500BF9F1CDF778DB18A06EB6DC71",
+          "final-test-artifacts.json": "C0144A407B2B5B72C706B276D3BBA0F6B43C655AB49FFBBACA0FC546366813F4",
+          "post-checks.status": "833113AF457FA828527BDF3F54D6D3EC94D0E210DB1ED6521ABA91820567F9A3"
+        },
+        "full_source_manifest_sha256": "AE9A146DF069FA0C4ED3EBF0A78C19D36486C0A9CF7EE9F6F2EFD412CC438222",
+        "clone_source_manifest_sha256": "E333B4DAEDE72CACF6309D546FC9A37F35744C141FC1C34C2F2E6D42B1FFC24A",
+        "full_source_manifest_paths": 287,
+        "clone_source_files": 71
+      },
+      "source": {
+        "lib_sha256": "e63127ac96b2afa4f48a8a2b1b3c19992f17e45c7508d16a279db4f4e69b44b2",
+        "vector_memory_sha256": "a0486cb80af74d8bf614b4fce7c8a806fb2245f95588855aa8a7ee9ae26b3c8e",
+        "Cargo_toml_sha256": "00550FBAC8EDB5C1316B5EB21983B078039604ED3C1460689515BA5539F30E25",
+        "Cargo_lock_sha256": "EDA5BFA67C1077C96F2B84E44F740273E695C87A1A51B352CF18F2A031A4F8D2",
+        "projection_rebuild_tests_sha256": "E69DC7DD5CBC5043AA5ED9C717E449E50246A8FBD8AD56AC95ED135718C99BE2",
+        "build_rs_sha256": "90CBE43C73A03EC048B906D8F63D809C2CB987F8AFE4B177EEBF18D72862E52A",
+        "external_bench_sha256": "a0486cb80af74d8bf614b4fce7c8a806fb2245f95588855aa8a7ee9ae26b3c8e"
+      },
+      "source_clone": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\release-src\\20261031T150004Z-b5e55f51",
+      "target_dir": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\release-target\\20261031T150004Z-b5e55f51",
+      "guard_status_path": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\release-variants-fresh-after-resume-20261031T171604Z\\fresh-after\\guard-output\\status.json",
+      "fresh_owned_stop_proof": {
+        "checked_at_utc": "2026-10-31T17:21:17.6138748Z",
+        "guard_runs_checked": 1,
+        "tracked_compiler_clients_checked": 6,
+        "active_tracked_clients": 0,
+        "identity": "PID+CreationDate+ExecutablePath+Name",
+        "excluded_helpers": []
+      },
+      "output_exe": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\fresh-after.exe",
+      "output_exe_sha256": "5273A92B0F2BB4A685BAEE7189795E1CF73FE2EFA079018CC21C604E3D2CDA54",
+      "target_exe_sha256": "5273A92B0F2BB4A685BAEE7189795E1CF73FE2EFA079018CC21C604E3D2CDA54"
+    }
+  ],
+  "guard_runs": [
+    {
+      "stage": "fresh-after",
+      "status_path": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\release-variants-fresh-after-resume-20261031T171604Z\\fresh-after\\guard-output\\status.json",
+      "status": {
+        "exit": 0,
+        "reason": null,
+        "seconds": 293.2843192,
+        "peak_rss": 1403531264,
+        "peak_private": 1610588160,
+        "identities": [
+          {
+            "ProcessId": 38128,
+            "ParentProcessId": 29484,
+            "CreationDate": "2026-11-01T00:16:23.940391+07:00",
+            "Name": "cargo.exe",
+            "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\cargo.exe"
+          },
+          {
+            "ProcessId": 10348,
+            "ParentProcessId": 38128,
+            "CreationDate": "2026-11-01T00:16:24.677859+07:00",
+            "Name": "rustc.exe",
+            "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+          },
+          {
+            "ProcessId": 40724,
+            "ParentProcessId": 23536,
+            "CreationDate": "2026-11-01T00:21:14.67215+07:00",
+            "Name": "link.exe",
+            "ExecutablePath": "C:\\GenesisBlockW1Tools\\vs2022\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe"
+          },
+          {
+            "ProcessId": 23536,
+            "ParentProcessId": 38128,
+            "CreationDate": "2026-11-01T00:20:57.584399+07:00",
+            "Name": "rustc.exe",
+            "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+          },
+          {
+            "ProcessId": 13028,
+            "ParentProcessId": 38128,
+            "CreationDate": "2026-11-01T00:16:23.949081+07:00",
+            "Name": "conhost.exe",
+            "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+          },
+          {
+            "ProcessId": 42284,
+            "ParentProcessId": 10348,
+            "CreationDate": "2026-11-01T00:20:56.13129+07:00",
+            "Name": "link.exe",
+            "ExecutablePath": "C:\\GenesisBlockW1Tools\\vs2022\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe"
+          }
+        ],
+        "excluded_build_helpers": [],
+        "helper_finished_parent_condition": true,
+        "helper_scope": "Helpers are not terminated; successful Cargo completion and stopped tracked compiler clients are required before private-source edits. No shared source/target mutation.",
+        "admission_cpu": 10.636363636363637,
+        "admission_free": 15587663872.0,
+        "remaining": [],
+        "cleanup_complete": true,
+        "monitor_error": null,
+        "rss_scope": "tracked processes; compiler telemetry/daemon helpers excluded"
+      }
+    }
+  ],
+  "before_status": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\release-variants-fresh-reopen-20261031T170202Z\\fresh-before\\guard-output\\status.json"
+}

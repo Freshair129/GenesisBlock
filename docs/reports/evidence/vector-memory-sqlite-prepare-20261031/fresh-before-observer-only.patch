@@ -1,0 +1,12 @@
+--- prior-diagnostic-lib
++++ query-only-props-diagnostic-lib
+@@ -14529,7 +14529,8 @@
+ 
+     fn projection_props_unlocked(&self, node_u32: u32) -> Result<Option<Value>> {
+         const SQL: &str = "SELECT payload FROM props WHERE node_u32 = ?1";
+-        let diagnostics = std::env::var_os("GB_VECTOR_QUERY_DIAGNOSTICS").is_some();
++        let diagnostics = std::env::var_os("GB_VECTOR_QUERY_DIAGNOSTICS").is_some()
++            && std::env::var_os("GB_VECTOR_PROPS_QUERY_DIAGNOSTICS").is_some();
+         if !diagnostics {
+             let conn = self.projection_db.lock();
+             let payload: Option<String> = conn
