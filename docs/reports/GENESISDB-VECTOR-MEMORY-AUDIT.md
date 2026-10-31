@@ -308,6 +308,12 @@ fixture directory was never created, and no database or query was opened. The
 before/after 100k and real-BGE measurements remain pending. The copy script and
 guard receipts are retained in `evidence/vector-memory-pristine-recheck-20261101/`.
 
+A further 10-minute resource wait on 2026-11-01 expired without launching the
+pristine copy; six external Cargo/rustc processes were observed immediately
+afterward. No new fixture or benchmark result was produced. The wait receipt is
+`evidence/vector-memory-pristine-retry2-20261101/wait-status.json`; query
+deadline, recall, and benchmark RSS remain unverified.
+
 Latest post-commit resource disposition (2026-11-01): the bounded preparation
 wait ended after nine admission attempts without opening the relocated pristine
 fixture. Last 10-second admission averaged 32.73% CPU with

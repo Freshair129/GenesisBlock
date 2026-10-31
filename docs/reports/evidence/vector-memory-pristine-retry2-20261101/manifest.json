@@ -1,0 +1,12 @@
+[
+  {
+    "file": "guard-config.json",
+    "bytes": 425,
+    "sha256": "098df1e3900adf85f201f5ae91d81d1626804631eabdd03861158f6e4f1ffa19"
+  },
+  {
+    "file": "wait-status.json",
+    "bytes": 506,
+    "sha256": "ac468f0bd8eab81e05e24dec68f54605119fbbe6502e6afa0553b9894e7becb1"
+  }
+]
