@@ -1,0 +1,42 @@
+[
+  {
+    "file": "admission.json",
+    "bytes": 726,
+    "sha256": "248d65366fd70b3c94efbd2f6566f739b4c236400a888e9ba4f1282a88aa160b"
+  },
+  {
+    "file": "competition.json",
+    "bytes": 449,
+    "sha256": "e3b3643620362c13f075689b37560d82a02afc773e669de7feb3620a61066cde"
+  },
+  {
+    "file": "prepare-pristine-nov01.py",
+    "bytes": 1714,
+    "sha256": "a9feb772fe91282b124fe9c76819bbafff9d2d23bf50bfee9a0cd712f24c2189"
+  },
+  {
+    "file": "pristine-copy-nov01-guard-config.json",
+    "bytes": 424,
+    "sha256": "a7e67a8838db9a9299e8ca6a2f19cc3fcd24f77924f7e9e553e5c42f55020039"
+  },
+  {
+    "file": "pristine-copy-nov01-wait-status.json",
+    "bytes": 492,
+    "sha256": "d0c0fe1ad16e34ca274b9080d29967fec36c6838035cedd4d5cd60b2fe98763f"
+  },
+  {
+    "file": "start.json",
+    "bytes": 964,
+    "sha256": "d1b5199f5b94fcf2e9495cbba9b7df4d45e698c67180214a44d00d9a7af4bcaa"
+  },
+  {
+    "file": "status.json",
+    "bytes": 1521,
+    "sha256": "21b29a2e418713fe3747452550a6a35624904688c18cd81d4b2f6f32b6adee84"
+  },
+  {
+    "file": "timeline.jsonl",
+    "bytes": 2621,
+    "sha256": "5c9597ce0745bf2f4062b33956b1931e9c42b2d6d4404d418bb5235217f4216d"
+  }
+]

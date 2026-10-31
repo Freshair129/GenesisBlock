@@ -301,6 +301,13 @@ admission samples, competing-process identities and logs are preserved in
 change was used; preparation must restart from a verified pristine copy when
 the host can remain uncontended.
 
+A subsequent 2026-11-01 pristine-copy attempt passed admission at 14.18% CPU
+and 13,599,981,568 B minimum available memory, but external compiler activity
+caused the guard to stop it after 11.796 s. Cleanup completed; the destination
+fixture directory was never created, and no database or query was opened. The
+before/after 100k and real-BGE measurements remain pending. The copy script and
+guard receipts are retained in `evidence/vector-memory-pristine-recheck-20261101/`.
+
 Latest post-commit resource disposition (2026-11-01): the bounded preparation
 wait ended after nine admission attempts without opening the relocated pristine
 fixture. Last 10-second admission averaged 32.73% CPU with
