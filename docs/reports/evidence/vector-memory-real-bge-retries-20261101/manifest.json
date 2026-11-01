@@ -1,0 +1,132 @@
+[
+  {
+    "file": "case2/benchmark-start.json",
+    "bytes": 374,
+    "sha256": "02da3cd92f22ed3fb035304cf79f9e776dce03dbe86b38072a3bd992729eb30c"
+  },
+  {
+    "file": "case2/driver-context.json",
+    "bytes": 2620,
+    "sha256": "9afefd58ea3bab8e2c51c595644234fde74e6b3efa5e93590314328bf14dea42"
+  },
+  {
+    "file": "case2/run-config.json",
+    "bytes": 2137,
+    "sha256": "6f4e8fe1d5f8c5407a31860b5ef76293371b90fb246c58be1f249055c8c498d7"
+  },
+  {
+    "file": "case2/stderr.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "file": "case2/stdout.log",
+    "bytes": 124,
+    "sha256": "543e6b214cabd6584c18d160fc90fcbe62fa07f9a4807ff573b70e6fe784e0d2"
+  },
+  {
+    "file": "case3/benchmark-start.json",
+    "bytes": 374,
+    "sha256": "a026387598d6531d62146e3e3061492dd35f2261cf010cd0254949cb437b4a19"
+  },
+  {
+    "file": "case3/driver-context.json",
+    "bytes": 2620,
+    "sha256": "904e693d54c2f9ec18f633a34a8ae537090eb818fa26766cc49ce986960a35f8"
+  },
+  {
+    "file": "case3/run-config.json",
+    "bytes": 2137,
+    "sha256": "09b251a438fd564fe9190246cb7cd5dffc2fd996986690f81782039e89e29ce7"
+  },
+  {
+    "file": "case3/stderr.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "file": "case3/stdout.log",
+    "bytes": 595,
+    "sha256": "e749f845cb3f9b9df7f7f5bddaac8f3b10d99453be3e459fe54d204df1939bb7"
+  },
+  {
+    "file": "guard2/admission.json",
+    "bytes": 727,
+    "sha256": "d00a834392958846547e083bd4d453556f5b487bcfdb02c16f31517e6461b164"
+  },
+  {
+    "file": "guard2/competition.json",
+    "bytes": 449,
+    "sha256": "d473df5c266cfb1698951ff6c939ad595b72a9586e65299ddc8aeece6dd9cd1e"
+  },
+  {
+    "file": "guard2/real-before-retry2-wait-status.json",
+    "bytes": 490,
+    "sha256": "17b5178f80c860187fab40b87d1fd9cf416fd900848a03aa887d69c1a27c3ccc"
+  },
+  {
+    "file": "guard2/start.json",
+    "bytes": 1109,
+    "sha256": "e5b667558b86fa05b085c218111d56170e0573005c421ee3d6a78502e8640abf"
+  },
+  {
+    "file": "guard2/status.json",
+    "bytes": 1944,
+    "sha256": "dc09c7bb1dda0696698b0f54d506274f595c1ca2e7d6546fa35643340f7a0a72"
+  },
+  {
+    "file": "guard2/stderr.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "file": "guard2/stdout.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "file": "guard2/timeline.jsonl",
+    "bytes": 9782,
+    "sha256": "803d875dc5cd3b5fee101fa0c4aad97d3040b0587ad019e4d8e8c338b3a1a343"
+  },
+  {
+    "file": "guard3/admission.json",
+    "bytes": 727,
+    "sha256": "b6172d0f8df8210000c7f08e9514a33c7bc3ebb965f6a9a695f6e599c80f5164"
+  },
+  {
+    "file": "guard3/competition.json",
+    "bytes": 448,
+    "sha256": "70faf5531e91258e1e8edff0877590f2f83405d87e2087fde5fafc889476be69"
+  },
+  {
+    "file": "guard3/real-before-retry3-wait-status.json",
+    "bytes": 490,
+    "sha256": "6c35cc0cb94048f459620a370483c127aea83e8df4c76b641327d5e52565f6b3"
+  },
+  {
+    "file": "guard3/start.json",
+    "bytes": 1109,
+    "sha256": "8f1e4e348f53f43cfe810b8e4060d9cd2631366e5a6981430807d63027413e4f"
+  },
+  {
+    "file": "guard3/status.json",
+    "bytes": 1944,
+    "sha256": "46cd161925001450a14852ba364d7b1775a6791f18639e23c4a41013abb55bc3"
+  },
+  {
+    "file": "guard3/stderr.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "file": "guard3/stdout.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "file": "guard3/timeline.jsonl",
+    "bytes": 64891,
+    "sha256": "bd432d1a2c8edcc3d6009955b969314cc84a61c5150d75ee9619d851222da5d7"
+  }
+]

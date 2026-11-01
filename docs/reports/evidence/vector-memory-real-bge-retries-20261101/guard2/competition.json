@@ -1,0 +1,14 @@
+[
+    {
+        "ProcessId":  38636,
+        "CreationDate":  "\/Date(1793496155463)\/",
+        "Name":  "cargo.exe",
+        "ExecutablePath":  "C:\\Users\\suanr\\.cargo\\bin\\cargo.exe"
+    },
+    {
+        "ProcessId":  26000,
+        "CreationDate":  "\/Date(1793496155506)\/",
+        "Name":  "cargo.exe",
+        "ExecutablePath":  "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\cargo.exe"
+    }
+]

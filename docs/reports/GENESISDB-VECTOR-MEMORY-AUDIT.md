@@ -355,6 +355,14 @@ both owned trees were cleaned up. Thus a completed real-BGE before/after recall
 and performance comparison remains open. Raw results and receipts are in
 `evidence/vector-memory-fresh-100k-20261101/`.
 
+Two further clean-directory baseline attempts on 2026-11-01 passed admission
+(11.91% and 18.55% CPU respectively), but external Cargo processes started
+while they were running. The resource guard stopped them after 30.710 s and
+203.257 s, with sampled tree RSS peaks of 227.582 MB and 313.364 MB. Both owned
+trees were cleaned up. Neither produced a complete baseline result, so no
+before/after real-BGE recall, latency, or RSS comparison can be qualified.
+Receipts and logs are in `evidence/vector-memory-real-bge-retries-20261101/`.
+
 Latest post-commit resource disposition (2026-11-01): the bounded preparation
 wait ended after nine admission attempts without opening the relocated pristine
 fixture. Last 10-second admission averaged 32.73% CPU with

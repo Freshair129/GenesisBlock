@@ -1,0 +1,43 @@
+{
+    "exit":  -1,
+    "reason":  "resource_competition",
+    "seconds":  30.710441399999997,
+    "peak_rss":  227581952,
+    "peak_private":  239489024,
+    "identities":  [
+                       {
+                           "ProcessId":  13248,
+                           "ParentProcessId":  34184,
+                           "CreationDate":  "\/Date(1793496125795)\/",
+                           "Name":  "python.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\AppData\\Local\\Programs\\Python\\Python314\\python.exe"
+                       },
+                       {
+                           "ProcessId":  45124,
+                           "ParentProcessId":  13248,
+                           "CreationDate":  "\/Date(1793496125803)\/",
+                           "Name":  "conhost.exe",
+                           "ExecutablePath":  "C:\\WINDOWS\\system32\\conhost.exe"
+                       },
+                       {
+                           "ProcessId":  27412,
+                           "ParentProcessId":  13248,
+                           "CreationDate":  "\/Date(1793496126115)\/",
+                           "Name":  "candidate-release.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\candidate-release.exe"
+                       }
+                   ],
+    "excluded_build_helpers":  [
+
+                               ],
+    "helper_finished_parent_condition":  false,
+    "helper_scope":  "Helpers are not terminated; successful Cargo completion and stopped tracked compiler clients are required before private-source edits. No shared source/target mutation.",
+    "admission_cpu":  11.909090909090908,
+    "admission_free":  16907833344,
+    "remaining":  [
+
+                  ],
+    "cleanup_complete":  true,
+    "monitor_error":  null,
+    "rss_scope":  "tracked owned process tree"
+}
