@@ -106,7 +106,7 @@ fn transaction() -> GenesisTransaction {
                 props: None,
                 valid_from: None,
                 supersede: None,
-                impact: Some(0.5),
+                impact: None,
                 caused_by: None,
             }],
         },
@@ -164,7 +164,7 @@ fn assert_unified_state(storage: &Storage) {
         .hybrid_search(HybridSearchInput {
             query_vector: vec![1.0, 0.0, 0.0, 0.0],
             k: 1,
-            alpha: Some(0.0),
+            alpha: None,
             lang: None,
             as_of: None,
             collection: Some("default".to_string()),

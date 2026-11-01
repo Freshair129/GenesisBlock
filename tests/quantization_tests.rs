@@ -53,7 +53,7 @@ fn top1(s: &Storage, q: Vec<f64>, coll: &str) -> Option<String> {
     s.hybrid_search(HybridSearchInput {
         query_vector: q,
         k: 1,
-        alpha: Some(0.0),
+        alpha: None,
         lang: None,
         as_of: None,
         collection: Some(coll.to_string()),

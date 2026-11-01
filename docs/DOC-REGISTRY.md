@@ -736,6 +736,7 @@ registry row explicitly names them.
 |---|---|---|---|---|---|
 | Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.77b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
 | Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.107b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
+| Importance policy retirement | `ADR--GENESISDB-RETIRE-KIMPACT` | `1.0.0` | accepted | GenesisBlockDB Architecture | `docs/adr/ADR--GENESISDB-RETIRE-KIMPACT.md` |
 | Execution DAG guard | `SPEC--EXECUTION-DAG-GUARD-V1` | `0.1.0` | accepted | Sol Decision / Contract and AC | `docs/SPEC--EXECUTION-DAG-GUARD-V1.md` |
 | HQL2 execution decision | `ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY` | `0.1.1b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY.md` |
 | HQL2 G4 shared-pipeline contract | `ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE` | `0.1.35b` | active | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md` |
@@ -770,7 +771,7 @@ registry row explicitly names them.
 |---|---|---|---|---|---|
 | Positioning | `POSITIONING-GENESISBLOCKDB` | n/a | current | GenesisBlockDB Product | `docs/POSITIONING.md` |
 | Whitepaper | `WHITEPAPER-GENESISBLOCKDB-SEMANTIC-SUBSTRATE` | `0.1.0+draft` | draft | GenesisBlockDB Architecture | `docs/WHITEPAPER--GENESISBLOCKDB-SEMANTIC-SUBSTRATE.md` |
-| Database whitepaper | `WHITEPAPER--GENESIS-DB` | n/a | current | GenesisBlockDB Architecture | `docs/WHITEPAPER--GENESIS-DB.md` |
+| Database whitepaper | `WHITEPAPER--GENESIS-DB` | n/a | historical | GenesisBlockDB Architecture | `docs/WHITEPAPER--GENESIS-DB.md` |
 | Performance report | `REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE` | n/a | historical | GenesisBlockDB Engineering | `docs/REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md` |
 | Product version | `VERSION` | current | current | GenesisBlockDB Engineering | `docs/VERSION.md` |
 

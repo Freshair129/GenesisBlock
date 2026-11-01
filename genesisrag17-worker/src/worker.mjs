@@ -1625,7 +1625,6 @@ export class GenesisRag17Worker {
       const vectorResults = await this.db.hybridSearch({
         queryVector: chunkVectors[0][1],
         k: Math.max(chunkVectors.length, 5),
-        alpha: 0,
         collection: candidate.vectorCollection,
       });
       const expectedIds = new Set(chunkVectors.map(([id]) => id));
@@ -1659,7 +1658,7 @@ export class GenesisRag17Worker {
     const queryVector = await this.embedder.embed([query], 'query');
     let vectorResults = [];
     try {
-      vectorResults = await this.db.hybridSearch({ queryVector: queryVector[0], k: Math.max(20, topK * 4), alpha: 0, collection: vectorCollection });
+      vectorResults = await this.db.hybridSearch({ queryVector: queryVector[0], k: Math.max(20, topK * 4), collection: vectorCollection });
     } catch (error) {
       // A published snapshot with no vectors is valid only when its policy
       // explicitly denied embedding; lexical-only search remains honest.
@@ -1727,7 +1726,7 @@ export class GenesisRag17Worker {
       const unscopedLexical = this.lexical.searchAll(query.query, candidate.generation, 20);
       crossTenantLeaks += unscopedLexical.filter((row) => !sameScopeJson(row.scope, this.scope)).length;
       const queryVector = await this.embedder.embed([query.query], 'query');
-      const unscopedVector = await this.db.hybridSearch({ queryVector: queryVector[0], k: 20, alpha: 0, collection: candidate.vectorCollection });
+      const unscopedVector = await this.db.hybridSearch({ queryVector: queryVector[0], k: 20, collection: candidate.vectorCollection });
       crossTenantLeaks += unscopedVector.filter((row) => !sameScopeJson(row.node?.props?.scope, this.scope)).length;
       queryRows.push({ retrieved: retrievedRelevant.size, totalRelevant: relevant.size, rank: first, citationCorrect, results });
     }

@@ -139,7 +139,8 @@ td.dagger{color:var(--c2)}
   </div>
 
   <div class="card" style="margin-bottom:var(--gap)">
-    <h3>Engine internals — K-Impact incremental (P25) & governance guard (P24)</h3>
+    <h3>Historical engine internals — retired K-Impact (P25) & governance guard (P24)</h3>
+    <p class="metricnote">P25 records the former implementation. K-Impact scoring and its benchmark target were retired on 2026-11-02; these values do not describe a current feature.</p>
     <div class="hint" id="ki-caption"></div>
     <table id="kiTable" style="font-size:13px"></table>
     <div class="metricnote" id="ki-note" style="margin-top:12px;max-width:none"></div>
@@ -361,7 +362,7 @@ const KUZU = {
     { metric:"memory",      g:686,   k:97,     unit:"MB", winner:"k" },
   ]
 };
-// P25 K-Impact full vs incremental + P24 governance guard
+// Historical P25 retired K-Impact full vs incremental + P24 governance guard.
 const KIMPACT = {
   guard_ns: 524, guard_overhead_pct: "<0.1% of a durable write",
   rows:[
@@ -540,7 +541,7 @@ const GRAPH = {
   // ---- P24/P25 engine internals ----
   (function(){
     document.getElementById('ki-caption').textContent =
-      `K-Impact recompute: full refresh_impacts(None) vs incremental(1 node) on fanout-8 graphs · governance guard microbench`;
+      `Historical P25: former full vs incremental scoring on fanout-8 graphs; scoring and the benchmark target are retired · P24 governance guard microbench`;
     const kt=document.getElementById('kiTable');
     let h='<thead><tr><th>Nodes</th><th class="num">Full recompute</th><th class="num">Incremental (1 node)</th><th class="num">Speedup</th></tr></thead><tbody>';
     KIMPACT.rows.forEach(r=>{

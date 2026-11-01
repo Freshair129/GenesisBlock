@@ -96,9 +96,8 @@ const NAPI_TO_REST: &[(&str, Option<&str>)] = &[
     ("node_versions", Some("/v1/node/versions")),
     ("supersede_node", Some("/v1/node/supersede")),
     ("retract_edge", Some("/v1/edge/retract")),
-    // GRL tiered retrieval (target_id/tier/budget/fuzzy). NOT the same as
-    // `/v1/reason/context`, which calls `Storage::get_ranked_context`
-    // (HybridSearchInput-based) — the two routes coexist deliberately.
+    // GRL tiered retrieval (target_id/tier/budget/fuzzy). `/v1/reason/context`
+    // remains a REST alias for vector-ranked hybrid_search.
     ("retrieve_context", Some("/v1/context/retrieve")),
     ("execute_hql", Some("/v1/query/hql")),
     ("execute_query_ir", Some("/v1/query/ir")),
@@ -140,7 +139,6 @@ const NAPI_TO_REST: &[(&str, Option<&str>)] = &[
     ("reconcile_state", None),
     // CRDT anti-entropy source; pairs with reconcile_state, same reasoning.
     ("events_since", None),
-    ("semantic_verify", Some("/v1/consensus/verify")),
     ("propose_consensus", Some("/v1/consensus/propose")),
     (
         "export_consensus_proposal",

@@ -58,7 +58,7 @@ fn top1(s: &Storage, q: Vec<f64>, coll: &str) -> Option<String> {
     s.hybrid_search(HybridSearchInput {
         query_vector: q,
         k: 1,
-        alpha: Some(0.0),
+        alpha: None,
         lang: None,
         as_of: None,
         collection: Some(coll.to_string()),
@@ -320,7 +320,7 @@ fn corrupted_fvec_same_length_does_not_panic_or_empty() {
         .hybrid_search(HybridSearchInput {
             query_vector: vec![1.0, 0.0, 0.0, 0.0],
             k: 2,
-            alpha: Some(0.0),
+            alpha: None,
             lang: None,
             as_of: None,
             collection: Some("c".to_string()),

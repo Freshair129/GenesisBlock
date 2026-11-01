@@ -1,8 +1,14 @@
 ---
-status: current
+status: historical
+superseded_by: adr/ADR--GENESISDB-RETIRE-KIMPACT.md
 ---
 
 # Functional Specification: K-Impact Engine & Transitive Inference (Mark IV)
+
+> Historical Mark IV proposal. K-Impact computation, propagation, and ranking
+> are retired by [ADR--GENESISDB-RETIRE-KIMPACT](adr/ADR--GENESISDB-RETIRE-KIMPACT.md).
+> The inference sketch below is design history; current query behavior is
+> specified by [HQL](SPEC--HQL-V1.md) and its executable grammar/tests.
 
 ## 1. Objective
 Transition the engine from static storage to active reasoning by implementing the **K-Impact Model** for node ranking and **Transitive Inference** for relationship derivation. This ensures that AI agents receive the most authoritative and logically complete context.

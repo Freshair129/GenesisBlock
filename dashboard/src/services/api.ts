@@ -37,7 +37,6 @@ export interface SuperNode {
   cluster_id: number;
   theme: string;
   member_count: number;
-  impact: number;
   centroid: number[];
   timestamp: string;
   drift: number | null;

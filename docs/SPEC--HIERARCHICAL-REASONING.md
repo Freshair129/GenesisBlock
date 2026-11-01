@@ -1,8 +1,13 @@
 ---
-status: current
+status: historical
 ---
 
 # Software Requirements Document (SRD): Hierarchical Reasoning
+
+> Historical Mark VI proposal. Aggregate/average importance fields are retired by
+> [the current decision](adr/ADR--GENESISDB-RETIRE-KIMPACT.md). Current community
+> summaries follow [graph clustering](SPEC--GRAPH-CLUSTERING.md) and the public
+> SuperNode DTO; the structures and implementation plan below are not that contract.
 
 ## 1. Introduction
 **Hierarchical Reasoning** is the next evolutionary step for GenesisBlockDB (Mark VI). While previous versions focused on individual nodes and clusters, this module enables the engine to reason about **Abstract Themes**. It transforms clusters of knowledge into "Super-Nodes," allowing AI agents to perform high-level strategic analysis across different domains of knowledge.

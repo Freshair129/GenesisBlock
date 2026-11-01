@@ -12,7 +12,7 @@ Given the real-time, highly mutable nature of Obsidian vaults, we will implement
 
 ### 2.1 Algorithm Flow
 1.  **Initialization:** Every node starts with a unique `cluster_id` (its own `u32` ID).
-2.  **Propagation:** During a clustering pass, each node updates its `cluster_id` to the most frequent `cluster_id` among its immediate neighbors. Ties are broken randomly or by K-Impact score.
+2.  **Propagation:** During a clustering pass, each node updates its `cluster_id` from neighboring cluster votes. Candidate ordering resolves equal votes; importance/authority scores do not participate.
 3.  **Convergence:** The process repeats until no `cluster_id` changes or a maximum iteration limit (e.g., 5) is reached.
 
 ### 2.2 Trigger Mechanism

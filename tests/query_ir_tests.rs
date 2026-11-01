@@ -341,7 +341,7 @@ fn query_ir_rejects_unsupported_filter_and_lexical_modes() {
 }
 
 #[test]
-fn hql_and_query_ir_preserve_search_hybrid_and_traverse_results() {
+fn hql_and_query_ir_preserve_vector_match_and_traverse_results() {
     let (storage, _dir) = storage(3);
     storage
         .add_node(node("parity-src", Some(vec![1.0, 0.0, 0.0])))
@@ -384,25 +384,24 @@ fn hql_and_query_ir_preserve_search_hybrid_and_traverse_results() {
         ir_search["data"][0]["node"]["id"]
     );
 
-    let hql_hybrid = storage
-        .execute_hql("MATCH parity-src SIMILAR TO [1,0,0] ALPHA 0.5 K 1")
+    let hql_vector_match = storage
+        .execute_hql("MATCH parity-src SIMILAR TO [1,0,0] K 1")
         .unwrap();
-    let ir_hybrid = storage
+    let ir_vector_match = storage
         .execute_query_ir_json(json!({
             "contract_version": "query-ir.v1",
-            "request_id": "parity-hybrid",
+            "request_id": "parity-vector-match",
             "operation": {
                 "kind": "search",
-                "mode": "hybrid",
+                "mode": "vector",
                 "query_vector": [1.0, 0.0, 0.0],
-                "alpha": 0.5,
                 "k": 1
             }
         }))
         .unwrap();
     assert_eq!(
-        hql_hybrid[0]["node"]["id"],
-        ir_hybrid["data"][0]["node"]["id"]
+        hql_vector_match[0]["node"]["id"],
+        ir_vector_match["data"][0]["node"]["id"]
     );
 
     let hql_traverse = storage
@@ -440,7 +439,7 @@ fn hql_and_query_ir_reject_zero_k_with_the_same_resource_error() {
         .unwrap_err()
         .to_string();
     let hybrid_error = storage
-        .execute_hql("MATCH zero-k-target SIMILAR TO [1,0,0] ALPHA 0.5 K 0")
+        .execute_hql("MATCH zero-k-target SIMILAR TO [1,0,0] K 0")
         .unwrap_err()
         .to_string();
     let ir_error = storage

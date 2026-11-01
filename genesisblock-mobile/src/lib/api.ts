@@ -21,7 +21,6 @@ export interface NodeOutput {
   id: string;
   labels: string[];
   props: any;
-  impact?: number | null;
   lang?: string | null;
   valid_from: string;
   valid_to?: string | null;
@@ -38,7 +37,6 @@ export interface EdgeOutput {
   props: any;
   valid_from: string;
   valid_to?: string | null;
-  impact?: number | null;
 }
 
 export interface NeighborOutput {
@@ -70,7 +68,6 @@ export interface NodeInput {
 export interface HybridSearchInput {
   query_vector: number[];
   k: number;
-  alpha?: number | null;
   lang?: string | null;
   as_of?: string | null;
   collection?: string | null;

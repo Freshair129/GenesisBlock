@@ -1034,7 +1034,6 @@ map](GENESISRAG17-EXTENSION-MAP.md) and [worker README](../genesisrag17-worker/R
 | `id` | String | Stable external/client-facing identifier. |
 | `labels` | Vec<String> | Client-defined classification labels. |
 | `props` | JSON | Generic client properties. |
-| `impact` | f64 | Optional derived importance score. |
 | `embedding` | Vec<f64> | Optional vector data; collection metadata applies. |
 | `valid_from` | RFC3339 | Logical start time. |
 | `valid_to` | Option<RFC3339> | Logical end time. |
@@ -1070,11 +1069,15 @@ Clients decide whether a supersession is a semantic correction, business update,
 
 ## 6. Reasoning and Autonomic Substrate
 
-### 6.1 K-Impact Model
+### 6.1 Retrieval relevance and client-owned importance
 
-Node importance may be calculated through the documented K-Impact formula and inputs such as dependency depth, configured strictness/governance metadata and source stability.
+Vector retrieval exposes vector relevance. Business importance, source authority,
+and ontology-change policy belong to consuming systems such as GKS.
 
-The core may compute generic scores. Clients decide how or whether those scores affect authority or workflows.
+The engine does not compute or refresh K-Impact, blend it into search, or use it
+for governance or clustering decisions. Current APIs reject retired scalar
+inputs. Authenticated historical values remain readable as generic legacy
+metadata; see [ADR--GENESISDB-RETIRE-KIMPACT](adr/ADR--GENESISDB-RETIRE-KIMPACT.md).
 
 ### 6.2 Structural Insight Engine
 
@@ -1172,7 +1175,7 @@ Relation labels are client-defined data. Query execution does not grant them uni
 ### 9.3 Hybrid
 
 ```sql
-MATCH target SIMILAR TO [...] ALPHA 0.4 LANGUAGE "en"
+MATCH target SIMILAR TO [...] LANGUAGE "en"
 ```
 
 Query contracts should support namespace, collection, temporal/revision and bounded traversal scope where implemented.

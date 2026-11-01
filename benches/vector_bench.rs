@@ -172,7 +172,7 @@ fn main() {
             .hybrid_search(HybridSearchInput {
                 query_vector: qv,
                 k: k as u32,
-                alpha: Some(0.0), // pure vector search
+                alpha: None, // pure vector search
                 lang: None,
                 as_of: None,
                 collection: None,

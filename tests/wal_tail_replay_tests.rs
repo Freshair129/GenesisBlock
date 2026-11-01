@@ -139,7 +139,7 @@ fn search_ids(s: &Storage, k: u32) -> Vec<String> {
     s.hybrid_search(HybridSearchInput {
         query_vector: vec![1.0, 0.0, 0.0, 0.0],
         k,
-        alpha: Some(0.0),
+        alpha: None,
         lang: None,
         as_of: None,
         collection: None,

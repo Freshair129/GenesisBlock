@@ -58,7 +58,7 @@ fn test_temporal_time_travel() {
             props: None,
             valid_from: Some("2024-02-01T00:00:00Z".to_string()),
             supersede: None,
-            impact: Some(0.8),
+            impact: None,
             caused_by: None,
         })
         .unwrap();
@@ -94,7 +94,7 @@ fn test_temporal_time_travel() {
             props: None,
             valid_from: Some("2026-02-01T00:00:00Z".to_string()),
             supersede: None,
-            impact: Some(0.9),
+            impact: None,
             caused_by: None,
         })
         .unwrap();

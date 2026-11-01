@@ -79,7 +79,7 @@ fn many_collection_indexes_do_not_oom() {
             .hybrid_search(HybridSearchInput {
                 query_vector: q,
                 k: 1,
-                alpha: Some(0.0),
+                alpha: None,
                 lang: None,
                 as_of: None,
                 collection: Some(format!("c{i}")),
@@ -147,7 +147,7 @@ fn index_grows_past_initial_floor() {
         .hybrid_search(HybridSearchInput {
             query_vector: emb_for(n - 1, dim),
             k: 5,
-            alpha: Some(0.0),
+            alpha: None,
             lang: None,
             as_of: None,
             collection: None,

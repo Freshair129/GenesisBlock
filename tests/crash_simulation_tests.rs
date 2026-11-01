@@ -116,7 +116,7 @@ fn search_returns(s: &Storage, query: [f64; 4], expected_id: &str) -> bool {
         .hybrid_search(HybridSearchInput {
             query_vector: query.to_vec(),
             k: 10,
-            alpha: Some(1.0),
+            alpha: None,
             lang: None,
             as_of: None,
             collection: None,

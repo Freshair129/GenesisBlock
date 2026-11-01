@@ -90,8 +90,9 @@ complete GraphRAG result when the engine did not provide that guarantee.
 - `Storage::retrieve_context` already returns nodes, edges, super-nodes,
   `token_estimate`, `reasoning_path` and `CoverageReport`, but that packet is
   not available through Query IR.
-- HQL `MATCH ... SIMILAR` is vector plus K-Impact blending. It is not a
-  lexical BM25+dense fusion contract.
+- At the original baseline, HQL `MATCH ... SIMILAR` included K-Impact blending.
+  That behavior is retired by ADR--GENESISDB-RETIRE-KIMPACT; current MATCH
+  retrieval uses vector relevance and has no lexical BM25+dense fusion contract.
 - Typed metadata predicates, vector candidate selection and temporal context
   are not one frozen pipeline. Adding a `filters` field now would risk claiming
   semantics that are only post-filter behavior.
@@ -137,8 +138,9 @@ complete GraphRAG result when the engine did not provide that guarantee.
    read **THEN** `context` SHALL be reported as `implemented` with its accepted
    input and output limits.
 2. **WHEN** a caller inspects search capabilities **THEN** the manifest SHALL
-   state that vector and K-Impact hybrid modes are implemented, lexical fusion
-   is planned, and typed metadata predicates are unsupported in this slice.
+   state that vector search is implemented, legacy K-Impact hybrid requests
+   are rejected with `KIMPACT_REMOVED`, lexical fusion is planned, and typed
+   metadata predicates are unsupported in this slice.
 3. **IF** a caller asks for a capability marked unsupported or planned **THEN**
    the request SHALL fail with `QUERY_CAPABILITY_UNSUPPORTED`; no post-filter
    reinterpretation or silent downgrade is allowed.
@@ -234,7 +236,7 @@ Keep the existing `operations` string map backward compatible and add a closed
 | Capability | Status | Boundary |
 |---|---|---|
 | `search.vector` | implemented | per-collection vector search with Wave D budgets |
-| `search.hybrid` | implemented | vector plus K-Impact blend; no lexical fusion |
+| `search.hybrid` | retired | rejected with KIMPACT_REMOVED; use vector search or application ranking |
 | `search.filters` | unsupported | no typed metadata predicate in this slice |
 | `search.lexical` | planned | requires a separate FTS5/RRF decision |
 | `traverse` | implemented | bounded direction/relation traversal |

@@ -274,7 +274,7 @@ fn sqlite_projection_uses_full_lww_clock_for_equal_lamport_times() {
             id: id.to_string(),
             labels: vec!["Clock".to_string()],
             props: json!({"winner": winner}),
-            impact: None,
+            legacy_wire_impact: genesis_block_native::LegacyImpactWire::Absent,
             embedding: None,
             lang: Some("en".to_string()),
             valid_from: "2026-07-20T00:00:00Z".to_string(),

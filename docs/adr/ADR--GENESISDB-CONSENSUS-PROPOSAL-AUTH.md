@@ -15,6 +15,13 @@ proposed_by: agent
 
 # ADR--GENESISDB-CONSENSUS-PROPOSAL-AUTH
 
+> Retirement update (2026-11-02): [ADR--GENESISDB-RETIRE-KIMPACT](ADR--GENESISDB-RETIRE-KIMPACT.md)
+> removes semantic_verify and refresh_impacts. References to those hooks below
+> record the original decision; they are not current requirements. Cryptographic
+> proposal/vote verification, membership, protected-state validation, quorum,
+> idempotent application and adjacency/vector indexing remain independent of
+> the retired importance policy.
+
 ## Context
 
 [[ADR--GENESISDB-CONSENSUS-VOTE-SIGNATURES]] closed vote forgery: a vote now only

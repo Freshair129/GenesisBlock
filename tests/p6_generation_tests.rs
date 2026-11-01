@@ -84,7 +84,7 @@ fn commit_cross_domain_fixture(storage: &Storage) -> u64 {
                     props: None,
                     valid_from: None,
                     supersede: None,
-                    impact: Some(0.5),
+                    impact: None,
                     caused_by: None,
                 }],
             },
@@ -117,7 +117,7 @@ fn hybrid_query() -> HybridSearchInput {
     HybridSearchInput {
         query_vector: vec![1.0, 0.0, 0.0, 0.0],
         k: 1,
-        alpha: Some(0.0),
+        alpha: None,
         lang: None,
         as_of: None,
         collection: Some("default".into()),
@@ -294,7 +294,7 @@ fn pin_generation_lazily_covers_a_committed_write() {
             let hits = view.hybrid_search(HybridSearchInput {
                 query_vector: vec![0.0, 1.0, 0.0, 0.0],
                 k: 1,
-                alpha: Some(0.0),
+                alpha: None,
                 lang: None,
                 as_of: None,
                 collection: Some("default".into()),

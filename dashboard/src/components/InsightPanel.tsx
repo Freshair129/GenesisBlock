@@ -4,7 +4,7 @@ import { useInsight } from '../hooks/useInsight';
 import { CommunityGraph } from './CommunityGraph';
 
 /**
- * GKS Insight panel: community clusters (size / impact / semantic drift) and the
+ * GKS Insight panel: community clusters (size / semantic drift) and the
  * structural gaps between them. Replaces the old "visualization coming soon"
  * placeholder. Reads /v1/insight/communities + /v1/insight/gaps and can trigger
  * a server-side recompute via /v1/insight/rebuild.
@@ -88,7 +88,6 @@ export function InsightPanel() {
                 />
               </div>
               <div className="mt-1 flex items-center gap-4 text-xs text-slate-500">
-                <span>impact {c.impact.toFixed(2)}</span>
                 {c.drift != null && <span>drift {c.drift.toFixed(3)}</span>}
               </div>
             </div>

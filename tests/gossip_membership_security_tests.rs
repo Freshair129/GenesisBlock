@@ -92,7 +92,7 @@ fn node(id: &str, labels: &[&str]) -> NodeOutput {
         id: id.to_string(),
         labels: labels.iter().map(|label| label.to_string()).collect(),
         props: serde_json::json!({"id": id}),
-        impact: None,
+        legacy_wire_impact: genesis_block_native::LegacyImpactWire::Absent,
         embedding: None,
         lang: Some("en".into()),
         valid_from: "2026-01-01T00:00:00Z".into(),
@@ -600,7 +600,7 @@ fn compacted_master_vectors_survive_nonmaster_relay(schema6: bool) {
             .hybrid_search(HybridSearchInput {
                 query_vector: vec![0.25, 0.75],
                 k: 10,
-                alpha: Some(0.0),
+                alpha: None,
                 lang: None,
                 as_of: None,
                 collection: collection.map(str::to_string),
@@ -1622,7 +1622,7 @@ fn current_schema_accepts_authenticated_compacted_graph_materializations() {
             props: None,
             valid_from: None,
             supersede: None,
-            impact: Some(1.0),
+            impact: None,
             caused_by: None,
         })
         .unwrap();
@@ -1640,7 +1640,7 @@ fn current_schema_accepts_authenticated_compacted_graph_materializations() {
             props: None,
             valid_from: None,
             supersede: None,
-            impact: Some(1.0),
+            impact: None,
             caused_by: None,
         })
         .unwrap();

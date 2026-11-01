@@ -119,12 +119,12 @@ fn search_without_in_uses_default() {
     );
 }
 
-/// `MATCH ... ALPHA ... IN "code"` scopes the hybrid command the same way.
+/// `MATCH ... SIMILAR TO ... IN "code"` scopes vector retrieval the same way.
 #[test]
 fn match_in_collection_scopes() {
     let s = two_collections("test_hql_coll_match");
     let v = s
-        .execute_hql("MATCH q SIMILAR TO [1.0,0.0,0.0,0.0] ALPHA 0.0 IN \"code\"")
+        .execute_hql("MATCH q SIMILAR TO [1.0,0.0,0.0,0.0] IN \"code\"")
         .unwrap();
     let hits = ids(&v);
     assert!(hits.contains(&"code-A".to_string()));

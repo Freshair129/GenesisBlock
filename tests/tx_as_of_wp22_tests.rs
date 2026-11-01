@@ -176,7 +176,7 @@ fn hybrid_search_as_of_resolves_superseded_version() {
         .hybrid_search(HybridSearchInput {
             query_vector: vec![1.0, 0.0, 0.0, 0.0],
             k: 5,
-            alpha: Some(0.0),
+            alpha: None,
             lang: None,
             as_of: Some("2022-01-01T00:00:00Z".to_string()),
             collection: None,

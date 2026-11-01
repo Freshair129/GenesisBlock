@@ -1,8 +1,12 @@
 ---
-status: current
+status: historical
 ---
 
 # TDD--GENESISDB-DUAL-TRACK-ARCHITECTURE
+
+> Historical architecture proposal. Its importance visualization is retired by
+> [the current decision](adr/ADR--GENESISDB-RETIRE-KIMPACT.md). Use the
+> [current architecture](C4--GENESISDB-ARCHITECTURE.md) for storage/API ownership.
 
 ## 1. Executive Summary
 GenesisBlockDB is evolving into a **Dual-Track Hybrid Engine** designed to solve the "File System Fragmentation" problem in PKM (Obsidian) while providing enterprise-grade performance (50k+ TPS) for AI Agent systems.

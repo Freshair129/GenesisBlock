@@ -278,7 +278,7 @@ fn pull_delta_syncs_secondary_vectors() {
         .hybrid_search(HybridSearchInput {
             query_vector: vec![1.0, 0.0, 0.0, 0.0],
             k: 5,
-            alpha: Some(0.0),
+            alpha: None,
             lang: None,
             as_of: None,
             collection: Some("code".to_string()),
@@ -335,7 +335,7 @@ fn compaction_preserves_secondary_vectors() {
         .hybrid_search(HybridSearchInput {
             query_vector: vec![1.0, 0.0, 0.0, 0.0],
             k: 5,
-            alpha: Some(0.0),
+            alpha: None,
             lang: None,
             as_of: None,
             collection: Some("code".to_string()),

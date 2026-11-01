@@ -13,7 +13,6 @@ interface GraphNode {
   id: number;
   theme: string;
   member_count: number;
-  impact: number;
   drift: number | null;
   val: number; // node size hint for force-graph
 }
@@ -65,7 +64,6 @@ export function CommunityGraph({
       id: n.cluster_id,
       theme: n.theme,
       member_count: n.member_count,
-      impact: n.impact,
       drift: n.drift,
       val: Math.max(1, n.member_count),
     }));
@@ -97,9 +95,7 @@ export function CommunityGraph({
         nodeVal={(n: GraphNode) => n.val}
         nodeColor={(n: GraphNode) => driftColor(n.drift)}
         nodeLabel={(n: GraphNode) =>
-          `${n.theme || `Cluster ${n.id}`} — ${n.member_count} nodes, impact ${n.impact.toFixed(
-            2,
-          )}${n.drift != null ? `, drift ${n.drift.toFixed(3)}` : ''}`
+          `${n.theme || `Cluster ${n.id}`} — ${n.member_count} nodes${n.drift != null ? `, drift ${n.drift.toFixed(3)}` : ''}`
         }
         linkColor={(l: GraphLink) => (l.gap ? '#f59e0b' : 'rgba(148,163,184,0.4)')}
         linkLineDash={(l: GraphLink) => (l.gap ? [4, 3] : null)}
