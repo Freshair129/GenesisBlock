@@ -393,6 +393,40 @@ queries per sweep, not proof of recall or latency non-regression. Receipts,
 results and the validation script are in
 `evidence/vector-memory-real-bge-complete-20261101/`.
 
+### Recall investigation and repeat (2026-11-01)
+
+The original 0.00833 recall@10 difference is two hits out of 240. The corpus,
+queries and truth hashes match; the persisted 46,145,536-byte `vec_bench.bin`
+also has the same SHA-256 (`f83b5bc3b3d1057f01114196cd37ac95ecbeefe2f04ad0168d723e0860af3133`)
+in both original and repeat before/after runs. Each run independently rebuilds
+HNSW. The pinned `hnsw_rs` 0.3.4 `LayerGenerator` initializes its RNG with
+`StdRng::from_os_rng()`, so graph variation is a plausible explanation, not a
+proven cause of the observed difference. The benchmark retains aggregate hits,
+not per-query result IDs, and cannot identify which queries or graph edges
+caused it. No change to retrieval or correctness gates was made.
+
+An additional serial pair ran under the same input, resource and query budgets:
+
+| Metric | Repeat before | Repeat after |
+|---|---:|---:|
+| Recall@10 / @100 | 0.9750 / 0.9800 | 0.9875 / 0.9758 |
+| Search k=10 p50 / p95 / p99 | 4.691 / 5.333 / 5.782 ms | 4.330 / 4.846 / 5.003 ms |
+| Search k=100 p50 / p95 / p99 | 6.593 / 7.150 / 8.623 ms | 5.928 / 6.495 / 7.320 ms |
+| Main-process reopen search k=10 | deadline error, 0/24 completed | recall 0.9833; p50/p95/p99 4.231/4.721/4.729 ms |
+| Peak sampled owned-tree RSS | 363.180 MB | 323.088 MB |
+
+Both jobs exited cleanly within their guards, input hashes and 11,266/11,266
+READY coverage passed, and the fresh child checked open/coverage. The baseline
+reopen query nevertheless failed `QUERY_BUDGET_EXCEEDED: reason=deadline`;
+exit zero is not a retrieval correctness pass. Recall@10 moved in the opposite
+direction from the original pair, while recall@100 decreased in this repeat.
+Two observations per variant are insufficient to establish non-regression or
+identify a causal change, and the repeat does not qualify the failed baseline
+reopen query. Three other launched runs were stopped by external compiler
+competition, and the next wait expired without launch. Results and evidence:
+`evidence/vector-memory-real-bge-repeat-20261101/`. More isolated pairs and
+per-query IDs are needed before a causal or statistical conclusion.
+
 Latest post-commit resource disposition (2026-11-01): the bounded preparation
 wait ended after nine admission attempts without opening the relocated pristine
 fixture. Last 10-second admission averaged 32.73% CPU with

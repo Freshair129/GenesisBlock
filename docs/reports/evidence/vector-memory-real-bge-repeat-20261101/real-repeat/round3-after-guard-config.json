@@ -1,0 +1,15 @@
+﻿{
+    "exe":  "C:\\Users\\suanr\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
+    "args":  [
+                 "-u",
+                 "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\run-real-case.py",
+                 "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\real-repeat\\round3-after\\run-config.json"
+             ],
+    "cwd":  "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\real-repeat\\round3-after",
+    "output":  "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\real-repeat\\round3-after-guard",
+    "env":  {
+
+            },
+    "kind":  "benchmark",
+    "cap_seconds":  1200
+}

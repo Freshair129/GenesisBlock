@@ -1,0 +1,10 @@
+{
+    "at":  "2026-11-01T06:29:51.0380044Z",
+    "state":  "resource_wait_expired_no_launch",
+    "active_compilers":  0,
+    "attempt":  0,
+    "config":  "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\real-repeat\\round3-after-guard-config.json",
+    "guard_output":  "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\real-repeat\\round3-after-guard",
+    "error":  null,
+    "scope":  "Resource wait only; actual job retains1200s/2GiB and query5000ms; no automatic retry after possible launch"
+}

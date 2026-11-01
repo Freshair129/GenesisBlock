@@ -1,0 +1,86 @@
+[
+    {
+        "ProcessId":  31816,
+        "CreationDate":  "\/Date(1793512441664)\/",
+        "Name":  "cargo.exe",
+        "ExecutablePath":  "C:\\Users\\suanr\\.cargo\\bin\\cargo.exe"
+    },
+    {
+        "ProcessId":  31796,
+        "CreationDate":  "\/Date(1793512441691)\/",
+        "Name":  "cargo.exe",
+        "ExecutablePath":  "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\cargo.exe"
+    },
+    {
+        "ProcessId":  2648,
+        "CreationDate":  "\/Date(1793512442387)\/",
+        "Name":  "rustc.exe",
+        "ExecutablePath":  "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+        "ProcessId":  10112,
+        "CreationDate":  "\/Date(1793512442392)\/",
+        "Name":  "rustc.exe",
+        "ExecutablePath":  "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+        "ProcessId":  36332,
+        "CreationDate":  "\/Date(1793512442399)\/",
+        "Name":  "rustc.exe",
+        "ExecutablePath":  null
+    },
+    {
+        "ProcessId":  30428,
+        "CreationDate":  "\/Date(1793512442415)\/",
+        "Name":  "rustc.exe",
+        "ExecutablePath":  "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+        "ProcessId":  8528,
+        "CreationDate":  "\/Date(1793512442422)\/",
+        "Name":  "rustc.exe",
+        "ExecutablePath":  "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+        "ProcessId":  40880,
+        "CreationDate":  "\/Date(1793512442435)\/",
+        "Name":  "rustc.exe",
+        "ExecutablePath":  "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+        "ProcessId":  46400,
+        "CreationDate":  "\/Date(1793512442442)\/",
+        "Name":  "rustc.exe",
+        "ExecutablePath":  "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+        "ProcessId":  25920,
+        "CreationDate":  "\/Date(1793512442450)\/",
+        "Name":  "rustc.exe",
+        "ExecutablePath":  "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+        "ProcessId":  43036,
+        "CreationDate":  "\/Date(1793512442458)\/",
+        "Name":  "rustc.exe",
+        "ExecutablePath":  "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+        "ProcessId":  4072,
+        "CreationDate":  "\/Date(1793512442637)\/",
+        "Name":  "rustc.exe",
+        "ExecutablePath":  "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+        "ProcessId":  44136,
+        "CreationDate":  "\/Date(1793512442652)\/",
+        "Name":  "rustc.exe",
+        "ExecutablePath":  "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+        "ProcessId":  20308,
+        "CreationDate":  "\/Date(1793512442685)\/",
+        "Name":  "rustc.exe",
+        "ExecutablePath":  "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    }
+]
