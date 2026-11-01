@@ -1,0 +1,141 @@
+{
+  "mode": "after",
+  "scope": "Fresh-process RW reopen of independently prepared, byte-identical100001node/100000vector fixture; not two-open lifecycle qualification",
+  "parent_guard": {
+    "exit": 0,
+    "reason": null,
+    "seconds": 839.8464078,
+    "peak_rss": 750276608,
+    "admission_cpu": 8.818181818181818,
+    "admission_free": 17197658112,
+    "cleanup_complete": true
+  },
+  "query0": {
+    "k": 10,
+    "p50_us": 21247.399999999998,
+    "p95_us": 21247.399999999998,
+    "p99_us": 21247.399999999998,
+    "recall": 0.1,
+    "result_count_max": 10,
+    "result_count_min": 10
+  },
+  "query0_memory": {
+    "before_rss_bytes": 567246848,
+    "peak_rss_bytes": 567263232,
+    "process_rss_bytes": 567263232,
+    "seconds": 0.0212617
+  },
+  "first_props": {
+    "event": "projection_props_stage",
+    "json_parse_error": null,
+    "json_parse_status": "ok",
+    "json_parse_us": 1,
+    "lock_acquire_us": 0,
+    "node_u32": 63605,
+    "payload_len_bytes": 2,
+    "prepare_status": "ok",
+    "prepare_us": 20,
+    "query_row_us": 208,
+    "select_error_code": null,
+    "select_error_extended_code": null,
+    "select_error_message": null,
+    "select_status": "row",
+    "statement_finalize_us": 1
+  },
+  "reopen_memory": {
+    "before_rss_bytes": 8540160,
+    "peak_rss_bytes": 729505792,
+    "process_rss_bytes": 567259136,
+    "seconds": 747.1042387
+  },
+  "final_drop": {
+    "before_rss_bytes": 567246848,
+    "peak_rss_bytes": 629329920,
+    "process_rss_bytes": 21950464,
+    "seconds": 88.3761005
+  },
+  "backup": {
+    "backup_elapsed_us": 86532647,
+    "event": "projection_publish_backup_done",
+    "main_bytes": 9006981120,
+    "publication_variant": "after_maintenance",
+    "shm_bytes": 17596416,
+    "shm_header_error": null,
+    "shm_mx_frame_le_u32_at_16": 2198969,
+    "shm_n_backfill_le_u32_at_96": 0,
+    "wal_bytes": 9059752312
+  },
+  "maintenance": [
+    {
+      "event": "projection_publish_maintenance_done",
+      "main_bytes": 9006981120,
+      "maintenance_elapsed_us": 31004962,
+      "maintenance_error": null,
+      "maintenance_status": "ok",
+      "publication_variant": "after_maintenance",
+      "shm_bytes": 17596416,
+      "shm_header_error": null,
+      "shm_mx_frame_le_u32_at_16": 2198969,
+      "shm_n_backfill_le_u32_at_96": 2198969,
+      "wal_bytes": 9059752312
+    }
+  ],
+  "projection_stages": [
+    {
+      "elapsed_us": 59439455,
+      "event": "projection_sync_candidate_stage",
+      "stage": "projection_replay_wal",
+      "status": "ok"
+    },
+    {
+      "elapsed_us": 51090046,
+      "event": "projection_sync_candidate_stage",
+      "stage": "rebuild_edge_history",
+      "status": "ok"
+    },
+    {
+      "elapsed_us": 8,
+      "event": "projection_sync_candidate_stage",
+      "stage": "projection_backfill_edges",
+      "status": "ok"
+    }
+  ],
+  "search10": {
+    "k": 10,
+    "p50_us": 3156.8999999999996,
+    "p95_us": 3886.2,
+    "p99_us": 3970.1,
+    "recall": 0.1375,
+    "result_count_max": 10,
+    "result_count_min": 10
+  },
+  "search100": {
+    "k": 100,
+    "p50_us": 6233.5,
+    "p95_us": 8183.400000000001,
+    "p99_us": 8459.0,
+    "recall": 0.09708333333333333,
+    "result_count_max": 100,
+    "result_count_min": 100
+  },
+  "coverage": {
+    "built_frontier": 394,
+    "collection": "bench",
+    "extra_count": 0,
+    "indexed_count": 100000,
+    "missing_count": 0,
+    "pending_count": 0,
+    "source_count": 100000,
+    "source_frontier": 394,
+    "state": "READY",
+    "validated": true
+  },
+  "counts": [
+    100001,
+    100000
+  ],
+  "marker_recovered": true,
+  "source_inputs_unchanged": true,
+  "after_deadline_gate_passed": true,
+  "recall_scope": "Reported fixed24queries; compare actual before/after values and realBGE contracts, not stateok alone"
+}

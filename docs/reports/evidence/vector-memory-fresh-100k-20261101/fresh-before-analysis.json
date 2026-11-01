@@ -1,0 +1,130 @@
+{
+  "mode": "before",
+  "scope": "Fresh-process RW reopen of independently prepared, byte-identical100001node/100000vector fixture; not two-open lifecycle qualification",
+  "parent_guard": {
+    "exit": 0,
+    "reason": null,
+    "seconds": 931.0159543999999,
+    "peak_rss": 745844736,
+    "admission_cpu": 10.090909090909092,
+    "admission_free": 17482092544,
+    "cleanup_complete": true
+  },
+  "query0": {
+    "completed_queries": 0,
+    "error": "QUERY_BUDGET_EXCEEDED: reason=deadline",
+    "k": 10,
+    "p50_us": null,
+    "p95_us": null,
+    "p99_us": null,
+    "recall": null,
+    "requested_queries": 1,
+    "result_count_max": null,
+    "result_count_min": null
+  },
+  "query0_memory": {
+    "before_rss_bytes": 562073600,
+    "peak_rss_bytes": 566513664,
+    "process_rss_bytes": 562089984,
+    "seconds": 34.1839024
+  },
+  "first_props": {
+    "event": "projection_props_stage",
+    "json_parse_error": null,
+    "json_parse_status": "ok",
+    "json_parse_us": 1,
+    "lock_acquire_us": 0,
+    "node_u32": 63605,
+    "payload_len_bytes": 2,
+    "prepare_status": "ok",
+    "prepare_us": 34176400,
+    "query_row_us": 214,
+    "select_error_code": null,
+    "select_error_extended_code": null,
+    "select_error_message": null,
+    "select_status": "row",
+    "statement_finalize_us": 0
+  },
+  "reopen_memory": {
+    "before_rss_bytes": 9334784,
+    "peak_rss_bytes": 729870336,
+    "process_rss_bytes": 562085888,
+    "seconds": 778.9966324
+  },
+  "final_drop": {
+    "before_rss_bytes": 562094080,
+    "peak_rss_bytes": 622157824,
+    "process_rss_bytes": 25272320,
+    "seconds": 114.0433836
+  },
+  "backup": {
+    "backup_elapsed_us": 85719357,
+    "event": "projection_publish_backup_done",
+    "main_bytes": 9006981120,
+    "publication_variant": "before_maintenance",
+    "shm_bytes": 17596416,
+    "shm_header_error": null,
+    "shm_mx_frame_le_u32_at_16": 2198969,
+    "shm_n_backfill_le_u32_at_96": 0,
+    "wal_bytes": 9059752312
+  },
+  "maintenance": [],
+  "projection_stages": [
+    {
+      "elapsed_us": 60721953,
+      "event": "projection_sync_candidate_stage",
+      "stage": "projection_replay_wal",
+      "status": "ok"
+    },
+    {
+      "elapsed_us": 51330948,
+      "event": "projection_sync_candidate_stage",
+      "stage": "rebuild_edge_history",
+      "status": "ok"
+    },
+    {
+      "elapsed_us": 1,
+      "event": "projection_sync_candidate_stage",
+      "stage": "projection_backfill_edges",
+      "status": "ok"
+    }
+  ],
+  "search10": {
+    "k": 10,
+    "p50_us": 3352.7000000000003,
+    "p95_us": 4355.2,
+    "p99_us": 4695.099999999999,
+    "recall": 0.15833333333333333,
+    "result_count_max": 10,
+    "result_count_min": 10
+  },
+  "search100": {
+    "k": 100,
+    "p50_us": 7620.1,
+    "p95_us": 8648.3,
+    "p99_us": 9324.8,
+    "recall": 0.09958333333333333,
+    "result_count_max": 100,
+    "result_count_min": 100
+  },
+  "coverage": {
+    "built_frontier": 394,
+    "collection": "bench",
+    "extra_count": 0,
+    "indexed_count": 100000,
+    "missing_count": 0,
+    "pending_count": 0,
+    "source_count": 100000,
+    "source_frontier": 394,
+    "state": "READY",
+    "validated": true
+  },
+  "counts": [
+    100001,
+    100000
+  ],
+  "marker_recovered": true,
+  "source_inputs_unchanged": true,
+  "after_deadline_gate_passed": false,
+  "recall_scope": "Reported fixed24queries; compare actual before/after values and realBGE contracts, not stateok alone"
+}

@@ -1,0 +1,43 @@
+{
+    "exit":  0,
+    "reason":  null,
+    "seconds":  579.8131465,
+    "peak_rss":  604971008,
+    "peak_private":  913268736,
+    "identities":  [
+                       {
+                           "ProcessId":  47368,
+                           "ParentProcessId":  18204,
+                           "CreationDate":  "\/Date(1793490052900)\/",
+                           "Name":  "conhost.exe",
+                           "ExecutablePath":  "C:\\WINDOWS\\system32\\conhost.exe"
+                       },
+                       {
+                           "ProcessId":  18204,
+                           "ParentProcessId":  20984,
+                           "CreationDate":  "\/Date(1793490052885)\/",
+                           "Name":  "python.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\AppData\\Local\\Programs\\Python\\Python314\\python.exe"
+                       },
+                       {
+                           "ProcessId":  37048,
+                           "ParentProcessId":  18204,
+                           "CreationDate":  "\/Date(1793490054349)\/",
+                           "Name":  "fresh-after.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\fresh-after.exe"
+                       }
+                   ],
+    "excluded_build_helpers":  [
+
+                               ],
+    "helper_finished_parent_condition":  true,
+    "helper_scope":  "Helpers are not terminated; successful Cargo completion and stopped tracked compiler clients are required before private-source edits. No shared source/target mutation.",
+    "admission_cpu":  16,
+    "admission_free":  16960733184,
+    "remaining":  [
+
+                  ],
+    "cleanup_complete":  true,
+    "monitor_error":  null,
+    "rss_scope":  "tracked owned process tree"
+}

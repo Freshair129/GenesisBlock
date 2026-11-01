@@ -1,0 +1,29 @@
+{
+  "expected_nodes_after_marker": 100001,
+  "expected_vector_nodes": 100000,
+  "first_drop_memory": {
+    "before_rss_bytes": 532860928,
+    "peak_rss_bytes": 595476480,
+    "process_rss_bytes": 23138304,
+    "seconds": 81.8712964
+  },
+  "first_open_memory": {
+    "before_rss_bytes": 8556544,
+    "peak_rss_bytes": 532832256,
+    "process_rss_bytes": 532832256,
+    "seconds": 494.454722
+  },
+  "input_dim": 1024,
+  "input_n": 100000,
+  "marker_id": "sqlite-publication-probe-1793490548861283600",
+  "marker_memory": {
+    "before_rss_bytes": 532815872,
+    "peak_rss_bytes": 532877312,
+    "process_rss_bytes": 532877312,
+    "seconds": 0.0043593
+  },
+  "method": "one RW open, legitimate non-vector add_node, normal Drop; no queries",
+  "queries_executed": 0,
+  "repeat_count": 1,
+  "state": "fixture_prepared"
+}

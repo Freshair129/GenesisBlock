@@ -314,6 +314,47 @@ afterward. No new fixture or benchmark result was produced. The wait receipt is
 `evidence/vector-memory-pristine-retry2-20261101/wait-status.json`; query
 deadline, recall, and benchmark RSS remain unverified.
 
+### Fresh 100k and real-embedding follow-up (2026-11-01)
+
+A new pristine copy matched the prior manifest for all 109 files (12,689,795,140
+bytes). The separate fixture preparation completed in 579.813 s with zero
+queries; its two closed copies were byte-identical. Both fresh-process RW reopen
+runs used the same prepared marker, 100,000 binary-quantized 1,024-dimensional
+synthetic vectors, 24 queries per sweep, a 5,000 ms query deadline, and the
+unchanged 1,200 s / 2 GiB parent guard. No warm-up query was issued. These runs
+do not qualify the earlier timed-out same-process two-open lifecycle.
+
+| Measurement | Before checkpoint change | After checkpoint change |
+|---|---:|---:|
+| First query | deadline error after 34.184 s | 21.262 ms, 10 results |
+| First property prepare | 34,176.400 ms | 0.020 ms |
+| Reopen | 778.997 s | 747.104 s |
+| Peak sampled tree RSS | 745.845 MB | 750.277 MB |
+| Search k=10 p50/p95/p99 | 3.353 / 4.355 / 4.695 ms | 3.157 / 3.886 / 3.970 ms |
+| Search k=100 p50/p95/p99 | 7.620 / 8.648 / 9.325 ms | 6.234 / 8.183 / 8.459 ms |
+| Synthetic recall@10 / @100 | 0.1583 / 0.0996 | 0.1375 / 0.0971 |
+
+Both runs recovered the marker and validated READY coverage of 100,000/100,000
+vectors; both later 24-query sweeps returned exactly k results. The baseline
+first query did not return results, so its result-count contract failed. The
+after run passed its first-query deadline and result-count contract. Before
+publication left 2,198,969 WAL frames pending; after publication checkpointed
+all of them in 31.005 s before the first query. This moves work into reopen;
+it is not an observed RAM saving. A single pair of randomized HNSW builds and
+24 queries is not a statistical recall or latency non-regression qualification;
+the observed synthetic recall decreases remain visible.
+
+The separately guarded untraced real BGE-m3 run after the change completed in
+356.604 s with 328.364 MB peak sampled tree RSS. For 11,266 vectors and 24
+queries it reported recall@10 0.9875, recall@100 0.9829, and same-process
+reopen recall@10 0.9708; its validated coverage was 11,266/11,266, and input
+hashes were unchanged. Its fresh read-only child checked open and coverage but
+did not issue a query. The two baseline attempts were interrupted by external
+compiler activity during that child after 352.626 s and 337.649 s respectively;
+both owned trees were cleaned up. Thus a completed real-BGE before/after recall
+and performance comparison remains open. Raw results and receipts are in
+`evidence/vector-memory-fresh-100k-20261101/`.
+
 Latest post-commit resource disposition (2026-11-01): the bounded preparation
 wait ended after nine admission attempts without opening the relocated pristine
 fixture. Last 10-second admission averaged 32.73% CPU with

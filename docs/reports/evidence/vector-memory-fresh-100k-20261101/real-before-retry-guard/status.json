@@ -1,0 +1,50 @@
+{
+    "exit":  -1,
+    "reason":  "resource_competition",
+    "seconds":  337.64894419999996,
+    "peak_rss":  324706304,
+    "peak_private":  399613952,
+    "identities":  [
+                       {
+                           "ProcessId":  22852,
+                           "ParentProcessId":  41364,
+                           "CreationDate":  "\/Date(1793493629428)\/",
+                           "Name":  "conhost.exe",
+                           "ExecutablePath":  "C:\\WINDOWS\\system32\\conhost.exe"
+                       },
+                       {
+                           "ProcessId":  25488,
+                           "ParentProcessId":  22736,
+                           "CreationDate":  "\/Date(1793493919257)\/",
+                           "Name":  "candidate-release.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\candidate-release.exe"
+                       },
+                       {
+                           "ProcessId":  41364,
+                           "ParentProcessId":  49796,
+                           "CreationDate":  "\/Date(1793493629415)\/",
+                           "Name":  "python.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\AppData\\Local\\Programs\\Python\\Python314\\python.exe"
+                       },
+                       {
+                           "ProcessId":  22736,
+                           "ParentProcessId":  41364,
+                           "CreationDate":  "\/Date(1793493629957)\/",
+                           "Name":  "candidate-release.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\candidate-release.exe"
+                       }
+                   ],
+    "excluded_build_helpers":  [
+
+                               ],
+    "helper_finished_parent_condition":  false,
+    "helper_scope":  "Helpers are not terminated; successful Cargo completion and stopped tracked compiler clients are required before private-source edits. No shared source/target mutation.",
+    "admission_cpu":  4.4545454545454541,
+    "admission_free":  16214228992,
+    "remaining":  [
+
+                  ],
+    "cleanup_complete":  true,
+    "monitor_error":  null,
+    "rss_scope":  "tracked owned process tree"
+}

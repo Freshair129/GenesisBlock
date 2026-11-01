@@ -1,0 +1,57 @@
+{
+  "mode": "after",
+  "started": "2026-11-01T07:11:29.131907+07:00",
+  "binary": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\fresh-after.exe",
+  "binary_sha256": "5273a92b0f2bb4a685baee7189795e1cf73fe2efa079018cc21c604e3d2cda54",
+  "production_commit": "f98a324c6ac9c16bbd98679622012519107628a3",
+  "environment": {
+    "GB_VBENCH": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\inputs\\synthetic-100000-1024",
+    "GB_MEMORY_AUDIT": "1",
+    "GB_MEMORY_INPUT": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\inputs\\synthetic-100000-1024",
+    "GB_MEMORY_OPEN_ONLY": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\100k-fresh-cases\\after\\gdb",
+    "GB_MEMORY_OPEN_OUT": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\100k-fresh-cases\\after\\result.json",
+    "GB_MEMORY_OPEN_READ_WRITE": "1",
+    "GB_MEMORY_OPEN_REPEAT": "1",
+    "GB_MEMORY_OPEN_QUERY_SAMPLES": "24",
+    "GB_MEMORY_OPEN_MUTATE_BEFORE_REOPEN": "1",
+    "GB_VECTOR_QUERY_DIAGNOSTICS": "1",
+    "GB_EF": "200",
+    "GB_QUANT": "bq",
+    "GB_RERANK": "0",
+    "GB_VEC_Q": "24",
+    "GB_MEMORY_RETENTION": "full",
+    "RETENTION": "full",
+    "RAYON_NUM_THREADS": "4",
+    "GB_MEMORY_RSS_LIMIT_BYTES": "2147483648",
+    "GB_MEMORY_PREPARED_MARKER_ID": "sqlite-publication-probe-1793490548861283600"
+  },
+  "input_before": {
+    "meta.json": "1a2bec07b13a6ba0df46756509fa152eeea16c96fec988afc7239d89d195a95a",
+    "corpus.f32": "a4d885ab3c6d6a0559e07f35e5a3bceaa285ab5e42c309e1691b9b648347aa30",
+    "queries.f32": "630a95758e4bc7861e3868435b7178b96fb2a790577a0c95d28616a14b2c3421",
+    "truth.json": "7608a283e2251aaa82424a6268c63b045fa17ed47d583e308a3fc4967ffc580e"
+  },
+  "input_after": {
+    "meta.json": "1a2bec07b13a6ba0df46756509fa152eeea16c96fec988afc7239d89d195a95a",
+    "corpus.f32": "a4d885ab3c6d6a0559e07f35e5a3bceaa285ab5e42c309e1691b9b648347aa30",
+    "queries.f32": "630a95758e4bc7861e3868435b7178b96fb2a790577a0c95d28616a14b2c3421",
+    "truth.json": "7608a283e2251aaa82424a6268c63b045fa17ed47d583e308a3fc4967ffc580e"
+  },
+  "method": "Separate setup or fresh-process RW reopen; no query warmup; parent retains1200s/2GiB; query5000ms",
+  "not_original_two_open_qualification": true,
+  "query_or_quality_qualification_claimed": false,
+  "engine_pid": 30848,
+  "input_unchanged": true,
+  "engine_exit": 0,
+  "seconds": 837.114224799996,
+  "engine_state": "ok",
+  "query0": {
+    "k": 10,
+    "p50_us": 21247.399999999998,
+    "p95_us": 21247.399999999998,
+    "p99_us": 21247.399999999998,
+    "recall": 0.1,
+    "result_count_max": 10,
+    "result_count_min": 10
+  }
+}

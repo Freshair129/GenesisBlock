@@ -1,0 +1,214 @@
+{
+  "coverage": {
+    "collections": [
+      {
+        "built_frontier": 394,
+        "collection": "bench",
+        "extra_count": 0,
+        "indexed_count": 100000,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 100000,
+        "source_frontier": 394,
+        "state": "READY",
+        "validated": true
+      },
+      {
+        "built_frontier": 0,
+        "collection": "default",
+        "extra_count": 0,
+        "indexed_count": 0,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 0,
+        "source_frontier": 0,
+        "state": "READY",
+        "validated": true
+      }
+    ],
+    "state": "ok"
+  },
+  "coverage_bench": {
+    "built_frontier": 394,
+    "collection": "bench",
+    "extra_count": 0,
+    "indexed_count": 100000,
+    "missing_count": 0,
+    "pending_count": 0,
+    "source_count": 100000,
+    "source_frontier": 394,
+    "state": "READY",
+    "validated": true
+  },
+  "coverage_bench_ok": true,
+  "coverage_memory": {
+    "before_rss_bytes": 567246848,
+    "peak_rss_bytes": 567607296,
+    "process_rss_bytes": 567263232,
+    "seconds": 0.0186062
+  },
+  "expected_nodes_after_marker": 100001,
+  "expected_vector_nodes": 100000,
+  "first_drop_memory": null,
+  "first_open_memory": null,
+  "input_dim": 1024,
+  "input_n": 100000,
+  "marker_id": "sqlite-publication-probe-1793490548861283600",
+  "marker_memory": null,
+  "marker_recovered": true,
+  "metadata_count": 100000,
+  "metadata_counts_ok": true,
+  "metadata_node_count": 100001,
+  "metadata_summary": {
+    "collection": "bench",
+    "event": "metadata_summary",
+    "metadata_count": 100000,
+    "metadata_samples": [
+      {
+        "arena_id": 0,
+        "node_id": "0",
+        "node_u32": 0,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 1,
+        "node_id": "1",
+        "node_u32": 1,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 2,
+        "node_id": "2",
+        "node_u32": 2,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 3,
+        "node_id": "3",
+        "node_u32": 3,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 4,
+        "node_id": "4",
+        "node_u32": 4,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 5,
+        "node_id": "5",
+        "node_u32": 5,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 6,
+        "node_id": "6",
+        "node_u32": 6,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 7,
+        "node_id": "7",
+        "node_u32": 7,
+        "retired_seq": 0,
+        "visible_current": true
+      }
+    ],
+    "missing_current_node_count": 0,
+    "missing_node_count": 0,
+    "missing_node_samples": [],
+    "node_count": 100001,
+    "retired_count": 0,
+    "visible_current_count": 100000
+  },
+  "metadata_summary_memory": {
+    "before_rss_bytes": 567246848,
+    "peak_rss_bytes": 567263232,
+    "process_rss_bytes": 567263232,
+    "seconds": 0.0375185
+  },
+  "mutation": "Storage.add_node(non-vector marker), then normal Storage drop",
+  "mutation_mode": "prepared fixture, fresh RW process",
+  "open_mode": "read_write",
+  "open_path": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\100k-fresh-cases\\after\\gdb",
+  "query0": {
+    "k": 10,
+    "p50_us": 21247.399999999998,
+    "p95_us": 21247.399999999998,
+    "p99_us": 21247.399999999998,
+    "recall": 0.1,
+    "result_count_max": 10,
+    "result_count_min": 10
+  },
+  "query0_memory": {
+    "before_rss_bytes": 567246848,
+    "peak_rss_bytes": 567263232,
+    "process_rss_bytes": 567263232,
+    "seconds": 0.0212617
+  },
+  "query_budget_default_elapsed_ms": 5000,
+  "query_sample_count": 24,
+  "query_samples_k10": {
+    "k": 10,
+    "p50_us": 3156.8999999999996,
+    "p95_us": 3886.2,
+    "p99_us": 3970.1,
+    "recall": 0.1375,
+    "result_count_max": 10,
+    "result_count_min": 10
+  },
+  "query_samples_k100": {
+    "k": 100,
+    "p50_us": 6233.5,
+    "p95_us": 8183.400000000001,
+    "p99_us": 8459.0,
+    "recall": 0.09708333333333333,
+    "result_count_max": 100,
+    "result_count_min": 100
+  },
+  "query_samples_k100_memory": {
+    "before_rss_bytes": 567246848,
+    "peak_rss_bytes": 567263232,
+    "process_rss_bytes": 567263232,
+    "seconds": 0.1558244
+  },
+  "query_samples_k10_memory": {
+    "before_rss_bytes": 567246848,
+    "peak_rss_bytes": 567263232,
+    "process_rss_bytes": 567263232,
+    "seconds": 0.0755124
+  },
+  "rayon_num_threads": "4",
+  "read_only": false,
+  "repeat_count": 1,
+  "result_count_contract": {
+    "passed": true,
+    "q0_exact_10": true,
+    "sample_k100_min_100": true,
+    "sample_k10_min_10": true
+  },
+  "retrieval_quality_gate": "none; recall is reported for comparison against existing contracts and the real-embedding pair",
+  "rss_limit_bytes": "2147483648",
+  "same_process": false,
+  "second_drop_memory": {
+    "before_rss_bytes": 567246848,
+    "peak_rss_bytes": 629329920,
+    "process_rss_bytes": 21950464,
+    "seconds": 88.3761005
+  },
+  "second_open_memory": {
+    "before_rss_bytes": 8540160,
+    "peak_rss_bytes": 729505792,
+    "process_rss_bytes": 567259136,
+    "seconds": 747.1042387
+  },
+  "state": "ok",
+  "vector_dim": 1024
+}
