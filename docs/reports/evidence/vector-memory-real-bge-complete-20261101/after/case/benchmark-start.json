@@ -1,0 +1,9 @@
+{
+  "driver_pid": 4024,
+  "benchmark_pid": 30060,
+  "started_at_local": "2026-11-01T07:33:59.616740+07:00",
+  "binary_sha256": "56538e10601914990227e82bbbd07b676c9d873fe78cfe6f887dac9c55dc356c",
+  "output_dir": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\real-pair\\after\\output",
+  "direct_file_handles": true,
+  "process_tree_root_pid": 4024
+}

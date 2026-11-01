@@ -351,8 +351,8 @@ reopen recall@10 0.9708; its validated coverage was 11,266/11,266, and input
 hashes were unchanged. Its fresh read-only child checked open and coverage but
 did not issue a query. The two baseline attempts were interrupted by external
 compiler activity during that child after 352.626 s and 337.649 s respectively;
-both owned trees were cleaned up. Thus a completed real-BGE before/after recall
-and performance comparison remains open. Raw results and receipts are in
+both owned trees were cleaned up. The later completed baseline is compared below.
+Raw results and receipts are in
 `evidence/vector-memory-fresh-100k-20261101/`.
 
 Two further clean-directory baseline attempts on 2026-11-01 passed admission
@@ -360,8 +360,38 @@ Two further clean-directory baseline attempts on 2026-11-01 passed admission
 while they were running. The resource guard stopped them after 30.710 s and
 203.257 s, with sampled tree RSS peaks of 227.582 MB and 313.364 MB. Both owned
 trees were cleaned up. Neither produced a complete baseline result, so no
-before/after real-BGE recall, latency, or RSS comparison can be qualified.
+before/after real-BGE recall, latency, or RSS comparison could be qualified from
+those attempts.
 Receipts and logs are in `evidence/vector-memory-real-bge-retries-20261101/`.
+
+### Completed real BGE baseline comparison (2026-11-01)
+
+A further baseline ran from an empty directory and completed with the original
+1,200 s / 2 GiB guard and 5,000 ms query budget. The baseline and the prior
+after-change run used the same hash-verified BGE-m3 corpus (11,266 vectors,
+1,024 dimensions), inputs unchanged, F32, ef=200, and 24 queries per sweep.
+Both returned validated READY coverage of 11,266/11,266 and completed their
+fresh read-only child open and coverage checks. That child did not run queries;
+the reopen query measurements below are from the main process.
+
+| Measurement | Before | After |
+|---|---:|---:|
+| Recall@10 / @100 | 0.9958 / 0.9829 | 0.9875 / 0.9829 |
+| Search k=10 p50 / p95 / p99 | 4.554 / 5.174 / 5.469 ms | 4.482 / 4.986 / 5.184 ms |
+| Search k=100 p50 / p95 / p99 | 6.705 / 8.840 / 8.860 ms | 6.062 / 6.522 / 6.587 ms |
+| Same-process reopen recall@10 | 0.9750 | 0.9708 |
+| Same-process reopen k=10 p50 / p95 / p99 | 4.765 / 5.615 / 2,949.655 ms | 4.402 / 5.040 / 5.398 ms |
+| Peak sampled owned-tree RSS | 325.222 MB | 328.364 MB |
+| Guarded job duration | 420.832 s | 356.604 s |
+
+RSS is the guard's sampled process-tree working set, which may include shared
+pages; it is not an allocation or a measured RAM saving. The after-change
+recall@10 is 0.00833 lower in this sample (reopen recall@10 0.00417 lower),
+while recall@100 is equal. The baseline's high reopen p99 remains part of the
+result. This is one serial pair of independently built HNSW graphs with only 24
+queries per sweep, not proof of recall or latency non-regression. Receipts,
+results and the validation script are in
+`evidence/vector-memory-real-bge-complete-20261101/`.
 
 Latest post-commit resource disposition (2026-11-01): the bounded preparation
 wait ended after nine admission attempts without opening the relocated pristine
