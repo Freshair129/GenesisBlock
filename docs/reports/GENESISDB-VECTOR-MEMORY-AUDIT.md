@@ -1543,3 +1543,16 @@ partial outputs are retained separately, not counted as completed runs. Seed
 instrumentation is not part of the production runtime. The diagnostic scripts,
 source patches, complete query evidence and compressed topologies are retained under
 `docs/reports/evidence/vector-memory-seeded-topology-20261101/`.
+
+#### Seed 43 resource-gate recheck
+
+A fresh retry on 2026-11-01 used the same frozen diagnostic binaries and original
+resource guard. Its ten-minute wait expired without launching the benchmark:
+all 17 admission windows had average CPU at or above 20%, ranging from 20.55%
+to 92.09%; one window also fell below the 6 GiB free-memory requirement, with
+6,134,050,816 bytes free. There was no seed 43 before or after measurement,
+and no additional multi-seed comparison or fresh deadline result. Admission
+samples, configuration, and the no-launch receipt are recorded in
+`docs/reports/evidence/vector-memory-seed43-gate-recheck-20261101/`.
+The previously completed seed 42 pair remains the only controlled real-BGE pair;
+its topology, recall, latency and RSS results above have not changed.

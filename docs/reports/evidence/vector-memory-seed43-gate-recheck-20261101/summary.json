@@ -1,0 +1,95 @@
+{
+  "admissions": [
+    {
+      "file": "admission-01.json",
+      "cpu_average": 58.18181818181818,
+      "minimum_free_bytes": 7045238784
+    },
+    {
+      "file": "admission-02.json",
+      "cpu_average": 34.36363636363637,
+      "minimum_free_bytes": 9007394816
+    },
+    {
+      "file": "admission-03.json",
+      "cpu_average": 89.36363636363636,
+      "minimum_free_bytes": 8710868992
+    },
+    {
+      "file": "admission-04.json",
+      "cpu_average": 35.0,
+      "minimum_free_bytes": 8382640128
+    },
+    {
+      "file": "admission-05.json",
+      "cpu_average": 20.545454545454547,
+      "minimum_free_bytes": 9000992768
+    },
+    {
+      "file": "admission-06.json",
+      "cpu_average": 23.90909090909091,
+      "minimum_free_bytes": 8833552384
+    },
+    {
+      "file": "admission-07.json",
+      "cpu_average": 23.545454545454547,
+      "minimum_free_bytes": 8851099648
+    },
+    {
+      "file": "admission-08.json",
+      "cpu_average": 21.90909090909091,
+      "minimum_free_bytes": 9058058240
+    },
+    {
+      "file": "admission-09.json",
+      "cpu_average": 61.63636363636363,
+      "minimum_free_bytes": 7104942080
+    },
+    {
+      "file": "admission-10.json",
+      "cpu_average": 89.0909090909091,
+      "minimum_free_bytes": 7997288448
+    },
+    {
+      "file": "admission-11.json",
+      "cpu_average": 30.272727272727273,
+      "minimum_free_bytes": 8393347072
+    },
+    {
+      "file": "admission-12.json",
+      "cpu_average": 36.54545454545455,
+      "minimum_free_bytes": 7999586304
+    },
+    {
+      "file": "admission-13.json",
+      "cpu_average": 20.545454545454547,
+      "minimum_free_bytes": 8835076096
+    },
+    {
+      "file": "admission-14.json",
+      "cpu_average": 34.36363636363637,
+      "minimum_free_bytes": 8319496192
+    },
+    {
+      "file": "admission-15.json",
+      "cpu_average": 45.72727272727273,
+      "minimum_free_bytes": 6134050816
+    },
+    {
+      "file": "admission-16.json",
+      "cpu_average": 92.0909090909091,
+      "minimum_free_bytes": 7277346816
+    },
+    {
+      "file": "admission-17.json",
+      "cpu_average": 72.0,
+      "minimum_free_bytes": 6886330368
+    }
+  ],
+  "count": 17,
+  "lowest_cpu_average": 20.545454545454547,
+  "highest_cpu_average": 92.0909090909091,
+  "minimum_free_bytes": 6134050816,
+  "no_launch": true,
+  "seed": 43
+}
