@@ -1,0 +1,75 @@
+{
+  "search10": {
+    "seed42_recall": 0.9833333333333333,
+    "interrupted_seed43_recall": 0.9875,
+    "seed42_error": null,
+    "seed43_error": null,
+    "different_returned_indices": [
+      2,
+      8,
+      10,
+      14,
+      17,
+      22
+    ],
+    "different_hit_indices": [
+      2,
+      8,
+      10,
+      14,
+      17,
+      22
+    ]
+  },
+  "search100": {
+    "seed42_recall": 0.9816666666666667,
+    "interrupted_seed43_recall": 0.9829166666666667,
+    "seed42_error": null,
+    "seed43_error": null,
+    "different_returned_indices": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23
+    ],
+    "different_hit_indices": [
+      2,
+      3,
+      4,
+      5,
+      7,
+      8,
+      10,
+      11,
+      12,
+      13,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23
+    ]
+  }
+}

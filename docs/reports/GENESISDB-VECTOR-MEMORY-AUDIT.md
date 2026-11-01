@@ -1556,3 +1556,26 @@ samples, configuration, and the no-launch receipt are recorded in
 `docs/reports/evidence/vector-memory-seed43-gate-recheck-20261101/`.
 The previously completed seed 42 pair remains the only controlled real-BGE pair;
 its topology, recall, latency and RSS results above have not changed.
+
+#### 2026-11-02 seed 43 diagnostic
+
+The first before-side attempt passed admission but its guard stopped it at
+144.48 s when external `rustc` processes appeared. Cleanup completed. The
+initial-query and topology files were already written, but the run did not
+complete snapshot/reopen, so its timing and RSS are not qualified benchmark
+results. For diagnosis only, its seed 43 initial graph was compared with the
+completed seed 42 baseline: all 11,266 node IDs were present, 1,283 nodes had
+different levels, and all 11,266 had different neighbor ID sets. Initial
+recall@10 was 0.9875 versus 0.983333, with returned IDs differing on six of 24
+queries. These observations are consistent with graph construction affecting
+recall, but the interrupted run does not establish a before/after checkpoint
+comparison or reopen correctness. Its partial evidence is retained under
+`docs/reports/evidence/vector-memory-nov02-seed43/`.
+
+A fresh before-side retry then exhausted the existing ten-minute admission wait
+without launching. All 13 admission windows exceeded the 20% CPU threshold; the
+lowest average was 26.82%. External compiler processes also appeared during the
+wait. Thus neither the seed 43 after-side nor any additional complete pair was
+run, and seed 43 latency, RSS, reopen deadline, and before/after recall remain
+unverified. The retry admission samples and no-launch receipt are retained with
+the interrupted evidence. No budget or warm-up policy was changed.

@@ -1,0 +1,74 @@
+{
+  "count": 13,
+  "lowest_cpu_average": 26.818181818181817,
+  "highest_cpu_average": 66.27272727272727,
+  "minimum_free_bytes": 9595850752,
+  "admissions": [
+    {
+      "file": "admission-01.json",
+      "cpu_average": 26.818181818181817,
+      "minimum_free_bytes": 12889440256
+    },
+    {
+      "file": "admission-02.json",
+      "cpu_average": 31.181818181818183,
+      "minimum_free_bytes": 12028264448
+    },
+    {
+      "file": "admission-03.json",
+      "cpu_average": 28.272727272727273,
+      "minimum_free_bytes": 12060913664
+    },
+    {
+      "file": "admission-04.json",
+      "cpu_average": 66.27272727272727,
+      "minimum_free_bytes": 10842456064
+    },
+    {
+      "file": "admission-05.json",
+      "cpu_average": 35.09090909090909,
+      "minimum_free_bytes": 10776834048
+    },
+    {
+      "file": "admission-06.json",
+      "cpu_average": 56.0,
+      "minimum_free_bytes": 9595850752
+    },
+    {
+      "file": "admission-07.json",
+      "cpu_average": 36.54545454545455,
+      "minimum_free_bytes": 9634226176
+    },
+    {
+      "file": "admission-08.json",
+      "cpu_average": 64.9090909090909,
+      "minimum_free_bytes": 9618194432
+    },
+    {
+      "file": "admission-09.json",
+      "cpu_average": 39.27272727272727,
+      "minimum_free_bytes": 10047225856
+    },
+    {
+      "file": "admission-10.json",
+      "cpu_average": 38.72727272727273,
+      "minimum_free_bytes": 11785564160
+    },
+    {
+      "file": "admission-11.json",
+      "cpu_average": 46.0,
+      "minimum_free_bytes": 10979999744
+    },
+    {
+      "file": "admission-12.json",
+      "cpu_average": 52.81818181818182,
+      "minimum_free_bytes": 11163160576
+    },
+    {
+      "file": "admission-13.json",
+      "cpu_average": 64.0,
+      "minimum_free_bytes": 10146840576
+    }
+  ],
+  "no_launch": true
+}

@@ -1,0 +1,14 @@
+{
+  "before_sha256": "e603f3f3b1a7afcd5dba03c6e85aa4141cab994240f15d62f5da98cc421a80dd",
+  "after_sha256": "7f7d0d8679789e399f2e3b9810fb6a47acc1e95637a0a0a472e093dadb2f1d14",
+  "identical_bytes": false,
+  "before_nodes": 11266,
+  "after_nodes": 11266,
+  "shared_nodes": 11266,
+  "missing_before": 0,
+  "missing_after": 0,
+  "level_different_nodes": 1283,
+  "slot_different_nodes": 11049,
+  "ordered_neighbor_records_different_nodes": 11266,
+  "neighbor_id_set_different_nodes": 11266
+}
