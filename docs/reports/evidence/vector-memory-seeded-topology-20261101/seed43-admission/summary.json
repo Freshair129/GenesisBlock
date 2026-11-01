@@ -1,0 +1,76 @@
+{
+  "admissions": [
+    {
+      "file": "admission-01.json",
+      "cpu_average": 74.9090909090909,
+      "minimum_free": 5063938048
+    },
+    {
+      "file": "admission-02.json",
+      "cpu_average": 48.18181818181818,
+      "minimum_free": 7112998912
+    },
+    {
+      "file": "admission-03.json",
+      "cpu_average": 35.63636363636363,
+      "minimum_free": 7161749504
+    },
+    {
+      "file": "admission-04.json",
+      "cpu_average": 39.45454545454545,
+      "minimum_free": 7588814848
+    },
+    {
+      "file": "admission-05.json",
+      "cpu_average": 33.90909090909091,
+      "minimum_free": 7891693568
+    },
+    {
+      "file": "admission-06.json",
+      "cpu_average": 51.54545454545455,
+      "minimum_free": 7736737792
+    },
+    {
+      "file": "admission-07.json",
+      "cpu_average": 38.81818181818182,
+      "minimum_free": 7821856768
+    },
+    {
+      "file": "admission-08.json",
+      "cpu_average": 42.36363636363637,
+      "minimum_free": 7784075264
+    },
+    {
+      "file": "admission-09.json",
+      "cpu_average": 38.27272727272727,
+      "minimum_free": 7674945536
+    },
+    {
+      "file": "admission-10.json",
+      "cpu_average": 30.818181818181817,
+      "minimum_free": 7878234112
+    },
+    {
+      "file": "admission-11.json",
+      "cpu_average": 31.454545454545453,
+      "minimum_free": 7866130432
+    },
+    {
+      "file": "admission-12.json",
+      "cpu_average": 30.818181818181817,
+      "minimum_free": 7829917696
+    },
+    {
+      "file": "admission-13.json",
+      "cpu_average": 35.27272727272727,
+      "minimum_free": 7948603392
+    },
+    {
+      "file": "admission-last.json",
+      "cpu_average": 54.81818181818182,
+      "minimum_free": 7209525248
+    }
+  ],
+  "count": 14,
+  "no_launch": true
+}

@@ -1,0 +1,14 @@
+{
+  "seed_patch": "21dec437975543d690a4b3ceead41e8eadb48edc4d860ec9505de46bd9c5927f",
+  "crate_original": "C:\\Users\\suanr\\.cargo\\registry\\src\\index.crates.io-1949cf8c6b5b557f\\hnsw_rs-0.3.4",
+  "cases": {
+    "before": {
+      "original_lib_sha256": "812afdbe74e96aee4f0c08b93488dda4ac5a6c0e4784b72bb9f615d30c7877a9",
+      "diagnostic_lib_sha256": "2adbe56ad917522c5d4513986b2c866e5f300ee8362e6c7c7978a62d228eb394"
+    },
+    "after": {
+      "original_lib_sha256": "5b8bb9bed5dde5fa6e7d4d255da3acce6c1bfe892092456133adb65a78998fdd",
+      "diagnostic_lib_sha256": "0b8a371539d2ed78b1aecc8979ee4de961cd4e9f8a422e2c7a88ffd97f8c9bb1"
+    }
+  }
+}

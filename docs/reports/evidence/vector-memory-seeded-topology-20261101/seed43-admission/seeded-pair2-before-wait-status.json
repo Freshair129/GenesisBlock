@@ -1,0 +1,10 @@
+{
+    "at":  "2026-11-01T14:31:48.6302550Z",
+    "state":  "resource_wait_expired_no_launch",
+    "active_compilers":  0,
+    "attempt":  14,
+    "config":  "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\seeded-topology-20261101\\runs\\pair2-before-guard-config.json",
+    "guard_output":  "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\seeded-topology-20261101\\runs\\pair2-before-guard",
+    "error":  null,
+    "scope":  "Resource wait only; actual job retains1200s/2GiB and query5000ms; no automatic retry after possible launch"
+}

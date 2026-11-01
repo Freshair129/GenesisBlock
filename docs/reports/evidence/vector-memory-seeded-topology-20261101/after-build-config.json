@@ -1,0 +1,29 @@
+{
+  "kind": "build_preparation",
+  "cap_seconds": 1200,
+  "exe": "C:\\Users\\suanr\\.cargo\\bin\\cargo.exe",
+  "args": [
+    "build",
+    "--manifest-path",
+    "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\seeded-topology-20261101\\after\\Cargo.toml",
+    "--locked",
+    "--offline",
+    "--release",
+    "--no-default-features",
+    "--features",
+    "bins",
+    "--bin",
+    "vbench-genesis",
+    "-j1"
+  ],
+  "cwd": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\seeded-topology-20261101\\after",
+  "output": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\seeded-topology-20261101\\after-postquery-build-guard",
+  "env": {
+    "CARGO_TARGET_DIR": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\release-target\\20261031T150004Z-b5e55f51",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "16",
+    "CARGO_PROFILE_RELEASE_LTO": "false",
+    "CARGO_BUILD_JOBS": "1",
+    "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-pc-windows-msvc"
+  }
+}

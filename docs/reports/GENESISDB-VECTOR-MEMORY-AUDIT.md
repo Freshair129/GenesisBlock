@@ -1483,3 +1483,63 @@ No production database, deployed addon, release or ADR was changed. Seven origin
 staged HQL2 documentation/test files were kept intact; their hashes are in baseline
 provenance and the source-verification receipt. Verification uses separate local
 worktrees and scratch database directories. No commit, push or deployment is included.
+### Seed-controlled topology investigation (2026-11-01, partial)
+
+The pinned `hnsw_rs 0.3.4` constructs its level generator with OS-seeded
+`StdRng`; a fixed seed alone is not proof of an identical graph. A diagnostic-only
+private copy now accepts a `u64` seed in both level-generator constructors.
+The existing rehydration loop inserts arena rows serially. Large ingest batches
+can still use concurrent insertion, and hash-map iteration or equal distances
+may also change graph construction. Therefore paired evidence must compare the
+actual graph, not just seeds or aggregate recall.
+
+The private benchmark captures each F32 node's origin ID, level, internal slot,
+ordered neighbor IDs, neighbor point IDs, and distance bits **after** each
+measured query sweep. It captures the initial rebuilt graph and the same-process
+reopened graph independently. Capture is intentionally after the query to avoid
+warming the graph before the measured query; it can still perturb later snapshot,
+open, and RSS measurements, so those remain diagnostic. The fresh subprocess in
+this harness checks open/coverage and does not execute a query. A graph hash and
+node-level comparisons distinguish equal topology from a seed-only match.
+
+The two private diagnostic binaries compiled under the original guard, and the
+graph comparator passed four small tests. In a separate 1,000-vector synthetic
+smoke pair with seed 42, all four captured initial/reopen graphs were byte
+identical (SHA-256 `2e056c016a32f1d7cb53186f0fba7f7946e3da4293ffeb3043ce3426d99346f5`),
+and all query IDs matched. This smoke verifies the instrumentation for that input;
+it does not establish BGE recall or production latency.
+
+Seed 42's completed real-BGE before/after pair had the same 11,266-node graph
+before snapshot and after reopen on both sides (all four SHA-256
+`e603f3f3b1a7afcd5dba03c6e85aa4141cab994240f15d62f5da98cc421a80dd`), and every
+returned ID matched in each 24-query sweep. Recall@10 was 0.983333 on both sides,
+recall@100 0.981667 on both sides, and reopened recall@10 0.983333 on both sides.
+The first same-process reopened query took 2,961.071 ms before and 5.111 ms after,
+both within 5,000 ms. Peak sampled process-tree working set was 327.336 MB before
+and 347.570 MB after; it can include shared pages and is not an allocation-by-
+allocation measurement: the after value is higher by 20.234 MB (6.18%). This is
+one controlled pair, not statistical proof that a recall regression is impossible.
+The seed 43 baseline did not launch: the 10-minute resource wait expired after
+14 rejected admission windows; the lowest average CPU among them was 30.82%,
+above the unchanged 20% gate. Some samples also lacked the required 6 GiB free.
+No seed 43 result or second completed pair is claimed.
+
+| Seed 42 search, ms | Before p50 / p95 / p99 | After p50 / p95 / p99 |
+|---|---:|---:|
+| Initial k=10 | 4.495 / 5.098 / 5.207 | 4.364 / 4.844 / 5.031 |
+| Initial k=100 | 6.291 / 6.754 / 9.565 | 6.221 / 6.783 / 7.366 |
+| Reopened k=10 | 4.250 / 4.862 / 2,961.071 | 5.111 / 6.282 / 6.514 |
+
+Each percentile comes from 24 queries and is sensitive to individual samples;
+the reopened p99 includes the first query and should not be interpreted as a
+stable latency distribution. The identical graphs and IDs demonstrate this
+particular result is consistent with graph-build variation explaining earlier
+recall differences; they do not prove the cause of every earlier difference.
+
+The first BGE baseline attempt was stopped by its guard at 160.13 s
+when an external `rustc.exe` appeared; a fresh retry was stopped after 1.09 s
+when external Cargo/rustc processes appeared. Both cleanups completed. Their
+partial outputs are retained separately, not counted as completed runs. Seed
+instrumentation is not part of the production runtime. The diagnostic scripts,
+source patches, complete query evidence and compressed topologies are retained under
+`docs/reports/evidence/vector-memory-seeded-topology-20261101/`.

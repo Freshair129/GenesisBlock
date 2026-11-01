@@ -1,0 +1,28 @@
+--- original
++++ diagnostic
+@@ -354,6 +354,7 @@
+     let (_, rebuild) = measure(|| storage.rebuild_index_parallel().unwrap());
+     let search10 = search(&storage, &queries, &truth, 10, ef);
+     let search100 = search(&storage, &queries, &truth, 100, ef);
++    storage.diagnostic_capture_topology("initial");
+     let collections_after_search = storage.list_collections();
+     fs::write(output.join("before_snapshot.json"),serde_json::to_vec_pretty(&json!({
+         "n":n,"dim":dim,"quant":quant,"rerank":rerank,"idle_rss_bytes":idle,
+@@ -373,11 +374,12 @@
+     let retention = options.retention.clone();
+     let (reopened, reopen) = measure(|| Storage::open(options));
+     let (coverage, reopen_search10, reopen_error) = match reopened {
+-        Ok(reopened) => (
+-            Some(reopened.validate_index_coverage().unwrap()),
+-            Some(search(&reopened, &queries, &truth, 10, ef)),
+-            None,
+-        ),
++        Ok(reopened) => {
++            let coverage = Some(reopened.validate_index_coverage().unwrap());
++            let results = Some(search(&reopened, &queries, &truth, 10, ef));
++            reopened.diagnostic_capture_topology("reopen");
++            (coverage, results, None)
++        },
+         Err(error) => (None, None, Some(error.to_string())),
+     };
+     let cold_out = output.join("fresh_reopen.json");
