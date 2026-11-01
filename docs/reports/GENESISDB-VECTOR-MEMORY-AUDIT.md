@@ -427,6 +427,51 @@ competition, and the next wait expired without launch. Results and evidence:
 `evidence/vector-memory-real-bge-repeat-20261101/`. More isolated pairs and
 per-query IDs are needed before a causal or statistical conclusion.
 
+### Per-query investigation: three real-BGE pairs (2026-11-01)
+
+The opt-in `GB_MEMORY_QUERY_EVIDENCE` benchmark mode records query index,
+elapsed time, ordered returned IDs, ground-truth IDs, hit count, and errors in
+the existing result JSON. It takes the search duration before constructing the
+record and does no per-query file I/O; record construction between queries can
+still affect subsequent timing. Both variants used this same instrumentation.
+The default output remains unchanged when the switch is absent. A 1,000-vector
+smoke run checked all 72 records against aggregate recall, and the helper's two
+unit tests cover ordered results and a failed query.
+
+Three additional serial pairs used the same hash-verified BGE-m3 input, 11,266
+F32 vectors, ef=200, 24 queries per sweep, 5,000 ms query deadline and original
+1,200 s / 2 GiB guard. All six jobs completed, input hashes matched, all six
+persisted vector files shared SHA-256 `f83b5bc3b3d1057f01114196cd37ac95ecbeefe2f04ad0168d723e0860af3133`,
+and validated main and fresh-child coverage was 11,266/11,266. The fresh child
+checks open/coverage only. Query evidence and analysis are in
+`evidence/vector-memory-query-evidence-20261101/`.
+
+| Pair | Recall@10 before / after | Recall@100 before / after | First query after main reopen before / after | Peak tree RSS before / after |
+|---|---:|---:|---:|---:|
+| 1 | 0.9875 / 0.9750 | 0.9808 / 0.9758 | 3,167.31 / 4.64 ms | 329.21 / 375.48 MB |
+| 2 | 0.9792 / 0.9833 | 0.9746 / 0.9808 | 3,519.29 / 5.78 ms | 324.27 / 388.20 MB |
+| 3 | 0.9833 / 0.9833 | 0.9746 / 0.9808 | **deadline error**, 6,057.61 / 4.68 ms | 323.97 / 338.49 MB |
+
+| Pair | k=10 p50/p95/p99 before / after (ms) | k=100 p50/p95/p99 before / after (ms) |
+|---|---|---|
+| 1 | 4.687/5.685/5.752 / 4.248/4.970/5.333 | 6.066/6.710/6.801 / 5.900/8.354/9.022 |
+| 2 | 4.788/6.517/6.534 / 4.250/4.893/5.157 | 6.816/9.270/9.984 / 6.002/6.513/6.546 |
+| 3 | 4.439/5.074/5.303 / 4.199/4.805/5.128 | 6.013/6.588/6.891 / 6.053/6.450/6.458 |
+
+For pair 3 before, the failed query is index 0 and no reopen queries completed;
+the parent process still exited zero, so that run is not a full query correctness
+pass. All after-change reopen sweeps returned the requested results without
+error. On pair 1, eight k=10 queries changed hits: after lost six and gained three
+(net -3/240). In pair 2 it gained four and lost three (net +1/240); in pair 3
+the aggregate was equal despite changed returned IDs. Even within the same
+binary, query hit counts vary across independently built graphs (11 queries for
+before and 10 for after). Together with the pinned HNSW OS-seeded layer RNG,
+this supports graph-build variability as a plausible contributor, but the graph
+topology was not captured and the checkpoint change has not been causally ruled
+out. These three pairs are not a statistical non-regression proof; per-query
+records expose the precise result differences and preserve the failed deadline.
+RSS is sampled working set for owned process trees, not unique allocation.
+
 Latest post-commit resource disposition (2026-11-01): the bounded preparation
 wait ended after nine admission attempts without opening the relocated pristine
 fixture. Last 10-second admission averaged 32.73% CPU with

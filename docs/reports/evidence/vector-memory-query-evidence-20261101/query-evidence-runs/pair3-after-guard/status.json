@@ -1,0 +1,50 @@
+{
+    "exit":  0,
+    "reason":  null,
+    "seconds":  361.6389405,
+    "peak_rss":  338489344,
+    "peak_private":  393035776,
+    "identities":  [
+                       {
+                           "ProcessId":  49880,
+                           "ParentProcessId":  24248,
+                           "CreationDate":  "\/Date(1793538736261)\/",
+                           "Name":  "query-evidence-after.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\query-evidence-after.exe"
+                       },
+                       {
+                           "ProcessId":  46792,
+                           "ParentProcessId":  24248,
+                           "CreationDate":  "\/Date(1793538735952)\/",
+                           "Name":  "conhost.exe",
+                           "ExecutablePath":  "C:\\WINDOWS\\system32\\conhost.exe"
+                       },
+                       {
+                           "ProcessId":  36436,
+                           "ParentProcessId":  49880,
+                           "CreationDate":  "\/Date(1793539023160)\/",
+                           "Name":  "query-evidence-after.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\query-evidence-after.exe"
+                       },
+                       {
+                           "ProcessId":  24248,
+                           "ParentProcessId":  26420,
+                           "CreationDate":  "\/Date(1793538735940)\/",
+                           "Name":  "python.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\AppData\\Local\\Programs\\Python\\Python314\\python.exe"
+                       }
+                   ],
+    "excluded_build_helpers":  [
+
+                               ],
+    "helper_finished_parent_condition":  true,
+    "helper_scope":  "Helpers are not terminated; successful Cargo completion and stopped tracked compiler clients are required before private-source edits. No shared source/target mutation.",
+    "admission_cpu":  5.9090909090909092,
+    "admission_free":  14680985600,
+    "remaining":  [
+
+                  ],
+    "cleanup_complete":  true,
+    "monitor_error":  null,
+    "rss_scope":  "tracked owned process tree"
+}

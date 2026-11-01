@@ -1,0 +1,9 @@
+{
+  "driver_pid": 46276,
+  "benchmark_pid": 38712,
+  "started_at_local": "2026-11-01T20:19:50.837562+07:00",
+  "binary_sha256": "9882cc1327d5b9d636172658f45a4a5e47fad01431c89e65cbf40bc939f851a5",
+  "output_dir": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\query-evidence-runs\\smoke-default\\output",
+  "direct_file_handles": true,
+  "process_tree_root_pid": 46276
+}

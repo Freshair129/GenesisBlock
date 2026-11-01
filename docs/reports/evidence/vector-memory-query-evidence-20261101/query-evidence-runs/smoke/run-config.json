@@ -1,0 +1,53 @@
+﻿{
+    "input_dir":  "C:\\Users\\suanr\\genesis-vector-memory-20261031\\inputs\\synthetic-1000-768",
+    "expected_input_hashes":  {
+                                  "corpus":  "f742e0b86efc6709e55e69b98b8ba4442b45efa63563529ed1b756f7a0507837",
+                                  "queries":  "17109f7f4608496b6d0de1a81a105c8e22ec5b20f8d3e4e011f5524dcafa3dd0",
+                                  "truth":  "2f1fd69bf2d1d2600018ab66d8b0e3b0ea6f6b9c56268281bebd92896b67b175",
+                                  "meta":  "09ce96a4c90fc1a5d8da6febfe3ca82dacf64e7a51e523a7ac8c85e53ce33eb0"
+                              },
+    "env_whitelist":  {
+                          "GB_VBENCH":  "C:\\Users\\suanr\\genesis-vector-memory-20261031\\inputs\\synthetic-1000-768",
+                          "GB_QUANT":  "none",
+                          "GB_MEMORY_RETENTION":  "full",
+                          "GB_VEC_Q":  "24",
+                          "GB_MEMORY_AUDIT":  "1",
+                          "GB_MEMORY_OPEN_QUERY_SAMPLES":  "0",
+                          "RAYON_NUM_THREADS":  "4",
+                          "GB_VECTOR_QUERY_DIAGNOSTICS":  null,
+                          "GB_MEMORY_OPEN_ONLY":  null,
+                          "GB_MEMORY_OPEN_READ_WRITE":  null,
+                          "GB_EF":  "200",
+                          "GB_MEMORY_OPEN_OUT":  null,
+                          "GB_MEMORY_RSS_LIMIT_BYTES":  "2147483648",
+                          "GB_MEMORY_INPUT":  "C:\\Users\\suanr\\genesis-vector-memory-20261031\\inputs\\synthetic-1000-768",
+                          "GB_MEMORY_OPEN_REPEAT":  null,
+                          "GB_RERANK":  "0"
+                      },
+    "extra_env":  {
+                      "GB_MEMORY_COMPACT":  "1",
+                      "GB_MEMORY_OUT":  "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\query-evidence-runs\\smoke\\output",
+                      "GB_MEMORY_QUERY_EVIDENCE":  "1"
+                  },
+    "clear_env":  [
+                      "GB_MEMORY_PREPARE",
+                      "GB_MEMORY_CORPUS",
+                      "GB_LIMIT",
+                      "GB_EF_SWEEP",
+                      "GB_MEMORY_OPEN_ONLY",
+                      "GB_MEMORY_OPEN_READ_WRITE",
+                      "GB_MEMORY_OPEN_OUT"
+                  ],
+    "limits":  {
+                   "host_admission_seconds":  10,
+                   "cpu_average_max_percent":  20,
+                   "minimum_free_ram_bytes":  6442450944,
+                   "process_tree_working_set_bytes":  2147483648,
+                   "per_job_deadline_seconds":  1200,
+                   "query_deadline_ms":  5000
+               },
+    "run_root":  "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\query-evidence-runs\\smoke",
+    "repo":  "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\query-evidence-runs\\smoke",
+    "binary":  "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\query-evidence-after.exe",
+    "binary_sha256":  "9882cc1327d5b9d636172658f45a4a5e47fad01431c89e65cbf40bc939f851a5"
+}

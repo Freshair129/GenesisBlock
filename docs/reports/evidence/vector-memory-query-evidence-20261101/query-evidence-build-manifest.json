@@ -1,0 +1,9 @@
+{
+  "clone": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\release-src\\query-evidence-20261101",
+  "before_lib": "812afdbe74e96aee4f0c08b93488dda4ac5a6c0e4784b72bb9f615d30c7877a9",
+  "after_lib": "5b8bb9bed5dde5fa6e7d4d255da3acce6c1bfe892092456133adb65a78998fdd",
+  "bench": "6568ca0e4e18a3bb714de6fdf33bcafa14f2a2f493710be3b434b8b66c5ef29e",
+  "helper": "6fa248d0cdf5899e6322091440908ef2bd69bc5ab83bc2b79b946c17eff446f4",
+  "cargo_lock": "eda5bfa67c1077c96f2b84e44f740273e695c87a1a51b352cf18f2a031a4f8d2",
+  "cargo_toml": "00550fbac8edb5c1316b5eb21983b078039604ed3c1460689515ba5539f30e25"
+}

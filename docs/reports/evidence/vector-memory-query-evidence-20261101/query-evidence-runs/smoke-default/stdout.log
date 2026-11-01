@@ -1,0 +1,13 @@
+snapshot: state persisted successfully to C:\Users\suanr\genesis-sqlite-prepare-20261031\query-evidence-runs\smoke-default\output\gdb
+snapshot: state persisted successfully to C:\Users\suanr\genesis-sqlite-prepare-20261031\query-evidence-runs\smoke-default\output\gdb
+compaction: starting index compaction...
+compaction: index compaction complete in 1.3114362s. Arenas resized to 1000 nodes.
+snapshot: state persisted successfully to C:\Users\suanr\genesis-sqlite-prepare-20261031\query-evidence-runs\smoke-default\output\gdb
+shutdown: graceful shutdown, state saved.
+snapshot: attempting instant load from binary state...
+snapshot: loading 1000 nodes
+snapshot: loading 0 edges
+snapshot: instant load complete in 493.9973ms
+snapshot: state persisted successfully to C:\Users\suanr\genesis-sqlite-prepare-20261031\query-evidence-runs\smoke-default\output\gdb
+shutdown: graceful shutdown, state saved.
+memory audit: 1000x768 none rerank=false: C:\Users\suanr\genesis-sqlite-prepare-20261031\query-evidence-runs\smoke-default\output

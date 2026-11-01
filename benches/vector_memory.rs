@@ -11,6 +11,10 @@ use std::sync::{
 };
 use std::time::{Duration, Instant};
 
+#[path = "query_evidence.rs"]
+mod query_evidence;
+use query_evidence::QueryEvidence;
+
 fn number(key: &str, default: usize) -> usize {
     std::env::var(key)
         .ok()
@@ -178,7 +182,9 @@ fn search(
 ) -> Value {
     let mut latency = Vec::new();
     let mut hits = 0;
-    for (query, expected) in queries.iter().zip(truth) {
+    let capture = std::env::var_os("GB_MEMORY_QUERY_EVIDENCE").is_some();
+    let mut evidence = Vec::new();
+    for (index, (query, expected)) in queries.iter().zip(truth).enumerate() {
         let input = HybridSearchInput {
             query_vector: query.iter().map(|&x| x as f64).collect(),
             k: k as u32,
@@ -190,17 +196,30 @@ fn search(
             oversample: None,
         };
         let start = Instant::now();
-        let result = match storage.hybrid_search(input) {
+        let answer = storage.hybrid_search(input);
+        let elapsed_us = start.elapsed().as_secs_f64() * 1e6;
+        let result = match answer {
             Ok(result) => result,
             Err(error) => {
                 // Preserve the measured lifecycle phases and the actual query
                 // contract failure; never widen the engine budget for a benchmark.
-                return json!({"k":k,"error":error.to_string(),
+                let error = error.to_string();
+                if capture {
+                    let record =
+                        QueryEvidence::failure(index, k, elapsed_us, error.clone(), expected);
+                    evidence.push(json!({"query_index":record.index,"elapsed_us":record.elapsed_us,
+                        "returned_ids":record.returned,"truth_ids":record.truth,"hit_count":null,"error":record.error}));
+                }
+                let mut value = json!({"k":k,"error":error,
                     "completed_queries":latency.len(),"requested_queries":queries.len(),
                     "recall":null,"p50_us":null,"p95_us":null,"p99_us":null});
+                if capture {
+                    value["per_query"] = json!(evidence);
+                }
+                return value;
             }
         };
-        latency.push(start.elapsed().as_secs_f64() * 1e6);
+        latency.push(elapsed_us);
         let got: std::collections::HashSet<usize> =
             result.iter().map(|x| x.node.id.parse().unwrap()).collect();
         hits += expected
@@ -208,11 +227,21 @@ fn search(
             .take(k)
             .filter(|id| got.contains(id))
             .count();
+        if capture {
+            let returned = result.iter().map(|x| x.node.id.parse().unwrap()).collect();
+            let record = QueryEvidence::success(index, k, elapsed_us, returned, expected);
+            evidence.push(json!({"query_index":record.index,"elapsed_us":record.elapsed_us,
+                "returned_ids":record.returned,"truth_ids":record.truth,"hit_count":record.hits,"error":record.error}));
+        }
     }
     latency.sort_by(f64::total_cmp);
     let percentile = |p: f64| latency[((latency.len() - 1) as f64 * p).round() as usize];
-    json!({"k":k,"recall":hits as f64/(queries.len()*k) as f64,
-        "p50_us":percentile(0.5),"p95_us":percentile(0.95),"p99_us":percentile(0.99)})
+    let mut value = json!({"k":k,"recall":hits as f64/(queries.len()*k) as f64,
+        "p50_us":percentile(0.5),"p95_us":percentile(0.95),"p99_us":percentile(0.99)});
+    if capture {
+        value["per_query"] = json!(evidence);
+    }
+    value
 }
 
 pub fn run() {
