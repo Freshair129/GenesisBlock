@@ -1,0 +1,9 @@
+test_distance_change_is_not_edge_change (test_compare_topology.TopologyTests.test_distance_change_is_not_edge_change) ... ok
+test_duplicate_fails_closed (test_compare_topology.TopologyTests.test_duplicate_fails_closed) ... ok
+test_identical (test_compare_topology.TopologyTests.test_identical) ... ok
+test_level_and_edge_change (test_compare_topology.TopologyTests.test_level_and_edge_change) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.024s
+
+OK
