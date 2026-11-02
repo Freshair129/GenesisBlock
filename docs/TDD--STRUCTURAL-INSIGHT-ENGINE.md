@@ -1,8 +1,13 @@
 ---
-status: current
+status: historical
 ---
 
 # Software Requirements Document (SRD): Structural Insight Engine
+
+> Historical Mark VI proposal. Importance thresholds and weighted cluster output
+> below are retired by [the current decision](adr/ADR--GENESISDB-RETIRE-KIMPACT.md).
+> Current cluster behavior is described by [graph clustering](SPEC--GRAPH-CLUSTERING.md)
+> and executable engine tests; this proposal is not its implementation contract.
 
 ## 1. Introduction
 The **Structural Insight Engine** is an advanced analytical module for GenesisBlockDB (Mark VI). Inspired by InfraNodus, it moves beyond retrieval-augmented generation (RAG) toward **Structural Thinking**. It identifies concepts, groups them into topical communities, and—most importantly—reveals "Gaps" in the user's knowledge graph.

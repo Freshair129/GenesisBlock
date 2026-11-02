@@ -10,9 +10,11 @@ the same way you'd use SQLite.
 npm install @freshair129/gks-genesis-block-native
 ```
 
-> `npm install` compiles the Rust native addon (`napi build`), so a Rust
-> toolchain (`cargo`) must be on PATH. Prebuilt platform binaries are published
-> per target (linux-x64, win32-x64, darwin-x64/arm64).
+Registry installations use prebuilt platform binaries. For this source checkout,
+run `npm ci` followed by `npm run build:debug` with a Rust toolchain on PATH.
+The K-Impact retirement described here requires a newly built addon; older
+published binaries retain their previous contract. See the
+[retirement and migration decision](docs/adr/ADR--GENESISDB-RETIRE-KIMPACT.md).
 
 ## 2. Open a database, add knowledge, search it
 
@@ -39,11 +41,11 @@ await db.addEdge({ from: 'doc:cats', to: 'doc:dogs', rel: 'RELATED_TO' })
 // HNSW indexing is async; flush for read-your-write (or poll indexLag()).
 await db.flushIndex()
 
-// Vector k-NN search (alpha=0 → pure vector; >0 blends graph K-Impact).
-const hits = await db.hybridSearch({ queryVector: [0.9, 0.1, 0, 0], k: 2, alpha: 0 })
+// Vector k-NN search, ranked by vector relevance.
+const hits = await db.hybridSearch({ queryVector: [0.9, 0.1, 0, 0], k: 2 })
 console.log(hits.map(h => h.node.id))   // → [ 'doc:cats', 'doc:dogs' ]
 
-// Or query with HQL (search / traverse / hybrid / context).
+// Or query with HQL (search / traverse / match / context).
 const traversed = await db.executeHql('TRAVERSE FROM "doc:cats" DEPTH 1 REL ANY')
 console.log(traversed)
 
@@ -57,7 +59,7 @@ await db.saveState()
 |---|---|
 | Embedded open / snapshot | `GenesisDatabase.open(opts)`, `saveState()` |
 | Durable node/edge ingest | `addNode()`, `addEdge()` |
-| Vector + graph hybrid search | `hybridSearch({ queryVector, k, alpha })` |
+| Vector nearest-neighbor search | `hybridSearch({ queryVector, k })` |
 | Query language (HQL) | `executeHql('SEARCH … | TRAVERSE … | MATCH … | CONTEXT …')` |
 | Async index control | `flushIndex()`, `indexLag()` |
 

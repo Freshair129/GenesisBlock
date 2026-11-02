@@ -20,6 +20,11 @@ related:
 
 # AUDIT — P24 Governance cost & P25 K-Impact cost
 
+> Historical measurements only. The K-Impact benchmark target and scoring
+> implementation were retired by
+> [ADR--GENESISDB-RETIRE-KIMPACT](adr/ADR--GENESISDB-RETIRE-KIMPACT.md).
+> Commands and measurements below describe that earlier source revision.
+
 `benches/gov_kimpact_bench.rs` (`[[bin]] gov-kimpact-bench`), C: SSD.
 
 ## P24 — Governance guard cost (off vs on)

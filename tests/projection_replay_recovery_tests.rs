@@ -335,7 +335,7 @@ fn failed_incremental_replay_does_not_mutate_the_live_projection() {
             id: "partially-replayed".into(),
             labels: vec!["TEST".into()],
             props: json!({"value": "must-not-publish"}),
-            impact: None,
+            legacy_wire_impact: genesis_block_native::LegacyImpactWire::Absent,
             embedding: None,
             lang: None,
             valid_from: "2026-01-01T00:00:00Z".into(),

@@ -494,7 +494,7 @@ fn hybrid_match_carries_clauses() {
     // MATCH (hybrid) must accept the same trailing clauses as SEARCH.
     let v = run(
         &s,
-        r#"MATCH q SIMILAR TO [1.0,0.0] ALPHA 0.5 ORDER BY score DESC LIMIT 2 RETURN id, score"#,
+        r#"MATCH q SIMILAR TO [1.0,0.0] ORDER BY score DESC LIMIT 2 RETURN id, score"#,
     );
     let arr = v.as_array().unwrap();
     assert!(
@@ -614,11 +614,7 @@ fn strict_numeric_parse_errors_surface_in_ast() {
         HqlCommand::try_from("TRAVERSE FROM a DEPTH 99999999999999999999 REL R").unwrap_err();
     assert!(depth_err.contains("DEPTH value out of range"));
 
-    let alpha_err = HqlCommand::try_from(
-        "MATCH q SIMILAR TO [1.0] ALPHA 9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-    )
-    .unwrap_err();
-    assert!(alpha_err.contains("ALPHA value out of range"));
+    assert!(HqlCommand::try_from("MATCH q SIMILAR TO [1.0] ALPHA 0.5").is_err());
 
     let budget_err =
         HqlCommand::try_from("CONTEXT FOR x TIER H1 BUDGET 99999999999999999999").unwrap_err();
@@ -642,7 +638,7 @@ fn hybrid_and_search_parse_new_exposed_knobs() {
         }
     ));
 
-    let hybrid = HqlCommand::try_from("MATCH q ALPHA 0.5 K 50 EF 256 OVERSAMPLE 11").unwrap();
+    let hybrid = HqlCommand::try_from("MATCH q K 50 EF 256 OVERSAMPLE 11").unwrap();
     assert!(matches!(
         hybrid,
         HqlCommand::Hybrid {

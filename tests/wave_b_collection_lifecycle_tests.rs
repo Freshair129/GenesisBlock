@@ -156,7 +156,7 @@ fn compacted_quantizers_and_empty_definitions_survive_journal_only() {
             .hybrid_search(HybridSearchInput {
                 query_vector: vec![1., 0.],
                 k: 2,
-                alpha: Some(0.),
+                alpha: None,
                 lang: None,
                 as_of: None,
                 collection: Some("space".into()),

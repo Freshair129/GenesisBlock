@@ -107,7 +107,6 @@ class GenesisClient:
             id=data["id"],
             labels=data["labels"],
             props=data["props"],
-            impact=data.get("impact"),
             lang=data.get("lang"),
             expires_at=data.get("expires_at")
         )
@@ -130,7 +129,7 @@ class GenesisClient:
         
         res = self.query(hql)
         
-        nodes = [Node(id=n["id"], labels=n["labels"], props=n["props"], impact=n.get("impact")) for n in res["nodes"]]
+        nodes = [Node(id=n["id"], labels=n["labels"], props=n["props"]) for n in res["nodes"]]
         edges = [Edge(id=e["id"], from_id=e["from"], to_id=e["to"], rel=e["rel"], props=e["props"]) for e in res["edges"]]
         
         return ContextPackage(

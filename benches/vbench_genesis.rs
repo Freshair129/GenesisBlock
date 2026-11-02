@@ -185,7 +185,7 @@ fn main() {
                 .hybrid_search(HybridSearchInput {
                     query_vector: qv,
                     k: k as u32,
-                    alpha: Some(0.0),
+                    alpha: None,
                     lang: None,
                     as_of: None,
                     collection: coll.clone(),

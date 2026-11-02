@@ -72,7 +72,7 @@ final class RoundTripTests: XCTestCase {
         try await db.flushIndex()
 
         let hits = try await db.search(
-            HybridSearchInput(queryVector: embedding, k: 1, alpha: 0.0)
+            HybridSearchInput(queryVector: embedding, k: 1)
         )
         XCTAssertEqual(hits.first?.node.id, "vec1")
 

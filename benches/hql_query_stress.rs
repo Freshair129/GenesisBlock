@@ -59,7 +59,7 @@ fn main() {
     let queries = [
         "TRAVERSE FROM N-0 DEPTH 5 REL LINK",
         "SEARCH Node SIMILAR TO [10.0; 1536] K 5",
-        "MATCH Node SIMILAR TO [50.0; 1536] ALPHA 0.5",
+        "MATCH Node SIMILAR TO [50.0; 1536]",
     ];
 
     println!("Running HQL queries...");

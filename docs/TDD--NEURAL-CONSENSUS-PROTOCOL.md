@@ -1,8 +1,13 @@
 ---
-status: current
+status: historical
 ---
 
 # Software Requirements Document (SRD): Multi-Agent Neural Consensus
+
+> Historical Mark VI proposal. get_ranked_context, semantic_verify, and the
+> importance-based voting rules below are retired by [the current decision](adr/ADR--GENESISDB-RETIRE-KIMPACT.md).
+> Signature, membership and quorum enforcement are separate engine contracts;
+> this proposal does not establish source truth or semantic contradiction detection.
 
 ## 1. Introduction
 The **Multi-Agent Neural Consensus** module is the pinnacle of Mark VI. It enables a decentralized network of GenesisBlockDB instances to operate as a single **Collective Brain**. It ensures that high-authority knowledge (Axioms) is only accepted into the network after passing a multi-peer validation process.

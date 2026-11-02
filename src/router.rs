@@ -391,21 +391,6 @@ async fn consensus_sign_vote_handler(
     }
 }
 
-async fn consensus_verify_handler(
-    State(state): State<AppState>,
-    ApiJson(event): ApiJson<Event>,
-) -> impl IntoResponse {
-    let storage = state.storage.read();
-    match storage.semantic_verify(&event) {
-        Ok(is_valid) => (StatusCode::OK, Json(is_valid)).into_response(),
-        Err(e) => rest_error_response(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            RestErrorCategory::Integrity,
-            e.to_string(),
-        ),
-    }
-}
-
 async fn bulk_add_nodes_handler(
     State(state): State<AppState>,
     ApiJson(inputs): ApiJson<Vec<NodeInput>>,
@@ -709,6 +694,14 @@ async fn add_edge_handler(
     State(state): State<AppState>,
     ApiJson(input): ApiJson<EdgeInput>,
 ) -> impl IntoResponse {
+    if input.impact.is_some() {
+        return rest_error_response_with_legacy(
+            StatusCode::BAD_REQUEST,
+            RestErrorCategory::Validation,
+            "KIMPACT_REMOVED",
+            "KIMPACT_REMOVED: store application-owned signals under props and rank above the database",
+        );
+    }
     let storage = state.storage.write();
     match storage.add_edge(input) {
         Ok(edge) => (StatusCode::OK, Json(edge)).into_response(),
@@ -975,13 +968,16 @@ async fn execute_hql_handler(
 fn query_ir_error_response(
     error: impl std::fmt::Display,
     category: RestErrorCategory,
+    removed_kimpact: bool,
 ) -> axum::response::Response {
     let message = error.to_string();
     // Keep the historical top-level code as a compatibility-only alias.
     // Stable category/code and HTTP status are selected from request semantics,
     // never from this reason-only diagnostic.
     let candidate = message.split(':').next().unwrap_or("").to_string();
-    let code = if candidate.starts_with("QUERY_") {
+    let code = if removed_kimpact {
+        "KIMPACT_REMOVED".to_string()
+    } else if candidate.starts_with("QUERY_") {
         candidate
     } else {
         "QUERY_EXECUTION_FAILED".to_string()
@@ -1000,6 +996,19 @@ fn query_ir_error_response(
         }
     };
     rest_error_response_with_legacy(status, category, code, message)
+}
+
+/// This retired request shape is classified from the typed request envelope,
+/// before execution. Error response mapping does not inspect diagnostic text.
+fn query_ir_request_uses_removed_kimpact(request: &serde_json::Value) -> bool {
+    let Some(operation) = request.get("operation") else {
+        return false;
+    };
+    operation.get("alpha").is_some()
+        || operation
+            .get("mode")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|mode| mode == "hybrid")
 }
 
 /// Detects only the unsupported operations declared by the capability
@@ -1131,15 +1140,15 @@ fn query_ir_operation_has_invalid_input(operation: &crate::QueryIrOperation) -> 
             query_vector,
             k,
             alpha,
+            mode,
             ef_search,
             oversample,
             ..
         } => {
             *k == 0
                 || *k > crate::QUERY_IR_MAX_K
-                || alpha
-                    .as_ref()
-                    .is_some_and(|value| !value.is_finite() || !(0.0..=1.0).contains(value))
+                || alpha.is_some()
+                || matches!(mode, crate::QueryIrSearchMode::Hybrid)
                 || ef_search.as_ref().is_some_and(|value| *value == 0)
                 || oversample.as_ref().is_some_and(|value| *value == 0)
                 || target_id.is_some() == query_vector.is_some()
@@ -1218,6 +1227,7 @@ async fn execute_query_ir_handler(
             "Engine is rebuilding index...",
         );
     }
+    let removed_kimpact = query_ir_request_uses_removed_kimpact(&request);
     let error_category = query_ir_error_category(&request);
     let storage = Arc::clone(&state.storage);
     let result = tokio::task::spawn_blocking(move || {
@@ -1227,7 +1237,7 @@ async fn execute_query_ir_handler(
     .await;
     match result {
         Ok(Ok(response)) => (StatusCode::OK, Json(response)).into_response(),
-        Ok(Err(error)) => query_ir_error_response(error, error_category),
+        Ok(Err(error)) => query_ir_error_response(error, error_category, removed_kimpact),
         Err(error) => blocking_query_failure(error),
     }
 }
@@ -1275,6 +1285,14 @@ async fn hybrid_search_handler(
     State(state): State<AppState>,
     ApiJson(input): ApiJson<HybridSearchInput>,
 ) -> impl IntoResponse {
+    if input.alpha.is_some() {
+        return rest_error_response_with_legacy(
+            StatusCode::BAD_REQUEST,
+            RestErrorCategory::Validation,
+            "KIMPACT_REMOVED",
+            "KIMPACT_REMOVED: alpha-based ranking was removed; use vector relevance or application-owned ranking",
+        );
+    }
     let _permit = match acquire_query_permit(&state) {
         Some(permit) => permit,
         None => return query_admission_rejected(),
@@ -1299,6 +1317,14 @@ async fn ranked_context_handler(
     State(state): State<AppState>,
     ApiJson(input): ApiJson<HybridSearchInput>,
 ) -> impl IntoResponse {
+    if input.alpha.is_some() {
+        return rest_error_response_with_legacy(
+            StatusCode::BAD_REQUEST,
+            RestErrorCategory::Validation,
+            "KIMPACT_REMOVED",
+            "KIMPACT_REMOVED: alpha-based ranking was removed; use vector relevance or application-owned ranking",
+        );
+    }
     let _permit = match acquire_query_permit(&state) {
         Some(permit) => permit,
         None => return query_admission_rejected(),
@@ -1311,8 +1337,7 @@ async fn ranked_context_handler(
         );
     }
     let storage = Arc::clone(&state.storage);
-    let result =
-        tokio::task::spawn_blocking(move || storage.read().get_ranked_context(input)).await;
+    let result = tokio::task::spawn_blocking(move || storage.read().hybrid_search(input)).await;
     match result {
         Ok(Ok(results)) => (StatusCode::OK, Json(results)).into_response(),
         Ok(Err(error)) => query_storage_error_response(error),
@@ -1636,7 +1661,6 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route("/v1/consensus/vote", post(consensus_vote_handler))
         .route("/v1/consensus/sign-vote", post(consensus_sign_vote_handler))
-        .route("/v1/consensus/verify", post(consensus_verify_handler))
         .layer(TraceLayer::new_for_http())
         .layer(cors_layer())
         // API key guard runs after CORS (so OPTIONS preflight is never blocked)
@@ -1726,6 +1750,45 @@ mod error_contract_tests {
     use tempfile::TempDir;
     use tower::ServiceExt;
 
+    fn test_app() -> (TempDir, Router) {
+        let directory = TempDir::new().unwrap();
+        let storage = Storage::open(crate::OpenOptions {
+            path: directory.path().to_string_lossy().into_owned(),
+            page_cache_mb: Some(16),
+            read_only: Some(false),
+            vector_dim: Some(2),
+            retention: None,
+        })
+        .unwrap();
+        let app = build_router(AppState {
+            storage: Arc::new(RwLock::new(storage)),
+            api_key: None,
+            query_admission: Arc::new(Semaphore::new(DEFAULT_QUERY_ADMISSION)),
+        });
+        (directory, app)
+    }
+
+    async fn assert_kimpact_validation(app: Router, uri: &str, body: &str) {
+        let request = Request::builder()
+            .method("POST")
+            .uri(uri)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(body.to_string()))
+            .unwrap();
+        let response = app.oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let bytes = response.into_body().collect().await.unwrap().to_bytes();
+        let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(body["error"]["category"], "validation");
+        assert_eq!(body["error"]["code"], "GENESIS_VALIDATION_ERROR");
+        assert_eq!(body["error"]["status"], 400);
+        assert_eq!(body["code"], "KIMPACT_REMOVED");
+        assert!(body["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("KIMPACT_REMOVED"));
+    }
+
     #[tokio::test]
     async fn recovery_required_write_returns_durability_envelope() {
         let directory = TempDir::new().unwrap();
@@ -1801,5 +1864,36 @@ mod error_contract_tests {
             .as_str()
             .unwrap_or_default()
             .starts_with("RECOVERY_REQUIRED:"));
+    }
+
+    #[tokio::test]
+    async fn retired_edge_impact_is_a_validation_error() {
+        let (_directory, app) = test_app();
+        assert_kimpact_validation(
+            app,
+            "/v1/edge/add",
+            r#"{"id":"legacy-impact","from":"a","to":"b","rel":"R","impact":0.7}"#,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn retired_hybrid_alpha_is_a_validation_error() {
+        let (_directory, app) = test_app();
+        assert_kimpact_validation(
+            app,
+            "/v1/search/hybrid",
+            r#"{"query_vector":[1.0,0.0],"k":1,"alpha":0.0}"#,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn query_ir_legacy_alpha_and_hybrid_modes_are_validation_errors() {
+        let (_directory, app) = test_app();
+        let alpha = r#"{"contract_version":"query-ir.v1","request_id":"legacy-alpha","operation":{"kind":"search","mode":"vector","target_id":null,"query_vector":[1.0,0.0],"collection":null,"filters":null,"k":1,"alpha":0.0,"language":null,"ef_search":null,"oversample":null}}"#;
+        let hybrid = r#"{"contract_version":"query-ir.v1","request_id":"legacy-hybrid","operation":{"kind":"search","mode":"hybrid","target_id":null,"query_vector":[1.0,0.0],"collection":null,"filters":null,"k":1,"alpha":null,"language":null,"ef_search":null,"oversample":null}}"#;
+        assert_kimpact_validation(app.clone(), "/v1/query/ir", alpha).await;
+        assert_kimpact_validation(app, "/v1/query/ir", hybrid).await;
     }
 }

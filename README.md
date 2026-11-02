@@ -448,11 +448,18 @@ The current evidence-backed report records, on its documented SSD environment:
 
 - **Vector k-NN** (bge-m3 1024-dim, 100k): recall@10 0.984 at approximately 1.1 ms p50, at parity with Chroma on the measured recall/latency frontier.
 - **Graph traversal**: 1-hop p50 approximately 22 µs, O(neighborhood) rather than O(N), and 7–185× faster than server Neo4j on the measured k-hop workloads.
-- **Incremental K-Impact**: O(V_affected), approximately 1.7 µs flat on the measured workload.
 - **Durable ingest**: approximately 2,000 vectors/second bulk and 839 TPS in the measured concurrent write scenario.
 - **Cross-dimension moat bench** (2026-08, 100k×1024 synthetic): fused vector+graph+AS-OF queries 114.9–187.9× versus the DIY single-file SQLite assembly, both sides in-process — see [docs/REPORT--G3-MOAT-VERDICT.md](docs/REPORT--G3-MOAT-VERDICT.md) for the honest caveats (ingest, synthetic corpus, skipped FTS axis).
 
 Do not reuse these values outside the report's workload, hardware, configuration, and caveats.
+
+K-Impact computation, importance blending, and authority-score consumers are
+retired in this source revision. Legacy search `alpha`, scalar
+`EdgeInput.impact`, and Query IR `mode: "hybrid"` are rejected; use vector retrieval and
+application-owned properties/ranking. Historical data is decoded separately
+from current API output. See the [retirement and migration decision](docs/adr/ADR--GENESISDB-RETIRE-KIMPACT.md).
+Published native binaries and pinned deployments require a rebuild and their
+own acceptance before adopting this contract.
 
 ## Documentation Entrypoints
 

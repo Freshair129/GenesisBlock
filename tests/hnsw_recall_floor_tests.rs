@@ -77,7 +77,7 @@ fn search_in(
     s.hybrid_search(HybridSearchInput {
         query_vector: q,
         k,
-        alpha: Some(0.0),
+        alpha: None,
         lang: None,
         as_of: None,
         collection: collection.map(str::to_string),

@@ -52,7 +52,6 @@ class WireFormatTest {
               "id": "n1",
               "labels": ["Person"],
               "props": {"name": "Ada"},
-              "impact": 0.5,
               "valid_from": "2026-07-03T00:00:00Z",
               "valid_to": null,
               "caused_by": null,
@@ -81,7 +80,7 @@ class WireFormatTest {
               "nodes": [],
               "edges": [],
               "super_nodes": [
-                {"cluster_id": 1, "theme": "t", "member_count": 2, "impact": 0.1,
+                {"cluster_id": 1, "theme": "t", "member_count": 2,
                  "centroid": [0.1, 0.2], "timestamp": "2026-07-03T00:00:00Z"}
               ],
               "token_estimate": 42,

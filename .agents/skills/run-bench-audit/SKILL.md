@@ -49,10 +49,10 @@ cargo run --release --features bins --bin shadow-sync-stress   # CRDT sync under
 cargo run --release --features bins --bin hql-query-stress     # HQL execution under load
 ```
 
-Other available bins: `vbench-genesis`, `graph-bench`, `gov-kimpact-bench`,
+Other available bins: `vbench-genesis`, `graph-bench`,
 `edge-interning-audit`, and the server `genesis-db-server`. Pick by what the
-change touches (vectors → vbench/scientific; graph → graph-bench; governance →
-gov-kimpact; edges → edge-interning-audit).
+change touches (vectors → vbench/scientific; graph → graph-bench;
+edges → edge-interning-audit). The retired K-Impact harness is no longer a target.
 
 ## 3. Clean stale scratch DBs between reruns (Windows)
 

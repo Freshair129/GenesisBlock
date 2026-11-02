@@ -254,7 +254,7 @@ def verify_records(base_url: str, records: list[dict[str, Any]]) -> None:
                 base_url,
                 "POST",
                 "/v1/search/hybrid",
-                {"query_vector": record["embedding"], "k": NODE_COUNT, "alpha": 0.0},
+                {"query_vector": record["embedding"], "k": NODE_COUNT},
             )
             require(isinstance(hits, list), f"hybrid search did not return an array: {hits}")
             last_ids = [hit.get("node", {}).get("id") for hit in hits]

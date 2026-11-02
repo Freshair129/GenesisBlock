@@ -44,8 +44,8 @@ The historical classifications below are retained for traceability. They may be 
 | SPEC--BATCH-ATOMICITY | `execute_batch` (`batch_atomicity_tests`) |
 | SPEC--CAUSALITY-CHAINS | `supersede_node`, `caused_by` |
 | SPEC--TEMPORAL-QUERIES | HQL `AS OF`, `is_valid_as_of` (`temporal_queries_tests`) |
-| SPEC--KIMPACT-AND-INFERENCE | `compute_impact`, incremental refresh, `INFER` (P25) |
-| SPEC--GRAPH-RETRIEVAL-LAYER, SPEC--LOGIC-GATED-CONTEXT | `retrieve_context`, `get_ranked_context` (`grl_retrieval_tests`) |
+| SPEC--KIMPACT-AND-INFERENCE | Historical P25 scoring/refresh evidence; retired by ADR--GENESISDB-RETIRE-KIMPACT |
+| SPEC--GRAPH-RETRIEVAL-LAYER, SPEC--LOGIC-GATED-CONTEXT | `retrieve_context` (`grl_retrieval_tests`); old score-only helper retired |
 | SPEC--GRAPH-CLUSTERING, SPEC--HIERARCHICAL-REASONING, SPEC--STATE-TRANSITION-REASONING | `detect_communities`, `generate_meta_graph`, `meta_history` |
 | SPEC--INDEX-COMPACTION | `compact` / `perform_index_compaction` (`compaction_tests`) |
 | SPEC--CROSS-LINGUAL-MAPPING | `set_language_centroid`, centroid mean-centering (`thai_fuzzy_tests`) |

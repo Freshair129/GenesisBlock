@@ -5,7 +5,6 @@ type Node struct {
 	ID        string                 `json:"id"`
 	Labels    []string               `json:"labels"`
 	Props     map[string]interface{} `json:"props"`
-	Impact    float64                `json:"impact,omitempty"`
 	Lang      string                 `json:"lang,omitempty"`
 	ExpiresAt string                 `json:"expires_at,omitempty"`
 }

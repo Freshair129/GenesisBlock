@@ -5,7 +5,10 @@ status: current
 # Software Requirements Document (SRD): Graph Retrieval Layer (GRL)
 
 ## 1. Introduction
-The **Graph Retrieval Layer (GRL)** transforms GenesisBlockDB from a hybrid database into a **Cognitive Retrieval Engine (CRE)**. Instead of raw queries, AI agents interact with the GRL via the **Context Scaling Tier (H0-H6)** protocol. The GRL acts as an intelligent orchestrator that resolves the optimal knowledge radius (Hops), prioritizes high-impact nodes, and compresses context to fit within the agent's token budget.
+The **Graph Retrieval Layer (GRL)** exposes bounded graph context through the
+**Context Scaling Tier (H0-H6)** protocol. It resolves traversal hops, estimates
+token cost, and compresses context to fit the caller's budget. Application
+importance and authority policy remain above the database.
 
 > Tiers are hop counts and nothing more. Work-scope interpretation — what a given
 > radius "means" for a task, and what to do on reaching the ceiling — is a
@@ -27,9 +30,11 @@ The **Graph Retrieval Layer (GRL)** transforms GenesisBlockDB from a hybrid data
 ### FR2: Hybrid Semantic Expansion
 - Retrieval must combine **Vector Similarity** (find relevant concepts) with **Graph Traversal** (expand into related knowledge) to build a coherent Sub-graph.
 
-### FR3: Reasoning-Based Ranking
-- Results must be ranked using a multi-factor scoring engine:
-    - `Score = (SemanticSimilarity * 0.5) + (K-Impact * 0.3) + (GraphProximity * 0.2)`
+### FR3: Explicit retrieval measurements
+- Vector-ranked results expose vector relevance. Graph traversal exposes paths,
+  depth and coverage without claiming business authority or importance.
+- K-Impact and the earlier fixed weighted formula are retired by
+  [ADR--GENESISDB-RETIRE-KIMPACT](adr/ADR--GENESISDB-RETIRE-KIMPACT.md).
 
 ### FR4: Context Budget & Compression
 - The GRL must estimate token costs. If the retrieved graph exceeds the agent's `token_budget`, the system must automatically pivot to **SuperNode Retrieval** (Themes) instead of individual atoms to preserve high-level context.
@@ -89,10 +94,10 @@ pub enum ScalingTier {
 1.  **Input:** `seed_id/query_vector`, `tier`, `budget`.
 2.  **Phase 1 (Identify):** Run HNSW search to find the "Anchor Nodes".
 3.  **Phase 2 (Expand):** Perform BFS traversal starting from Anchors up to `tier.hops()`.
-4.  **Phase 3 (Rank):** Apply the multi-factor scoring formula to the resulting set.
+4.  **Phase 3 (Collect):** Preserve the retrieved graph and its paths/coverage; any business reranking belongs to the caller.
 5.  **Phase 4 (Evaluate):** Estimate tokens (Approx 4 chars per token).
 6.  **Phase 5 (Prune/Compress):** 
-    - If `cost > budget`: Replace low-impact nodes with their cluster's `SuperNode`.
+    - If `cost > budget`: Use cluster `SuperNode` summaries and report compression through coverage; no importance scalar chooses the result.
 7.  **Phase 6 (Pack):** Return the `ContextPackage`.
 
 ## 3. HQL Grammar Update (`hql.pest`)
@@ -113,7 +118,7 @@ tier = { "H0" | "H1" | "H2" | "H3" | "H4" | "H5" | "H6" }
 2.  [ ] HQL `CONTEXT` command successfully parsed and executed.
 3.  [ ] **H1 Verification:** Retrieving H1 context for a node returns only its direct neighbors.
 4.  [ ] **Budget Verification:** Retrieving context with a tiny budget triggers SuperNode fallback.
-5.  [ ] **Ranking Verification:** High-impact nodes are prioritized even if semantically secondary.
+5.  [ ] **Policy isolation:** Legacy importance metadata cannot affect retrieval relevance or context compression.
 
 ---
 **Please review and approve this Specification. I will begin the implementation once approved.**

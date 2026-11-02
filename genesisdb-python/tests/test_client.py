@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from genesisdb import GenesisClient
+from genesisdb.models import Edge, Node
 
 
 class GenesisClientTests(unittest.TestCase):
@@ -41,6 +42,16 @@ class GenesisClientTests(unittest.TestCase):
         self.assertEqual(node.id, "py-node")
         self.assertEqual(node.labels, ["Doc"])
         self.assertEqual(node.props["title"], "Python")
+        self.assertNotIn("impact", node.__dataclass_fields__)
+
+    def test_models_preserve_legacy_metadata_without_importance_policy(self):
+        props = {"legacy.genesisdb.impact": 0.9}
+        node = Node(id="historic", labels=["Doc"], props=props)
+        edge = Edge(id="historic-edge", from_id="historic", to_id="other", rel="LINK", props=props)
+        self.assertEqual(node.props["legacy.genesisdb.impact"], 0.9)
+        self.assertEqual(edge.props["legacy.genesisdb.impact"], 0.9)
+        self.assertNotIn("impact", Node.__dataclass_fields__)
+        self.assertNotIn("impact", Edge.__dataclass_fields__)
 
 
 if __name__ == "__main__":

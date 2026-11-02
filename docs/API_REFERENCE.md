@@ -3,13 +3,15 @@ doc_id: API_REFERENCE
 status: current
 version: generated
 owner: GenesisBlockDB Engineering
-updated: "2026-10-15"
+updated: "2026-11-02"
 ---
 
 # GenesisBlockDB REST API Reference
 
-**Generated from `src/router.rs` (Axum server) — 2026-10-15.** The server is the
-SSOT; update this when routes or response contracts change.
+Base reference generated from `src/router.rs` on 2026-10-15; retirement contracts
+refreshed on 2026-11-02. The server remains the source of truth.
+K-Impact input options and the importance verifier are retired; see
+[the migration decision](adr/ADR--GENESISDB-RETIRE-KIMPACT.md).
 
 - **Base URL:** `http://localhost:3000` (port via `GENESIS_PORT`, bind `0.0.0.0`)
 - **Data dir:** `.brain/gks/storage` (via `GENESIS_DATA_DIR`)
@@ -225,7 +227,7 @@ exact boundary, tests and performance limitations.
 | GET | `/v1/query/ir/capabilities` | _none_ | operation-specific Query IR capability manifest |
 | POST | `/v1/query` | `QueryInput` | `EdgeOutput[]` |
 | POST | `/v1/search/hybrid` | `HybridSearchInput` | `NeighborOutput[]` |
-| POST | `/v1/reason/context` | `HybridSearchInput` | `NeighborOutput[]` (alpha forced 0.4) |
+| POST | `/v1/reason/context` | `HybridSearchInput` | `NeighborOutput[]` (vector relevance) |
 | GET | `/v1/insight/drift/:cluster_id` | path `u32` | `SuperNode[]` |
 | GET | `/v1/insight/communities` | _none_ | `{ nodes, edges }`; 401 authorization error (`ACCESS_CONTEXT_REQUIRED` message) when ACL policy is Enforced |
 | GET | `/v1/insight/gaps` | _none_ | structural gap analysis |
@@ -238,7 +240,6 @@ exact boundary, tests and performance limitations.
 | POST | `/v1/consensus/proposal/import` | `{ proposal: ConsensusProposal }` | `{ imported: true }` after membership, signature, and role checks; requires writable storage |
 | POST | `/v1/consensus/sign-vote` | `{ proposal_id, approve }` | `u8[]` (ed25519 signature) |
 | POST | `/v1/consensus/vote` | `{ proposal_id, peer_id, approve, signature: u8[] }` | `bool` (quorum reached) |
-| POST | `/v1/consensus/verify` | `Event` | `bool` |
 
 Consensus proposals can be relayed between operators with `export` and
 `import`: the proposer exports the signed envelope, each voter imports it before
@@ -343,15 +344,15 @@ implemented operations.
 ```
 SEARCH <target> SIMILAR TO [v1, v2, …] K <k> [IN <collection>] [LANGUAGE "th"] [AS OF "<rfc3339>"]
 TRAVERSE FROM <seed> DEPTH <n> REL <rel|INFER(rel)|ANY> [AS OF "…"]
-MATCH <target> SIMILAR TO [v…] ALPHA <a> [IN <collection>] [LANGUAGE "…"] [AS OF "…"]
+MATCH <target> [SIMILAR TO [v…]] [K <k>] [EF <n>] [OVERSAMPLE <n>] [IN <collection>] [LANGUAGE "…"] [AS OF "…"]
 MATCH (<node>) (<edge> (<node>))* [AS OF "…"] [<clauses>]        # Cypher graph patterns
 CONTEXT FOR <target> TIER <H0..H5> [BUDGET <n>]
 
 # Optional trailing <clauses> on SEARCH / TRAVERSE / MATCH (both forms):
   [ WHERE <field> <op> <value> (AND …)* ] [ ORDER BY <field> (ASC|DESC)? ] [ LIMIT <n> ] [ RETURN <field> ("," …)* ]
 ```
-`~` prefix on target/seed enables fuzzy id resolution. `SEARCH` runs pure vector
-k-NN (alpha=0); `MATCH <t> SIMILAR` is hybrid (vector + K-Impact, k=10). `IN
+`~` prefix on target/seed enables fuzzy id resolution. `SEARCH` and
+`MATCH <t> SIMILAR` run vector retrieval; MATCH defaults to k=10 when K is omitted. `IN
 <collection>` scopes the query to a named vector collection (quoted `"code"` or
 bare `code`); omitted → the `default` collection. The query dim is validated
 against the collection dim.
@@ -375,7 +376,7 @@ paths only in v1 (no variable-length `*`, branching, or `OR`). See
 _(`collection` routes `embedding` into a named vector space; defaults to `default`.)_
 ### NodeOutput
 ```jsonc
-{ "id", "labels": [], "props": {}, "impact": f64?, "embedding": [f64]?,
+{ "id", "labels": [], "props": {}, "embedding": [f64]?,
   "lang": "en"?, "valid_from", "valid_to": null?, "caused_by": null?,
   "expires_at": null?, "clock": { "time": u32, "peer_id": "…" },
   "collection": "default"? }
@@ -387,10 +388,10 @@ collection's arena/HNSW. `collection` records which space it lives in.)_
 ```jsonc
 // EdgeInput
 { "id": "…"?, "from": "N-1", "to": "N-2", "rel": "LINK", "props": {}?,
-  "valid_from": "…"?, "supersede": false?, "impact": f64?, "caused_by": "…"? }
+  "valid_from": "…"?, "supersede": false?, "caused_by": "…"? }
 // EdgeOutput
 { "id", "from": "N-1", "to": "N-2", "rel", "props", "valid_from",
-  "valid_to": null?, "recorded_at", "superseded_by": null?, "impact": f64?,
+  "valid_to": null?, "recorded_at", "superseded_by": null?,
   "caused_by": null?, "clock": { "time", "peer_id" } }
 ```
 **`from`/`to` are node string ids** (interned to `u32` internally only).
@@ -402,7 +403,7 @@ collection's arena/HNSW. `collection` records which space it lives in.)_
 ```
 ### HybridSearchInput (`/v1/search/hybrid`, `/v1/reason/context`)
 ```jsonc
-{ "query_vector": [f64], "k": u32, "alpha": f64?, "lang": "…"?, "as_of": "…"?,
+{ "query_vector": [f64], "k": u32, "lang": "…"?, "as_of": "…"?,
   "collection": "default"? }
 ```
 _(Searches the named collection; query length is validated against the

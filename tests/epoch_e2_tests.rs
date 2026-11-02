@@ -352,7 +352,7 @@ fn meta_v1_gbp1_snapshot_migrates() {
         .hybrid_search(HybridSearchInput {
             query_vector: vec![0.2, 0.2, 0.2, 0.2],
             k: 1,
-            alpha: Some(0.0),
+            alpha: None,
             lang: None,
             as_of: None,
             collection: None,

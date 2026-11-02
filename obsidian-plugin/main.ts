@@ -179,7 +179,6 @@ class GenesisSidebarView extends ItemView {
                 data.forEach((res: any) => {
                     const li = list.createEl("li");
                     li.createEl("b", { text: res.node.id });
-                    li.createEl("span", { text: ` (Impact: ${res.node.impact?.toFixed(2)})` });
                 });
             }
         } catch (e) {
@@ -207,7 +206,7 @@ class HqlQueryModal extends Modal {
                 const data = await response.json();
                 resultsEl.empty();
                 data.forEach((res: any) => {
-                    resultsEl.createDiv({ text: `📄 ${res.node.id} (${res.node.impact?.toFixed(2)})` });
+                    resultsEl.createDiv({ text: `📄 ${res.node.id}` });
                 });
             }
         };

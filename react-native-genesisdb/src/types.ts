@@ -38,7 +38,6 @@ export interface NodeOutput {
   id: string;
   labels: string[];
   props: unknown;
-  impact?: number;
   embedding?: number[];
   lang?: string;
   valid_from: string;
@@ -59,7 +58,6 @@ export interface EdgeOutput {
   valid_to?: string;
   recorded_at: string;
   superseded_by?: string;
-  impact?: number;
   caused_by?: string;
   clock: LogicalClock;
 }
@@ -68,7 +66,6 @@ export interface SuperNode {
   cluster_id: number;
   theme: string;
   member_count: number;
-  impact: number;
   centroid: number[];
   timestamp: string;
   drift?: number;
@@ -92,7 +89,6 @@ export interface NeighborOutput {
 export interface HybridSearchInput {
   query_vector: number[];
   k: number;
-  alpha?: number;
   lang?: string;
   as_of?: string;
   collection?: string;

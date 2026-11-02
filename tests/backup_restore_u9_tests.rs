@@ -256,7 +256,7 @@ fn export_then_clean_restore_preserves_graph_vector_and_manifest_identity() {
         .hybrid_search(HybridSearchInput {
             query_vector: vec![1.0, 0.0, 0.0, 0.0],
             k: 1,
-            alpha: Some(0.0),
+            alpha: None,
             lang: None,
             as_of: None,
             collection: Some("notes".to_string()),

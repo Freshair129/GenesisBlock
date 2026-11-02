@@ -301,7 +301,7 @@ fn cypher_anchor_only() {
 }
 
 // -----------------------------------------------------------------------
-// 12. Disambiguation: the existing hybrid `MATCH <t> SIMILAR TO [..] ALPHA`
+// 12. Disambiguation: vector `MATCH <t> SIMILAR TO [..]`
 //     still parses and runs (must NOT be captured by the pattern rule), while
 //     `MATCH (n)` routes to the new pattern command.
 // -----------------------------------------------------------------------
@@ -332,9 +332,7 @@ fn cypher_does_not_break_hybrid_match() {
     s.flush_index();
 
     // Hybrid form: identifier target + SIMILAR TO — parses as `hybrid`, returns array.
-    let hybrid = s
-        .execute_hql("MATCH n SIMILAR TO [0.1, 0.2] ALPHA 0.5")
-        .unwrap();
+    let hybrid = s.execute_hql("MATCH n SIMILAR TO [0.1, 0.2]").unwrap();
     assert!(
         hybrid.is_array(),
         "hybrid MATCH still returns a result array"

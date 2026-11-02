@@ -21,7 +21,6 @@ vector = { number ~ ("," ~ number)* }
 // "DEPTH always parses to 1" bug. See ADR--GENESISDB-HQL-FILTER-PROJECTION.
 k = @{ ASCII_DIGIT+ }
 depth = @{ ASCII_DIGIT+ }
-alpha = { number }
 ef = @{ ASCII_DIGIT+ }
 oversample = @{ ASCII_DIGIT+ }
 lang_spec = { ^"LANGUAGE" ~ string_lit }
@@ -53,7 +52,7 @@ clauses = { where_clause? ~ order_clause? ~ limit_clause? ~ return_clause? }
 similar_clause = { ^"SIMILAR" ~ ^"TO" ~ "[" ~ vector ~ "]" }
 search = { ^"SEARCH" ~ target ~ similar_clause? ~ ^"K" ~ k ~ ef_spec? ~ oversample_spec? ~ collection_spec? ~ lang_spec? ~ as_of? ~ clauses }
 traverse = { ^"TRAVERSE" ~ ^"FROM" ~ seed ~ ^"DEPTH" ~ depth ~ ^"REL" ~ rel ~ direction_spec? ~ as_of? ~ clauses }
-hybrid = { ^"MATCH" ~ target ~ similar_clause? ~ ^"ALPHA" ~ alpha ~ (^"K" ~ k)? ~ ef_spec? ~ oversample_spec? ~ collection_spec? ~ lang_spec? ~ as_of? ~ clauses }
+hybrid = { ^"MATCH" ~ target ~ similar_clause? ~ (^"K" ~ k)? ~ ef_spec? ~ oversample_spec? ~ collection_spec? ~ lang_spec? ~ as_of? ~ clauses }
 
 // --- Cypher-style graph pattern matching (ADR--GENESISDB-HQL-CYPHER-PATTERNS, path 1) ---
 // A linear path pattern: an anchor node followed by zero+ (edge, node) hops.

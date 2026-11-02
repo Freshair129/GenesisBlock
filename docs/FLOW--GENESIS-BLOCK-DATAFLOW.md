@@ -19,7 +19,7 @@ GenesisBlockDB uses a contiguous memory model for 'Mechanical Sympathy'.
 ## 3. Indexing & Processing Flow
 - **Semantic Path:** Query Vector -> HNSW Graph (Navigation) -> Top-K Arena IDs.
 - **Structural Path:** Node ID -> CSR Adjacency List (BFS/DFS) -> Connected Components.
-- **Scoring Path:** SIMD Dot Product + K-Impact Weighted Sum -> Blended Result Slices.
+- **Scoring Path:** Per-collection vector metric -> optional exact rerank -> vector relevance results. Application importance policy belongs above the engine.
 
 ## 4. Persistence Cycle
 - **WAL (Hot):** Event Serialization -> JSONL Append (Synchronous).

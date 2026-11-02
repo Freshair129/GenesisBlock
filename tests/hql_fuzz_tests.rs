@@ -95,7 +95,7 @@ fn unicode_stress() {
         "\u{FEFF}SEARCH x SIMILAR TO [1.0] K 5",
         "SEARCH x\u{0000}y SIMILAR TO [1.0] K 5",
         "SEARCH \u{202E}x SIMILAR TO [1.0] K 5",
-        "MATCH x SIMILAR TO [\u{FF11}.\u{FF10}] ALPHA 0.5",
+        "MATCH x SIMILAR TO [\u{FF11}.\u{FF10}]",
     ];
     for s in &inputs {
         must_not_panic(s);
@@ -108,10 +108,10 @@ fn unicode_stress() {
 
 const VALID_SEARCH: &str = "SEARCH mynode SIMILAR TO [1.0,2.0,3.0] K 10";
 const VALID_TRAVERSE: &str = "TRAVERSE FROM seed_node DEPTH 3 REL KNOWS";
-const VALID_HYBRID: &str = "MATCH target SIMILAR TO [0.5,0.5] ALPHA 0.7";
+const VALID_HYBRID: &str = "MATCH target SIMILAR TO [0.5,0.5]";
 const VALID_CONTEXT: &str = "CONTEXT FOR node_id TIER H2";
 const VALID_SEARCH_BY_NODE: &str = "SEARCH user:5 K 5 EF 64 OVERSAMPLE 3";
-const VALID_HYBRID_BY_NODE: &str = "MATCH user:5 ALPHA 0.5 K 7 EF 64 OVERSAMPLE 3";
+const VALID_HYBRID_BY_NODE: &str = "MATCH user:5 K 7 EF 64 OVERSAMPLE 3";
 const VALID_TRAVERSE_P0: &str = "TRAVERSE FROM user:5 DEPTH 3 REL LINK|REF DIRECTION both";
 
 #[test]
@@ -186,7 +186,7 @@ fn doubled_keywords() {
     let inputs = [
         "SEARCH SEARCH mynode SIMILAR TO [1.0] K 5",
         "TRAVERSE TRAVERSE FROM seed DEPTH 3 REL KNOWS",
-        "MATCH target SIMILAR SIMILAR TO [0.5] ALPHA 0.7",
+        "MATCH target SIMILAR SIMILAR TO [0.5]",
         "CONTEXT CONTEXT FOR node TIER H1",
         "SEARCH mynode SIMILAR TO TO [1.0] K 5",
         "TRAVERSE FROM FROM seed DEPTH 3 REL KNOWS",
@@ -230,9 +230,9 @@ fn extreme_k_values() {
         "SEARCH x SIMILAR TO [1.0] K 0",
         "SEARCH x K 0",
         "SEARCH x SIMILAR TO [1.0] K 1",
-        "MATCH x ALPHA 0.5 K 1",
+        "MATCH x K 1",
         "SEARCH x SIMILAR TO [1.0] K 999999999",
-        "MATCH x SIMILAR TO [1.0] ALPHA 0.5 K 999999999",
+        "MATCH x SIMILAR TO [1.0] K 999999999",
         "SEARCH x SIMILAR TO [1.0] K 4294967295",
         "SEARCH x SIMILAR TO [1.0] K 99999999999999999999",
     ];
@@ -279,7 +279,7 @@ fn large_vector_dimension() {
 }
 
 #[test]
-fn extreme_alpha_values() {
+fn retired_alpha_values_reject_without_panic() {
     let inputs = [
         "MATCH x SIMILAR TO [1.0] ALPHA 0.0",
         "MATCH x SIMILAR TO [1.0] ALPHA 1.0",
@@ -289,6 +289,10 @@ fn extreme_alpha_values() {
     ];
     for s in &inputs {
         must_not_panic(s);
+        assert!(
+            HqlCommand::try_from(*s).is_err(),
+            "retired ALPHA clause must reject"
+        );
     }
 }
 
@@ -312,11 +316,11 @@ fn p0_optional_vector_and_tuning_values() {
         "SEARCH user:5 K 5 EF 64",
         "SEARCH user:5 K 5 OVERSAMPLE 3",
         "SEARCH user:5 K 5 EF 64 OVERSAMPLE 3",
-        "MATCH x ALPHA 0.5",
-        "MATCH user:5 ALPHA 0.5 K 7",
-        "MATCH user:5 ALPHA 0.5 K 7 EF 64",
-        "MATCH user:5 ALPHA 0.5 K 7 OVERSAMPLE 3",
-        "MATCH user:5 ALPHA 0.5 K 7 EF 64 OVERSAMPLE 3",
+        "MATCH x",
+        "MATCH user:5 K 7",
+        "MATCH user:5 K 7 EF 64",
+        "MATCH user:5 K 7 OVERSAMPLE 3",
+        "MATCH user:5 K 7 EF 64 OVERSAMPLE 3",
     ];
     for s in &inputs {
         must_not_panic(s);
@@ -518,9 +522,9 @@ fn valid_traverse_p0_parses() {
 #[test]
 fn valid_hybrid_parses() {
     parses_ok(VALID_HYBRID);
-    if let Ok(HqlCommand::Hybrid { target, alpha, .. }) = HqlCommand::try_from(VALID_HYBRID) {
+    if let Ok(HqlCommand::Hybrid { target, vector, .. }) = HqlCommand::try_from(VALID_HYBRID) {
         assert_eq!(target, "target");
-        assert!((alpha - 0.7).abs() < 1e-9);
+        assert_eq!(vector, Some(vec![0.5, 0.5]));
     } else {
         panic!("Expected Hybrid variant");
     }
@@ -532,7 +536,6 @@ fn valid_hybrid_by_node_p0_parses() {
     if let Ok(HqlCommand::Hybrid {
         target,
         vector,
-        alpha,
         k,
         ef_search,
         oversample,
@@ -541,7 +544,6 @@ fn valid_hybrid_by_node_p0_parses() {
     {
         assert_eq!(target, "user:5");
         assert_eq!(vector, None);
-        assert!((alpha - 0.5).abs() < 1e-9);
         assert_eq!(k, 7);
         assert_eq!(ef_search, Some(64));
         assert_eq!(oversample, Some(3));

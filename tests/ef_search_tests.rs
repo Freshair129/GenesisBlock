@@ -50,7 +50,7 @@ fn search(s: &Storage, q: Vec<f64>, k: u32, ef: Option<u32>) -> Vec<String> {
     s.hybrid_search(HybridSearchInput {
         query_vector: q,
         k,
-        alpha: Some(0.0),
+        alpha: None,
         lang: None,
         as_of: None,
         collection: None,

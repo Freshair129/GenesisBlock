@@ -12,7 +12,7 @@ Build the **Human-to-Machine Bridge** for GenesisBlockDB. This phase implements 
 ### 2.1 The Genesis Sidebar (Shadow Graph)
 - **View:** A dedicated sidebar panel.
 - **Content:** 
-    - **Current Node Info:** Displays the K-Impact score and Cluster ID of the active note.
+    - **Current Node Info:** Displays the Cluster ID and ordinary metadata of the active note. Retired importance scores are not displayed.
     - **Intelligent Neighbors:** Lists the top 5 neighbors resolved via `INFER(REPORTS_TO)` or physical links.
     - **Similarity Search:** A button to "Find similar notes" across languages (Mark V Step 1).
 

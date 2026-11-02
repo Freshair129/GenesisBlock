@@ -94,7 +94,7 @@ fn test_mark_ix_memory_reclamation_compaction() {
         .hybrid_search(genesis_block_native::HybridSearchInput {
             query_vector: vec![99.0, 0.0, 0.0],
             k: 1,
-            alpha: Some(0.0),
+            alpha: None,
             lang: None,
             as_of: None,
             collection: None,

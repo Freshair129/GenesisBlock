@@ -22,13 +22,6 @@ function tierColor(node: NodeOutput): string {
   return TIER_COLORS[tier] ?? DEFAULT_COLOR;
 }
 
-// Map impact (0..1-ish, may be null) to a node radius.
-function nodeSize(node: NodeOutput): number {
-  const impact = typeof node.impact === "number" ? node.impact : 0;
-  const clamped = Math.max(0, Math.min(1, impact));
-  return 4 + clamped * 12; // 4 (small default) .. 16
-}
-
 // Short, human-ish label for the node.
 function nodeLabel(node: NodeOutput): string {
   const props = node.props;
@@ -61,7 +54,7 @@ export default function GraphView({ nodes, edges, onNodeTap }: GraphViewProps) {
       graph.addNode(node.id, {
         x: Math.cos(angle),
         y: Math.sin(angle),
-        size: nodeSize(node),
+        size: 4,
         color: tierColor(node),
         label: nodeLabel(node),
       });

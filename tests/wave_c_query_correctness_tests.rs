@@ -52,7 +52,7 @@ fn query(vector: Vec<f64>, k: u32) -> HybridSearchInput {
     HybridSearchInput {
         query_vector: vector,
         k,
-        alpha: Some(0.0),
+        alpha: None,
         lang: None,
         as_of: None,
         collection: None,
@@ -113,7 +113,7 @@ fn filtered_ann_refills_large_collection_when_ef_is_smaller_than_fetch() {
         HybridSearchInput {
             query_vector: vec![0.0, 0.0],
             k: 3,
-            alpha: Some(0.0),
+            alpha: None,
             lang: None,
             as_of: None,
             collection: None,
@@ -203,7 +203,7 @@ fn temporal_search_normalizes_rfc3339_and_hides_future_nodes() {
     let as_of = HybridSearchInput {
         query_vector: vec![1.0, 0.0],
         k: 2,
-        alpha: Some(0.0),
+        alpha: None,
         lang: None,
         as_of: Some("2025-01-01T00:00:00Z".to_string()),
         collection: None,

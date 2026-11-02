@@ -26,8 +26,8 @@ The multi-stage discovery process.
 
 1. **Resolve + validate:** Pick the query's `collection` (default if unset); validate the query length against the collection dim.
 2. **Search Phase:** HNSW semantic lookup within that collection's index.
-3. **Expansion Phase:** BFS structural traversal from semantic seeds via `out_idx` / `in_idx`.
-4. **Ranking Phase:** Blend vector similarity with K-Impact.
+3. **Graph traversal (when requested):** `neighbors` or context retrieval traverses from seeds via `out_idx` / `in_idx`.
+4. **Ranking Phase:** Order search results by vector relevance, with the existing per-collection rerank options. No importance blend is applied.
 5. **Delivery:** Slice to `k` and return via FFI or JSON.
 
 ## 4. Maintenance (Compaction)

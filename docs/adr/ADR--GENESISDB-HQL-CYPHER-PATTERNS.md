@@ -46,7 +46,7 @@ analogue of the filter/projection ADR's "planner-free" stance.
 
 ### Keyword disambiguation (no breaking change)
 
-`MATCH` is already the hybrid command (`MATCH <target> SIMILAR TO [..] ALPHA n`).
+`MATCH` is already the hybrid command (`MATCH <target> SIMILAR TO [..]`).
 A Cypher pattern always begins with `(`; a hybrid target is an identifier/string
 and never starts with `(`. The grammar orders `match_pattern` **before** `hybrid`
 in the top-level choice, so `MATCH (` → pattern and `MATCH foo SIMILAR` →

@@ -4,8 +4,8 @@ type: spec
 status: current
 tier: process
 cluster: implementation_flow
-role: "HQL v1 language specification — the query language exactly as shipped on main (2026-07-03), defects documented as-is"
-date: 2026-07-03
+role: "HQL v1 command contract with historical audit appendix"
+date: 2026-11-02
 related:
   - adr/ADR--GENESISDB-HQL-FILTER-PROJECTION
   - adr/ADR--GENESISDB-HQL-CYPHER-PATTERNS
@@ -16,9 +16,13 @@ related:
 
 # SPEC — HQL v1 (current, as-shipped)
 
-**This document specifies HQL exactly as it behaves on `main` as of 2026-07-03** (post PR #60). It is descriptive, not aspirational: known defects are specified as current behavior and cross-referenced to the refinement plan that fixes them. The target spec after refinement is [SPEC--HQL-V2](SPEC--HQL-V2.md).
+The command contract below includes the P0 grammar refinements and the
+[K-Impact retirement](adr/ADR--GENESISDB-RETIRE-KIMPACT.md). The July 2026
+defect register and measurements at the end are historical evidence.
 
-**Source of truth:** grammar `src/query/hql.pest` (loaded by `pest_derive` via `src/query/ast.rs`), executor `Storage::execute_hql` (`src/lib.rs:3326`), clause transforms `apply_hql_clauses` (`src/lib.rs:2927`) and `match_pattern` (`src/lib.rs:3037`). Where this document and the code disagree, the code wins and this document has a bug.
+**Source of truth:** grammar `src/query/hql.pest`, parser `src/query/ast.rs`,
+and executor `Storage::execute_hql` in `src/lib.rs`, with the HQL integration
+and fuzz tests. Source line numbers vary as the engine evolves.
 
 ---
 
@@ -28,9 +32,9 @@ HQL (Hybrid Query Language) is GenesisBlockDB's text query language: **five fixe
 
 | Command | Dispatches to | Returns |
 |---|---|---|
-| `SEARCH` | `hybrid_search` (α = 0.0) | node list |
+| `SEARCH` | `hybrid_search` (vector relevance) | node list |
 | `TRAVERSE` | `neighbors` | node list |
-| `MATCH <target> SIMILAR TO …` (hybrid) | `hybrid_search` (α = user) | node list |
+| `MATCH <target> [SIMILAR TO …]` | `hybrid_search` (vector relevance) | node list |
 | `MATCH (pattern)` (Cypher-style) | `match_pattern` | binding rows |
 | `CONTEXT` | `retrieve_context` (GRL) | `ContextPackage` |
 
@@ -47,7 +51,9 @@ Grammar changes therefore land on all three surfaces simultaneously; only doc te
 ### 1.2 Lexical rules
 
 - Keywords are **case-insensitive** (`^"…"` pest rules); `search`, `Search`, `SEARCH` are equivalent.
-- `identifier = (ASCII_ALPHANUMERIC | "_" | "-")+`. **Colons are not identifier characters**: ids like `user:5` MUST be written as string literals (`"user:5"`). *(Known ergonomics gap — the filter ADR's own `TRAVERSE FROM user:5` example does not parse. Refinement: PLAN--HQL-REFINEMENT P0-T0/T9.)*
+- Identifiers contain ASCII alphanumerics, `_` and `-`. Colon-qualified IDs such
+  as `user:5` are accepted in command target/seed positions; pattern labels
+  retain their existing colon grammar. Quoted string IDs are also accepted.
 - `string_lit` = double-quoted, no escape sequences (`(!"\"" ~ ANY)*` — a literal `"` cannot appear inside).
 - `number` = optional sign, digits, optional decimal part. Digit-only rules (`k`, `depth`, `budget`, `limit_n`) are **atomic** — the fix for the historical "DEPTH always parses to 1" whitespace bug (see ADR--GENESISDB-HQL-FILTER-PROJECTION).
 - Whitespace: space/tab/CR/LF between tokens.
@@ -59,41 +65,44 @@ Grammar changes therefore land on all three surfaces simultaneously; only doc te
 ### 2.1 SEARCH — pure vector search
 
 ```
-SEARCH [~]<target> SIMILAR TO [ <n>(,<n>)* ] K <k>
+SEARCH [~]<target> [SIMILAR TO [ <n>(,<n>)* ]] K <k> [EF <n>] [OVERSAMPLE <n>]
        [IN <collection>] [LANGUAGE "<lang>"] [AS OF "<ts>"] [<clauses>]
 ```
 
-- Executes `hybrid_search` with `alpha = 0.0` (pure vector similarity; no K-Impact blend).
+- Executes vector retrieval through `hybrid_search`. Retired importance options are rejected.
 - `K <k>` is **required** and sets the retrieval pool size.
-- **The target is decorative.** It is resolved — including the expensive `~` fuzzy path (§4.1) — into a variable that is **never used**; the search runs on the literal vector alone (`src/lib.rs:3343-3347`). *(Defect. Refinement: P0-T1 makes the target meaningful — search-by-node.)*
+- An explicit vector supplies the query. When it is omitted, the target node's
+  stored embedding supplies it; fuzzy target resolution applies to that lookup.
 - `IN <collection>` scopes the search to a named vector collection and validates query dimension against it; default = `default` collection.
 - `LANGUAGE "<lang>"` adds the named language centroid to the query vector before search (if that centroid exists).
 - `AS OF "<ts>"` applies bitemporal validity filtering (§4.2).
-- Knobs **not** expressible: `ef_search`, `oversample` — both are hardwired to `None` (`src/lib.rs:3355-3356`), so HQL cannot use the per-query recall levers that exist on `HybridSearchInput`. *(Gap. Refinement: P0-T3.)*
+- `EF` and `OVERSAMPLE` expose the per-query HNSW and rerank controls.
 
 ### 2.2 TRAVERSE — k-hop graph traversal
 
 ```
 TRAVERSE FROM [~]<seed> DEPTH <d> REL <rel | INFER(<rel>)>
-         [AS OF "<ts>"] [<clauses>]
+         [DIRECTION <out|in|both>] [AS OF "<ts>"] [<clauses>]
 ```
 
-- Executes `neighbors` (BFS over adjacency indices), **outgoing direction only** — `direction` is hardcoded `"out"` (`src/lib.rs:3383`) although the engine supports `in`/`both`. *(Gap. Refinement: P0-T4.)*
-- Exactly **one** rel type; `INFER(<rel>)` requests inferred-relationship traversal. The engine's multi-rel filter (`rels`) is not reachable. *(Gap. Refinement: P0-T4.)*
+- Executes `neighbors` (BFS over adjacency indices); direction defaults to `out`
+  and may be explicitly `in` or `both`.
+- Relation alternation such as `LINK|REF` and `ANY` are supported;
+  `INFER(<rel>)` requests inferred-relationship traversal.
 - No retrieval limit is passed (`limit: None`) — `LIMIT` in the clauses truncates only **after** the full BFS materializes. `DEPTH` is the only retrieval bound.
-- `~` fuzzy seed **is** honored (unlike SEARCH): the resolved id seeds the traversal.
+- A fuzzy seed resolves the traversal's starting ID.
 - BFS semantics: node-deduplicated (`visited` set — each node is reported once, via its first-discovered path), results carry the full path.
 
-### 2.3 MATCH … SIMILAR TO — hybrid search
+### 2.3 MATCH … SIMILAR TO — vector retrieval
 
 ```
-MATCH [~]<target> SIMILAR TO [ <vector> ] ALPHA <a>
+MATCH [~]<target> [SIMILAR TO [ <vector> ]] [K <k>] [EF <n>] [OVERSAMPLE <n>]
       [IN <collection>] [LANGUAGE "<lang>"] [AS OF "<ts>"] [<clauses>]
 ```
 
-- Executes `hybrid_search` with the user's `ALPHA` = blend weight for the K-Impact graph signal (engine default α = 0.0 per ADR--GENESISDB-KIMPACT-AS-SIGNAL; the signal is opt-in).
-- **`k` is hardcoded to 10** (`src/lib.rs:3409`) — there is no `K` clause on this form, so the candidate pool is always 10 and `LIMIT` can only shrink it. *(Defect. Refinement: P0-T2.)*
-- Target handling has the same discard defect as SEARCH.
+- Executes vector retrieval. `ALPHA` is no longer part of the grammar.
+- `K` controls the candidate count; omitting it uses the existing default of 10.
+- Target/vector selection follows SEARCH. No importance score participates.
 - Keyword collision note: `MATCH (` routes to the pattern command (§2.4); `MATCH <ident|string> SIMILAR` routes here. The grammar orders `match_pattern` before `hybrid`; PEG backtracking makes this unambiguous.
 
 ### 2.4 MATCH (pattern) — Cypher-style linear path matching
@@ -165,14 +174,19 @@ Optional trailing clauses, applied to the already-materialized result list **in 
 - Pattern command: array of binding rows `{<var>: <node|edge JSON>, …}` — or flat projected objects keyed `a`, `a.id`, `a.<propkey>`.
 - CONTEXT: `ContextPackage` object.
 
-### 4.5 Error model & numeric fallbacks
+### 4.5 Error model and numeric validation
 
 - Unparseable queries return `Err("HQL Parse Error: <pest error with position>")` — a string error over every surface (REST maps to an error response; NAPI rejects the promise). **Zero panics** across a 5,000+ input fuzz corpus (AUDIT--HQL-FUZZ, 34/34).
-- **Silent numeric fallbacks (specified as current behavior, scheduled for removal):** an in-grammar numeric token that fails Rust-side parsing (overflow) silently becomes a default — `K` → 5, `DEPTH` → 1, `ALPHA` → 0.5, `BUDGET` → 32000, vector component → 0.0. Only `LIMIT`'s saturate is intended. *(Defect class. Refinement: P0-T5 turns these into parse errors.)*
+- Numeric overflow in K, DEPTH, BUDGET and vector components returns a parse
+  error instead of substituting a value. LIMIT retains its documented saturation.
+- A retired ALPHA clause is rejected by the grammar.
 
 ---
 
-## 5. Known-defect register (v1, all scheduled)
+## 5. Historical July 2026 defect register
+
+This table records the original audit, not the current acceptance status.
+The P0 command refinements above supersede its earlier syntax and defaults.
 
 | # | Behavior specified above | Class | Fix |
 |---|---|---|---|
@@ -188,7 +202,7 @@ Optional trailing clauses, applied to the already-materialized result list **in 
 | 10 | AND-only WHERE, no aggregation, no label index | scope | P2 |
 | 11 | No text query without a caller-supplied vector (path 3) | scope | P3 (ADR first) |
 
-## 6. Verification status (v1)
+## 6. Historical verification evidence (July 2026)
 
 - **Tests:** `tests/hql.rs`, `hql_collection_tests.rs`, `hql_filter_tests.rs` (27), `hql_cypher_tests.rs` (13), `hql_fuzz_tests.rs` (34/34, ~5k inputs, zero panics). All run under `cargo test --no-default-features` (Linux-CI linkable).
 - **Bench:** `benches/hql_query_stress.rs` (`cargo run --release --features bins --bin hql-query-stress`) — covers the node-list commands; **no pattern-match rows yet** (added by P1-T6).
