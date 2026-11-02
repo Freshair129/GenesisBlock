@@ -1478,12 +1478,15 @@ Search-performance qualification remains open: 24-query single-run distributions
 | `benches/scripts/vector_memory_matrix.ps1` | Fresh-directory matrix runner, free-memory admission and owned-process RSS guard |
 | `.brain/rca/2026-10-31-vector-memory-allocations.md` and `2026-10-31-vector-memory-timeouts.md` | Source evidence, staged hypotheses, RED/GREEN, causes, review and prevention |
 | This report and `docs/reports/evidence/vector-memory-20261031/`, `docs/reports/evidence/vector-memory-followup-20261031/` | Separate initial/follow-up raw results, provenance and validation receipts |
+| docs/reports/evidence/vector-memory-nov02-seeded-topology-20261102/ | Four seeded real-BGE before/after pairs, cross-seed/query comparisons, per-query records, guard receipts and checksums |
 
 No production database, deployed addon, release or ADR was changed. Seven original
 staged HQL2 documentation/test files were kept intact; their hashes are in baseline
 provenance and the source-verification receipt. Verification uses separate local
-worktrees and scratch database directories. No commit, push or deployment is included.
-### Seed-controlled topology investigation (2026-11-01, partial)
+worktrees and scratch database directories. The scoped audit report and evidence
+commits are recorded in Git; nothing was pushed or deployed.
+
+### Seed-controlled topology investigation (2026-11-01 through 2026-11-02)
 
 The pinned `hnsw_rs 0.3.4` constructs its level generator with OS-seeded
 `StdRng`; a fixed seed alone is not proof of an identical graph. A diagnostic-only
@@ -1554,8 +1557,18 @@ to 92.09%; one window also fell below the 6 GiB free-memory requirement, with
 and no additional multi-seed comparison or fresh deadline result. Admission
 samples, configuration, and the no-launch receipt are recorded in
 `docs/reports/evidence/vector-memory-seed43-gate-recheck-20261101/`.
-The previously completed seed 42 pair remains the only controlled real-BGE pair;
-its topology, recall, latency and RSS results above have not changed.
+At that point, the previously completed seed 42 pair was the only controlled
+real-BGE pair; its topology, recall, latency and RSS results above have not
+changed.
+
+On 2026-11-02, two independently launched seed 43 before-side attempts produced
+the same initial graph byte for byte (SHA-256
+`7f7d0d8679789e399f2e3b9810fb6a47acc1e95637a0a0a472e093dadb2f1d14`) and identical
+returned IDs on both initial query sweeps (recall@10 0.9875; recall@100
+0.982917). This confirms repeatable seeded rebuilds for this benchmark input and
+binary even though one run was stopped before reopening. It strengthens the
+interpretation that different seeds change approximate recall. It still does
+not qualify a seed 43 before/after checkpoint pair.
 
 #### 2026-11-02 seed 43 diagnostic
 
@@ -1575,7 +1588,76 @@ comparison or reopen correctness. Its partial evidence is retained under
 A fresh before-side retry then exhausted the existing ten-minute admission wait
 without launching. All 13 admission windows exceeded the 20% CPU threshold; the
 lowest average was 26.82%. External compiler processes also appeared during the
-wait. Thus neither the seed 43 after-side nor any additional complete pair was
-run, and seed 43 latency, RSS, reopen deadline, and before/after recall remain
-unverified. The retry admission samples and no-launch receipt are retained with
-the interrupted evidence. No budget or warm-up policy was changed.
+wait. At that point, the seed 43 after-side and additional complete pairs had not
+run; the retry admission samples and no-launch receipt remain retained with the
+interrupted evidence. The subsequent successful pairs are recorded below. No
+budget or warm-up policy was changed.
+
+#### 2026-11-02 seeded real-BGE before/after pairs
+
+The final host resource-gate recheck before starting seed 45 passed: five CPU
+samples averaged 13.39%, free RAM was 17.64 GiB, and no Cargo/rustc process was
+active. Each of the eight individual run launches also passed its own original
+admission and process-tree guard. Each run used a clean directory, the same real BGE-M3 repository fixture
+(11,266 vectors × 1,024 dimensions), 24 fixed queries, F32, no rerank, ef=200,
+and the existing 5,000 ms query deadline and 2 GiB process-tree RSS ceiling.
+Corpus, query, truth and metadata hashes matched in each pair and inputs were
+unchanged after every run. No warm-up query was issued. Per-query outputs,
+guard/admission receipts, graph snapshots, and checksums are in
+docs/reports/evidence/vector-memory-nov02-seeded-topology-20261102/.
+
+Two independent seed 43 pairs and one pair each at seeds 44 and 45 completed.
+For every pair, the initial graph and post-reopen graph had identical bytes
+before and after the code change. Each graph contained 11,266 nodes with no
+missing nodes and zero differences in level, slot, ordered neighbor records or
+neighbor ID sets. The two seed 43 repetitions produced the same graph hash and
+identical returned IDs across all 24 queries for k=10, k=100 and reopened k=10,
+on both binaries. Seeds 44 and 45 produced distinct graph hashes and changed
+returned IDs versus the seed 43 reference on 3/24 and 4/24 k=10 queries, and
+22/24 and 23/24 k=100 queries, respectively. Seed 44 kept aggregate recall@10
+unchanged while seed 45 raised it from 0.987500 to 0.991667; recall@100 moved
+from 0.982917 to 0.981667 and 0.975000. This supports a link between seeded
+HNSW topology and candidate variation in this fixture. It does not establish
+that every prior recall difference has the same cause.
+
+| Pair / seed | Graph SHA-256 (initial and reopened) | Recall@10 before/after | Recall@100 before/after | Reopened recall@10 before/after | First reopened query, ms before → after | Peak process-tree RSS, MB before → after |
+|---|---|---:|---:|---:|---:|---:|
+| 43d / 43 | 7f7d0d8679789e399f2e3b9810fb6a47acc1e95637a0a0a472e093dadb2f1d14 | 0.987500 / 0.987500 | 0.982917 / 0.982917 | 0.987500 / 0.987500 | 3,228.393 → 4.665 | 334.705 → 331.383 (-0.99%) |
+| 43f / 43 | 7f7d0d8679789e399f2e3b9810fb6a47acc1e95637a0a0a472e093dadb2f1d14 | 0.987500 / 0.987500 | 0.982917 / 0.982917 | 0.987500 / 0.987500 | 2,842.761 → 4.833 | 357.782 → 325.706 (-8.97%) |
+| 44a / 44 | bdf213a04e0ebb73ea583f2b81034859138501a95a81969b4f12dcc3bd77d844 | 0.987500 / 0.987500 | 0.981667 / 0.981667 | 0.987500 / 0.987500 | 3,380.844 → 4.477 | 377.496 → 334.238 (-11.46%) |
+| 45a / 45 | 9618183f6195839ca81338f3de8bcbe53e311951a092d13f319efb3718c216b1 | 0.991667 / 0.991667 | 0.975000 / 0.975000 | 0.991667 / 0.991667 | 3,148.684 → 5.046 | 323.478 → 338.379 (+4.61%) |
+
+All 24 queries completed without error in each initial k=10, initial k=100 and
+same-process reopened k=10 sweep. Returned IDs and hit IDs were identical
+before/after within every pair. The first query after reopen took 2.843–3.381 s
+before and 4.477–5.046 ms after, within the unchanged 5,000 ms deadline. The
+separate fresh-child reopen check confirmed READY index coverage for all 11,266
+vectors, with no missing, pending or extra entries; that child check does not
+issue a query.
+
+| Pair / seed | Initial k=10 p50 / p95 / p99, ms before → after | Initial k=100 p50 / p95 / p99, ms before → after | Reopened k=10 p50 / p95 / p99, ms before → after |
+|---|---:|---:|---:|
+| 43d / 43 | 4.511 / 5.824 / 5.856 → 4.340 / 5.551 / 5.937 | 5.975 / 6.785 / 6.874 → 5.734 / 6.226 / 6.234 | 4.385 / 4.931 / 3,228.393 → 4.598 / 5.214 / 5.507 |
+| 43f / 43 | 4.304 / 4.749 / 5.179 → 4.695 / 5.224 / 5.784 | 6.300 / 7.176 / 7.803 → 6.663 / 8.572 / 9.305 | 4.342 / 4.830 / 2,842.761 → 4.769 / 5.591 / 6.233 |
+| 44a / 44 | 4.510 / 4.938 / 5.226 → 4.461 / 4.874 / 4.924 | 6.214 / 6.782 / 7.139 → 6.202 / 6.966 / 6.997 | 4.739 / 6.018 / 3,380.844 → 4.283 / 4.709 / 4.742 |
+| 45a / 45 | 4.357 / 4.913 / 4.940 → 4.359 / 4.748 / 4.779 | 6.004 / 6.780 / 7.342 → 6.218 / 7.861 / 10.903 | 4.366 / 4.878 / 3,148.684 → 4.936 / 6.880 / 7.123 |
+
+Each latency percentile is based on 24 queries. The reopened p99 includes the
+single first-query latency shown above; it is therefore a cold-after-reopen
+sample rather than a stable steady-state estimate. Steady-state latency moved
+in both directions across pairs, especially at k=100. The peak RSS sample also
+fell in three of these four pairs and rose 4.61% in the seed 45 pair. Including
+the earlier seed 42 pair (+6.18% RSS), these small-fixture runs do not establish
+a consistent RSS reduction. RSS is sampled process-tree working set, not an
+exact allocation count. The fresh-child checker reports open/coverage only, so
+the query deadline result here is specifically for the same-process reopen
+sweep. This 11,266-vector result does not replace the separate 100k
+fresh-reopen qualification.
+
+The earlier seed 42 pair remains in its original evidence directory. Together,
+the five controlled pairs show exact topology and query-result parity within
+each fixed-seed pair, with no recall loss from the measured checkpoint/reopen
+path. Recall differs across seeds, confirming that seed control is necessary
+when investigating ANN recall. The pinned production implementation and data
+format were not changed for this diagnostic; no unsafe vector sharing or
+structural deduplication was introduced.
