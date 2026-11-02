@@ -1,0 +1,78 @@
+{
+  "at": "2026-11-02T19:09:44.1586227+07:00",
+  "sample_count": 11,
+  "sample_interval_seconds": 1,
+  "cpu_avg_pct": 16.36,
+  "cpu_gate": "avg < 20%",
+  "cpu_gate_pass": true,
+  "min_free_ram_bytes": 17625829376.0,
+  "ram_gate": ">= 6 GiB",
+  "ram_gate_pass": true,
+  "active_relevant_processes": [],
+  "compiler_gate_pass": true,
+  "c_free_bytes": 34191015936,
+  "c_free_gib": 31.84,
+  "d_free_bytes": 1712427008,
+  "d_free_gib": 1.59,
+  "copy_helper_required_free_gib": 50,
+  "copy_space_gate_pass": false,
+  "benchmark_launched": false,
+  "result": "NO_LAUNCH",
+  "samples": [
+    {
+      "at": "2026-11-02T19:09:30.1445100+07:00",
+      "cpu_pct": 10.0,
+      "free_ram_bytes": 17764466688
+    },
+    {
+      "at": "2026-11-02T19:09:31.5358139+07:00",
+      "cpu_pct": 5.0,
+      "free_ram_bytes": 17760374784
+    },
+    {
+      "at": "2026-11-02T19:09:32.9236935+07:00",
+      "cpu_pct": 13.0,
+      "free_ram_bytes": 17761177600
+    },
+    {
+      "at": "2026-11-02T19:09:34.3143277+07:00",
+      "cpu_pct": 11.0,
+      "free_ram_bytes": 17737404416
+    },
+    {
+      "at": "2026-11-02T19:09:35.6918814+07:00",
+      "cpu_pct": 16.0,
+      "free_ram_bytes": 17741025280
+    },
+    {
+      "at": "2026-11-02T19:09:37.0714641+07:00",
+      "cpu_pct": 21.0,
+      "free_ram_bytes": 17715687424
+    },
+    {
+      "at": "2026-11-02T19:09:38.4392493+07:00",
+      "cpu_pct": 6.0,
+      "free_ram_bytes": 17731551232
+    },
+    {
+      "at": "2026-11-02T19:09:39.8368329+07:00",
+      "cpu_pct": 11.0,
+      "free_ram_bytes": 17712984064
+    },
+    {
+      "at": "2026-11-02T19:09:41.2445892+07:00",
+      "cpu_pct": 43.0,
+      "free_ram_bytes": 17625829376
+    },
+    {
+      "at": "2026-11-02T19:09:42.6289084+07:00",
+      "cpu_pct": 33.0,
+      "free_ram_bytes": 17633746944
+    },
+    {
+      "at": "2026-11-02T19:09:44.0067790+07:00",
+      "cpu_pct": 11.0,
+      "free_ram_bytes": 17720344576
+    }
+  ]
+}

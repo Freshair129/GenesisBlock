@@ -1661,3 +1661,18 @@ path. Recall differs across seeds, confirming that seed control is necessary
 when investigating ANN recall. The pinned production implementation and data
 format were not changed for this diagnostic; no unsafe vector sharing or
 structural deduplication was introduced.
+
+#### 2026-11-02 clean 100k fixture admission recheck
+
+The 11-sample, one-second resource check passed the CPU/RAM/process gates:
+average CPU was 16.36%, minimum free RAM was 17,625,829,376 bytes, and no
+compiler or benchmark process was active. The pristine paired-copy helper still
+requires at least 50 GiB free on its C: scratch volume; C: had 31.84 GiB free
+and D: had 1.59 GiB. The storage prerequisite therefore failed. No new fixture
+copy or engine process was launched, and existing run directories were not
+reused as pristine inputs. This check adds no new 100k query, recall or RSS
+result; the historical before/after fresh-process results above retain their
+original scope and limitations. The 5,000 ms query deadline, 1,200 s job cap,
+2 GiB process-tree RSS cap and no-warm-up policy were unchanged. The exact
+no-launch admission receipt and its checksum are in
+`docs/reports/evidence/vector-memory-resource-recheck-20261102/`.
