@@ -937,3 +937,110 @@ fn cached_compaction_bytes_preserve_all_graph_envelopes_and_bounds() {
     assert_eq!(fallback.signature, signed.signature);
     assert!(full.entries.is_empty());
 }
+
+#[test]
+fn sidecar_cache_evicts_by_decoded_payload_bytes_at_max_collection_dimension() {
+    use std::io::{Seek, SeekFrom, Write};
+
+    const EXPECTED_CACHE_BUDGET: usize = 16 * 1024 * 1024;
+    let dim = 65_535usize;
+    let row_bytes = dim * std::mem::size_of::<f32>();
+    let rows = EXPECTED_CACHE_BUDGET / row_bytes + 1;
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("max-dimension-sidecar.bin");
+    let mut file = std::fs::File::create(path).unwrap();
+    file.set_len((rows * row_bytes) as u64).unwrap();
+    for d_id in 0..rows {
+        file.seek(SeekFrom::Start((d_id * row_bytes) as u64))
+            .unwrap();
+        file.write_all(&(d_id as f32).to_le_bytes()).unwrap();
+    }
+
+    let reader = SidecarReader::new(file, dim);
+    for d_id in 0..rows {
+        let row = reader.row(d_id).unwrap();
+        assert_eq!(row.len(), dim);
+        assert_eq!(row[0], d_id as f32);
+        assert!(
+            reader.cache_bytes() <= EXPECTED_CACHE_BUDGET,
+            "retained decoded-row capacity exceeded the 16 MiB per-reader budget"
+        );
+    }
+    let cache = reader.cache.lock();
+    assert!(!cache.map.contains_key(&0), "the least-recent row should be evicted");
+    assert!(cache.map.contains_key(&(rows - 1)));
+    assert!(cache.order.len() <= SIDECAR_CACHE_ROWS);
+}
+
+#[test]
+fn sidecar_cache_keeps_the_existing_row_ceiling_at_ordinary_dimensions() {
+    use std::io::Write;
+
+    let dim = 1usize;
+    let rows = SIDECAR_CACHE_ROWS + 1;
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("row-limit-sidecar.bin");
+    let mut file = std::fs::File::create(path).unwrap();
+    for d_id in 0..rows {
+        file.write_all(&(d_id as f32).to_le_bytes()).unwrap();
+    }
+
+    let reader = SidecarReader::new(file, dim);
+    for d_id in 0..rows {
+        assert_eq!(reader.row(d_id).unwrap(), vec![d_id as f32]);
+    }
+    let (cache_len, has_oldest, has_newest) = {
+        let cache = reader.cache.lock();
+        (
+            cache.map.len(),
+            cache.map.contains_key(&0),
+            cache.map.contains_key(&(rows - 1)),
+        )
+    };
+    assert_eq!(cache_len, SIDECAR_CACHE_ROWS);
+    assert!(!has_oldest);
+    assert!(has_newest);
+    assert!(reader.cache_bytes() <= 16 * 1024 * 1024);
+}
+
+#[test]
+fn sidecar_cache_skips_one_over_budget_row_but_returns_the_disk_value() {
+    use std::io::{Seek, SeekFrom, Write};
+
+    const EXPECTED_CACHE_BUDGET: usize = 16 * 1024 * 1024;
+    let dim = EXPECTED_CACHE_BUDGET / std::mem::size_of::<f32>() + 1;
+    let row_bytes = dim * std::mem::size_of::<f32>();
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("oversize-sidecar.bin");
+    let mut file = std::fs::File::create(path).unwrap();
+    file.set_len(row_bytes as u64).unwrap();
+    file.write_all(&17.25f32.to_le_bytes()).unwrap();
+    file.seek(SeekFrom::Start(((dim - 1) * std::mem::size_of::<f32>()) as u64))
+        .unwrap();
+    file.write_all(&(-3.5f32).to_le_bytes()).unwrap();
+
+    let reader = SidecarReader::new(file, dim);
+    let row = reader.row(0).unwrap();
+    assert_eq!(row.len(), dim);
+    assert_eq!(row[0], 17.25);
+    assert_eq!(row[dim - 1], -3.5);
+    assert_eq!(reader.cache_bytes(), 0);
+    assert!(reader.cache.lock().map.is_empty());
+}
+
+#[test]
+fn sidecar_cache_truncate_clears_byte_accounting_and_cached_rows() {
+    use std::io::Write;
+
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("truncate-sidecar.bin");
+    let mut file = std::fs::File::create(path).unwrap();
+    file.write_all(&5.0f32.to_le_bytes()).unwrap();
+
+    let reader = SidecarReader::new(file, 1);
+    assert_eq!(reader.row(0).unwrap(), vec![5.0]);
+    assert!(reader.cache_bytes() > 0);
+    reader.truncate_empty().unwrap();
+    assert_eq!(reader.cache_bytes(), 0);
+    assert!(reader.row(0).is_none());
+}
