@@ -948,7 +948,12 @@ fn sidecar_cache_evicts_by_decoded_payload_bytes_at_max_collection_dimension() {
     let rows = EXPECTED_CACHE_BUDGET / row_bytes + 1;
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("max-dimension-sidecar.bin");
-    let mut file = std::fs::File::create(path).unwrap();
+    let mut file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .open(path)
+        .unwrap();
     file.set_len((rows * row_bytes) as u64).unwrap();
     for d_id in 0..rows {
         file.seek(SeekFrom::Start((d_id * row_bytes) as u64))
@@ -967,7 +972,10 @@ fn sidecar_cache_evicts_by_decoded_payload_bytes_at_max_collection_dimension() {
         );
     }
     let cache = reader.cache.lock();
-    assert!(!cache.map.contains_key(&0), "the least-recent row should be evicted");
+    assert!(
+        !cache.map.contains_key(&0),
+        "the least-recent row should be evicted"
+    );
     assert!(cache.map.contains_key(&(rows - 1)));
     assert!(cache.order.len() <= SIDECAR_CACHE_ROWS);
 }
@@ -980,7 +988,12 @@ fn sidecar_cache_keeps_the_existing_row_ceiling_at_ordinary_dimensions() {
     let rows = SIDECAR_CACHE_ROWS + 1;
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("row-limit-sidecar.bin");
-    let mut file = std::fs::File::create(path).unwrap();
+    let mut file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .open(path)
+        .unwrap();
     for d_id in 0..rows {
         file.write_all(&(d_id as f32).to_le_bytes()).unwrap();
     }
@@ -1012,11 +1025,18 @@ fn sidecar_cache_skips_one_over_budget_row_but_returns_the_disk_value() {
     let row_bytes = dim * std::mem::size_of::<f32>();
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("oversize-sidecar.bin");
-    let mut file = std::fs::File::create(path).unwrap();
+    let mut file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .open(path)
+        .unwrap();
     file.set_len(row_bytes as u64).unwrap();
     file.write_all(&17.25f32.to_le_bytes()).unwrap();
-    file.seek(SeekFrom::Start(((dim - 1) * std::mem::size_of::<f32>()) as u64))
-        .unwrap();
+    file.seek(SeekFrom::Start(
+        ((dim - 1) * std::mem::size_of::<f32>()) as u64,
+    ))
+    .unwrap();
     file.write_all(&(-3.5f32).to_le_bytes()).unwrap();
 
     let reader = SidecarReader::new(file, dim);
@@ -1034,7 +1054,12 @@ fn sidecar_cache_truncate_clears_byte_accounting_and_cached_rows() {
 
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("truncate-sidecar.bin");
-    let mut file = std::fs::File::create(path).unwrap();
+    let mut file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .open(path)
+        .unwrap();
     file.write_all(&5.0f32.to_le_bytes()).unwrap();
 
     let reader = SidecarReader::new(file, 1);
