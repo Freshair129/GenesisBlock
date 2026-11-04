@@ -4606,7 +4606,8 @@ impl ArenaStore {
         ) -> std::io::Result<()> {
             let mut buffer = [0u8; 8192];
             for chunk in values.chunks(buffer.len() / N) {
-                for (value, bytes) in chunk.iter().zip(buffer.chunks_exact_mut(N)) {
+                let encoded = &mut buffer[..chunk.len() * N];
+                for (value, bytes) in chunk.iter().zip(encoded.chunks_mut(N)) {
                     bytes.copy_from_slice(&encode(value));
                 }
                 writer.write_all(&buffer[..chunk.len() * N])?;
@@ -4861,11 +4862,11 @@ impl VecIndex {
     }
 }
 
-/// Fixed capacity (in rows) of the per-`SidecarReader` LRU decode cache. Bounds
-/// the resident bytes at `SIDECAR_CACHE_ROWS * dim * 4` regardless of collection
-/// size, so the cache can never re-create the resident-RAM problem the on-disk
-/// sidecar exists to solve. 4096 rows × 1024 dim × 4 B ≈ 16 MiB worst case.
+/// Fixed capacity (in rows) of the per-`SidecarReader` LRU decode cache.
 pub const SIDECAR_CACHE_ROWS: usize = 4096;
+/// Retained decoded-row payload limit for one `SidecarReader`, excluding cache
+/// metadata, caller-owned/transient copies, other readers, and process RSS.
+const SIDECAR_CACHE_BYTES: usize = 16 * 1024 * 1024;
 
 /// Positioned-read view over `fvec_<name>.bin` — the exact-f32 rerank sidecar,
 /// kept ON DISK (post-P0) instead of resident in a `Vec<f32>`. Row `d_id` lives
@@ -4874,16 +4875,16 @@ pub const SIDECAR_CACHE_ROWS: usize = 4096;
 /// use `seek_read` (Windows) / `read_at` (Unix) behind `#[cfg]` — NEVER mmap
 /// (see ADR--GENESISDB-ONDISK-RERANK-SIDECAR for the Windows-safety rationale).
 ///
-/// A small bounded LRU (`SIDECAR_CACHE_ROWS`) fronts the disk so hot rerank rows
-/// don't re-hit the file. The cache `Mutex` is strictly nested: `row()` takes it
-/// only to look up / insert a decoded row and releases it before/after the disk
-/// read — it is never held across, and never wraps, the arena or `meta` locks,
-/// so the `meta → arena → sidecar` order is preserved.
+/// A small bounded LRU (`SIDECAR_CACHE_ROWS`, `SIDECAR_CACHE_BYTES`) fronts the
+/// disk so hot rerank rows don't re-hit the file. The cache `Mutex` is strictly
+/// nested: `row()` takes it only to look up / insert a decoded row and releases
+/// it before/after the disk read — it is never held across, and never wraps, the
+/// arena or `meta` locks, so the `meta → arena → sidecar` order is preserved.
 pub struct SidecarReader {
     file: File,
     dim: usize,
     /// Bounded LRU: `(d_id -> decoded row)` newest-last. Hand-rolled over a
-    /// `Vec` (no new crate dep); capacity == `SIDECAR_CACHE_ROWS`.
+    /// `Vec` (no new crate dep); bounded by rows and retained payload bytes.
     cache: parking_lot::Mutex<SidecarCache>,
 }
 
@@ -4894,6 +4895,7 @@ pub struct SidecarReader {
 struct SidecarCache {
     map: HashMap<usize, Vec<f32>>,
     order: VecDeque<usize>,
+    bytes: usize,
 }
 
 impl SidecarCache {
@@ -4901,6 +4903,7 @@ impl SidecarCache {
         SidecarCache {
             map: HashMap::new(),
             order: VecDeque::new(),
+            bytes: 0,
         }
     }
 
@@ -4923,19 +4926,37 @@ impl SidecarCache {
     }
 
     fn put(&mut self, d_id: usize, row: Vec<f32>) {
-        if self.map.insert(d_id, row).is_some() {
-            // Key already resident: the value is overwritten above; just bump recency.
+        if self.map.contains_key(&d_id) {
+            // A concurrent miss may have populated this key while the disk read
+            // was in flight. Keep the accounted resident row and bump recency.
             self.touch(d_id);
             return;
         }
-        while self.order.len() >= SIDECAR_CACHE_ROWS {
+
+        let Some(row_bytes) = row.capacity().checked_mul(std::mem::size_of::<f32>()) else {
+            return;
+        };
+        if row_bytes > SIDECAR_CACHE_BYTES {
+            return;
+        }
+
+        while self.map.len() >= SIDECAR_CACHE_ROWS || self.bytes > SIDECAR_CACHE_BYTES - row_bytes {
             if let Some(evict) = self.order.pop_front() {
-                self.map.remove(&evict);
+                if let Some(evicted_row) = self.map.remove(&evict) {
+                    let evicted_bytes = evicted_row
+                        .capacity()
+                        .saturating_mul(std::mem::size_of::<f32>());
+                    self.bytes = self.bytes.saturating_sub(evicted_bytes);
+                }
             } else {
-                break;
+                // An inconsistent order/map must not let the cache exceed either
+                // bound. Refuse this admission and leave existing rows intact.
+                return;
             }
         }
-        // Row was inserted above; the new key just needs its recency slot.
+
+        self.bytes += row_bytes;
+        self.map.insert(d_id, row);
         self.order.push_back(d_id);
     }
 }
@@ -4944,12 +4965,7 @@ impl SidecarReader {
     /// Allocated decoded-row payload only; excludes cache container overhead and
     /// caller-owned copies. Taking this metric never reads or populates the file.
     pub fn cache_bytes(&self) -> usize {
-        self.cache
-            .lock()
-            .map
-            .values()
-            .map(|row| row.capacity() * 4)
-            .sum()
+        self.cache.lock().bytes
     }
     /// `pub` (not just `pub(crate)`) so `tests/*.rs` integration crates — which
     /// link against this crate as an external dependency — can construct a
@@ -5015,6 +5031,7 @@ impl SidecarReader {
         let mut c = self.cache.lock();
         c.map.clear();
         c.order.clear();
+        c.bytes = 0;
         Ok(())
     }
 

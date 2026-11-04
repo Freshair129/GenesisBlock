@@ -1676,3 +1676,33 @@ original scope and limitations. The 5,000 ms query deadline, 1,200 s job cap,
 2 GiB process-tree RSS cap and no-warm-up policy were unchanged. The exact
 no-launch admission receipt and its checksum are in
 `docs/reports/evidence/vector-memory-resource-recheck-20261102/`.
+
+#### 2026-11-05 per-reader sidecar-cache byte-bound follow-up
+
+Source review found that the existing `SIDECAR_CACHE_ROWS = 4096` limit did
+not bound retained decoded-row bytes independently of collection dimension.
+At the admitted maximum dimension of 65,535, a row-count-only full cache can
+retain about 1.0 GiB of decoded `f32` payload in one reader. This is an
+analytical source bound; no runtime OOM, customer impact, or unauthenticated
+remote reachability has been observed or established.
+
+The implementation candidate now keeps both the 4,096-row ceiling and a
+16 MiB per-`SidecarReader` decoded-row-capacity ceiling. It evicts least-recent
+rows until both limits admit a new row, skips caching an individually
+over-budget row while returning its disk-decoded value, and clears accounted
+bytes when truncation clears the cache. The metric covers retained `Vec<f32>`
+capacity only; it excludes LRU metadata, returned/transient copies, other
+readers or collections, allocator overhead, and process RSS. This is not a
+global memory guarantee and does not bound the public constructor's transient
+allocation for arbitrary caller-provided dimensions.
+
+Test-first hosted evidence is tied to the exact test-only candidate, not to
+the historical benchmark runs above. On `b96f36497045498e40ee7c648c10bc4d666adab2`,
+Ubuntu job `126718951950` ran 73 tests: 70 passed, two cache-bound tests failed,
+and one existing test was ignored. The maximum-dimension case exceeded the
+16 MiB assertion; the single-row case retained 16,777,220 bytes instead of
+zero. The ordinary-dimension row-limit and truncate-accounting tests passed.
+The byte-aware implementation and this dated report update are not yet
+qualified by hosted green checks at this point in the record. The original
+seeded topology, query, and RSS measurements above retain their original
+candidate and provenance; they are not measurements of this cache change.

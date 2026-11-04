@@ -1,5 +1,11 @@
 use super::*;
 
+fn cached_sidecar_payload_bytes(reader: &SidecarReader) -> usize {
+    reader.cache.lock().map.values().fold(0usize, |total, row| {
+        total.saturating_add(row.capacity().saturating_mul(std::mem::size_of::<f32>()))
+    })
+}
+
 struct BoundedWriter {
     bytes: Vec<u8>,
     fail_after: Option<usize>,
@@ -966,11 +972,17 @@ fn sidecar_cache_evicts_by_decoded_payload_bytes_at_max_collection_dimension() {
         let row = reader.row(d_id).unwrap();
         assert_eq!(row.len(), dim);
         assert_eq!(row[0], d_id as f32);
+        assert_eq!(row[dim - 1], 0.0);
         assert!(
             reader.cache_bytes() <= EXPECTED_CACHE_BUDGET,
             "retained decoded-row capacity exceeded the 16 MiB per-reader budget"
         );
+        assert_eq!(reader.cache_bytes(), cached_sidecar_payload_bytes(&reader));
     }
+    let bytes_before_hit = reader.cache_bytes();
+    assert_eq!(reader.row(rows - 1).unwrap()[0], (rows - 1) as f32);
+    assert_eq!(reader.cache_bytes(), bytes_before_hit);
+    assert_eq!(reader.cache_bytes(), cached_sidecar_payload_bytes(&reader));
     let cache = reader.cache.lock();
     assert!(
         !cache.map.contains_key(&0),
@@ -1014,6 +1026,7 @@ fn sidecar_cache_keeps_the_existing_row_ceiling_at_ordinary_dimensions() {
     assert!(!has_oldest);
     assert!(has_newest);
     assert!(reader.cache_bytes() <= 16 * 1024 * 1024);
+    assert_eq!(reader.cache_bytes(), cached_sidecar_payload_bytes(&reader));
 }
 
 #[test]
@@ -1045,6 +1058,7 @@ fn sidecar_cache_skips_one_over_budget_row_but_returns_the_disk_value() {
     assert_eq!(row[0], 17.25);
     assert_eq!(row[dim - 1], -3.5);
     assert_eq!(reader.cache_bytes(), 0);
+    assert_eq!(reader.cache_bytes(), cached_sidecar_payload_bytes(&reader));
     assert!(reader.cache.lock().map.is_empty());
 }
 
@@ -1065,7 +1079,9 @@ fn sidecar_cache_truncate_clears_byte_accounting_and_cached_rows() {
     let reader = SidecarReader::new(file, 1);
     assert_eq!(reader.row(0).unwrap(), vec![5.0]);
     assert!(reader.cache_bytes() > 0);
+    assert_eq!(reader.cache_bytes(), cached_sidecar_payload_bytes(&reader));
     reader.truncate_empty().unwrap();
     assert_eq!(reader.cache_bytes(), 0);
+    assert_eq!(reader.cache_bytes(), cached_sidecar_payload_bytes(&reader));
     assert!(reader.row(0).is_none());
 }
