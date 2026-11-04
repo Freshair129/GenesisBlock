@@ -32,9 +32,14 @@ use hnsw_rs::prelude::*;
 use napi::bindgen_prelude::*;
 #[cfg(feature = "napi-bindings")]
 use napi_derive::napi;
+#[cfg(feature = "napi-bindings")]
+mod napi_compat;
 use roaring::RoaringBitmap;
 use rusqlite::types::{Value as SqlValue, ValueRef};
 use rusqlite::{params, params_from_iter, Connection, OpenFlags, OptionalExtension};
+
+#[cfg(test)]
+mod legacy_kimpact_tests;
 
 const GOSSIP_MAX_PEERS: usize = 256;
 const GOSSIP_MAX_PENDING_SYNC_REQUESTS: usize = 256;
@@ -369,14 +374,15 @@ pub struct LogicalClock {
     pub peer_id: String,
 }
 
-#[cfg_attr(feature = "napi-bindings", napi(object))]
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct NodeOutput {
     pub id: String,
     pub labels: Vec<String>,
     pub props: serde_json::Value,
-    pub impact: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Hidden typed decoder state for historical signed event envelopes.
+    /// Runtime JSON/NAPI output omits it; it is never an importance score.
+    #[doc(hidden)]
+    pub legacy_wire_impact: LegacyImpactWire,
     pub embedding: Option<Vec<f64>>,
     pub lang: Option<String>,
     pub valid_from: String,
@@ -386,11 +392,148 @@ pub struct NodeOutput {
     pub clock: LogicalClock,
     /// Which vector collection this node's embedding lives in (None = default).
     /// Persisted in the WAL `Event::Node` so replay rebuilds the right space.
-    #[serde(default)]
     pub collection: Option<String>,
 }
 
-#[cfg_attr(feature = "napi-bindings", napi(object))]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[doc(hidden)]
+pub enum LegacyImpactWire {
+    #[default]
+    Absent,
+    Null,
+    Number(f64),
+}
+
+impl LegacyImpactWire {
+    fn is_absent(&self) -> bool {
+        matches!(self, Self::Absent)
+    }
+}
+
+impl Serialize for LegacyImpactWire {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Absent | Self::Null => serializer.serialize_none(),
+            Self::Number(value) => serializer.serialize_f64(*value),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for LegacyImpactWire {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct ImpactVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for ImpactVisitor {
+            type Value = LegacyImpactWire;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("a legacy impact number or null")
+            }
+
+            fn visit_none<E>(self) -> std::result::Result<Self::Value, E> {
+                Ok(LegacyImpactWire::Null)
+            }
+
+            fn visit_unit<E>(self) -> std::result::Result<Self::Value, E> {
+                Ok(LegacyImpactWire::Null)
+            }
+
+            fn visit_some<D>(self, deserializer: D) -> std::result::Result<Self::Value, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                f64::deserialize(deserializer).map(LegacyImpactWire::Number)
+            }
+        }
+
+        deserializer.deserialize_option(ImpactVisitor)
+    }
+}
+
+impl Serialize for NodeOutput {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        #[derive(Serialize)]
+        struct NodePublicRef<'a> {
+            id: &'a str,
+            labels: &'a [String],
+            props: &'a Value,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            embedding: Option<&'a Vec<f64>>,
+            lang: &'a Option<String>,
+            valid_from: &'a str,
+            valid_to: &'a Option<String>,
+            caused_by: &'a Option<String>,
+            expires_at: &'a Option<String>,
+            clock: &'a LogicalClock,
+            collection: &'a Option<String>,
+        }
+        NodePublicRef {
+            id: &self.id,
+            labels: &self.labels,
+            props: &self.props,
+            embedding: self.embedding.as_ref(),
+            lang: &self.lang,
+            valid_from: &self.valid_from,
+            valid_to: &self.valid_to,
+            caused_by: &self.caused_by,
+            expires_at: &self.expires_at,
+            clock: &self.clock,
+            collection: &self.collection,
+        }
+        .serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for NodeOutput {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct NodeOwned {
+            id: String,
+            labels: Vec<String>,
+            props: Value,
+            #[serde(default, rename = "impact")]
+            legacy_wire_impact: LegacyImpactWire,
+            #[serde(default)]
+            embedding: Option<Vec<f64>>,
+            lang: Option<String>,
+            valid_from: String,
+            valid_to: Option<String>,
+            caused_by: Option<String>,
+            expires_at: Option<String>,
+            clock: LogicalClock,
+            #[serde(default)]
+            collection: Option<String>,
+        }
+        let node = NodeOwned::deserialize(deserializer)?;
+        Ok(Self {
+            id: node.id,
+            labels: node.labels,
+            props: node.props,
+            legacy_wire_impact: node.legacy_wire_impact,
+            embedding: node.embedding,
+            lang: node.lang,
+            valid_from: node.valid_from,
+            valid_to: node.valid_to,
+            caused_by: node.caused_by,
+            expires_at: node.expires_at,
+            clock: node.clock,
+            collection: node.collection,
+        })
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct EdgeInput {
     pub id: Option<String>,
@@ -400,12 +543,13 @@ pub struct EdgeInput {
     pub props: Option<serde_json::Value>,
     pub valid_from: Option<String>,
     pub supersede: Option<bool>,
+    /// Request-only compatibility slot so runtime bindings can return
+    /// `KIMPACT_REMOVED`; omitted from the generated TypeScript contract.
     pub impact: Option<f64>,
     pub caused_by: Option<String>,
 }
 
-#[cfg_attr(feature = "napi-bindings", napi(object))]
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct EdgeOutput {
     pub id: String,
     pub from: String,
@@ -416,9 +560,324 @@ pub struct EdgeOutput {
     pub valid_to: Option<String>,
     pub recorded_at: String,
     pub superseded_by: Option<String>,
-    pub impact: Option<f64>,
+    /// Hidden typed decoder state for historical signed event envelopes.
+    /// Runtime JSON/NAPI output omits it; it is never an importance score.
+    #[doc(hidden)]
+    pub legacy_wire_impact: LegacyImpactWire,
     pub caused_by: Option<String>,
     pub clock: LogicalClock,
+}
+
+impl Serialize for EdgeOutput {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        #[derive(Serialize)]
+        struct EdgePublicRef<'a> {
+            id: &'a str,
+            from: &'a str,
+            to: &'a str,
+            rel: &'a str,
+            props: &'a Value,
+            valid_from: &'a str,
+            valid_to: &'a Option<String>,
+            recorded_at: &'a str,
+            superseded_by: &'a Option<String>,
+            caused_by: &'a Option<String>,
+            clock: &'a LogicalClock,
+        }
+        EdgePublicRef {
+            id: &self.id,
+            from: &self.from,
+            to: &self.to,
+            rel: &self.rel,
+            props: &self.props,
+            valid_from: &self.valid_from,
+            valid_to: &self.valid_to,
+            recorded_at: &self.recorded_at,
+            superseded_by: &self.superseded_by,
+            caused_by: &self.caused_by,
+            clock: &self.clock,
+        }
+        .serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for EdgeOutput {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct EdgeOwned {
+            id: String,
+            from: String,
+            to: String,
+            rel: String,
+            props: Value,
+            valid_from: String,
+            valid_to: Option<String>,
+            recorded_at: String,
+            superseded_by: Option<String>,
+            #[serde(default, rename = "impact")]
+            legacy_wire_impact: LegacyImpactWire,
+            caused_by: Option<String>,
+            clock: LogicalClock,
+        }
+        let edge = EdgeOwned::deserialize(deserializer)?;
+        Ok(Self {
+            id: edge.id,
+            from: edge.from,
+            to: edge.to,
+            rel: edge.rel,
+            props: edge.props,
+            valid_from: edge.valid_from,
+            valid_to: edge.valid_to,
+            recorded_at: edge.recorded_at,
+            superseded_by: edge.superseded_by,
+            legacy_wire_impact: edge.legacy_wire_impact,
+            caused_by: edge.caused_by,
+            clock: edge.clock,
+        })
+    }
+}
+
+struct NodeEventRef<'a>(&'a NodeOutput);
+
+type LegacyNodeEventWireRef<'a> = NodeEventRef<'a>;
+
+impl<'a> From<&'a NodeOutput> for NodeEventRef<'a> {
+    fn from(node: &'a NodeOutput) -> Self {
+        Self(node)
+    }
+}
+
+impl Serialize for NodeEventRef<'_> {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let node = self.0;
+        let mut state = serializer.serialize_struct(
+            "NodeOutput",
+            if node.legacy_wire_impact.is_absent() {
+                12
+            } else {
+                13
+            },
+        )?;
+        state.serialize_field("id", &node.id)?;
+        state.serialize_field("labels", &node.labels)?;
+        state.serialize_field("props", &node.props)?;
+        if !node.legacy_wire_impact.is_absent() {
+            state.serialize_field("impact", &node.legacy_wire_impact)?;
+        }
+        if node.embedding.is_some() {
+            state.serialize_field("embedding", &node.embedding)?;
+        }
+        state.serialize_field("lang", &node.lang)?;
+        state.serialize_field("valid_from", &node.valid_from)?;
+        state.serialize_field("valid_to", &node.valid_to)?;
+        state.serialize_field("caused_by", &node.caused_by)?;
+        state.serialize_field("expires_at", &node.expires_at)?;
+        state.serialize_field("clock", &node.clock)?;
+        state.serialize_field("collection", &node.collection)?;
+        state.end()
+    }
+}
+
+struct EdgeEventRef<'a>(&'a EdgeOutput);
+
+type LegacyEdgeEventWireRef<'a> = EdgeEventRef<'a>;
+
+impl<'a> From<&'a EdgeOutput> for EdgeEventRef<'a> {
+    fn from(edge: &'a EdgeOutput) -> Self {
+        Self(edge)
+    }
+}
+
+impl Serialize for EdgeEventRef<'_> {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let edge = self.0;
+        let mut state = serializer.serialize_struct(
+            "EdgeOutput",
+            if edge.legacy_wire_impact.is_absent() {
+                11
+            } else {
+                12
+            },
+        )?;
+        state.serialize_field("id", &edge.id)?;
+        state.serialize_field("from", &edge.from)?;
+        state.serialize_field("to", &edge.to)?;
+        state.serialize_field("rel", &edge.rel)?;
+        state.serialize_field("props", &edge.props)?;
+        state.serialize_field("valid_from", &edge.valid_from)?;
+        state.serialize_field("valid_to", &edge.valid_to)?;
+        state.serialize_field("recorded_at", &edge.recorded_at)?;
+        state.serialize_field("superseded_by", &edge.superseded_by)?;
+        if !edge.legacy_wire_impact.is_absent() {
+            state.serialize_field("impact", &edge.legacy_wire_impact)?;
+        }
+        state.serialize_field("caused_by", &edge.caused_by)?;
+        state.serialize_field("clock", &edge.clock)?;
+        state.end()
+    }
+}
+
+mod legacy_node_event_wire {
+    use super::*;
+
+    pub fn serialize<S>(node: &NodeOutput, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        NodeEventRef(node).serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> std::result::Result<NodeOutput, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        NodeOutput::deserialize(deserializer)
+    }
+}
+
+mod legacy_edge_event_wire {
+    use super::*;
+
+    pub fn serialize<S>(edge: &EdgeOutput, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        EdgeEventRef(edge).serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> std::result::Result<EdgeOutput, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        EdgeOutput::deserialize(deserializer)
+    }
+}
+
+mod legacy_node_event_wire_vec {
+    use super::*;
+
+    pub fn serialize<S>(nodes: &[NodeOutput], serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        nodes
+            .iter()
+            .map(NodeEventRef)
+            .collect::<Vec<_>>()
+            .serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> std::result::Result<Vec<NodeOutput>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Vec::<NodeOutput>::deserialize(deserializer)
+    }
+}
+
+mod legacy_edge_event_wire_vec {
+    use super::*;
+
+    pub fn serialize<S>(edges: &[EdgeOutput], serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        edges
+            .iter()
+            .map(EdgeEventRef)
+            .collect::<Vec<_>>()
+            .serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> std::result::Result<Vec<EdgeOutput>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Vec::<EdgeOutput>::deserialize(deserializer)
+    }
+}
+
+const LEGACY_IMPACT_PROP: &str = "legacy.genesisdb.impact";
+const LEGACY_ORIGINAL_PROPS_PROP: &str = "legacy.genesisdb.original_props";
+
+fn migrate_legacy_impact(props: &mut Value, impact: &mut LegacyImpactWire) -> Result<()> {
+    let LegacyImpactWire::Number(legacy_value) = *impact else {
+        *impact = LegacyImpactWire::Absent;
+        return Ok(());
+    };
+    let legacy_number = serde_json::Number::from_f64(legacy_value).ok_or_else(|| {
+        Error::from_reason("KIMPACT_MIGRATION_INVALID: legacy impact is not a finite JSON number")
+    })?;
+    let mut object = match &*props {
+        Value::Object(object) => object.clone(),
+        other => {
+            let mut wrapped = serde_json::Map::new();
+            wrapped.insert(LEGACY_ORIGINAL_PROPS_PROP.to_string(), other.clone());
+            wrapped
+        }
+    };
+    if let Some(existing) = object.get(LEGACY_IMPACT_PROP) {
+        if existing.as_f64() != Some(legacy_value) {
+            return Err(Error::from_reason(
+                "KIMPACT_MIGRATION_CONFLICT: props.legacy.genesisdb.impact already contains a different value",
+            ));
+        }
+    } else {
+        object.insert(LEGACY_IMPACT_PROP.to_string(), Value::Number(legacy_number));
+    }
+    *props = Value::Object(object);
+    *impact = LegacyImpactWire::Absent;
+    Ok(())
+}
+
+fn migrate_legacy_node_impact(node: &mut NodeOutput) -> Result<()> {
+    migrate_legacy_impact(&mut node.props, &mut node.legacy_wire_impact)
+}
+
+fn migrate_legacy_edge_impact(edge: &mut EdgeOutput) -> Result<()> {
+    migrate_legacy_impact(&mut edge.props, &mut edge.legacy_wire_impact)
+}
+
+fn reject_legacy_impact(impact: Option<f64>) -> Result<()> {
+    if impact.is_some() {
+        return Err(Error::from_reason(
+            "KIMPACT_REMOVED: impact-based ranking and authority were removed; store application-owned signals under props and rank above the database",
+        ));
+    }
+    Ok(())
+}
+
+fn event_has_legacy_impact(event: &Event) -> bool {
+    match event {
+        Event::Node(node) => !node.legacy_wire_impact.is_absent(),
+        Event::Edge(edge) => !edge.legacy_wire_impact.is_absent(),
+        Event::Batch(events) => events.iter().any(event_has_legacy_impact),
+        Event::Transaction(transaction) => {
+            transaction
+                .nodes
+                .iter()
+                .any(|node| !node.legacy_wire_impact.is_absent())
+                || transaction
+                    .edges
+                    .iter()
+                    .any(|edge| !edge.legacy_wire_impact.is_absent())
+        }
+        _ => false,
+    }
 }
 
 #[cfg_attr(feature = "napi-bindings", napi)]
@@ -529,19 +988,17 @@ pub struct NeighborOutput {
     pub node: NodeOutput,
     pub path: Vec<EdgeOutput>,
     pub depth: u32,
-    /// Relevance score for ranked results (hybrid_search): the blended
-    /// `similarity*(1-alpha) + impact*alpha`. `None` for graph traversal
-    /// (`neighbors`), which is not relevance-ranked. Kept separate from
-    /// `node.impact` so the caller still sees the node's true graph-authority
-    /// signal and can fuse it itself (see ADR--GENESISDB-KIMPACT-AS-SIGNAL).
+    /// Vector relevance score for ranked results. `None` for graph traversal
+    /// (`neighbors`), which is not relevance-ranked.
     pub score: Option<f64>,
 }
 
-#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct HybridSearchInput {
     pub query_vector: Vec<f64>,
     pub k: u32,
+    /// Request-only compatibility slot so runtime bindings can return
+    /// `KIMPACT_REMOVED`; omitted from the generated TypeScript contract.
     pub alpha: Option<f64>,
     pub lang: Option<String>,
     pub as_of: Option<String>,
@@ -1436,7 +1893,6 @@ pub struct StudioGraphNode {
     pub valid_from: String,
     pub valid_to: Option<String>,
     pub caused_by: Option<String>,
-    pub impact: Option<f64>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -2415,7 +2871,9 @@ pub struct GenesisTransactionEvent {
     pub local_frame_seq: Option<u64>,
     pub payload_hash: String,
     pub relational: Vec<RelationalMutationGroup>,
+    #[serde(with = "legacy_node_event_wire_vec")]
     pub nodes: Vec<NodeOutput>,
+    #[serde(with = "legacy_edge_event_wire_vec")]
     pub edges: Vec<EdgeOutput>,
     pub vectors: Vec<VectorEvent>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -2620,8 +3078,8 @@ pub enum Event {
     CollectionMaterialization(CollectionMaterialization),
     /// Values are already prepared at the collection's resident/sidecar fidelity.
     VectorMaterialized(VectorEvent),
-    Node(NodeOutput),
-    Edge(EdgeOutput),
+    Node(#[serde(with = "legacy_node_event_wire")] NodeOutput),
+    Edge(#[serde(with = "legacy_edge_event_wire")] EdgeOutput),
     Batch(Vec<Event>),
     /// Attach an additional vector to an existing node in a named collection
     /// (a node may hold one vector per collection — e.g. code + text embeddings).
@@ -2836,6 +3294,89 @@ fn compacted_revision_checkpoint_payload(
     Ok(payload)
 }
 
+fn remove_json_path(value: &mut Value, path: &[&str]) -> Option<Value> {
+    let (last, parents) = path.split_last()?;
+    let mut current = value;
+    for key in parents {
+        current = current.get_mut(*key)?;
+    }
+    current.as_object_mut()?.remove(*last)
+}
+
+fn legacy_numeric_payload_matches(
+    actual: &Value,
+    expected: &Value,
+    path: &[&str],
+    expected_number: f64,
+) -> bool {
+    if actual == expected {
+        return true;
+    }
+    let mut actual_without_number = actual.clone();
+    let mut expected_without_number = expected.clone();
+    let Some(actual_number) = remove_json_path(&mut actual_without_number, path) else {
+        return false;
+    };
+    let Some(expected_value) = remove_json_path(&mut expected_without_number, path) else {
+        return false;
+    };
+    actual_number.as_f64() == Some(expected_number)
+        && expected_value.as_f64() == Some(expected_number)
+        && actual_without_number == expected_without_number
+}
+
+fn graph_revision_payload_matches_node(node: &NodeOutput, payload: &Value) -> bool {
+    let Ok(wire) = serde_json::to_value(LegacyNodeEventWireRef::from(node)) else {
+        return false;
+    };
+    let Ok(public) = serde_json::to_value(node) else {
+        return false;
+    };
+    let LegacyImpactWire::Number(value) = node.legacy_wire_impact else {
+        return payload == &wire || payload == &public;
+    };
+    let mut normalized = node.clone();
+    if migrate_legacy_node_impact(&mut normalized).is_err() {
+        return false;
+    }
+    let Ok(normalized) = serde_json::to_value(normalized) else {
+        return false;
+    };
+    legacy_numeric_payload_matches(payload, &wire, &["impact"], value)
+        || legacy_numeric_payload_matches(
+            payload,
+            &normalized,
+            &["props", LEGACY_IMPACT_PROP],
+            value,
+        )
+}
+
+fn graph_revision_payload_matches_edge(edge: &EdgeOutput, payload: &Value) -> bool {
+    let Ok(wire) = serde_json::to_value(LegacyEdgeEventWireRef::from(edge)) else {
+        return false;
+    };
+    let Ok(public) = serde_json::to_value(edge) else {
+        return false;
+    };
+    let LegacyImpactWire::Number(value) = edge.legacy_wire_impact else {
+        return payload == &wire || payload == &public;
+    };
+    let mut normalized = edge.clone();
+    if migrate_legacy_edge_impact(&mut normalized).is_err() {
+        return false;
+    }
+    let Ok(normalized) = serde_json::to_value(normalized) else {
+        return false;
+    };
+    legacy_numeric_payload_matches(payload, &wire, &["impact"], value)
+        || legacy_numeric_payload_matches(
+            payload,
+            &normalized,
+            &["props", LEGACY_IMPACT_PROP],
+            value,
+        )
+}
+
 fn node_projection_matches_proof(target: &NodeOutput, source: &NodeOutput) -> bool {
     if target.id != source.id
         || Storage::labels_are_master(&target.labels) != Storage::labels_are_master(&source.labels)
@@ -2857,7 +3398,8 @@ fn node_projection_matches_proof(target: &NodeOutput, source: &NodeOutput) -> bo
     let mut source = source.clone();
     target.embedding = None;
     source.embedding = None;
-    serde_json::to_vec(&target).ok() == serde_json::to_vec(&source).ok()
+    serde_json::to_vec(&LegacyNodeEventWireRef::from(&target)).ok()
+        == serde_json::to_vec(&LegacyNodeEventWireRef::from(&source)).ok()
 }
 
 fn node_base_projection_matches_proof(target: &NodeOutput, source: &NodeOutput) -> bool {
@@ -2865,8 +3407,6 @@ fn node_base_projection_matches_proof(target: &NodeOutput, source: &NodeOutput) 
     let mut source = source.clone();
     target.embedding = None;
     source.embedding = None;
-    target.impact = None;
-    source.impact = None;
     serde_json::to_vec(&target).ok() == serde_json::to_vec(&source).ok()
 }
 
@@ -2981,7 +3521,7 @@ mod compacted_master_proof_effective_state_tests {
             id: id.to_string(),
             labels: vec!["MASTER".to_string()],
             props: serde_json::json!({"value": "signed"}),
-            impact: None,
+            legacy_wire_impact: LegacyImpactWire::Absent,
             embedding: None,
             lang: None,
             valid_from: "2026-10-16T00:00:00Z".to_string(),
@@ -3232,8 +3772,9 @@ pub struct RetiredEdge {
 }
 
 /// One `node_versions` chain row as selected by `node_version_row_at`:
-/// (labels, payload, valid_from, valid_to, caused_by, clock_time, clock_peer).
+/// (frame_seq, labels, payload, valid_from, valid_to, caused_by, clock_time, clock_peer).
 type NodeVersionRow = (
+    i64,
     String,
     Option<String>,
     String,
@@ -3669,7 +4210,6 @@ pub struct SuperNode {
     pub cluster_id: u32,
     pub theme: String,
     pub member_count: u32,
-    pub impact: f64,
     pub centroid: Vec<f64>,
     pub timestamp: String,
     pub drift: Option<f64>,
@@ -6173,8 +6713,9 @@ impl Storage {
                     "SCHEMA6_MIGRATION_SOURCE_FRONTIER_MISMATCH",
                 ));
             }
-            let edge: EdgeOutput = serde_json::from_str(&row.3)
+            let mut edge: EdgeOutput = serde_json::from_str(&row.3)
                 .map_err(|_| Error::from_reason("SCHEMA6_MIGRATION_HISTORY_UNSUPPORTED"))?;
+            migrate_legacy_edge_impact(&mut edge)?;
             let predecessor = previous_edge_revision.get(&row.0).cloned();
             let revision_id = Self::migration_revision_id(
                 migration_id,
@@ -8575,7 +9116,12 @@ impl Storage {
             let operation = operation
                 .as_str()
                 .ok_or_else(|| Error::from_reason("REVISION_OPERATION_INVALID"))?;
-            let payload = serde_json::to_string(&mutation.payload)
+            // The signed transaction above is validated in its original wire
+            // form. Normalize only the SQLite read projection so historical
+            // revision reads expose generic props and never the retired scalar.
+            let projection_payload =
+                Self::normalize_legacy_revision_payload(&mutation.kind, &mutation.payload)?;
+            let payload = serde_json::to_string(&projection_payload)
                 .map_err(|error| Error::from_reason(error.to_string()))?;
             tx.execute(
                 "INSERT INTO hql2_record_revisions(
@@ -8693,6 +9239,107 @@ impl Storage {
         )
         .map_err(|error| Error::from_reason(error.to_string()))?;
         Ok(())
+    }
+
+    fn normalize_legacy_revision_payload(
+        kind: &uee_v2::RecordKindV2,
+        payload: &Value,
+    ) -> Result<Value> {
+        if !payload
+            .as_object()
+            .is_some_and(|object| object.contains_key("impact"))
+        {
+            return Ok(payload.clone());
+        }
+        match kind {
+            uee_v2::RecordKindV2::Node => {
+                let mut node: NodeOutput = serde_json::from_value(payload.clone())
+                    .map_err(|error| Error::from_reason(error.to_string()))?;
+                migrate_legacy_node_impact(&mut node)?;
+                serde_json::to_value(node).map_err(|error| Error::from_reason(error.to_string()))
+            }
+            uee_v2::RecordKindV2::Edge => {
+                let mut edge: EdgeOutput = serde_json::from_value(payload.clone())
+                    .map_err(|error| Error::from_reason(error.to_string()))?;
+                migrate_legacy_edge_impact(&mut edge)?;
+                serde_json::to_value(edge).map_err(|error| Error::from_reason(error.to_string()))
+            }
+            _ => Ok(payload.clone()),
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn legacy_node_version_props_from_revision(
+        &self,
+        connection: &Connection,
+        database_id: &str,
+        id: &str,
+        frame_seq: i64,
+        labels: &[String],
+        props: &Value,
+        valid_from: &str,
+        valid_to: &Option<String>,
+        caused_by: &Option<String>,
+        clock_time: i64,
+        clock_peer: &str,
+    ) -> Result<Option<Value>> {
+        // Schema 5 has no HQL2 revision tables. The revision payload is only
+        // needed to normalize historical schema 6 records written before the
+        // legacy impact field was retired. Keep the schema check at this
+        // migration boundary: a missing table in schema 6 remains a real
+        // projection error and must not be treated as an empty history.
+        if self.storage_schema_version != SCHEMA_VERSION {
+            return Ok(None);
+        }
+        let raw_payload: Option<String> = connection
+            .query_row(
+                "SELECT payload_json FROM hql2_record_revisions
+                 WHERE database_id=?1 AND namespace='default' AND kind='node'
+                   AND record_id=?2 AND tx_from=?3 AND operation='upsert'",
+                params![database_id, id, frame_seq],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let Some(raw_payload) = raw_payload else {
+            return Ok(None);
+        };
+        let raw: Value = serde_json::from_str(&raw_payload)
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        if !raw
+            .as_object()
+            .is_some_and(|object| object.contains_key("impact"))
+        {
+            return Ok(None);
+        }
+        let normalized =
+            Self::normalize_legacy_revision_payload(&uee_v2::RecordKindV2::Node, &raw)?;
+        let expected_labels =
+            serde_json::to_value(labels).map_err(|error| Error::from_reason(error.to_string()))?;
+        let payload_matches =
+            raw.get("props") == Some(props) || normalized.get("props") == Some(props);
+        let valid_to_value = valid_to
+            .as_ref()
+            .map(|value| Value::String(value.clone()))
+            .unwrap_or(Value::Null);
+        let caused_by_value = caused_by
+            .as_ref()
+            .map(|value| Value::String(value.clone()))
+            .unwrap_or(Value::Null);
+        if raw["id"].as_str() != Some(id)
+            || raw["labels"] != expected_labels
+            || raw["valid_from"].as_str() != Some(valid_from)
+            || raw["valid_to"] != valid_to_value
+            || raw["caused_by"] != caused_by_value
+            || raw["clock"]["time"].as_i64() != Some(clock_time)
+            || raw["clock"]["peer_id"].as_str() != Some(clock_peer)
+            || !payload_matches
+        {
+            return Err(Error::from_reason(
+                "LEGACY_REVISION_PROJECTION_MISMATCH: historical node row does not match its signed revision projection",
+            ));
+        }
+        Ok(normalized.get("props").cloned())
     }
 
     // Called only while commit_lock is held. Reads authorized schema metadata,
@@ -13033,6 +13680,9 @@ impl Storage {
     where
         C: std::ops::Deref<Target = Connection>,
     {
+        let mut normalized = edge.clone();
+        migrate_legacy_edge_impact(&mut normalized)?;
+        let edge = &normalized;
         if let Some(seq) = frame_seq {
             let previous: Option<(u64, String)> = conn.query_row(
                 "SELECT tx_from, payload FROM edge_versions WHERE id=?1 ORDER BY tx_from DESC LIMIT 1",
@@ -13079,7 +13729,7 @@ impl Storage {
                 edge.valid_to,
                 edge.recorded_at,
                 edge.superseded_by,
-                edge.impact,
+                Option::<f64>::None,
                 edge.caused_by,
                 edge.clock.time as i64,
                 edge.clock.peer_id,
@@ -13127,6 +13777,9 @@ impl Storage {
         node_u32: u32,
         node: &NodeOutput,
     ) -> Result<()> {
+        let mut normalized = node.clone();
+        migrate_legacy_node_impact(&mut normalized)?;
+        let node = &normalized;
         let current_clock: Option<(u32, String)> = tx
             .query_row(
                 "SELECT clock_time, clock_peer FROM props WHERE node_u32 = ?1",
@@ -13186,6 +13839,9 @@ impl Storage {
         node: &NodeOutput,
         frame_seq: u64,
     ) -> Result<()> {
+        let mut normalized = node.clone();
+        migrate_legacy_node_impact(&mut normalized)?;
+        let node = &normalized;
         let current: Option<(u32, String)> = conn
             .query_row(
                 "SELECT clock_time,clock_peer FROM props WHERE node_u32=?1",
@@ -14106,6 +14762,7 @@ impl Storage {
                     "RECOVERY_REQUIRED: rejected snapshot requires a writable open to rebuild the projection",
                 ));
             }
+            self.validate_legacy_snapshot_projection()?;
             return Ok(());
         }
         let journal_fingerprint = self.projection_journal_fingerprint()?;
@@ -14119,6 +14776,7 @@ impl Storage {
                 });
         }
         if self.projection_journal_fingerprint_matches(&journal_fingerprint) {
+            self.validate_legacy_snapshot_projection()?;
             return Ok(());
         }
         // Lamport time is not a WAL cursor: distinct peers may emit equal clocks,
@@ -14131,6 +14789,30 @@ impl Storage {
             return self.projection_rebuild_fresh_candidate(&journal_fingerprint, None);
         }
         self.projection_sync_existing_candidate(&journal_fingerprint)
+    }
+
+    fn validate_legacy_snapshot_projection(&self) -> Result<()> {
+        for entry in self.nodes.iter() {
+            let node = entry.value();
+            if !matches!(node.legacy_wire_impact, LegacyImpactWire::Number(_)) {
+                continue;
+            }
+            let projected = self
+                .projection_props_unlocked(*entry.key())
+                .map_err(|error| {
+                    Error::from_reason(format!(
+                        "RECOVERY_REQUIRED: legacy snapshot/projection validation failed for '{}': {error}",
+                        node.id
+                    ))
+                })?;
+            if projected.is_none() {
+                return Err(Error::from_reason(format!(
+                    "RECOVERY_REQUIRED: legacy snapshot has no properties projection for '{}'",
+                    node.id
+                )));
+            }
+        }
+        Ok(())
     }
 
     fn projection_sync_existing_candidate(&self, journal_fingerprint: &str) -> Result<()> {
@@ -14345,12 +15027,32 @@ impl Storage {
             )
             .optional()
             .map_err(|e| Error::from_reason(e.to_string()))?;
-        match payload {
-            Some(raw) => serde_json::from_str(&raw)
-                .map(Some)
-                .map_err(|e| Error::from_reason(e.to_string())),
-            None => Ok(None),
+        let Some(raw) = payload else {
+            return Ok(None);
+        };
+        let mut projected: Value =
+            serde_json::from_str(&raw).map_err(|e| Error::from_reason(e.to_string()))?;
+
+        // A snapshot may contain an old signed NodeOutput whose top-level
+        // `impact` was moved into generic props during deserialization.
+        // `insert_node_lean` normally discards props because SQLite is the
+        // source of truth; retain and merge this one-way migration metadata
+        // when a verified snapshot row is the only surviving copy. Do not
+        // rewrite the P6-covered SQLite file on open.
+        if let Some(snapshot) = self.nodes.get(&node_u32) {
+            if let LegacyImpactWire::Number(legacy_value) = snapshot.legacy_wire_impact {
+                let mut wire_value = LegacyImpactWire::Number(legacy_value);
+                migrate_legacy_impact(&mut projected, &mut wire_value)?;
+            } else if let Some(legacy_value) = snapshot
+                .props
+                .get(LEGACY_IMPACT_PROP)
+                .and_then(Value::as_f64)
+            {
+                let mut wire_value = LegacyImpactWire::Number(legacy_value);
+                migrate_legacy_impact(&mut projected, &mut wire_value)?;
+            }
         }
+        Ok(Some(projected))
     }
 
     pub fn register_relational_schema(&self, package: RelationalSchemaPackage) -> Result<u32> {
@@ -15371,23 +16073,47 @@ impl Storage {
             .collect()
     }
 
-    fn hydrated_props(&self, node_u32: u32, node: &NodeOutput) -> Value {
-        if !node.props.is_null() {
-            return node.props.clone();
-        }
-        self.projection_props_unlocked(node_u32)
-            .ok()
-            .flatten()
-            .unwrap_or_else(|| Value::Object(Default::default()))
+    fn hydration_failure<T>(&self, node_id: &str, error: Error) -> Result<T> {
+        self.recovery_required.store(true, Ordering::SeqCst);
+        Err(Error::from_reason(format!(
+            "RECOVERY_REQUIRED: node '{node_id}' hydration failed: {error}"
+        )))
     }
 
-    fn hydrated_node(&self, node_u32: u32, node: &NodeOutput) -> NodeOutput {
-        if !node.props.is_null() {
-            return node.clone();
+    fn hydrated_props(&self, node_u32: u32, node: &NodeOutput) -> Result<Value> {
+        let mut props = if node.props.is_null() {
+            match self.projection_props_unlocked(node_u32) {
+                Ok(Some(props)) => props,
+                Ok(None) if !matches!(node.legacy_wire_impact, LegacyImpactWire::Number(_)) => {
+                    Value::Object(Default::default())
+                }
+                Ok(None) => {
+                    return self.hydration_failure(
+                        &node.id,
+                        Error::from_reason(
+                            "KIMPACT_MIGRATION_CONFLICT: legacy snapshot impact has no properties projection",
+                        ),
+                    )
+                }
+                Err(error) => return self.hydration_failure(&node.id, error),
+            }
+        } else {
+            node.props.clone()
+        };
+        let mut wire_impact = node.legacy_wire_impact;
+        if let Err(error) = migrate_legacy_impact(&mut props, &mut wire_impact) {
+            return self.hydration_failure(&node.id, error);
         }
+        Ok(props)
+    }
+
+    fn hydrated_node(&self, node_u32: u32, node: &NodeOutput) -> Result<NodeOutput> {
         let mut hydrated = node.clone();
-        hydrated.props = self.hydrated_props(node_u32, node);
-        hydrated
+        hydrated.props = self.hydrated_props(node_u32, node)?;
+        if let Err(error) = migrate_legacy_node_impact(&mut hydrated) {
+            return self.hydration_failure(&node.id, error);
+        }
+        Ok(hydrated)
     }
 
     pub fn node_view(&self, id: &str) -> Option<NodeOutput> {
@@ -15414,7 +16140,7 @@ impl Storage {
 
     fn node_view_u32_unlocked(&self, u32_id: u32) -> Option<NodeOutput> {
         let node = self.nodes.get(&u32_id)?;
-        Some(self.hydrated_node(u32_id, node.value()))
+        self.hydrated_node(u32_id, node.value()).ok()
     }
 
     pub fn open(opts: OpenOptions) -> Result<Self> {
@@ -16418,14 +17144,14 @@ impl Storage {
         let validate = |kind: uee_v2::RecordKindV2,
                         id: &str,
                         operation: uee_v2::RevisionOperationV1,
-                        payload: Value|
+                        payload_matches: &dyn Fn(&Value) -> bool|
          -> Result<()> {
             let mutation = index
                 .first(&kind, id)
                 .ok_or_else(|| Error::from_reason("REVISION_EVENT_MISMATCH"))?;
             if mutation.namespace != "default"
                 || mutation.operation != operation
-                || mutation.payload != payload
+                || !payload_matches(&mutation.payload)
             {
                 return Err(Error::from_reason("REVISION_EVENT_MISMATCH"));
             }
@@ -16436,8 +17162,7 @@ impl Storage {
                 uee_v2::RecordKindV2::Node,
                 &node.id,
                 uee_v2::RevisionOperationV1::Upsert,
-                serde_json::to_value(node)
-                    .map_err(|error| Error::from_reason(error.to_string()))?,
+                &|payload| graph_revision_payload_matches_node(node, payload),
             )?;
         }
         for edge in &transaction.edges {
@@ -16449,8 +17174,7 @@ impl Storage {
                 } else {
                     uee_v2::RevisionOperationV1::Upsert
                 },
-                serde_json::to_value(edge)
-                    .map_err(|error| Error::from_reason(error.to_string()))?,
+                &|payload| graph_revision_payload_matches_edge(edge, payload),
             )?;
         }
         for retraction in &transaction.node_retractions {
@@ -16458,10 +17182,13 @@ impl Storage {
                 uee_v2::RecordKindV2::Node,
                 &retraction.id,
                 uee_v2::RevisionOperationV1::Retract,
-                serde_json::json!({
-                    "id": retraction.id,
-                    "retracted_at": retraction.retracted_at,
-                }),
+                &|payload| {
+                    *payload
+                        == serde_json::json!({
+                            "id": retraction.id,
+                            "retracted_at": retraction.retracted_at,
+                        })
+                },
             )?;
         }
         let vector_revision_count = revisions
@@ -17021,6 +17748,11 @@ impl Storage {
         let _commit_guard = self.commit_lock.lock();
         self.ensure_readable()?;
         self.ensure_writable()?;
+        if event_has_legacy_impact(event) {
+            return Err(Error::from_reason(
+                "KIMPACT_REMOVED: legacy impact fields are accepted only when reading historical signed events",
+            ));
+        }
         if Self::contains_p6_control_event(event) {
             return Err(Error::from_reason("P6_LOCAL_ONLY"));
         }
@@ -17047,7 +17779,23 @@ impl Storage {
         index: bool,
         commit_seq: u64,
     ) {
-        for node in &transaction.nodes {
+        let mut nodes = transaction.nodes.clone();
+        for node in &mut nodes {
+            if let Err(error) = migrate_legacy_node_impact(node) {
+                self.recovery_required.store(true, Ordering::SeqCst);
+                eprintln!("transaction node legacy-field migration failed: {error}");
+                return;
+            }
+        }
+        let mut edges = transaction.edges.clone();
+        for edge in &mut edges {
+            if let Err(error) = migrate_legacy_edge_impact(edge) {
+                self.recovery_required.store(true, Ordering::SeqCst);
+                eprintln!("transaction edge legacy-field migration failed: {error}");
+                return;
+            }
+        }
+        for node in &nodes {
             let node_u32 = self.get_or_intern_id(&node.id);
             if let Some(embedding) = &node.embedding {
                 self.replay_vector(
@@ -17064,7 +17812,7 @@ impl Storage {
         if let Some(clock) = Self::event_time(&Event::Transaction(transaction.clone())) {
             self.logical_clock.fetch_max(clock, Ordering::SeqCst);
         }
-        for edge in &transaction.edges {
+        for edge in &edges {
             if self
                 .edges
                 .get(&Self::edge_key(&edge.id))
@@ -17169,27 +17917,72 @@ impl Storage {
                  FROM node_versions WHERE id = ?1 AND frame_seq >= ?2 ORDER BY frame_seq ASC",
             )
             .map_err(|e| Error::from_reason(e.to_string()))?;
-        let rows: Vec<serde_json::Value> = stmt
+        let raw_rows = stmt
             .query_map(params![id, horizon], |row| {
-                let labels: String = row.get(1)?;
-                let payload: Option<String> = row.get(2)?;
-                Ok(serde_json::json!({
-                    "frame_seq": row.get::<_, i64>(0)?,
-                    "labels": serde_json::from_str::<serde_json::Value>(&labels)
-                        .unwrap_or(serde_json::Value::Array(vec![])),
-                    "props": payload
-                        .and_then(|p| serde_json::from_str::<serde_json::Value>(&p).ok()),
-                    "valid_from": row.get::<_, String>(3)?,
-                    "valid_to": row.get::<_, Option<String>>(4)?,
-                    "caused_by": row.get::<_, Option<String>>(5)?,
-                    "clock_time": row.get::<_, i64>(6)?,
-                    "clock_peer": row.get::<_, String>(7)?,
-                    "retracted": row.get::<_, i64>(8)? != 0,
-                }))
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, Option<String>>(4)?,
+                    row.get::<_, Option<String>>(5)?,
+                    row.get::<_, i64>(6)?,
+                    row.get::<_, String>(7)?,
+                    row.get::<_, i64>(8)? != 0,
+                ))
             })
             .map_err(|e| Error::from_reason(e.to_string()))?
-            .filter_map(|r| r.ok())
-            .collect();
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        drop(stmt);
+        let database_id = self.database_id();
+        let mut rows = Vec::with_capacity(raw_rows.len());
+        for (
+            frame_seq,
+            labels_json,
+            payload,
+            valid_from,
+            valid_to,
+            caused_by,
+            clock_time,
+            clock_peer,
+            retracted,
+        ) in raw_rows
+        {
+            let labels = serde_json::from_str::<Vec<String>>(&labels_json).unwrap_or_default();
+            let mut props = payload
+                .as_deref()
+                .and_then(|value| serde_json::from_str::<Value>(value).ok())
+                .unwrap_or(Value::Null);
+            if !retracted {
+                if let Some(migrated) = self.legacy_node_version_props_from_revision(
+                    &conn,
+                    &database_id,
+                    id,
+                    frame_seq,
+                    &labels,
+                    &props,
+                    &valid_from,
+                    &valid_to,
+                    &caused_by,
+                    clock_time,
+                    &clock_peer,
+                )? {
+                    props = migrated;
+                }
+            }
+            rows.push(serde_json::json!({
+                "frame_seq": frame_seq,
+                "labels": labels,
+                "props": props,
+                "valid_from": valid_from,
+                "valid_to": valid_to,
+                "caused_by": caused_by,
+                "clock_time": clock_time,
+                "clock_peer": clock_peer,
+                "retracted": retracted,
+            }));
+        }
         let resolved = at_seq.map(|seq| {
             rows.iter()
                 .rev()
@@ -17223,7 +18016,7 @@ impl Storage {
         let conn = self.projection_db.lock();
         let row = conn
             .query_row(
-                "SELECT labels, payload, valid_from, valid_to, caused_by, clock_time, clock_peer
+                "SELECT frame_seq, labels, payload, valid_from, valid_to, caused_by, clock_time, clock_peer
                  FROM node_versions
                  WHERE id = ?1 AND frame_seq >= ?2 AND retracted = 0
                    AND valid_from <= ?3 AND (valid_to IS NULL OR valid_to > ?3)
@@ -17231,25 +18024,52 @@ impl Storage {
                 params![current.id, horizon, as_of],
                 |row| {
                     Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, Option<String>>(1)?,
-                        row.get::<_, String>(2)?,
-                        row.get::<_, Option<String>>(3)?,
+                        row.get::<_, i64>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, Option<String>>(2)?,
+                        row.get::<_, String>(3)?,
                         row.get::<_, Option<String>>(4)?,
-                        row.get::<_, i64>(5)?,
-                        row.get::<_, String>(6)?,
+                        row.get::<_, Option<String>>(5)?,
+                        row.get::<_, i64>(6)?,
+                        row.get::<_, String>(7)?,
                     ))
                 },
             )
             .optional()
             .ok()
             .flatten()?;
-        let (labels, payload, valid_from, valid_to, caused_by, clock_time, clock_peer) = row;
+        let (frame_seq, labels, payload, valid_from, valid_to, caused_by, clock_time, clock_peer) =
+            row;
         let mut node = current.clone();
         node.labels = serde_json::from_str(&labels).unwrap_or_default();
         node.props = payload
             .and_then(|p| serde_json::from_str(&p).ok())
             .unwrap_or(Value::Null);
+        let database_id = self.database_id();
+        match self.legacy_node_version_props_from_revision(
+            &conn,
+            &database_id,
+            &current.id,
+            frame_seq,
+            &node.labels,
+            &node.props,
+            &valid_from,
+            &valid_to,
+            &caused_by,
+            clock_time,
+            &clock_peer,
+        ) {
+            Ok(Some(props)) => node.props = props,
+            Ok(None) => {}
+            Err(error) => {
+                self.recovery_required.store(true, Ordering::SeqCst);
+                eprintln!(
+                    "historical node revision mismatch for '{}': {error}",
+                    current.id
+                );
+                return None;
+            }
+        }
         node.valid_from = valid_from;
         node.valid_to = valid_to;
         node.caused_by = caused_by;
@@ -17316,6 +18136,11 @@ impl Storage {
         &self,
         input: GenesisTransaction,
     ) -> api_error::CoreResult<CommitResult> {
+        if input.graph.edges.iter().any(|edge| edge.impact.is_some()) {
+            return Err(api_error::ApiErrorEnvelopeV1::validation(
+                "KIMPACT_REMOVED: remove edge impact and store application-owned signals under props",
+            ));
+        }
         if self.recovery_required.load(Ordering::SeqCst) {
             return Err(api_error::ApiErrorEnvelopeV1::durability(
                 "RECOVERY_REQUIRED: reopen database before reading, writing or checkpointing",
@@ -17457,7 +18282,7 @@ impl Storage {
                     id: node.id.unwrap_or_else(|| format!("N-{}", Uuid::new_v4())),
                     labels: node.labels,
                     props: node.props.unwrap_or(Value::Object(Default::default())),
-                    impact: Some(0.7),
+                    legacy_wire_impact: LegacyImpactWire::Absent,
                     embedding: node.embedding,
                     lang: Some(node.lang.unwrap_or_else(|| "en".to_string())),
                     valid_from: node.valid_from.unwrap_or_else(|| now.to_rfc3339()),
@@ -17485,7 +18310,7 @@ impl Storage {
                 valid_to: None,
                 recorded_at: now.to_rfc3339(),
                 superseded_by: None,
-                impact: edge.impact,
+                legacy_wire_impact: LegacyImpactWire::Absent,
                 caused_by: edge.caused_by,
                 clock: self.next_clock(),
             })
@@ -17600,77 +18425,6 @@ impl Storage {
         }
 
         None
-    }
-
-    pub fn semantic_verify(&self, event: &Event) -> Result<bool> {
-        let _read_guard = self.commit_lock.lock();
-        self.ensure_readable()?;
-
-        match event {
-            Event::Node(node) => {
-                if let Some(emb) = &node.embedding {
-                    let context = self.get_ranked_context(HybridSearchInput {
-                        query_vector: emb.clone(),
-                        k: 3,
-                        alpha: Some(0.4),
-                        lang: node.lang.clone(),
-                        as_of: None,
-                        collection: node.collection.clone(),
-                        ef_search: None,
-                        oversample: None,
-                    })?;
-
-                    for neighbor in context {
-                        if neighbor.node.impact.unwrap_or(0.0) > 0.8
-                            && node.labels != neighbor.node.labels
-                            && neighbor.node.labels.contains(&"MASTER".to_string())
-                        {
-                            return Ok(false);
-                        }
-                    }
-                }
-                Ok(true)
-            }
-            Event::CollectionDefinition(_)
-            | Event::CollectionMaterialization(_)
-            | Event::VectorMaterialized(_) => Ok(true),
-            Event::Edge(_) => Ok(true),
-            // A vector attachment carries no governance/axiom implication.
-            Event::Vector(_) => Ok(true),
-            // Retraction proposals carry no axiom-creation implication (the
-            // MASTER-immutability breadth question is tracked separately).
-            Event::NodeRetract { .. } => Ok(true),
-            Event::RelationalSchema(_) | Event::RelationalRows { .. } => Ok(true),
-            Event::GenerationPublished(receipt) => Ok(receipt.version == 1
-                && receipt.generation.publication_seq
-                    == receipt.generation.wal_frontier.saturating_add(1)
-                && receipt.generation.component_manifest_sha256.len() == 64),
-            Event::AccessPolicyChanged(policy) => Ok(policy.version
-                == Self::access_policy_event_version(&policy.policy)
-                && (policy.version == 1 || self.storage_schema_version == SCHEMA_VERSION)
-                && (policy.folded
-                    || policy.expected_revision.checked_add(1) == Some(policy.policy.revision))
-                && Self::validate_access_policy_shape(&policy.policy).is_ok()),
-            Event::Schema6MigrationChunkV1(_)
-            | Event::Schema6MigrationCommitV1(_)
-            | Event::Schema6ActivationV1(_) => Ok(false),
-            Event::Transaction(transaction) => {
-                for node in &transaction.nodes {
-                    if !self.semantic_verify(&Event::Node(node.clone()))? {
-                        return Ok(false);
-                    }
-                }
-                Ok(true)
-            }
-            Event::Batch(events) => {
-                for e in events {
-                    if !self.semantic_verify(e)? {
-                        return Ok(false);
-                    }
-                }
-                Ok(true)
-            }
-        }
     }
 
     fn collect_consensus_graph_mutations(
@@ -17857,10 +18611,14 @@ impl Storage {
     /// node's own key (the `_signature` param is ignored — an external caller has
     /// no access to the local private key, so a caller-supplied signature could
     /// never be authentic; signing here binds the proposal to this node as its
-    /// authentic originator). The event must also pass `semantic_verify`, so a
-    /// proposal that conflicts with an existing high-impact MASTER axiom is
-    /// rejected up front rather than slipping through to quorum.
+    /// authentic originator). Schema validation, authority checks, and event
+    /// signature verification remain independent consensus gates.
     pub fn propose_consensus(&self, event: Event, _signature: Vec<u8>) -> Result<String> {
+        if event_has_legacy_impact(&event) {
+            return Err(Error::from_reason(
+                "KIMPACT_REMOVED: new consensus proposals cannot contain legacy impact fields",
+            ));
+        }
         if Self::contains_p6_control_event(&event) {
             return Err(Error::from_reason("P6_LOCAL_ONLY"));
         }
@@ -17880,11 +18638,6 @@ impl Storage {
             ));
         }
         Self::validate_consensus_proposal_event(&event)?;
-        if !self.semantic_verify(&event)? {
-            return Err(Error::from_reason(
-                "proposal rejected by semantic_verify (conflicts with a governing axiom)",
-            ));
-        }
         self.prune_expired_consensus_proposals();
         if self.proposals.len() >= MAX_CONSENSUS_PROPOSALS {
             return Err(Error::from_reason(format!(
@@ -19995,14 +20748,14 @@ impl Storage {
         let validate_graph_mutation = |kind: uee_v2::RecordKindV2,
                                        id: &str,
                                        operation: uee_v2::RevisionOperationV1,
-                                       payload: Value|
+                                       payload_matches: &dyn Fn(&Value) -> bool|
          -> bool {
             let Some(mutation) = index.unique(&kind, id) else {
                 return false;
             };
             mutation.namespace == "default"
                 && mutation.operation == operation
-                && mutation.payload == payload
+                && payload_matches(&mutation.payload)
         };
 
         let mut graph_ids = HashSet::new();
@@ -20012,7 +20765,7 @@ impl Storage {
                     uee_v2::RecordKindV2::Node,
                     &node.id,
                     uee_v2::RevisionOperationV1::Upsert,
-                    serde_json::to_value(node).unwrap_or(Value::Null),
+                    &|payload| graph_revision_payload_matches_node(node, payload),
                 )
             {
                 return false;
@@ -20028,7 +20781,7 @@ impl Storage {
                     } else {
                         uee_v2::RevisionOperationV1::Upsert
                     },
-                    serde_json::to_value(edge).unwrap_or(Value::Null),
+                    &|payload| graph_revision_payload_matches_edge(edge, payload),
                 )
             {
                 return false;
@@ -20040,10 +20793,13 @@ impl Storage {
                     uee_v2::RecordKindV2::Node,
                     &retraction.id,
                     uee_v2::RevisionOperationV1::Retract,
-                    serde_json::json!({
-                        "id": retraction.id,
-                        "retracted_at": retraction.retracted_at,
-                    }),
+                    &|payload| {
+                        *payload
+                            == serde_json::json!({
+                                "id": retraction.id,
+                                "retracted_at": retraction.retracted_at,
+                            })
+                    },
                 )
             {
                 return false;
@@ -20429,7 +21185,10 @@ impl Storage {
                 .edges
                 .iter()
                 .filter(|source| source.id == edge.id)
-                .any(|source| serde_json::to_value(source).ok() == serde_json::to_value(edge).ok()),
+                .any(|source| {
+                    serde_json::to_value(LegacyEdgeEventWireRef::from(source)).ok()
+                        == serde_json::to_value(LegacyEdgeEventWireRef::from(edge)).ok()
+                }),
             Event::VectorMaterialized(target) => {
                 let Some(revisions) = transaction.record_revision_transaction.as_ref() else {
                     return false;
@@ -21493,12 +22252,6 @@ impl Storage {
             }
             self.validate_signed_event_authorization(&signed_event)?;
             self.validate_consensus_schema_event(&signed_event.event)?;
-            if !self.semantic_verify(&signed_event.event)? {
-                return Err(Error::from_reason(
-                    "proposal rejected by semantic_verify at commit",
-                ));
-            }
-
             let proposal_digest = hex::encode(Self::consensus_proposal_digest(&signed_event)?);
             self.prepare_consensus_commit(&ConsensusCommitReceipt {
                 proposal_id: proposal_id.clone(),
@@ -21533,7 +22286,6 @@ impl Storage {
                     // Match projection/replay LWW selection, including stale
                     // proposals that reach quorum after a newer edge version.
                     self.apply_event_memory(seq, Event::Edge(e.clone()), true);
-                    self.refresh_impacts(Some(vec![e.to.clone()]));
                 }
                 Event::Batch(events) => {
                     let seq = self.persist_signed(signed_event.clone())?;
@@ -21603,68 +22355,6 @@ impl Storage {
         Ok(false)
     }
 
-    pub fn calculate_sc(&self, node: &NodeOutput) -> f64 {
-        let props = self
-            .get_u32(&node.id)
-            .map(|u32_id| self.hydrated_props(u32_id, node))
-            .unwrap_or_else(|| node.props.clone());
-        let stability = node
-            .props
-            .get("stability")
-            .or_else(|| props.get("stability"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("active");
-        match stability {
-            "stable" => 1.0,
-            "active" => 0.8,
-            "draft" => 0.4,
-            "deprecated" => 0.1,
-            _ => 0.8,
-        }
-    }
-
-    pub fn compute_impact(&self, node: &NodeOutput) -> f64 {
-        let u32_id = match self.get_u32_unlocked(&node.id) {
-            Some(id) => id,
-            None => return 0.7,
-        };
-        let hydrated = self.hydrated_node(u32_id, node);
-        let incoming_count = self
-            .in_idx
-            .get(&u32_id)
-            .map(|edges| edges.len())
-            .unwrap_or(0);
-        let dd = (incoming_count as f64 / 10.0).min(1.0);
-        let tier = Tier::from_labels(&node.labels);
-        let as_score = match tier {
-            Tier::MASTER => 1.0,
-            Tier::SPEC => 0.8,
-            Tier::ADR => 0.6,
-            Tier::USER => 0.3,
-        };
-        let sc = self.calculate_sc(&hydrated);
-        (dd * 0.5) + (as_score * 0.3) + (sc * 0.2)
-    }
-
-    pub fn refresh_impacts(&self, affected_ids: Option<Vec<String>>) {
-        let ids_to_process = match affected_ids {
-            Some(ids) => ids,
-            None => self
-                .nodes
-                .iter()
-                .map(|entry| entry.value().id.clone())
-                .collect(),
-        };
-        for id in ids_to_process {
-            if let Some(u32_id) = self.get_u32_unlocked(&id) {
-                if let Some(mut node_ref) = self.nodes.get_mut(&u32_id) {
-                    let new_impact = self.compute_impact(node_ref.value());
-                    node_ref.value_mut().impact = Some(new_impact);
-                }
-            }
-        }
-    }
-
     /// Index an edge into the adjacency maps and return its u128 key. The edge key
     /// is the deterministic `edge_key(id)` hash (no trigram/reverse/`id_to_u32`);
     /// `from`/`to` are node ids and keep the full node intern (they are searchable).
@@ -21703,6 +22393,14 @@ impl Storage {
     /// per node (the largest avoidable per-node cost). The full embedding is
     /// still persisted in the WAL `Event::Node` for replay/arena rebuild.
     fn insert_node_lean(&self, u32_id: u32, mut node: NodeOutput) {
+        if let Err(error) = migrate_legacy_node_impact(&mut node) {
+            self.recovery_required.store(true, Ordering::SeqCst);
+            eprintln!(
+                "node legacy-field migration failed for '{}': {error}",
+                node.id
+            );
+            return;
+        }
         // A node upsert that reaches this point re-creates the id: clear any
         // Slice-1 tombstone. Every path that must NOT resurrect a tombstoned
         // node (CRDT reconcile) LWW-gates against the tombstone BEFORE calling
@@ -21710,8 +22408,32 @@ impl Storage {
         // retraction by construction (commit_lock / frame order).
         self.tombstones.remove(&node.id);
         node.embedding = None;
-        node.props = Value::Null;
+        // Most props live only in SQLite to keep the in-memory node lean.
+        // Keep the one-way migrated value when a verified snapshot is the
+        // only copy: its matching journal fingerprint may correctly skip
+        // replay, while the old projection still has only the original props.
+        if node
+            .props
+            .get(LEGACY_IMPACT_PROP)
+            .is_none_or(|value| value.as_f64().is_none())
+        {
+            node.props = Value::Null;
+        }
         self.nodes.insert(u32_id, node);
+    }
+
+    fn insert_node_lean_snapshot(&self, u32_id: u32, mut node: NodeOutput) {
+        // Historical snapshots used this lean `null` props slot as a marker
+        // that the original application props live in SQLite. Defer migration
+        // until hydration so the old top-level scalar is merged into those
+        // verified props instead of wrapping the placeholder and losing them.
+        if node.props.is_null() && matches!(node.legacy_wire_impact, LegacyImpactWire::Number(_)) {
+            self.tombstones.remove(&node.id);
+            node.embedding = None;
+            self.nodes.insert(u32_id, node);
+        } else {
+            self.insert_node_lean(u32_id, node);
+        }
     }
 
     pub fn add_node(&self, args: NodeInput) -> Result<NodeOutput> {
@@ -21731,7 +22453,7 @@ impl Storage {
             id: id.clone(),
             labels: args.labels,
             props: args.props.unwrap_or(Value::Object(Default::default())),
-            impact: Some(0.7),
+            legacy_wire_impact: LegacyImpactWire::Absent,
             embedding: None,
             lang: Some(lang.clone()),
             valid_from: args.valid_from.unwrap_or_else(|| now.to_rfc3339()),
@@ -21775,6 +22497,7 @@ impl Storage {
     }
 
     pub fn add_edge(&self, args: EdgeInput) -> Result<EdgeOutput> {
+        reject_legacy_impact(args.impact)?;
         self.ensure_writable()?;
         let _commit_guard = self.commit_lock.lock();
         self.ensure_readable()?;
@@ -21788,14 +22511,13 @@ impl Storage {
             valid_to: None,
             recorded_at: Utc::now().to_rfc3339(),
             superseded_by: None,
-            impact: args.impact,
+            legacy_wire_impact: LegacyImpactWire::Absent,
             caused_by: args.caused_by,
             clock: self.next_clock(),
         };
         self.persist_local_graph_mutations(&[], std::slice::from_ref(&edge), &[])?;
         let u32_id = self.index_edge_internal(&edge.id, &edge.from, &edge.to);
         self.edges.insert(u32_id, edge.clone());
-        self.refresh_impacts(Some(vec![edge.to.clone()]));
         Ok(edge)
     }
 
@@ -21816,7 +22538,7 @@ impl Storage {
         let now = Utc::now().to_rfc3339();
 
         let mut old_node = match self.nodes.get(&u32_id) {
-            Some(node) => self.hydrated_node(u32_id, node.value()),
+            Some(node) => self.hydrated_node(u32_id, node.value())?,
             None => return Err(Error::from_reason("Node not in memory index")),
         };
         self.validate_local_node_mutation(Some(&id), &old_node.labels)?;
@@ -22035,13 +22757,13 @@ impl Storage {
         node_u32: u32,
         node: &NodeOutput,
         pat: &query::ast::NodePattern,
-    ) -> bool {
+    ) -> Result<bool> {
         if let Some(label) = &pat.label {
             if !node.labels.iter().any(|l| l == label) {
-                return false;
+                return Ok(false);
             }
         }
-        let props = self.hydrated_props(node_u32, node);
+        let props = self.hydrated_props(node_u32, node)?;
         for (k, v) in &pat.props {
             // `{id:"..."}` addresses the node's top-level id (there is no `:id`
             // syntax and anchoring a pattern by a known id is the common case);
@@ -22052,20 +22774,20 @@ impl Storage {
                     query::ast::HqlValue::Num(n) => node.id == n.to_string(),
                 };
                 if !ok {
-                    return false;
+                    return Ok(false);
                 }
                 continue;
             }
             match props.get(k) {
                 Some(av) => {
                     if !Self::json_eq_hqlvalue(av, v) {
-                        return false;
+                        return Ok(false);
                     }
                 }
-                None => return false,
+                None => return Ok(false),
             }
         }
-        true
+        Ok(true)
     }
 
     /// Exact-equality of a JSON value against an inline `{k:v}` constraint value.
@@ -22113,10 +22835,10 @@ impl Storage {
                 if let Some(entry) = self.nodes.get(&anchor_u32) {
                     let node = entry.value();
                     if Self::is_node_visible(node, as_of, false, &now)
-                        && self.node_matches(anchor_u32, node, &pattern.start)
+                        && self.node_matches(anchor_u32, node, &pattern.start)?
                     {
                         budget.node()?;
-                        let node = self.hydrated_node(anchor_u32, node);
+                        let node = self.hydrated_node(anchor_u32, node)?;
                         let mut row = Row::new();
                         if let Some(v) = &pattern.start.var {
                             row.insert(v.clone(), serde_json::to_value(node).map_err(ser_err)?);
@@ -22132,11 +22854,11 @@ impl Storage {
                 if !Self::is_node_visible(node, as_of, false, &now) {
                     continue;
                 }
-                if !self.node_matches(*entry.key(), node, &pattern.start) {
+                if !self.node_matches(*entry.key(), node, &pattern.start)? {
                     continue;
                 }
                 budget.node()?;
-                let node = self.hydrated_node(*entry.key(), node);
+                let node = self.hydrated_node(*entry.key(), node)?;
                 let mut row = Row::new();
                 if let Some(v) = &pattern.start.var {
                     row.insert(v.clone(), serde_json::to_value(node).map_err(ser_err)?);
@@ -22210,11 +22932,11 @@ impl Storage {
                     if !Self::is_node_visible(far_node, as_of, false, &now) {
                         continue;
                     }
-                    if !self.node_matches(far_u32, far_node, node_pat) {
+                    if !self.node_matches(far_u32, far_node, node_pat)? {
                         continue;
                     }
                     budget.node()?;
-                    let far_node = self.hydrated_node(far_u32, far_node);
+                    let far_node = self.hydrated_node(far_u32, far_node)?;
                     let mut nb = row.clone();
                     if let Some(v) = &edge_pat.var {
                         nb.insert(v.clone(), serde_json::to_value(edge).map_err(ser_err)?);
@@ -22616,12 +23338,10 @@ impl Storage {
                         "QUERY_CAPABILITY_UNSUPPORTED: lexical Query IR search is planned",
                     ));
                 }
-                if let Some(value) = alpha {
-                    if !value.is_finite() || !(0.0..=1.0).contains(&value) {
-                        return Err(Error::from_reason(
-                            "QUERY_IR_VALIDATION_FAILED: search.alpha must be between 0 and 1",
-                        ));
-                    }
+                if alpha.is_some() || matches!(mode, QueryIrSearchMode::Hybrid) {
+                    return Err(Error::from_reason(
+                        "KIMPACT_REMOVED: Query IR alpha/hybrid importance ranking was removed; use vector search or application-owned ranking",
+                    ));
                 }
                 if ef_search == Some(0) || oversample == Some(0) {
                     return Err(Error::from_reason(
@@ -22639,11 +23359,7 @@ impl Storage {
                         HybridSearchInput {
                             query_vector,
                             k,
-                            alpha: Some(match mode {
-                                QueryIrSearchMode::Vector => 0.0,
-                                QueryIrSearchMode::Hybrid => alpha.unwrap_or(0.5),
-                                QueryIrSearchMode::Lexical => unreachable!(),
-                            }),
+                            alpha: None,
                             lang: language,
                             as_of,
                             collection: resolved_collection,
@@ -22760,7 +23476,7 @@ impl Storage {
                         "QUERY_TARGET_NOT_FOUND: node '{target_id}' is not live"
                     ))
                 })?;
-                let hydrated_target = self.hydrated_node(target_u32, target_node.value());
+                let hydrated_target = self.hydrated_node(target_u32, target_node.value())?;
                 let now = Utc::now().to_rfc3339();
                 if !Self::is_node_visible(&hydrated_target, &None, false, &now) {
                     return Err(Error::from_reason(format!(
@@ -23018,7 +23734,7 @@ impl Storage {
                                 collection: resolved_collection,
                                 filters: None,
                                 k,
-                                alpha: Some(0.0),
+                                alpha: None,
                                 language: lang,
                                 ef_search,
                                 oversample,
@@ -23031,7 +23747,7 @@ impl Storage {
                         HybridSearchInput {
                             query_vector,
                             k,
-                            alpha: Some(0.0),
+                            alpha: None,
                             lang,
                             as_of,
                             collection: resolved_collection,
@@ -23116,7 +23832,6 @@ impl Storage {
             }
             HqlCommand::Hybrid {
                 vector,
-                alpha,
                 k,
                 ef_search,
                 oversample,
@@ -23144,13 +23859,13 @@ impl Storage {
                             consistency: None,
                             budget: None,
                             operation: QueryIrOperation::Search {
-                                mode: QueryIrSearchMode::Hybrid,
+                                mode: QueryIrSearchMode::Vector,
                                 target_id: None,
                                 query_vector: Some(query_vector),
                                 collection: resolved_collection,
                                 filters: None,
                                 k,
-                                alpha: Some(alpha),
+                                alpha: None,
                                 language: lang,
                                 ef_search,
                                 oversample,
@@ -23163,7 +23878,7 @@ impl Storage {
                         HybridSearchInput {
                             query_vector,
                             k,
-                            alpha: Some(alpha),
+                            alpha: None,
                             lang,
                             as_of,
                             collection: resolved_collection,
@@ -23251,8 +23966,8 @@ impl Storage {
         }
     }
 
-    fn studio_graph_node(&self, node_u32: u32, node: &NodeOutput) -> StudioGraphNode {
-        let hydrated = self.hydrated_node(node_u32, node);
+    fn studio_graph_node(&self, node_u32: u32, node: &NodeOutput) -> Result<StudioGraphNode> {
+        let hydrated = self.hydrated_node(node_u32, node)?;
         let label = hydrated
             .props
             .get("title")
@@ -23260,7 +23975,7 @@ impl Storage {
             .and_then(Value::as_str)
             .unwrap_or(&hydrated.id)
             .to_string();
-        StudioGraphNode {
+        Ok(StudioGraphNode {
             id: hydrated.id,
             label,
             labels: hydrated.labels,
@@ -23268,8 +23983,7 @@ impl Storage {
             valid_from: hydrated.valid_from,
             valid_to: hydrated.valid_to,
             caused_by: hydrated.caused_by,
-            impact: hydrated.impact,
-        }
+        })
     }
 
     fn studio_graph_edge(edge: &EdgeOutput) -> StudioGraphEdge {
@@ -23353,6 +24067,7 @@ impl Storage {
                 .nodes
                 .get(&seed_u32)
                 .map(|node| self.hydrated_node(seed_u32, node.value()))
+                .transpose()?
                 .ok_or_else(|| Error::from_reason("STUDIO_ENTITY_NOT_FOUND"))?;
             if !Self::is_currently_visible(
                 &seed_node.valid_from,
@@ -23398,12 +24113,10 @@ impl Storage {
                     )
                 })
                 .map(|entry| {
-                    (
-                        *entry.key(),
-                        self.hydrated_node(*entry.key(), entry.value()),
-                    )
+                    self.hydrated_node(*entry.key(), entry.value())
+                        .map(|node| (*entry.key(), node))
                 })
-                .collect()
+                .collect::<Result<Vec<_>>>()?
         };
         candidates.sort_by(|left, right| left.1.id.cmp(&right.1.id));
         candidates.dedup_by(|left, right| left.1.id == right.1.id);
@@ -23418,7 +24131,7 @@ impl Storage {
         let nodes: Vec<StudioGraphNode> = page
             .iter()
             .map(|(node_u32, node)| self.studio_graph_node(*node_u32, node))
-            .collect();
+            .collect::<Result<Vec<_>>>()?;
         let mut all_edges: Vec<StudioGraphEdge> = self
             .edges
             .iter()
@@ -23529,7 +24242,7 @@ impl Storage {
         Ok(StudioEntityInspection {
             entity_id: entity_id.to_string(),
             frontier: self.stable_frontier(),
-            node: self.studio_graph_node(node_u32, &hydrated),
+            node: self.studio_graph_node(node_u32, &hydrated)?,
             properties: hydrated.props,
             incident_edges,
             vector_collection: vector_present.then_some(collection_name),
@@ -23692,12 +24405,9 @@ impl Storage {
                 "QUERY_VALIDATION_FAILED: query_vector must contain only finite values",
             ));
         }
-        if args
-            .alpha
-            .is_some_and(|value| !value.is_finite() || !(0.0..=1.0).contains(&value))
-        {
+        if args.alpha.is_some() {
             return Err(Error::from_reason(
-                "QUERY_VALIDATION_FAILED: alpha must be between 0 and 1",
+                "KIMPACT_REMOVED: alpha-based ranking was removed; use vector relevance or rank with application-owned signals",
             ));
         }
         if args.ef_search == Some(0) || args.oversample == Some(0) {
@@ -23949,10 +24659,6 @@ impl Storage {
         }
         let mut hybrid_results = Vec::new();
         let meta_arena = coll.metadata.read();
-        // Default to pure vector similarity. K-Impact blending is opt-in via an
-        // explicit `alpha > 0` — see ADR--GENESISDB-KIMPACT-AS-SIGNAL. (Was 0.5,
-        // which silently mixed graph-authority into every query.)
-        let alpha = args.alpha.unwrap_or(0.0);
         // history_horizon() scans the journal directory — only pay for it on
         // the tx path (the current-view hot path never needs it).
         let horizon = if tx_as_of.is_some() {
@@ -23978,7 +24684,7 @@ impl Storage {
                                 None => continue,
                             },
                         };
-                        match self.tx_view_node(&id_str, t, horizon, &args.as_of) {
+                        match self.tx_view_node(&id_str, t, horizon, &args.as_of)? {
                             Some(n) => n,
                             None => continue,
                         }
@@ -23991,7 +24697,7 @@ impl Storage {
                         // and keep the old last-writer-wins behavior.)
                         continue;
                     } else if let Some(node) = self.nodes.get(&u32_id) {
-                        let node_out = self.hydrated_node(u32_id, node.value());
+                        let node_out = self.hydrated_node(u32_id, node.value())?;
 
                         if Self::is_node_visible(&node_out, &args.as_of, false, &now) {
                             node_out
@@ -24012,17 +24718,12 @@ impl Storage {
                     };
 
                     let similarity = 1.0 - distance as f64;
-                    let reasoning_score =
-                        (similarity * (1.0 - alpha)) + (node_out.impact.unwrap_or(0.0) * alpha);
-                    // Carry the ranking score in `score`; leave `node.impact`
-                    // as the node's true graph-authority signal (don't clobber
-                    // it) so the caller can fuse it itself.
                     budget.row()?;
                     hybrid_results.push(NeighborOutput {
                         node: node_out,
                         path: Vec::new(),
                         depth: 0,
-                        score: Some(reasoning_score),
+                        score: Some(similarity),
                     });
                 }
             }
@@ -24043,15 +24744,6 @@ impl Storage {
         hybrid_results.retain(|n| seen.insert(n.node.id.clone()));
         hybrid_results.truncate(args.k as usize);
         Ok(hybrid_results)
-    }
-
-    pub fn get_ranked_context(&self, args: HybridSearchInput) -> Result<Vec<NeighborOutput>> {
-        let _read_guard = self.commit_lock.lock();
-        self.ensure_readable()?;
-
-        let mut context_args = args;
-        context_args.alpha = Some(0.4);
-        self.hybrid_search(context_args)
     }
 
     pub fn neighbors(
@@ -24202,7 +24894,7 @@ impl Storage {
                                 // current version postdates as_of, resolve the
                                 // historically valid version from the chain
                                 // instead of hiding the node.
-                                let hydrated = self.hydrated_node(next_u32, node);
+                                let hydrated = self.hydrated_node(next_u32, node)?;
                                 let out_node = if Self::is_node_visible(
                                     &hydrated,
                                     &args.as_of,
@@ -24254,20 +24946,21 @@ impl Storage {
     fn node_version_row_at(&self, node_id: &str, t: u64, horizon: u64) -> Option<NodeVersionRow> {
         let conn = self.projection_db.lock();
         conn.query_row(
-            "SELECT labels, payload, valid_from, valid_to, caused_by, clock_time, clock_peer
+            "SELECT frame_seq, labels, payload, valid_from, valid_to, caused_by, clock_time, clock_peer
              FROM node_versions
              WHERE id = ?1 AND frame_seq >= ?2 AND frame_seq <= ?3 AND retracted = 0
              ORDER BY frame_seq DESC LIMIT 1",
             params![node_id, horizon, t],
             |row| {
                 Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, Option<String>>(1)?,
-                    row.get::<_, String>(2)?,
-                    row.get::<_, Option<String>>(3)?,
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                    row.get::<_, String>(3)?,
                     row.get::<_, Option<String>>(4)?,
-                    row.get::<_, i64>(5)?,
-                    row.get::<_, String>(6)?,
+                    row.get::<_, Option<String>>(5)?,
+                    row.get::<_, i64>(6)?,
+                    row.get::<_, String>(7)?,
                 ))
             },
         )
@@ -24323,19 +25016,30 @@ impl Storage {
         t: u64,
         horizon: u64,
         valid_as_of: &Option<String>,
-    ) -> Option<NodeOutput> {
-        let (labels, payload, valid_from, valid_to, caused_by, clock_time, clock_peer) =
-            self.node_version_row_at(id, t, horizon)?;
+    ) -> Result<Option<NodeOutput>> {
+        let Some((
+            frame_seq,
+            labels,
+            payload,
+            valid_from,
+            valid_to,
+            caused_by,
+            clock_time,
+            clock_peer,
+        )) = self.node_version_row_at(id, t, horizon)
+        else {
+            return Ok(None);
+        };
         let mut out_node = match self
             .get_u32(id)
-            .and_then(|u| self.nodes.get(&u).map(|n| self.hydrated_node(u, n.value())))
+            .and_then(|u| self.nodes.get(&u).map(|n| (u, n)))
         {
-            Some(live) => live,
+            Some((u32_id, live)) => self.hydrated_node(u32_id, live.value())?,
             None => NodeOutput {
                 id: id.to_string(),
                 labels: Vec::new(),
                 props: Value::Null,
-                impact: None,
+                legacy_wire_impact: LegacyImpactWire::Absent,
                 embedding: None,
                 lang: None,
                 valid_from: String::new(),
@@ -24344,7 +25048,7 @@ impl Storage {
                 expires_at: None,
                 clock: LogicalClock {
                     time: clock_time.max(0) as u32,
-                    peer_id: clock_peer,
+                    peer_id: clock_peer.clone(),
                 },
                 collection: None,
             },
@@ -24353,13 +25057,37 @@ impl Storage {
         out_node.props = payload
             .and_then(|p| serde_json::from_str(&p).ok())
             .unwrap_or(Value::Null);
+        let database_id = self.database_id();
+        let revision_props = {
+            let connection = self.projection_db.lock();
+            self.legacy_node_version_props_from_revision(
+                &connection,
+                &database_id,
+                id,
+                frame_seq,
+                &out_node.labels,
+                &out_node.props,
+                &valid_from,
+                &valid_to,
+                &caused_by,
+                clock_time,
+                &clock_peer,
+            )
+        };
+        match revision_props {
+            Ok(Some(props)) => out_node.props = props,
+            Ok(None) => {}
+            Err(error) => {
+                return self.hydration_failure(id, error);
+            }
+        }
         out_node.valid_from = valid_from;
         out_node.valid_to = valid_to;
         out_node.caused_by = caused_by;
         if !Self::is_valid_as_of(&out_node.valid_from, &out_node.valid_to, valid_as_of) {
-            return None;
+            return Ok(None);
         }
-        Some(out_node)
+        Ok(Some(out_node))
     }
 
     /// E1 (SPEC--GENESISDB-EPOCH-HNSW §3.2): tx-view traverse with
@@ -24449,10 +25177,10 @@ impl Storage {
                 let mut edges = Vec::new();
                 for row in rows {
                     let payload = row.map_err(|e| Error::from_reason(e.to_string()))?;
-                    edges.push(
-                        serde_json::from_str::<EdgeOutput>(&payload)
-                            .map_err(|e| Error::from_reason(e.to_string()))?,
-                    );
+                    let mut edge = serde_json::from_str::<EdgeOutput>(&payload)
+                        .map_err(|e| Error::from_reason(e.to_string()))?;
+                    migrate_legacy_edge_impact(&mut edge)?;
+                    edges.push(edge);
                 }
                 edges
             };
@@ -24486,7 +25214,7 @@ impl Storage {
 
                 // Resolve the far node through the chain at t (shared with the
                 // vector tx path — see `tx_view_node` for the two-axis rule).
-                let Some(out_node) = self.tx_view_node(&next_id, t, horizon, &args.as_of) else {
+                let Some(out_node) = self.tx_view_node(&next_id, t, horizon, &args.as_of)? else {
                     continue;
                 };
 
@@ -24737,11 +25465,9 @@ impl Storage {
 
         for (c_id, members) in cluster_groups.iter() {
             let mut centroid = vec![0.0; dim];
-            let mut total_impact = 0.0;
             let mut count = 0;
             for &u32_id in members {
-                if let Some(node) = self.nodes.get(&u32_id) {
-                    total_impact += node.value().impact.unwrap_or(0.0);
+                if self.nodes.get(&u32_id).is_some() {
                     if let Some(a_id) = coll.node_to_arena.get(&u32_id) {
                         if let Some(meta) = meta_arena.get(*a_id as usize) {
                             let start = meta.embedding_offset as usize;
@@ -24777,7 +25503,6 @@ impl Storage {
                     cluster_id: *c_id,
                     theme: format!("Theme-{}", c_id),
                     member_count: members.len() as u32,
-                    impact: total_impact / members.len() as f64,
                     centroid: centroid.clone(),
                     timestamp: now.clone(),
                     drift,
@@ -25154,7 +25879,6 @@ impl Storage {
                             &remote_edge.to,
                         );
                         self.edges.insert(u32_id, remote_edge.clone());
-                        self.refresh_impacts(Some(vec![remote_edge.to.clone()]));
                     }
                 }
                 Event::Vector(remote_vec) => {
@@ -25401,7 +26125,7 @@ impl Storage {
 
         if let Some(u32_id) = self.get_u32_unlocked(&target_id_resolved) {
             if let Some(node) = self.nodes.get(&u32_id) {
-                let hydrated = self.hydrated_node(u32_id, node.value());
+                let hydrated = self.hydrated_node(u32_id, node.value())?;
                 if Self::is_node_visible(&hydrated, &None, false, &now) {
                     if let Some(state) = query_budget.as_deref_mut() {
                         state.node()?;
@@ -25424,7 +26148,7 @@ impl Storage {
                 // is popped, every node within the radius is already in `nodes`.
                 if !ceiling_hit
                     && !visited.contains(&curr_u32)
-                    && self.has_edge_beyond(curr_u32, &nodes)
+                    && self.has_edge_beyond(curr_u32, &nodes)?
                 {
                     ceiling_hit = true;
                 }
@@ -25456,7 +26180,7 @@ impl Storage {
                         }
                         if let Some(next_u32) = self.get_u32_unlocked(&edge.to) {
                             if let Some(node) = self.nodes.get(&next_u32) {
-                                let hydrated = self.hydrated_node(next_u32, node.value());
+                                let hydrated = self.hydrated_node(next_u32, node.value())?;
                                 if !Self::is_node_visible(&hydrated, &None, false, &now) {
                                     continue;
                                 }
@@ -25468,7 +26192,7 @@ impl Storage {
                                 nodes.entry(next_u32)
                             {
                                 if let Some(node) = self.nodes.get(&next_u32) {
-                                    let hydrated = self.hydrated_node(next_u32, node.value());
+                                    let hydrated = self.hydrated_node(next_u32, node.value())?;
                                     if !Self::is_node_visible(&hydrated, &None, false, &now) {
                                         continue;
                                     }
@@ -25506,7 +26230,7 @@ impl Storage {
                         }
                         if let Some(prev_u32) = self.get_u32_unlocked(&edge.from) {
                             if let Some(node) = self.nodes.get(&prev_u32) {
-                                let hydrated = self.hydrated_node(prev_u32, node.value());
+                                let hydrated = self.hydrated_node(prev_u32, node.value())?;
                                 if !Self::is_node_visible(&hydrated, &None, false, &now) {
                                     continue;
                                 }
@@ -25518,7 +26242,7 @@ impl Storage {
                                 nodes.entry(prev_u32)
                             {
                                 if let Some(node) = self.nodes.get(&prev_u32) {
-                                    let hydrated = self.hydrated_node(prev_u32, node.value());
+                                    let hydrated = self.hydrated_node(prev_u32, node.value())?;
                                     if !Self::is_node_visible(&hydrated, &None, false, &now) {
                                         continue;
                                     }
@@ -25597,7 +26321,7 @@ impl Storage {
     /// truncated frontier from the edge of a fully-served subgraph, so
     /// `CoverageReport::ceiling_hit` reports a fact rather than merely
     /// "traversal stopped here".
-    fn has_edge_beyond(&self, u32_id: u32, included: &HashMap<u32, NodeOutput>) -> bool {
+    fn has_edge_beyond(&self, u32_id: u32, included: &HashMap<u32, NodeOutput>) -> Result<bool> {
         let now = Utc::now().to_rfc3339();
         if let Some(eids) = self.out_idx.get(&u32_id) {
             for eid in eids.iter() {
@@ -25615,17 +26339,19 @@ impl Storage {
                         continue;
                     }
                     if let Some(next) = self.get_u32_unlocked(&edge.to) {
-                        if !included.contains_key(&next)
-                            && self
-                                .nodes
-                                .get(&next)
-                                .map(|node| {
-                                    let hydrated = self.hydrated_node(next, node.value());
-                                    Self::is_node_visible(&hydrated, &None, false, &now)
-                                })
-                                .unwrap_or(true)
-                        {
-                            return true;
+                        if !included.contains_key(&next) {
+                            let visible = match self.nodes.get(&next) {
+                                Some(node) => Self::is_node_visible(
+                                    &self.hydrated_node(next, node.value())?,
+                                    &None,
+                                    false,
+                                    &now,
+                                ),
+                                None => true,
+                            };
+                            if visible {
+                                return Ok(true);
+                            }
                         }
                     }
                 }
@@ -25647,23 +26373,25 @@ impl Storage {
                         continue;
                     }
                     if let Some(prev) = self.get_u32_unlocked(&edge.from) {
-                        if !included.contains_key(&prev)
-                            && self
-                                .nodes
-                                .get(&prev)
-                                .map(|node| {
-                                    let hydrated = self.hydrated_node(prev, node.value());
-                                    Self::is_node_visible(&hydrated, &None, false, &now)
-                                })
-                                .unwrap_or(true)
-                        {
-                            return true;
+                        if !included.contains_key(&prev) {
+                            let visible = match self.nodes.get(&prev) {
+                                Some(node) => Self::is_node_visible(
+                                    &self.hydrated_node(prev, node.value())?,
+                                    &None,
+                                    false,
+                                    &now,
+                                ),
+                                None => true,
+                            };
+                            if visible {
+                                return Ok(true);
+                            }
                         }
                     }
                 }
             }
         }
-        false
+        Ok(false)
     }
 
     fn prune_gossip_state(
@@ -26524,8 +27252,17 @@ impl Storage {
         let nodes: Vec<(u32, NodeOutput)> = self
             .nodes
             .iter()
-            .map(|e| (*e.key(), e.value().clone()))
-            .collect();
+            .map(|entry| {
+                let u32_id = *entry.key();
+                let node = entry.value();
+                let snapshot = if node.legacy_wire_impact.is_absent() {
+                    Ok(node.clone())
+                } else {
+                    self.hydrated_node(u32_id, node)
+                };
+                snapshot.map(|snapshot| (u32_id, snapshot))
+            })
+            .collect::<Result<Vec<_>>>()?;
         let edges: Vec<(u128, EdgeOutput)> = self
             .edges
             .iter()
@@ -28436,8 +29173,22 @@ impl Storage {
         // 2. Load Maps
         if let Ok(data) = fs::read(self.path.join("nodes.bin")) {
             match serde_json::from_slice::<Vec<(u32, NodeOutput)>>(&data) {
-                Ok(nodes) => {
+                Ok(mut nodes) => {
                     println!("snapshot: loading {} nodes", nodes.len());
+                    for (_, node) in &mut nodes {
+                        let deferred_lean_props = node.props.is_null()
+                            && matches!(node.legacy_wire_impact, LegacyImpactWire::Number(_));
+                        let mut validation = node.clone();
+                        let validation_result = migrate_legacy_node_impact(&mut validation);
+                        if let Err(error) = validation_result {
+                            println!("snapshot: legacy node migration failed: {error}");
+                            self.recovery_required.store(true, Ordering::SeqCst);
+                            return SnapshotLoadOutcome::NotLoaded;
+                        }
+                        if !deferred_lean_props {
+                            *node = validation;
+                        }
+                    }
                     let mut next_node_id = 0;
                     for (k, v) in nodes {
                         next_node_id = next_node_id.max(k.saturating_add(1));
@@ -28453,7 +29204,7 @@ impl Storage {
                         for trigram in Self::tokenize_id(&v.id) {
                             self.trigram_index.entry(trigram).or_default().insert(k);
                         }
-                        self.insert_node_lean(k, v);
+                        self.insert_node_lean_snapshot(k, v);
                     }
                     self.next_u32.store(next_node_id, Ordering::SeqCst);
                 }
@@ -28470,8 +29221,15 @@ impl Storage {
             // Deserialize as u128 tuples. Legacy snapshots wrote u32/u64 keys; JSON
             // numbers widen into u128 fine, and the saved key is ignored anyway
             // (re-derived below), so all widths load transparently.
-            if let Ok(edges) = serde_json::from_slice::<Vec<(u128, EdgeOutput)>>(&data) {
+            if let Ok(mut edges) = serde_json::from_slice::<Vec<(u128, EdgeOutput)>>(&data) {
                 println!("snapshot: loading {} edges", edges.len());
+                for (_, edge) in &mut edges {
+                    if let Err(error) = migrate_legacy_edge_impact(edge) {
+                        println!("snapshot: legacy edge migration failed: {error}");
+                        self.recovery_required.store(true, Ordering::SeqCst);
+                        return SnapshotLoadOutcome::NotLoaded;
+                    }
+                }
                 for (_saved_k, v) in edges {
                     // Re-derive the edge key deterministically from the edge id
                     // (ADR--GENESISDB-EDGE-NUMERIC-KEYS). This reproduces the
@@ -28568,6 +29326,10 @@ impl Storage {
         let _commit_guard = self.commit_lock.lock();
         self.ensure_readable()?;
 
+        for edge in &input.edges {
+            reject_legacy_impact(edge.impact)?;
+        }
+
         // 1. Validation Phase (All-or-Nothing)
         for node in &input.nodes {
             self.validate_local_node_mutation(node.id.as_deref(), &node.labels)?;
@@ -28608,7 +29370,7 @@ impl Storage {
                 id: id.clone(),
                 labels: args.labels,
                 props: args.props.unwrap_or(Value::Object(Default::default())),
-                impact: Some(0.7),
+                legacy_wire_impact: LegacyImpactWire::Absent,
                 embedding: args.embedding.clone(),
                 lang: Some(lang.clone()),
                 valid_from: args.valid_from.unwrap_or_else(|| now.to_rfc3339()),
@@ -28635,7 +29397,7 @@ impl Storage {
                 valid_to: None,
                 recorded_at: now.to_rfc3339(),
                 superseded_by: None,
-                impact: args.impact,
+                legacy_wire_impact: LegacyImpactWire::Absent,
                 caused_by: args.caused_by,
                 clock: self.next_clock(),
             };
@@ -29317,7 +30079,7 @@ impl Storage {
                 && Self::labels_are_master(&node.labels)
             {
                 let mut materialized = node.clone();
-                materialized.props = self.hydrated_props(*entry.key(), &materialized);
+                materialized.props = self.hydrated_props(*entry.key(), &materialized)?;
                 materialized.embedding = None;
                 required_nodes.insert(node.id.clone(), materialized);
             }
@@ -29805,7 +30567,7 @@ impl Storage {
                     continue;
                 }
                 let mut baseline = node.clone();
-                baseline.props = self.hydrated_props(*entry.key(), &baseline);
+                baseline.props = self.hydrated_props(*entry.key(), &baseline)?;
                 baseline.embedding = None;
                 let event = Event::Node(baseline);
                 if let Some(proof) = self.schema6_migration_revision_proof_for(&event)? {
@@ -29880,7 +30642,7 @@ impl Storage {
                 .ok_or_else(|| {
                     Error::from_reason(format!("COMPACTION_MASTER_NODE_MISSING: {id}"))
                 })?;
-            current_node.props = self.hydrated_props(node_key, &current_node);
+            current_node.props = self.hydrated_props(node_key, &current_node)?;
             current_node.embedding = None;
             let mut source_node = find_base_proof_node(&proof.event, &current_node).ok_or_else(|| {
                 Error::from_reason(format!(
@@ -29951,7 +30713,7 @@ impl Storage {
                     continue;
                 }
                 let mut node = node.clone();
-                node.props = self.hydrated_props(*entry.key(), &node);
+                node.props = self.hydrated_props(*entry.key(), &node)?;
                 // Both primary and secondary vectors are emitted below with
                 // an explicit already-prepared representation.
                 node.embedding = None;
@@ -31059,7 +31821,12 @@ impl Storage {
                 }
                 self.insert_node_lean(u32_id, n);
             }
-            Event::Edge(e) => {
+            Event::Edge(mut e) => {
+                if let Err(error) = migrate_legacy_edge_impact(&mut e) {
+                    self.recovery_required.store(true, Ordering::SeqCst);
+                    eprintln!("edge legacy-field migration failed for '{}': {error}", e.id);
+                    return;
+                }
                 if self
                     .edges
                     .get(&Self::edge_key(&e.id))
@@ -31167,7 +31934,6 @@ impl Storage {
         edge.clock = self.next_clock(); // advance for CRDT LWW: the retraction must win
         self.persist_local_graph_mutations(&[], &[edge.clone()], &[])?;
         self.edges.insert(ekey, edge.clone());
-        self.refresh_impacts(Some(vec![edge.to.clone()]));
         Ok(Some(edge))
     }
     pub fn status_sync(&self) -> DatabaseStatus {
@@ -31218,7 +31984,6 @@ impl Storage {
         let mut gaps = Vec::new();
         let mut cluster_centroids: HashMap<u32, Vec<f32>> = HashMap::new();
         let mut cluster_member_count: HashMap<u32, u32> = HashMap::new();
-        let mut cluster_impact: HashMap<u32, f64> = HashMap::new();
         // Structural gaps are computed over the default collection's space.
         let coll = self.default_coll();
         let meta_arena = coll.metadata.read();
@@ -31236,13 +32001,6 @@ impl Storage {
                     entry[i] += val;
                 }
                 *cluster_member_count.entry(c_id).or_insert(0) += 1;
-                {
-                    let u32_id = meta.node_u32; // A2: id interned in metadata
-                    if let Some(node) = self.nodes.get(&u32_id) {
-                        *cluster_impact.entry(c_id).or_insert(0.0) +=
-                            node.value().impact.unwrap_or(0.0);
-                    }
-                }
             }
         }
         for (c_id, centroid) in cluster_centroids.iter_mut() {
@@ -31256,17 +32014,15 @@ impl Storage {
             for j in i + 1..cluster_ids.len() {
                 let id_a = cluster_ids[i];
                 let id_b = cluster_ids[j];
-                let avg_impact_a = cluster_impact[&id_a] / cluster_member_count[&id_a] as f64;
-                let avg_impact_b = cluster_impact[&id_b] / cluster_member_count[&id_b] as f64;
-                if avg_impact_a < 0.5 || avg_impact_b < 0.5 {
-                    continue;
-                }
                 let dist = DistL2 {}.eval(&cluster_centroids[&id_a], &cluster_centroids[&id_b]);
                 let similarity = 1.0 / (1.0 + dist as f64);
                 if similarity > 0.75 {
                     gaps.push(GapSuggestion {
-                        cluster_a: id_a, cluster_b: id_b, similarity,
-                        reason: format!("High-authority clusters ({:.2} & {:.2}) are semantically related but physically disconnected.", avg_impact_a, avg_impact_b),
+                        cluster_a: id_a,
+                        cluster_b: id_b,
+                        similarity,
+                        reason: "Clusters are semantically related but physically disconnected."
+                            .to_string(),
                     });
                 }
             }
@@ -31380,8 +32136,23 @@ fn hql2_read_revision_payload(
             |row| row.get(0),
         )
         .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "source_revision_missing"))?;
-    serde_json::from_str(&payload)
-        .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "source_payload"))
+    let payload: Value = serde_json::from_str(&payload)
+        .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "source_payload"))?;
+    // Older databases may already have revision rows whose payloads contain
+    // the signed NodeOutput/EdgeOutput shape with a top-level `impact`. New
+    // writes normalize at projection time, but a matching projection marker
+    // correctly skips replay. Normalize only the returned value here and keep
+    // the original SQLite bytes available for verification and recovery.
+    let kind = match kind {
+        "node" => Some(uee_v2::RecordKindV2::Node),
+        "edge" => Some(uee_v2::RecordKindV2::Edge),
+        _ => None,
+    };
+    match kind {
+        Some(kind) => Storage::normalize_legacy_revision_payload(&kind, &payload)
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "source_payload")),
+        None => Ok(payload),
+    }
 }
 
 fn hql2_check_output(
@@ -33955,15 +34726,6 @@ impl GenesisDatabase {
         })
         .await
         .map_err(|e| Error::from_reason(e.to_string()))?
-    }
-    #[napi]
-    pub async fn semantic_verify(&self, event_json: String) -> Result<bool> {
-        let i = Arc::clone(&self.inner);
-        let event = serde_json::from_str::<Event>(&event_json)
-            .map_err(|e| Error::from_reason(e.to_string()))?;
-        tokio::task::spawn_blocking(move || i.semantic_verify(&event))
-            .await
-            .map_err(|e| Error::from_reason(e.to_string()))?
     }
     #[napi]
     pub async fn propose_consensus(

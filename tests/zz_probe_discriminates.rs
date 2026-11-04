@@ -79,7 +79,7 @@ fn probe_vs_recall() {
                 .hybrid_search(HybridSearchInput {
                     query_vector: q.clone(),
                     k: 10,
-                    alpha: Some(0.0),
+                    alpha: None,
                     lang: None,
                     as_of: None,
                     collection: None,
@@ -103,7 +103,7 @@ fn probe_vs_recall() {
                 .hybrid_search(HybridSearchInput {
                     query_vector: vectors[i].clone(),
                     k: 10,
-                    alpha: Some(0.0),
+                    alpha: None,
                     lang: None,
                     as_of: None,
                     collection: None,

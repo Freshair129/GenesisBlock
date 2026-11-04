@@ -1,7 +1,8 @@
 ---
 proposed_id: ADR--GENESISDB-KIMPACT-ALGORITHM
 type: adr
-status: candidate
+status: superseded
+superseded_by: ADR--GENESISDB-RETIRE-KIMPACT.md
 aliases:
   - ADR
 phase: 2
@@ -14,6 +15,10 @@ proposed_by: agent
 ---
 
 # ADR--GENESISDB-KIMPACT-ALGORITHM
+
+> Historical decision, superseded on 2026-11-02 by
+> [K-Impact retirement](ADR--GENESISDB-RETIRE-KIMPACT.md).
+> The scoring formula and implementation instructions below are retired.
 
 ## Context
 Modern graph databases typically rely on PageRank or HITS for node ranking. However, for a Knowledge Graph (GKS), "popularity" (number of links) does not always equal "truth" or "architectural importance." A high-tier `MASTER` rule may have few incoming links but must outweigh a thousand low-tier `EPISODE` logs.

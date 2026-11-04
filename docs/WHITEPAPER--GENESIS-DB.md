@@ -1,11 +1,17 @@
 ---
 doc_id: WHITEPAPER--GENESIS-DB
-status: current
+status: historical
 version: n/a
 owner: GenesisBlockDB Architecture
 ---
 
 # GenesisBlockDB: An Embedded Semantic-Graph Engine for AI Agent Memory
+
+> Historical June 2026 evidence snapshot. K-Impact computation, blending, and its
+> benchmark below are retired by [the current decision](adr/ADR--GENESISDB-RETIRE-KIMPACT.md).
+> The old cost figures and harness names describe that historical revision;
+> they are not current capability or reproduction instructions.
+
 **Whitepaper — evidence-backed revision (2026-06-21)**
 **Status:** Advanced prototype with measured benchmarks (see §4, audits P14–P25)
 

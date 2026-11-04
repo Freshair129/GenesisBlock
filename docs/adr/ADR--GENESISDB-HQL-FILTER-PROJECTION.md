@@ -134,7 +134,7 @@ TRAVERSE FROM user:5 DEPTH 2 REL SENT_BY
   WHERE label = "Message"
   RETURN id, prop.text
 
-MATCH topic SIMILAR TO [..] ALPHA 0
+MATCH topic SIMILAR TO [..]
   WHERE label = "Notification" AND prop.text CONTAINS "โอน"
   LIMIT 5
 ```

@@ -149,7 +149,7 @@ fn search_by_node_no_vector_returns_nearest_by_embedding() {
     );
 }
 
-/// Same semantics via the hybrid `MATCH <id> ALPHA 0.0` form (no vector).
+/// Same semantics via the hybrid `MATCH <id>` form (no vector).
 #[test]
 fn hybrid_by_node_no_vector_returns_nearest_by_embedding() {
     let p = fresh("p0_hybrid_by_node");
@@ -157,7 +157,7 @@ fn hybrid_by_node_no_vector_returns_nearest_by_embedding() {
     seed_search_by_node_fixture(&s);
     s.flush_index();
 
-    let res = s.execute_hql("MATCH q ALPHA 0.0").unwrap();
+    let res = s.execute_hql("MATCH q").unwrap();
     let hits = ids(&res);
     // MATCH's default K is 10 (src/query/ast.rs); the fixture's 24 total nodes
     // comfortably cover that, so a short result set is a real regression, not
@@ -165,7 +165,7 @@ fn hybrid_by_node_no_vector_returns_nearest_by_embedding() {
     assert_eq!(
         hits.len(),
         10,
-        "MATCH q ALPHA 0.0 must return exactly 10 hits (default K), got {:?}",
+        "MATCH q must return exactly 10 hits (default K), got {:?}",
         hits
     );
     assert_eq!(
@@ -199,7 +199,7 @@ fn search_by_node_matches_direct_hybrid_search_with_same_embedding() {
         .hybrid_search(genesis_block_native::HybridSearchInput {
             query_vector: vec![0.0, 0.0],
             k: 3,
-            alpha: Some(0.0),
+            alpha: None,
             lang: None,
             as_of: None,
             collection: None,
@@ -303,9 +303,7 @@ fn match_literal_vector_unchanged_shape() {
     add(&s, "b", Some(vec![0.0, 1.0]), None);
     s.flush_index();
 
-    let res = s
-        .execute_hql("MATCH q SIMILAR TO [1.0,0.0] ALPHA 0.0")
-        .unwrap();
+    let res = s.execute_hql("MATCH q SIMILAR TO [1.0,0.0]").unwrap();
     let hits = ids(&res);
     assert_eq!(hits[0], "a", "literal vector hybrid must rank a first");
 }
@@ -338,9 +336,7 @@ fn hybrid_k_widens_pool_past_default_10() {
 
     // Default K (10, absent from grammar) misses target-hit: only the 10
     // closest decoys are in the pool.
-    let default_res = s
-        .execute_hql("MATCH q SIMILAR TO [0.0,0.0] ALPHA 0.0")
-        .unwrap();
+    let default_res = s.execute_hql("MATCH q SIMILAR TO [0.0,0.0]").unwrap();
     let default_hits = ids(&default_res);
     assert!(
         !default_hits.contains(&"target-hit".to_string()),
@@ -352,7 +348,7 @@ fn hybrid_k_widens_pool_past_default_10() {
     // make HNSW exhaustive; compare pool sizes instead of requiring one
     // particular approximate neighbor.
     let wide_res = s
-        .execute_hql("MATCH q SIMILAR TO [0.0,0.0] ALPHA 0.0 K 50 EF 200")
+        .execute_hql("MATCH q SIMILAR TO [0.0,0.0] K 50 EF 200")
         .unwrap();
     let wide_hits = ids(&wide_res);
     assert!(
@@ -372,14 +368,12 @@ fn hybrid_without_k_unchanged() {
     add(&s, "a", Some(vec![1.0, 0.0]), None);
     s.flush_index();
 
-    let res = s
-        .execute_hql("MATCH q SIMILAR TO [1.0,0.0] ALPHA 0.0")
-        .unwrap();
+    let res = s.execute_hql("MATCH q SIMILAR TO [1.0,0.0]").unwrap();
     let hits = ids(&res);
     assert_eq!(hits[0], "a");
 }
 
-/// K composes with ALPHA/IN/LANGUAGE/AS OF/clauses in the documented order.
+/// K composes with IN/LANGUAGE/AS OF/clauses in the documented order.
 #[test]
 fn hybrid_k_composes_with_other_clauses() {
     let p = fresh("p0_hybrid_k_compose");
@@ -390,7 +384,7 @@ fn hybrid_k_composes_with_other_clauses() {
 
     let res = s
         .execute_hql(
-            "MATCH q SIMILAR TO [1.0,0.0] ALPHA 0.5 K 50 LANGUAGE \"en\" AS OF \"2099-01-01T00:00:00Z\" LIMIT 5",
+            "MATCH q SIMILAR TO [1.0,0.0] K 50 LANGUAGE \"en\" AS OF \"2099-01-01T00:00:00Z\" LIMIT 5",
         )
         .unwrap();
     let hits = ids(&res);
@@ -421,7 +415,7 @@ fn ef_oversample_parse_into_ast_search() {
 
 #[test]
 fn ef_oversample_parse_into_ast_hybrid() {
-    let q = "MATCH mynode SIMILAR TO [1.0,2.0] ALPHA 0.5 EF 256 OVERSAMPLE 4";
+    let q = "MATCH mynode SIMILAR TO [1.0,2.0] EF 256 OVERSAMPLE 4";
     match HqlCommand::try_from(q).unwrap() {
         HqlCommand::Hybrid {
             ef_search,
@@ -669,11 +663,10 @@ fn depth_overflow_errors() {
 }
 
 #[test]
-fn alpha_overflow_errors() {
+fn retired_alpha_clause_errors() {
     let huge = "1".repeat(400);
     let q = format!("MATCH x SIMILAR TO [1.0] ALPHA {huge}");
-    let err = HqlCommand::try_from(q.as_str()).unwrap_err();
-    assert!(err.contains("ALPHA value out of range"), "{err}");
+    assert!(HqlCommand::try_from(q.as_str()).is_err());
 }
 
 #[test]

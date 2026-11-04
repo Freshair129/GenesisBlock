@@ -796,7 +796,7 @@ fn main() {
             .hybrid_search(HybridSearchInput {
                 query_vector: q.iter().map(|x| *x as f64).collect(),
                 k: 20,
-                alpha: Some(0.0),
+                alpha: None,
                 lang: None,
                 as_of: Some(AS_OF_T.to_string()),
                 collection: None,
@@ -863,7 +863,7 @@ fn main() {
             .hybrid_search(HybridSearchInput {
                 query_vector: q.iter().map(|x| *x as f64).collect(),
                 k: 10,
-                alpha: Some(0.0),
+                alpha: None,
                 lang: None,
                 as_of: Some(AS_OF_T.to_string()),
                 collection: None,
@@ -894,7 +894,7 @@ fn main() {
             .hybrid_search(HybridSearchInput {
                 query_vector: q.iter().map(|x| *x as f64).collect(),
                 k: k as u32,
-                alpha: Some(0.0),
+                alpha: None,
                 lang: None,
                 as_of: None,
                 collection: None,

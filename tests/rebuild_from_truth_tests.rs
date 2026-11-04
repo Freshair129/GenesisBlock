@@ -63,7 +63,7 @@ fn search_top1(s: &Storage, query: [f64; 4]) -> String {
         .hybrid_search(HybridSearchInput {
             query_vector: query.to_vec(),
             k: 1,
-            alpha: Some(1.0),
+            alpha: None,
             lang: None,
             as_of: None,
             collection: None,

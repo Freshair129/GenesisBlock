@@ -44,7 +44,6 @@ data class NodeOutput(
     val id: String,
     val labels: List<String>,
     val props: JsonElement,
-    val impact: Double? = null,
     val embedding: List<Double>? = null,
     val lang: String? = null,
     @SerialName("valid_from") val validFrom: String,
@@ -66,7 +65,6 @@ data class EdgeOutput(
     @SerialName("valid_to") val validTo: String? = null,
     @SerialName("recorded_at") val recordedAt: String,
     @SerialName("superseded_by") val supersededBy: String? = null,
-    val impact: Double? = null,
     @SerialName("caused_by") val causedBy: String? = null,
     val clock: LogicalClock,
 )
@@ -76,7 +74,6 @@ data class SuperNode(
     @SerialName("cluster_id") val clusterId: Int,
     val theme: String,
     @SerialName("member_count") val memberCount: Int,
-    val impact: Double,
     val centroid: List<Double>,
     val timestamp: String,
     val drift: Double? = null,
@@ -128,7 +125,6 @@ data class NeighborOutput(
 data class HybridSearchInput(
     @SerialName("query_vector") val queryVector: List<Double>,
     val k: Int,
-    val alpha: Double? = null,
     val lang: String? = null,
     @SerialName("as_of") val asOf: String? = null,
     val collection: String? = null,

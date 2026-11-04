@@ -87,7 +87,6 @@ public struct NodeOutput: Codable, Sendable {
     public var id: String
     public var labels: [String]
     public var props: JSONValue
-    public var impact: Double?
     public var embedding: [Double]?
     public var lang: String?
     public var validFrom: String
@@ -109,7 +108,6 @@ public struct NodeOutput: Codable, Sendable {
         id: String,
         labels: [String],
         props: JSONValue,
-        impact: Double? = nil,
         embedding: [Double]? = nil,
         lang: String? = nil,
         validFrom: String,
@@ -122,7 +120,6 @@ public struct NodeOutput: Codable, Sendable {
         self.id = id
         self.labels = labels
         self.props = props
-        self.impact = impact
         self.embedding = embedding
         self.lang = lang
         self.validFrom = validFrom
@@ -134,7 +131,7 @@ public struct NodeOutput: Codable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, labels, props, impact, embedding, lang
+        case id, labels, props, embedding, lang
         case validFrom = "valid_from"
         case validTo = "valid_to"
         case causedBy = "caused_by"
@@ -153,7 +150,6 @@ public struct EdgeOutput: Codable, Sendable {
     public var validTo: String?
     public var recordedAt: String
     public var supersededBy: String?
-    public var impact: Double?
     public var causedBy: String?
     public var clock: LogicalClock
 
@@ -167,7 +163,6 @@ public struct EdgeOutput: Codable, Sendable {
         validTo: String? = nil,
         recordedAt: String,
         supersededBy: String? = nil,
-        impact: Double? = nil,
         causedBy: String? = nil,
         clock: LogicalClock
     ) {
@@ -180,7 +175,6 @@ public struct EdgeOutput: Codable, Sendable {
         self.validTo = validTo
         self.recordedAt = recordedAt
         self.supersededBy = supersededBy
-        self.impact = impact
         self.causedBy = causedBy
         self.clock = clock
     }
@@ -191,7 +185,6 @@ public struct EdgeOutput: Codable, Sendable {
         case validTo = "valid_to"
         case recordedAt = "recorded_at"
         case supersededBy = "superseded_by"
-        case impact
         case causedBy = "caused_by"
         case clock
     }
@@ -201,7 +194,6 @@ public struct SuperNode: Codable, Sendable {
     public var clusterId: Int
     public var theme: String
     public var memberCount: Int
-    public var impact: Double
     public var centroid: [Double]
     public var timestamp: String
     public var drift: Double?
@@ -210,7 +202,6 @@ public struct SuperNode: Codable, Sendable {
         clusterId: Int,
         theme: String,
         memberCount: Int,
-        impact: Double,
         centroid: [Double],
         timestamp: String,
         drift: Double? = nil
@@ -218,7 +209,6 @@ public struct SuperNode: Codable, Sendable {
         self.clusterId = clusterId
         self.theme = theme
         self.memberCount = memberCount
-        self.impact = impact
         self.centroid = centroid
         self.timestamp = timestamp
         self.drift = drift
@@ -228,7 +218,7 @@ public struct SuperNode: Codable, Sendable {
         case clusterId = "cluster_id"
         case theme
         case memberCount = "member_count"
-        case impact, centroid, timestamp, drift
+        case centroid, timestamp, drift
     }
 }
 
@@ -313,7 +303,6 @@ public struct NeighborOutput: Codable, Sendable {
 public struct HybridSearchInput: Codable, Sendable {
     public var queryVector: [Double]
     public var k: Int
-    public var alpha: Double?
     public var lang: String?
     public var asOf: String?
     public var collection: String?
@@ -323,7 +312,6 @@ public struct HybridSearchInput: Codable, Sendable {
     public init(
         queryVector: [Double],
         k: Int,
-        alpha: Double? = nil,
         lang: String? = nil,
         asOf: String? = nil,
         collection: String? = nil,
@@ -332,7 +320,6 @@ public struct HybridSearchInput: Codable, Sendable {
     ) {
         self.queryVector = queryVector
         self.k = k
-        self.alpha = alpha
         self.lang = lang
         self.asOf = asOf
         self.collection = collection
@@ -342,7 +329,7 @@ public struct HybridSearchInput: Codable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case queryVector = "query_vector"
-        case k, alpha, lang
+        case k, lang
         case asOf = "as_of"
         case collection
         case efSearch = "ef_search"

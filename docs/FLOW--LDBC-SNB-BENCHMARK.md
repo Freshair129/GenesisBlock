@@ -20,11 +20,11 @@ How data moves through the hybrid storage engine.
 
 - Ingestion: CSV -> Parallel Rust Parser -> Transaction Buffer
 - Indexing: Vector -> Aligned Arena -> HNSW Graph; Social -> CSR Adjacency List
-- Query: Input -> Hybrid Resolver -> SIMD Dot Product -> K-Impact Blending
+- Query: Input -> Collection Resolver -> HNSW candidates -> vector metric / optional exact rerank
 
 ## 3. Entity Relationship Diagram (ERD)
 Mapping the SNB Social Schema to GenesisBlockDB Atomic structures.
 
 - PERSON (Node): { firstName, gender, embedding: Interests }
 - POST (Node): { content, creationDate, embedding: Semantics }
-- KNOWS (Edge): { since, weight: K-Impact }
+- KNOWS (Edge): { since }; application properties do not create an engine-owned importance weight.

@@ -38,7 +38,6 @@ interface BackendGraphNode {
   valid_from: string;
   valid_to: string | null;
   caused_by: string | null;
-  impact: number | null;
 }
 
 interface BackendGraphEdge {
@@ -150,7 +149,7 @@ function mapNode(node: BackendGraphNode, index: number, count: number): GraphSce
     group,
     x: position.x,
     y: position.y,
-    size: 4 + Math.min(5, Math.max(0, node.impact ?? 0)),
+    size: 4,
     color: nodeColor(group),
     vectorCollection: node.collection,
     validFrom: node.valid_from,

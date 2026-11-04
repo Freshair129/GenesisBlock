@@ -1492,37 +1492,9 @@ async fn rest_error_categories_are_stable_across_representative_routes() {
     assert_eq!(body["error"]["code"], "GENESIS_CONFLICT");
     assert_eq!(body["error"]["message"], "expected frontier conflict");
 
-    // An event whose embedding is incompatible with the configured vector
-    // dimension fails semantic verification and is classified as integrity.
-    let (status, body) = post_json(
-        &app,
-        "/v1/consensus/verify",
-        json!({
-            "Node": {
-                "id": "integrity-probe",
-                "labels": [],
-                "props": {},
-                "impact": null,
-                "embedding": [1.0, 0.0, 0.0],
-                "lang": null,
-                "valid_from": "2026-01-01T00:00:00Z",
-                "valid_to": null,
-                "caused_by": null,
-                "expires_at": null,
-                "clock": { "time": 0, "peer_id": "test" },
-                "collection": null
-            }
-        }),
-    )
-    .await;
-    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
-    assert_eq!(body["contract_version"], "genesis.api.errors.v1");
-    assert_eq!(body["error"]["category"], "integrity");
-    assert_eq!(body["error"]["code"], "GENESIS_INTEGRITY_ERROR");
-    assert!(!body["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .is_empty());
+    // The retired importance-based verifier is no longer an executable route.
+    let (status, _) = post_json(&app, "/v1/consensus/verify", json!({})).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
 #[tokio::test]
@@ -1586,7 +1558,6 @@ async fn insight_routes_fail_closed_without_scoped_context() {
                 cluster_id: 7,
                 theme: "protected".into(),
                 member_count: 1,
-                impact: 1.0,
                 centroid: vec![0.25, 0.75],
                 timestamp: "2026-09-22T00:00:00Z".into(),
                 drift: None,
@@ -1654,7 +1625,6 @@ async fn test_consensus_sign_vote_returns_bytes() {
                     "id": "sign-vote-probe",
                     "labels": ["USER"],
                     "props": {},
-                    "impact": null,
                     "embedding": null,
                     "lang": null,
                     "valid_from": "2026-01-01T00:00:00Z",
@@ -2081,7 +2051,6 @@ async fn test_all_v1_routes_are_wired() {
         "/v1/consensus/propose",
         "/v1/consensus/vote",
         "/v1/consensus/sign-vote",
-        "/v1/consensus/verify",
     ];
     let get_routes = [
         "/v1/collections",

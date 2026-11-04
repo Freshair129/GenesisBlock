@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Document Registry"
 doc_id: "DOC-REGISTRY-GENESISBLOCKDB"
 status: draft
-version: "0.5.134+draft"
+version: "0.5.135+draft"
 updated: "2026-10-30"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -18,13 +18,23 @@ related_docs:
   - "docs/adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md"
 ---
 
-## H1-T confirmed transport cause and repair candidate — 2026-10-30
+## Approved G4/P8 Phase H2a nullable multi-key qualification — 2026-10-30
+
+Register the owner-approved LOW/C-3 tests/docs-only seven-file candidate based on merged main `ad94aa2e46025b7729d117ff376ab281ac15c49d` / tree `b50341abfc211cdb07519e73286cd73999689f8d`. PR #278's H1-T candidate snapshot is historical; it later merged normally at this baseline.
+
+The two paired HQL2/typed-IR tests qualify a selected nullable two-key `(x, bucket)` Sort over two Values/Project branches, UnionAll, optional Offset/Take and Project. Six unique complete keys, sixteen frozen literal profiles, five tested orderable scalar types and full/paged/empty scenarios assert literal rows, ordered schema, plan/counters and Normal/Analyze results. P7 is unchanged and used only for Bool/I64/F64Finite/Utf8; DecimalU64 is literal-only. HQL omitted NULL placement is checked as NULLS LAST, and IR remains explicit. No tie rule is asserted. The tests issue 1,500 requests (500 per mode).
+
+Author local evidence: focused target 22/22; full locked/offline all-test-target suite 1,309/0/6 over 158 top-level summaries (43 library-unit tests plus 157 integration targets), with 44 HQL2 targets at 472/0/1. Corrected-source independent same-host execution passed 27/27 over three targets with zero failed/ignored/filtered; raw names and source/binary hashes were reconciled without runtime rerun. Counts overlap. This is not a new-machine/oracle result.
+
+This evidence does not close broad G4/P8, P6 or P9-P16. Full-key ties, exhaustive types/order/composition/provenance, universal no-write, ordinary success state, other-machine/new-oracle, performance, device and release remain open or NOT_RUN. Preserve P8 -> P9-P12 -> P13/P14 -> P15 -> P16. See the [P8 H2a evidence ledger](REPORT--HQL2-P8-CORE-2026-09-28.md#approved-g4p8-phase-h2a-nullable-multi-key-ordering-qualification--2026-10-30).
+
+## H1-T pre-merge candidate snapshot — 2026-10-30
 
 The owner-approved H1-T packet and explicit consumer-lock extension remain HIGH/C-3, at most17 files on the existing checkout/branch/PR278. Actual diagnostic head7858c03a3145e6110bd8b7d1e5feb5c8219ba2c6 macOS Tests40953668239/job123728076319 confirmed SO_SNDBUF=9,216, SO_RCVBUF=786,896 and a31,481-byte authenticated PushDelta rejected with raw errno40 (Darwin EMSGSIZE), while smaller replies succeeded. The original required prefix response remained RED. [Transport ../.brain/rca/2026-10-30-gossip-datagram-capacity.md](../.brain/rca/2026-10-30-gossip-datagram-capacity.md) freezes the raw log/hash before behavioral repair; old155 graph and same-host qualification remain historical at their recorded bytes.
 
 The private repair candidate borrows the bound Tokio socket through safe socket2=0.6.4, retains a larger host send capacity or increases a smaller one, then verifies effective capacity is at least65,535 before publishing nonzero gossip_port. Capacity setup errors return without advertising a usable port. Numeric binding, IPv4/IPv6, ownership, roster/authentication, API/error taxonomy and restart semantics remain unchanged. The selected65,535 socket allocation is not a protocol budget. Failed PushDelta sends retain bounded length/errno diagnostics without payloads or success-per-packet logging. No per-success capacity syscall was added.
 
-A real constrained-socket regression first failed at4,096 bytes with the observational stub, then exercises configured capacity and55,900-byte raw loopback delivery for numeric IPv4/IPv6. Original authenticated54,000/54,001 event and55,000/55,001 vector boundaries, three-second guards, prefix continuation/retry, graph/reopen, receipts/state checks and oversized-group bounded no-response controls remain intact. Corrected-source Windows focus passed80/80 (library43, history22, peer15), including the constrained IPv4/IPv6 regression and original authenticated prefix/byte-budget cases. These are overlapping selected tests, not80 independent obligations. The author final46-target run passed528 unique tests, zero failures and one existing ignored parser child explicitly invoked twice by its passing parent, at frozen246-path manifest SHA256d17cf339c32bf03f0931a155d8bf2599399fd0ce04e6e1ede73d5f7bef3c8896. Strict core/default all-target Clippy, fmt, docs244/0, version0.2.10 and diff checks passed. Fresh independent execution passed237 exact top-level tests across27 targets, zero failed/ignored/filtered, in one attempt without runtime retries. The root independently verified29 sealed artifacts,27 executed binaries, raw test identities and unchanged246 source paths. This Windows executor shared the target/registry and compile-time fixture scratch, with fresh OS TEMP; it is not a fresh build, filesystem sandbox, new machine, new oracle or blind study. Counts overlap the author selection and are not additive independent obligations. Architecture/evidence review and ALL new-head applicable CI remain PENDING; this is **NOT MERGE ELIGIBLE** and no repaired macOS acceptance is claimed. OS setup-failure branches are source-reviewed rather than fault-injected through unsafe/new test hooks; no universal reliability claim follows.
+A real constrained-socket regression first failed at4,096 bytes with the observational stub, then exercises configured capacity and55,900-byte raw loopback delivery for numeric IPv4/IPv6. Original authenticated54,000/54,001 event and55,000/55,001 vector boundaries, three-second guards, prefix continuation/retry, graph/reopen, receipts/state checks and oversized-group bounded no-response controls remain intact. Corrected-source Windows focus passed80/80 (library43, history22, peer15), including the constrained IPv4/IPv6 regression and original authenticated prefix/byte-budget cases. These are overlapping selected tests, not80 independent obligations. The author final46-target run passed528 unique tests, zero failures and one existing ignored parser child explicitly invoked twice by its passing parent, at frozen246-path manifest SHA256d17cf339c32bf03f0931a155d8bf2599399fd0ce04e6e1ede73d5f7bef3c8896. Strict core/default all-target Clippy, fmt, docs244/0, version0.2.10 and diff checks passed. Fresh independent execution passed237 exact top-level tests across27 targets, zero failed/ignored/filtered, in one attempt without runtime retries. The root independently verified29 sealed artifacts,27 executed binaries, raw test identities and unchanged246 source paths. This Windows executor shared the target/registry and compile-time fixture scratch, with fresh OS TEMP; it is not a fresh build, filesystem sandbox, new machine, new oracle or blind study. Counts overlap the author selection and are not additive independent obligations. This paragraph records the pre-merge candidate snapshot only. PR #278 later merged normally as commit `ad94aa2e46025b7729d117ff376ab281ac15c49d` (tree `b50341abfc211cdb07519e73286cd73999689f8d`); that merge record does not widen the claims in this section. OS setup-failure branches are source-reviewed rather than fault-injected through unsafe/new test hooks; no universal reliability claim follows.
 
 The owner explicitly approved the17-file extension for the two existing consumer lockfiles after actual Studio shell jobs on all three hosts rejected the stale lock under --locked. Both now add the genesis-block-native direct socket2 edge; Studio alone aligns its existing socket2 package0.6.5 to the owner-selected0.6.4/checksum, while mobile retains0.6.4. Parsed comparison covers590 Studio and543 mobile packages with no other package/version/checksum/edge changes. The root246 source/test/Cargo manifest is unchanged. Both full --locked offline resolutions passed. All five first-attempt local --locked --offline consumer commands passed: Studio test/build and mobile test/build/check. Studio ran14 unit tests; mobile lib/main/doc harnesses ran zero tests, so its evidence is compilation/build/check only. Ten actual test/build artifacts were hashed. Existing unchanged frontend dist assets were used locally; fresh hosted frontend builds, GUI/device acceptance and final hosted packaging remain separate gates; no --locked removal, unrelated dependency update or workflow change is allowed. Windows diagnostic library41/1 failed a pre-existing HISTORY-seal assertion; controlled exact1/1 and full42/42 runs at the same diagnostic bytes passed locally, which does not explain or erase the hosted failure. No unrelated WAL/fixture fix, assertion weakening or timeout increase is authorized.
 
@@ -724,17 +734,18 @@ registry row explicitly names them.
 
 | Role | Doc ID | Version | Status | Owner | Path |
 |---|---|---|---|---|---|
-| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.76b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
-| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.106b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
+| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.77b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
+| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.107b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
+| Importance policy retirement | `ADR--GENESISDB-RETIRE-KIMPACT` | `1.0.0` | accepted | GenesisBlockDB Architecture | `docs/adr/ADR--GENESISDB-RETIRE-KIMPACT.md` |
 | Execution DAG guard | `SPEC--EXECUTION-DAG-GUARD-V1` | `0.1.0` | accepted | Sol Decision / Contract and AC | `docs/SPEC--EXECUTION-DAG-GUARD-V1.md` |
 | HQL2 execution decision | `ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY` | `0.1.1b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY.md` |
-| HQL2 G4 shared-pipeline contract | `ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE` | `0.1.34b` | active | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md` |
+| HQL2 G4 shared-pipeline contract | `ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE` | `0.1.35b` | active | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md` |
 | HQL2 P8 completion addendum | `ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM` | `0.1.17b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md` |
 | HQL2 Sequence pattern constraints | `ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS` | `0.2.1b` | beta | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS.md` |
 | HQL2 durable revisions and annotations | `ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS` | `0.8.27b` | beta | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS.md` |
-| UEE-HQL2 orchestration plan | `IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22` | `0.9.9b` | beta | Boss (Founder / Product Authority) | `docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md` |
+| UEE-HQL2 orchestration plan | `IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22` | `0.9.10b` | beta | Boss (Founder / Product Authority) | `docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md` |
 | HQL2 typed P8 boundary | `SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY` | `0.2.68b` | beta | Boss (Founder / Product Authority) | `docs/SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY.md` |
-| HQL2 P8 core checkpoint | `REPORT--HQL2-P8-CORE-2026-09-28` | `0.1.101b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P8-CORE-2026-09-28.md` |
+| HQL2 P8 core checkpoint | `REPORT--HQL2-P8-CORE-2026-09-28` | `0.1.102b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P8-CORE-2026-09-28.md` |
 | HQL2 P7 bounded oracle evidence | `REPORT--HQL2-P7-ORACLE-2026-09-28` | `0.1.12b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P7-ORACLE-2026-09-28.md` |
 | Commit correctness | `SPEC--WAVE-A-COMMIT-CORRECTNESS` | `0.1.0b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-A-COMMIT-CORRECTNESS.md` |
 | Durable collections and edge history | `SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY` | `0.1.2b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY.md` |
@@ -760,7 +771,7 @@ registry row explicitly names them.
 |---|---|---|---|---|---|
 | Positioning | `POSITIONING-GENESISBLOCKDB` | n/a | current | GenesisBlockDB Product | `docs/POSITIONING.md` |
 | Whitepaper | `WHITEPAPER-GENESISBLOCKDB-SEMANTIC-SUBSTRATE` | `0.1.0+draft` | draft | GenesisBlockDB Architecture | `docs/WHITEPAPER--GENESISBLOCKDB-SEMANTIC-SUBSTRATE.md` |
-| Database whitepaper | `WHITEPAPER--GENESIS-DB` | n/a | current | GenesisBlockDB Architecture | `docs/WHITEPAPER--GENESIS-DB.md` |
+| Database whitepaper | `WHITEPAPER--GENESIS-DB` | n/a | historical | GenesisBlockDB Architecture | `docs/WHITEPAPER--GENESIS-DB.md` |
 | Performance report | `REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE` | n/a | historical | GenesisBlockDB Engineering | `docs/REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md` |
 | Product version | `VERSION` | current | current | GenesisBlockDB Engineering | `docs/VERSION.md` |
 
@@ -795,6 +806,8 @@ The following documents should be created only when implementation work requires
 - third-client namespace conformance report.
 
 ## 9. Changelog
+Version diff 0.5.134+draft -> 0.5.135+draft: register H2a nullable multi-key qualification, local and independent results, and synchronize the six governing versions; retain broad gates.
+
 
 Version diff 0.5.129+draft -> 0.5.130+draft: register the selected C1b nullable ordering qualification and synchronize six governance-document versions; preserve broad G4/P8, P6, P9-P16, device and release gates.
 
@@ -1205,6 +1218,7 @@ review and full P8 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 0.5.135+draft | 2026-10-30 | GenesisBlockDB Architecture | Register H2a selected nullable multi-key evidence and synchronize six governing-document versions; preserve tie, G4/P8, P6, P9-P16, device and release gates |
 | 0.5.131+draft | 2026-10-29 | GenesisBlockDB Architecture | Register Phase C2 composed nullable scalar pipeline qualification, local focused/target evidence, and synchronize six governance-document versions; retain open broad G4/P8, P6, P9-P16 and device/release gates |
 | 0.5.130+draft | 2026-10-28 | GenesisBlockDB Architecture | Register C1b nullable sorting evidence and synchronize six governance-document versions; retain open broad G4/P8, P6, P9-P16 and device/release gates |
 | 0.5.128+draft | 2026-10-27 | GenesisBlockDB Architecture | Register C1 ordering candidate and synchronize six governance-document versions; preserve broader ordering, composition, provenance, P6 and P9-P16 gates |

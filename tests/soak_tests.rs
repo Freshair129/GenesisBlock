@@ -256,7 +256,7 @@ fn run_soak(cfg: SoakConfig) {
             .hybrid_search(HybridSearchInput {
                 query_vector: probe_emb,
                 k: cfg.query_k,
-                alpha: Some(1.0),
+                alpha: None,
                 lang: None,
                 as_of: None,
                 collection: None,

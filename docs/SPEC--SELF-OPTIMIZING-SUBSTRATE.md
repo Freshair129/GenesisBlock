@@ -1,8 +1,13 @@
 ---
-status: current
+status: historical
 ---
 
 # Software Requirements Document (SRD): Self-Optimizing Substrate
+
+> Historical Mark VI proposal. Importance-based consolidation/pruning below is
+> retired by [the current decision](adr/ADR--GENESISDB-RETIRE-KIMPACT.md).
+> This plan does not authorize automatic deletion, merging, or authority-based
+> maintenance in the current engine.
 
 ## 1. Introduction
 The **Self-Optimizing Substrate** is the autonomic nervous system of GenesisBlockDB (Mark VI). As the knowledge graph grows through Shadow Sync and AI interactions, it may accumulate redundancy or fragmented indexes. This module automates the maintenance tasks required to sustain peak performance and logical clarity.

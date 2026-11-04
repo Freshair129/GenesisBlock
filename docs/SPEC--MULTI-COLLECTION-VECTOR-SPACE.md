@@ -163,7 +163,7 @@ This phase is done; §3/§6/§7 (per-collection spaces) remain the open work.
 - HQL: optional `IN <collection>` clause on `SEARCH`/`MATCH`:
   `SEARCH target SIMILAR TO [..] K 5 IN "code"`. Grammar adds
   `collection_spec = { ^"IN" ~ (identifier | string_lit) }` (placed after `K`/
-  `ALPHA`, before `LANGUAGE`/`AS OF`); the name may be quoted or a bare
+  the search options, before `LANGUAGE`/`AS OF`); the name may be quoted or a bare
   identifier; default collection if omitted. ✅ **DONE** (2026-06-22).
 
 **Dim validation:** every search validates `query.len() == collection.dim`,

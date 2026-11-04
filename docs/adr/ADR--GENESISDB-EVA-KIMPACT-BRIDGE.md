@@ -1,7 +1,8 @@
 ---
 proposed_id: ADR--GENESISDB-EVA-KIMPACT-BRIDGE
 type: adr
-status: proposed
+status: superseded
+superseded_by: ADR--GENESISDB-RETIRE-KIMPACT.md
 tier: strategy
 cluster: implementation_flow
 role: "ADR — boundary contract for EVA-computed K_Impact feeding the engine's node.impact slot; producer/consumer separation, no engine-side cognition"
@@ -14,6 +15,11 @@ related:
 ---
 
 # ADR: EVA K_Impact → GenesisBlock `impact`-slot bridge
+
+> Historical proposal, superseded on 2026-11-02 by
+> [K-Impact retirement](ADR--GENESISDB-RETIRE-KIMPACT.md).
+> Its proposed engine importance slot/blend is retired. Application-owned
+> signals belong in generic properties and application ranking.
 
 **Status:** Proposed · **Date:** 2026-07-04 · **Deciders:** Boss
 

@@ -91,4 +91,4 @@ install-and-go slice carries **zero** methodology, by design.
 ## Related
 - Moat + bench gates: [[BENCH-SPEC--HQL-MOAT-AND-EXPRESSIVENESS]]
 - Substrate direction: [[ADR--GENESISDB-EMBEDDED-SQLITE-SUBSTRATE]]
-- Ranking-in-app precedent: [[ADR--GENESISDB-KIMPACT-AS-SIGNAL]]
+- Ranking-in-app decision: [ADR--GENESISDB-RETIRE-KIMPACT](ADR--GENESISDB-RETIRE-KIMPACT.md)

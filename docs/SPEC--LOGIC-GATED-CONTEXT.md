@@ -1,8 +1,14 @@
 ---
-status: current
+status: historical
+superseded_by: adr/ADR--GENESISDB-RETIRE-KIMPACT.md
 ---
 
 # Functional Specification: Logic-Gated Context Windows (Mark V)
+
+> Historical proposal, retired by [ADR--GENESISDB-RETIRE-KIMPACT](adr/ADR--GENESISDB-RETIRE-KIMPACT.md).
+> The weighted score, min_impact input and get_ranked_context helper below are
+> not current APIs. `/v1/reason/context` uses vector retrieval without this policy;
+> see [the current API reference](API_REFERENCE.md).
 
 ## 1. Objective
 Provide AI Agents (LLMs) with a **Ranked Context Window**. Instead of returning raw search results, this feature filters and orders nodes based on a weighted "Reasoning Score" that combines semantic relevance (vector distance) and logical authority (K-Impact).

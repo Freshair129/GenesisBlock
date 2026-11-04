@@ -190,7 +190,6 @@ pub enum HqlCommand {
     Hybrid {
         target: String,
         vector: Option<Vec<f64>>,
-        alpha: f64,
         k: u32,
         ef_search: Option<u32>,
         oversample: Option<u32>,
@@ -579,7 +578,6 @@ impl HqlCommand {
     fn parse_hybrid(pair: pest::iterators::Pair<Rule>) -> Result<Self, String> {
         let mut target = String::new();
         let mut vector = None;
-        let mut alpha = 0.5;
         let mut k = 10;
         let mut ef_search = None;
         let mut oversample = None;
@@ -601,7 +599,6 @@ impl HqlCommand {
                         vector = Some(Self::parse_vector(v)?);
                     }
                 }
-                Rule::alpha => alpha = Self::parse_f64(inner.as_str(), "ALPHA")?,
                 Rule::k => k = Self::parse_u32(inner.as_str(), "K")?,
                 Rule::ef_spec => {
                     for p in inner.into_inner() {
@@ -628,7 +625,6 @@ impl HqlCommand {
         Ok(HqlCommand::Hybrid {
             target,
             vector,
-            alpha,
             k,
             ef_search,
             oversample,

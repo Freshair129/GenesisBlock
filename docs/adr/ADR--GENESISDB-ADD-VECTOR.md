@@ -15,6 +15,11 @@ proposed_by: agent
 
 # ADR--GENESISDB-ADD-VECTOR
 
+> Retirement update (2026-11-02): semantic_verify is removed by
+> [ADR--GENESISDB-RETIRE-KIMPACT](ADR--GENESISDB-RETIRE-KIMPACT.md). Its match arm
+> below is historical; vector validation and signature/revision checks do not
+> depend on an always-true semantic verifier.
+
 ## Context
 
 Multi-collection ([[ADR--GENESISDB-MULTI-COLLECTION]]) gave each collection its own

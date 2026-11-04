@@ -55,7 +55,7 @@ fn mk_node(id: &str) -> NodeOutput {
         id: id.to_string(),
         labels: vec!["USER".to_string()],
         props: serde_json::json!({}),
-        impact: None,
+        legacy_wire_impact: genesis_block_native::LegacyImpactWire::Absent,
         embedding: None,
         lang: None,
         valid_from: "2026-01-01T00:00:00Z".to_string(),
@@ -81,7 +81,7 @@ fn mk_edge(id: &str, from: &str, to: &str) -> EdgeOutput {
         valid_to: None,
         recorded_at: "2026-01-01T00:00:00Z".to_string(),
         superseded_by: None,
-        impact: None,
+        legacy_wire_impact: genesis_block_native::LegacyImpactWire::Absent,
         caused_by: None,
         clock: LogicalClock {
             time: 1,
@@ -180,7 +180,7 @@ fn consensus_committed_vector_is_searchable() {
         .hybrid_search(HybridSearchInput {
             query_vector: vec![1.0, 0.0, 0.0, 0.0],
             k: 5,
-            alpha: Some(0.0),
+            alpha: None,
             lang: None,
             as_of: None,
             collection: None,

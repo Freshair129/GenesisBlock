@@ -3852,3 +3852,910 @@ fn composed_scalar_pipeline_matches_literals_p7_and_diagnostics() {
         }
     }
 }
+
+// H2a freezes nullable two-key ordering only for unique complete (x, bucket)
+// keys. The literal position lists are the expected oracle; no production
+// comparator or sorted actual result is used to construct them.
+#[derive(Clone, Copy)]
+struct H2aProfile {
+    x_first: bool,
+    x_descending: bool,
+    bucket_descending: bool,
+    x_nulls_first: bool,
+    full: [usize; 6],
+    offset1_take3: [usize; 3],
+}
+
+const H2A_PROFILES: [H2aProfile; 16] = [
+    H2aProfile {
+        x_first: true,
+        x_descending: false,
+        bucket_descending: false,
+        x_nulls_first: true,
+        full: [4, 1, 5, 2, 3, 0],
+        offset1_take3: [1, 5, 2],
+    },
+    H2aProfile {
+        x_first: true,
+        x_descending: false,
+        bucket_descending: false,
+        x_nulls_first: false,
+        full: [5, 2, 3, 0, 4, 1],
+        offset1_take3: [2, 3, 0],
+    },
+    H2aProfile {
+        x_first: true,
+        x_descending: false,
+        bucket_descending: true,
+        x_nulls_first: true,
+        full: [1, 4, 2, 5, 0, 3],
+        offset1_take3: [4, 2, 5],
+    },
+    H2aProfile {
+        x_first: true,
+        x_descending: false,
+        bucket_descending: true,
+        x_nulls_first: false,
+        full: [2, 5, 0, 3, 1, 4],
+        offset1_take3: [5, 0, 3],
+    },
+    H2aProfile {
+        x_first: true,
+        x_descending: true,
+        bucket_descending: false,
+        x_nulls_first: true,
+        full: [4, 1, 3, 0, 5, 2],
+        offset1_take3: [1, 3, 0],
+    },
+    H2aProfile {
+        x_first: true,
+        x_descending: true,
+        bucket_descending: false,
+        x_nulls_first: false,
+        full: [3, 0, 5, 2, 4, 1],
+        offset1_take3: [0, 5, 2],
+    },
+    H2aProfile {
+        x_first: true,
+        x_descending: true,
+        bucket_descending: true,
+        x_nulls_first: true,
+        full: [1, 4, 0, 3, 2, 5],
+        offset1_take3: [4, 0, 3],
+    },
+    H2aProfile {
+        x_first: true,
+        x_descending: true,
+        bucket_descending: true,
+        x_nulls_first: false,
+        full: [0, 3, 2, 5, 1, 4],
+        offset1_take3: [3, 2, 5],
+    },
+    H2aProfile {
+        x_first: false,
+        x_descending: false,
+        bucket_descending: false,
+        x_nulls_first: true,
+        full: [4, 5, 3, 1, 2, 0],
+        offset1_take3: [5, 3, 1],
+    },
+    H2aProfile {
+        x_first: false,
+        x_descending: false,
+        bucket_descending: false,
+        x_nulls_first: false,
+        full: [5, 3, 4, 2, 0, 1],
+        offset1_take3: [3, 4, 2],
+    },
+    H2aProfile {
+        x_first: false,
+        x_descending: false,
+        bucket_descending: true,
+        x_nulls_first: true,
+        full: [1, 2, 0, 4, 5, 3],
+        offset1_take3: [2, 0, 4],
+    },
+    H2aProfile {
+        x_first: false,
+        x_descending: false,
+        bucket_descending: true,
+        x_nulls_first: false,
+        full: [2, 0, 1, 5, 3, 4],
+        offset1_take3: [0, 1, 5],
+    },
+    H2aProfile {
+        x_first: false,
+        x_descending: true,
+        bucket_descending: false,
+        x_nulls_first: true,
+        full: [4, 3, 5, 1, 0, 2],
+        offset1_take3: [3, 5, 1],
+    },
+    H2aProfile {
+        x_first: false,
+        x_descending: true,
+        bucket_descending: false,
+        x_nulls_first: false,
+        full: [3, 5, 4, 0, 2, 1],
+        offset1_take3: [5, 4, 0],
+    },
+    H2aProfile {
+        x_first: false,
+        x_descending: true,
+        bucket_descending: true,
+        x_nulls_first: true,
+        full: [1, 0, 2, 4, 3, 5],
+        offset1_take3: [0, 2, 4],
+    },
+    H2aProfile {
+        x_first: false,
+        x_descending: true,
+        bucket_descending: true,
+        x_nulls_first: false,
+        full: [0, 2, 1, 3, 5, 4],
+        offset1_take3: [2, 1, 3],
+    },
+];
+
+struct H2aTypeCase {
+    type_name: &'static str,
+    encoded_lo: Value,
+    encoded_hi: Value,
+    literal_lo: V,
+    literal_hi: V,
+    p7_lo: Option<R>,
+    p7_hi: Option<R>,
+}
+
+fn h2a_type_cases() -> [H2aTypeCase; 5] {
+    [
+        H2aTypeCase {
+            type_name: "Bool",
+            encoded_lo: json!(false),
+            encoded_hi: json!(true),
+            literal_lo: V::Bool(false),
+            literal_hi: V::Bool(true),
+            p7_lo: Some(R::Bool(false)),
+            p7_hi: Some(R::Bool(true)),
+        },
+        H2aTypeCase {
+            type_name: "I64",
+            encoded_lo: json!("-7"),
+            encoded_hi: json!("2"),
+            literal_lo: V::I64(-7),
+            literal_hi: V::I64(2),
+            p7_lo: Some(R::I64(-7)),
+            p7_hi: Some(R::I64(2)),
+        },
+        H2aTypeCase {
+            type_name: "DecimalU64",
+            encoded_lo: json!("2"),
+            encoded_hi: json!("10"),
+            literal_lo: V::DecimalU64(2),
+            literal_hi: V::DecimalU64(10),
+            p7_lo: None,
+            p7_hi: None,
+        },
+        H2aTypeCase {
+            type_name: "F64Finite",
+            encoded_lo: json!(-0.5),
+            encoded_hi: json!(2.5),
+            literal_lo: V::F64(-0.5),
+            literal_hi: V::F64(2.5),
+            p7_lo: Some(R::F64(-0.5)),
+            p7_hi: Some(R::F64(2.5)),
+        },
+        H2aTypeCase {
+            type_name: "Utf8",
+            encoded_lo: json!("a"),
+            encoded_hi: json!("z"),
+            literal_lo: V::Utf8("a".into()),
+            literal_hi: V::Utf8("z".into()),
+            p7_lo: Some(R::Text("a".into())),
+            p7_hi: Some(R::Text("z".into())),
+        },
+    ]
+}
+
+#[derive(Clone, Copy, Debug)]
+enum H2aScenario {
+    Full,
+    Offset1Take3,
+    Empty,
+}
+
+impl H2aScenario {
+    fn positions(self, profile: &H2aProfile) -> &[usize] {
+        match self {
+            Self::Full => &profile.full,
+            Self::Offset1Take3 => &profile.offset1_take3,
+            Self::Empty => &[],
+        }
+    }
+
+    fn is_paged(self) -> bool {
+        matches!(self, Self::Offset1Take3)
+    }
+
+    fn is_empty(self) -> bool {
+        matches!(self, Self::Empty)
+    }
+}
+
+fn h2a_assert_golden_discriminators() {
+    for profile in H2A_PROFILES {
+        let mut positions = profile.full;
+        positions.sort_unstable();
+        assert_eq!(positions, [0, 1, 2, 3, 4, 5]);
+        assert_eq!(profile.full[1..4], profile.offset1_take3);
+    }
+
+    // Stable first-key-only output leaves bucket-1 rows ahead on equal x.
+    // The approved two-key literal instead makes the secondary bucket visible.
+    assert_ne!(H2A_PROFILES[0].full, [1, 4, 2, 5, 0, 3]);
+    // Swapping the key priority changes the independently frozen permutation.
+    assert_ne!(H2A_PROFILES[0].full, H2A_PROFILES[8].full);
+    // Numeric DecimalU64 order (2 before 10) differs from lexical text order.
+    assert_ne!(H2A_PROFILES[1].full, [3, 0, 5, 2, 4, 1]);
+    assert_eq!(
+        [(2_u8, 1_u8), (0, 1), (1, 1), (2, 0), (0, 0), (1, 0)]
+            .into_iter()
+            .collect::<std::collections::BTreeSet<_>>()
+            .len(),
+        6,
+        "all fixture (x,bucket) pairs are unique"
+    );
+}
+
+fn h2a_literal_row(case: &H2aTypeCase, position: usize) -> BTreeMap<String, V> {
+    let x = match position % 3 {
+        0 => case.literal_hi.clone(),
+        1 => V::Null,
+        2 => case.literal_lo.clone(),
+        _ => unreachable!(),
+    };
+    let bucket = if position < 3 { 1 } else { 0 };
+    BTreeMap::from([("x".into(), x), ("bucket".into(), V::I64(bucket))])
+}
+
+fn h2a_literal_rows(case: &H2aTypeCase, positions: &[usize]) -> Vec<BTreeMap<String, V>> {
+    positions
+        .iter()
+        .map(|position| h2a_literal_row(case, *position))
+        .collect()
+}
+
+fn h2a_schema(case: &H2aTypeCase) -> Value {
+    json!([
+        {"name":"x","type":format!("Nullable<{}>", case.type_name),"nullable":true},
+        {"name":"bucket","type":"I64","nullable":false}
+    ])
+}
+
+fn h2a_params(case: &H2aTypeCase, empty: bool) -> Value {
+    let rows = if empty {
+        json!([])
+    } else {
+        json!([case.encoded_hi.clone(), null, case.encoded_lo.clone()])
+    };
+    let declaration = format!("List<Nullable<{}>>", case.type_name);
+    json!({
+        "left":{"type":declaration,"value":rows.clone()},
+        "right":{"type":declaration,"value":rows}
+    })
+}
+
+fn h2a_fields(bucket: &str) -> Value {
+    json!({"fields":[
+        {"expression":field("x"),"as":"x"},
+        {"expression":{"type":"I64","literal":bucket},"as":"bucket"}
+    ]})
+}
+
+fn h2a_key(alias: &str, descending: bool, nulls_first: bool) -> Value {
+    c1_sort_key(
+        field(alias),
+        if descending { "desc" } else { "asc" },
+        if nulls_first { "first" } else { "last" },
+    )
+}
+
+fn h2a_requests(
+    case: &H2aTypeCase,
+    profile: H2aProfile,
+    scenario: H2aScenario,
+    omit_x_nulls: bool,
+) -> (QueryRequestV2, QueryRequestV2) {
+    let params = h2a_params(case, scenario.is_empty());
+    let mut keys = Vec::with_capacity(2);
+    let x_key = h2a_key("x", profile.x_descending, profile.x_nulls_first);
+    let bucket_key = h2a_key("bucket", profile.bucket_descending, false);
+    if profile.x_first {
+        keys.extend([x_key, bucket_key]);
+    } else {
+        keys.extend([bucket_key, x_key]);
+    }
+
+    let mut nodes = vec![
+        values("left_values", "left", "x"),
+        values("right_values", "right", "x"),
+        node("left_project", "Project", &["left_values"], h2a_fields("1")),
+        node(
+            "right_project",
+            "Project",
+            &["right_values"],
+            h2a_fields("0"),
+        ),
+        node(
+            "union",
+            "UnionAll",
+            &["left_project", "right_project"],
+            json!({}),
+        ),
+        node("sort", "Sort", &["union"], json!({"keys":keys})),
+    ];
+    let mut root = "sort";
+    if scenario.is_paged() {
+        nodes.push(node("offset", "Offset", &["sort"], json!({"count":1})));
+        nodes.push(node("take", "Take", &["offset"], json!({"count":3})));
+        root = "take";
+    }
+    nodes.push(node(
+        "out",
+        "Project",
+        &[root],
+        json!({"fields":[
+            {"expression":field("x"),"as":"x"},
+            {"expression":field("bucket"),"as":"bucket"}
+        ]}),
+    ));
+    let mut ir = request(nodes, "out", params.clone());
+
+    let x_direction = if profile.x_descending { "DESC" } else { "ASC" };
+    let bucket_direction = if profile.bucket_descending {
+        "DESC"
+    } else {
+        "ASC"
+    };
+    let x_order = if omit_x_nulls {
+        format!("x {x_direction}")
+    } else {
+        format!(
+            "x {x_direction} NULLS {}",
+            if profile.x_nulls_first {
+                "FIRST"
+            } else {
+                "LAST"
+            }
+        )
+    };
+    let bucket_order = if omit_x_nulls {
+        format!("bucket {bucket_direction}")
+    } else {
+        format!("bucket {bucket_direction} NULLS LAST")
+    };
+    let order = if profile.x_first {
+        format!("{x_order}, {bucket_order}")
+    } else {
+        format!("{bucket_order}, {x_order}")
+    };
+    let pagination = if scenario.is_paged() {
+        " |> SKIP 1 |> TAKE 3"
+    } else {
+        ""
+    };
+    let hql_text = format!(
+        "UNION ALL {{ VALUES $left AS x |> RETURN x, 1 AS bucket }} {{ VALUES $right AS x |> RETURN x, 0 AS bucket }} |> ORDER BY {order}{pagination} |> RETURN x, bucket"
+    );
+    let mut hql = b1_hql_request(params, &hql_text);
+    ir.temporal = Some(serde_json::from_value(json!({"valid_at":"2026-10-23T00:00:00Z"})).unwrap());
+    hql.temporal = ir.temporal.clone();
+    (ir, hql)
+}
+
+fn h2a_p7_values(case: &H2aTypeCase, bucket: i64, empty: bool) -> Option<P> {
+    let (Some(hi), Some(lo)) = (&case.p7_hi, &case.p7_lo) else {
+        return None;
+    };
+    let rows = if empty {
+        Vec::new()
+    } else {
+        vec![
+            BTreeMap::from([("x".into(), hi.clone())]),
+            BTreeMap::from([("x".into(), R::Null)]),
+            BTreeMap::from([("x".into(), lo.clone())]),
+        ]
+    };
+    let values = P::Values(rows);
+    Some(P::Project(
+        Box::new(values),
+        vec![
+            ("x".into(), E::Field("x".into())),
+            ("bucket".into(), E::Literal(R::I64(bucket))),
+        ],
+    ))
+}
+
+fn h2a_p7_plan(case: &H2aTypeCase, profile: H2aProfile, scenario: H2aScenario) -> Option<P> {
+    let left = h2a_p7_values(case, 1, scenario.is_empty())?;
+    let right = h2a_p7_values(case, 0, scenario.is_empty())?;
+    let union = P::UnionAll(Box::new(left), Box::new(right));
+    let x_key = reference::SortKey {
+        expr: E::Field("x".into()),
+        descending: profile.x_descending,
+        nulls_first: profile.x_nulls_first,
+    };
+    let bucket_key = reference::SortKey {
+        expr: E::Field("bucket".into()),
+        descending: profile.bucket_descending,
+        nulls_first: false,
+    };
+    let keys = if profile.x_first {
+        vec![x_key, bucket_key]
+    } else {
+        vec![bucket_key, x_key]
+    };
+    let sorted = P::Sort(Box::new(union), keys);
+    let shaped = if scenario.is_paged() {
+        P::Take(Box::new(P::Offset(Box::new(sorted), 1)), 3)
+    } else {
+        sorted
+    };
+    Some(P::Project(
+        Box::new(shaped),
+        vec![
+            ("x".into(), E::Field("x".into())),
+            ("bucket".into(), E::Field("bucket".into())),
+        ],
+    ))
+}
+
+type H2aNodeCount = (String, QueryOpV2, u64, u64);
+
+fn h2a_one_input(node: &genesis_block_native::query::hql2::result::ExplainNodeV2) -> &str {
+    assert_eq!(node.inputs.len(), 1, "{:?} input arity", node.logical_op);
+    &node.inputs[0]
+}
+
+fn h2a_assert_plan(
+    plan: &genesis_block_native::query::hql2::ExplainResultV2,
+    expected_columns: &Value,
+    branch_rows: u64,
+    total_rows: u64,
+    output_rows: u64,
+    paged: bool,
+    analyzed: bool,
+) -> Vec<H2aNodeCount> {
+    use genesis_block_native::query::hql2::result::ExplainNodeV2;
+
+    let find = |id: &str| -> &ExplainNodeV2 {
+        plan.plan
+            .iter()
+            .find(|node| node.id == id)
+            .unwrap_or_else(|| panic!("missing H2a plan node {id}"))
+    };
+    let root = find(&plan.root);
+    assert_eq!(root.logical_op, QueryOpV2::Project);
+    assert_eq!(
+        serde_json::to_value(&root.columns).unwrap(),
+        *expected_columns,
+        "H2a ordered root schema"
+    );
+    let mut counts = vec![(
+        root.id.clone(),
+        QueryOpV2::Project,
+        output_rows,
+        output_rows,
+    )];
+    let mut sort_id = h2a_one_input(root);
+    if paged {
+        let take = find(sort_id);
+        assert_eq!(take.logical_op, QueryOpV2::Take);
+        counts.push((
+            take.id.clone(),
+            QueryOpV2::Take,
+            total_rows - 1,
+            output_rows,
+        ));
+        let offset = find(h2a_one_input(take));
+        assert_eq!(offset.logical_op, QueryOpV2::Offset);
+        counts.push((
+            offset.id.clone(),
+            QueryOpV2::Offset,
+            total_rows,
+            total_rows - 1,
+        ));
+        sort_id = h2a_one_input(offset);
+    }
+    let sort = find(sort_id);
+    assert_eq!(sort.logical_op, QueryOpV2::Sort);
+    counts.push((sort.id.clone(), QueryOpV2::Sort, total_rows, total_rows));
+    let union = find(h2a_one_input(sort));
+    assert_eq!(union.logical_op, QueryOpV2::UnionAll);
+    assert_eq!(union.inputs.len(), 2);
+    counts.push((
+        union.id.clone(),
+        QueryOpV2::UnionAll,
+        total_rows,
+        total_rows,
+    ));
+    for branch_id in &union.inputs {
+        let project = find(branch_id);
+        assert_eq!(project.logical_op, QueryOpV2::Project);
+        assert_eq!(
+            serde_json::to_value(&project.columns).unwrap(),
+            *expected_columns
+        );
+        counts.push((
+            project.id.clone(),
+            QueryOpV2::Project,
+            branch_rows,
+            branch_rows,
+        ));
+        let source = find(h2a_one_input(project));
+        assert_eq!(source.logical_op, QueryOpV2::Values);
+        assert!(source.inputs.is_empty());
+        counts.push((source.id.clone(), QueryOpV2::Values, 0, branch_rows));
+    }
+
+    assert_eq!(plan.plan.len(), if paged { 9 } else { 7 });
+    let expected_ids: std::collections::BTreeSet<_> =
+        counts.iter().map(|(id, _, _, _)| id.as_str()).collect();
+    let actual_ids: std::collections::BTreeSet<_> =
+        plan.plan.iter().map(|node| node.id.as_str()).collect();
+    assert_eq!(expected_ids, actual_ids, "exact H2a plan topology");
+
+    for (id, op, rows_in, rows_out) in &counts {
+        let node = find(id);
+        assert_eq!(node.logical_op, *op);
+        assert!(node.estimates.is_none());
+        if !analyzed {
+            assert!(node.actual.is_none());
+            continue;
+        }
+        let actual = serde_json::to_value(node.actual.as_ref().unwrap()).unwrap();
+        for (name, count) in [("rows_in", rows_in), ("rows_out", rows_out)] {
+            assert_eq!(
+                actual[name],
+                json!({"unit":"rows","measurement":{"status":"measured","value":count}}),
+                "{op:?}.{name}"
+            );
+        }
+        for (name, unit, reason) in [
+            ("bytes_read", "bytes", "not_instrumented"),
+            ("work_units", "work_units", "not_instrumented"),
+            ("memory_peak_bytes", "bytes", "not_instrumented"),
+            ("index_probes", "index_probes", "not_applicable"),
+            (
+                "distance_evaluations",
+                "distance_evaluations",
+                "not_applicable",
+            ),
+            ("graph_expansions", "graph_expansions", "not_applicable"),
+            ("spill_bytes", "bytes", "not_applicable"),
+        ] {
+            assert_eq!(
+                actual[name],
+                json!({"unit":unit,"measurement":{"status":"unknown","reason":reason}}),
+                "{op:?}.{name}"
+            );
+        }
+        assert_eq!(actual["elapsed_ns"]["unit"], "nanoseconds");
+        assert_eq!(actual["elapsed_ns"]["measurement"]["status"], "measured");
+        assert!(actual["elapsed_ns"]["measurement"]["value"]
+            .as_u64()
+            .is_some());
+        assert_eq!(actual["clock_source"], "monotonic_instant");
+        assert_eq!(actual["sampling"], "complete");
+        assert_eq!(actual["elapsed_scope"], "operator_execution");
+    }
+    counts
+}
+
+struct H2aPlannedRequest {
+    frontend: &'static str,
+    request: QueryRequestV2,
+    plan: genesis_block_native::query::hql2::ExplainResultV2,
+    schema: Value,
+    rows: Vec<BTreeMap<String, V>>,
+    counts: Vec<H2aNodeCount>,
+    paged: bool,
+    total_rows: u64,
+    output_rows: u64,
+}
+
+fn h2a_assert_completed_rows(
+    result: &genesis_block_native::query::hql2::QueryResultV2,
+    rows: &[BTreeMap<String, V>],
+    schema: &Value,
+    frontend: &str,
+    mode: &str,
+) {
+    assert_eq!(
+        serde_json::to_value(&result.columns).unwrap(),
+        *schema,
+        "{frontend} {mode} schema"
+    );
+    assert_eq!(result.rows, rows, "{frontend} {mode} literal rows");
+    assert_eq!(
+        result.completeness.status,
+        genesis_block_native::query::hql2::result::CompletionStatusV2::Complete
+    );
+    assert!(result.completeness.reason.is_none());
+    assert!(result.completeness.eligible_count_known);
+}
+
+#[test]
+fn nullable_multikey_unique_complete_keys_match_literals_and_supported_p7() {
+    h2a_assert_golden_discriminators();
+    let directory = TempDir::new().unwrap();
+    let storage = open(&directory);
+    scalar_policy(&storage);
+    let before_plan = state(&storage, directory.path());
+    let mut planned = Vec::with_capacity(480);
+    let mut p7_checks = Vec::with_capacity(192);
+    let mut plan_requests = 0;
+    let mut normal_requests = 0;
+    let mut analyze_requests = 0;
+
+    for case in h2a_type_cases() {
+        assert_ne!(
+            case.literal_lo, case.literal_hi,
+            "distinct x values per type"
+        );
+        for profile in H2A_PROFILES {
+            for scenario in [
+                H2aScenario::Full,
+                H2aScenario::Offset1Take3,
+                H2aScenario::Empty,
+            ] {
+                let positions = scenario.positions(&profile);
+                let rows = h2a_literal_rows(&case, positions);
+                let schema = h2a_schema(&case);
+                let (ir, hql) = h2a_requests(&case, profile, scenario, false);
+                for (frontend, request) in [("typed IR", ir), ("HQL2", hql)] {
+                    let mut plan_request = request.clone();
+                    plan_request.explain = Some(ExplainV2::Plan);
+                    let QueryOutcomeV2::Plan(plan) = storage
+                        .query_v2(access(), plan_request)
+                        .unwrap_or_else(|error| panic!("{frontend} Plan failed: {error:?}"))
+                    else {
+                        panic!("{frontend} Plan must return a plan");
+                    };
+                    plan_requests += 1;
+                    assert_eq!(plan.catalog.policy_revision, 1);
+                    assert_eq!(plan.catalog.observed_frontier, before_plan.0);
+                    let branch_rows = if scenario.is_empty() { 0 } else { 3 };
+                    let total_rows = if scenario.is_empty() { 0 } else { 6 };
+                    let output_rows = rows.len() as u64;
+                    let counts = h2a_assert_plan(
+                        &plan,
+                        &schema,
+                        branch_rows,
+                        total_rows,
+                        output_rows,
+                        scenario.is_paged(),
+                        false,
+                    );
+                    assert_state(&storage, directory.path(), &before_plan);
+                    planned.push(H2aPlannedRequest {
+                        frontend,
+                        request,
+                        plan,
+                        schema: schema.clone(),
+                        rows: rows.clone(),
+                        counts,
+                        paged: scenario.is_paged(),
+                        total_rows,
+                        output_rows,
+                    });
+                }
+                if let Some(p7) = h2a_p7_plan(&case, profile, scenario) {
+                    p7_checks.push((case.type_name, p7, rows));
+                }
+            }
+        }
+    }
+    assert_eq!(plan_requests, 480);
+    assert_eq!(p7_checks.len(), 192, "P7 excludes DecimalU64");
+
+    // Independent P7 runs and explicit publication begin only after every Plan.
+    for (type_name, oracle, expected) in p7_checks {
+        let p7_rows = reference::execute(&oracle)
+            .unwrap()
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .map(|(name, value)| (name.clone(), b1_from_p7(value)))
+                    .collect::<BTreeMap<_, _>>()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            p7_rows, expected,
+            "{type_name} literal rows vs unchanged P7"
+        );
+    }
+    storage.publish_generation().unwrap();
+
+    for case in planned {
+        let QueryOutcomeV2::Rows(normal) = storage
+            .query_v2(access(), case.request.clone())
+            .unwrap_or_else(|error| panic!("{} Normal failed: {error:?}", case.frontend))
+        else {
+            panic!("{} Normal must return rows", case.frontend);
+        };
+        normal_requests += 1;
+        h2a_assert_completed_rows(&normal, &case.rows, &case.schema, case.frontend, "Normal");
+
+        let mut analyze_request = case.request.clone();
+        analyze_request.explain = Some(ExplainV2::Analyze);
+        let QueryOutcomeV2::Rows(analyzed) = storage
+            .query_v2(access(), analyze_request)
+            .unwrap_or_else(|error| panic!("{} Analyze failed: {error:?}", case.frontend))
+        else {
+            panic!("{} Analyze must return rows", case.frontend);
+        };
+        analyze_requests += 1;
+        h2a_assert_completed_rows(
+            &analyzed,
+            &case.rows,
+            &case.schema,
+            case.frontend,
+            "Analyze",
+        );
+        assert_eq!(normal.rows, analyzed.rows);
+        assert_eq!(normal.columns, analyzed.columns);
+        assert_eq!(normal.semantics, analyzed.semantics);
+        assert_eq!(normal.snapshot, analyzed.snapshot);
+        assert_eq!(normal.completeness, analyzed.completeness);
+        assert_eq!(normal.index_frontiers, analyzed.index_frontiers);
+        assert_eq!(normal.cursor, analyzed.cursor);
+
+        let mut analyzed_plan = analyzed.explain.unwrap();
+        assert_eq!(analyzed_plan.plan_hash, case.plan.plan_hash);
+        assert_eq!(analyzed_plan.planner_version, case.plan.planner_version);
+        let counts = h2a_assert_plan(
+            &analyzed_plan,
+            &case.schema,
+            if case.total_rows == 0 { 0 } else { 3 },
+            case.total_rows,
+            case.output_rows,
+            case.paged,
+            true,
+        );
+        assert_eq!(counts, case.counts);
+        for node in &mut analyzed_plan.plan {
+            node.actual.take();
+        }
+        assert_eq!(analyzed_plan.plan, case.plan.plan);
+    }
+    assert_eq!((normal_requests, analyze_requests), (480, 480));
+}
+
+#[test]
+fn nullable_multikey_hql_default_null_order_matches_literals() {
+    h2a_assert_golden_discriminators();
+    let directory = TempDir::new().unwrap();
+    let storage = open(&directory);
+    scalar_policy(&storage);
+    let before_plan = state(&storage, directory.path());
+    let mut planned = Vec::with_capacity(20);
+    let mut p7_checks = Vec::with_capacity(16);
+    let mut plan_requests = 0;
+    let mut normal_requests = 0;
+    let mut analyze_requests = 0;
+
+    for case in h2a_type_cases() {
+        for x_first in [true, false] {
+            for x_descending in [false, true] {
+                let profile = *H2A_PROFILES
+                    .iter()
+                    .find(|profile| {
+                        profile.x_first == x_first
+                            && profile.x_descending == x_descending
+                            && !profile.bucket_descending
+                            && !profile.x_nulls_first
+                    })
+                    .expect("H2a literal profile with bucket ASC and NULLS LAST");
+                let rows = h2a_literal_rows(&case, &profile.full);
+                let schema = h2a_schema(&case);
+                let (_, hql) = h2a_requests(&case, profile, H2aScenario::Full, true);
+                let mut plan_request = hql.clone();
+                plan_request.explain = Some(ExplainV2::Plan);
+                let QueryOutcomeV2::Plan(plan) = storage
+                    .query_v2(access(), plan_request)
+                    .unwrap_or_else(|error| panic!("HQL2 default Plan failed: {error:?}"))
+                else {
+                    panic!("HQL2 default Plan must return a plan");
+                };
+                plan_requests += 1;
+                assert_eq!(plan.catalog.policy_revision, 1);
+                assert_eq!(plan.catalog.observed_frontier, before_plan.0);
+                let counts = h2a_assert_plan(&plan, &schema, 3, 6, 6, false, false);
+                assert_state(&storage, directory.path(), &before_plan);
+                planned.push(H2aPlannedRequest {
+                    frontend: "HQL2 default NULLS LAST",
+                    request: hql,
+                    plan,
+                    schema: schema.clone(),
+                    rows: rows.clone(),
+                    counts,
+                    paged: false,
+                    total_rows: 6,
+                    output_rows: 6,
+                });
+                if let Some(p7) = h2a_p7_plan(&case, profile, H2aScenario::Full) {
+                    p7_checks.push((case.type_name, p7, rows));
+                }
+            }
+        }
+    }
+    assert_eq!(plan_requests, 20);
+    assert_eq!(p7_checks.len(), 16, "P7 excludes DecimalU64");
+    for (type_name, oracle, expected) in p7_checks {
+        let p7_rows = reference::execute(&oracle)
+            .unwrap()
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .map(|(name, value)| (name.clone(), b1_from_p7(value)))
+                    .collect::<BTreeMap<_, _>>()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(p7_rows, expected, "{type_name} default literal rows vs P7");
+    }
+    storage.publish_generation().unwrap();
+
+    for case in planned {
+        let QueryOutcomeV2::Rows(normal) = storage
+            .query_v2(access(), case.request.clone())
+            .unwrap_or_else(|error| panic!("{} Normal failed: {error:?}", case.frontend))
+        else {
+            panic!("{} Normal must return rows", case.frontend);
+        };
+        normal_requests += 1;
+        h2a_assert_completed_rows(&normal, &case.rows, &case.schema, case.frontend, "Normal");
+        let mut analyze_request = case.request.clone();
+        analyze_request.explain = Some(ExplainV2::Analyze);
+        let QueryOutcomeV2::Rows(analyzed) = storage
+            .query_v2(access(), analyze_request)
+            .unwrap_or_else(|error| panic!("{} Analyze failed: {error:?}", case.frontend))
+        else {
+            panic!("{} Analyze must return rows", case.frontend);
+        };
+        analyze_requests += 1;
+        h2a_assert_completed_rows(
+            &analyzed,
+            &case.rows,
+            &case.schema,
+            case.frontend,
+            "Analyze",
+        );
+        assert_eq!(normal.rows, analyzed.rows);
+        assert_eq!(normal.columns, analyzed.columns);
+        assert_eq!(normal.semantics, analyzed.semantics);
+        assert_eq!(normal.snapshot, analyzed.snapshot);
+        assert_eq!(normal.completeness, analyzed.completeness);
+        assert_eq!(normal.index_frontiers, analyzed.index_frontiers);
+        assert_eq!(normal.cursor, analyzed.cursor);
+
+        let mut analyzed_plan = analyzed.explain.unwrap();
+        assert_eq!(analyzed_plan.plan_hash, case.plan.plan_hash);
+        assert_eq!(analyzed_plan.planner_version, case.plan.planner_version);
+        let counts = h2a_assert_plan(
+            &analyzed_plan,
+            &case.schema,
+            3,
+            case.total_rows,
+            case.output_rows,
+            case.paged,
+            true,
+        );
+        assert_eq!(counts, case.counts);
+        for node in &mut analyzed_plan.plan {
+            node.actual.take();
+        }
+        assert_eq!(analyzed_plan.plan, case.plan.plan);
+    }
+    assert_eq!((normal_requests, analyze_requests), (20, 20));
+}

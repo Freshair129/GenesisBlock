@@ -43,7 +43,7 @@ describe('remote StudioTransport', () => {
     ]);
   });
 
-  it('normalizes bounded backend graph DTOs without embeddings', async () => {
+  it('normalizes bounded backend graph DTOs without embeddings or retired importance', async () => {
     const fetcher = (async (input: string | URL | Request) => {
       const url = String(input);
       if (url.endsWith('/v1/studio/capabilities')) return json(capabilities);
@@ -73,8 +73,10 @@ describe('remote StudioTransport', () => {
       id: 'n1',
       group: 'Memory',
       vectorCollection: 'default',
+      size: 4,
     });
     expect(JSON.stringify(scene)).not.toContain('embedding');
+    expect(scene.data.nodes[0]).not.toHaveProperty('impact');
   });
 
   it('executes only a versioned named-query contract over the relational endpoint', async () => {

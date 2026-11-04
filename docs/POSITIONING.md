@@ -32,9 +32,9 @@ to start; no second database to reconcile.
 
 ## Why it's different
 
-- **One store, two retrieval modes.** Vector k-NN and graph traversal over the
-  *same* nodes — `HYBRID` blends semantic similarity with graph-derived K-Impact
-  in one query, no cross-system join.
+- **One store, two retrieval modes.** Vector k-NN and graph traversal share
+  the same nodes and durable identities. Vector relevance remains separate
+  from application-owned importance and ranking policy.
 - **Bitemporal by construction.** Every node/edge carries `valid_from`/`valid_to`;
   evolution is supersession, not destructive overwrite. `retract_edge` is a soft
   delete. You can query the graph *as of* any past instant — time-travel for
@@ -86,8 +86,10 @@ and head-to-head audits (P22–P31), on the same corpus/queries:
   Whole-process RSS at 1M measured 2.06×/2.93× smaller — a ~3.6 GB graph+metadata
   floor does not shrink with vector quantization (AUDIT--P33); the post-sidecar
   empirical re-run is pending.
-- **Incremental K-Impact**: `O(V_affected)`, ~1.7 µs — up to ~398,000× faster than
-  a full recompute; the governance guard is <0.1% of a write.
+
+K-Impact computation and blending are retired. Earlier P25 measurements describe
+the historical implementation and are not a feature of this source revision;
+see [the retirement decision](adr/ADR--GENESISDB-RETIRE-KIMPACT.md).
 
 ## Honest caveats
 

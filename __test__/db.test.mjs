@@ -26,6 +26,30 @@ function cleanup(dbPath) {
   }
 }
 
+test('NAPI: retired importance inputs reject and generic metadata cannot change relevance', async () => {
+  const dbPath = tempDb('retired-importance');
+  try {
+    const db = GenesisDatabase.open({ path: dbPath, vectorDim: 3 });
+    const first = await db.addNode({ id: 'same-vector-a', labels: ['Doc'], embedding: [1, 0, 0], props: { 'legacy.genesisdb.impact': 0 } });
+    await db.addNode({ id: 'same-vector-b', labels: ['Doc'], embedding: [1, 0, 0], props: { 'legacy.genesisdb.impact': 1 } });
+    assert.equal(Object.hasOwn(first, 'impact'), false);
+    assert.equal(Object.hasOwn(first, 'legacyWireImpact'), false);
+    assert.equal(typeof db.semanticVerify, 'undefined');
+    await db.flushIndex();
+    const results = await db.hybridSearch({ queryVector: [1, 0, 0], k: 2 });
+    assert.equal(results.length, 2);
+    assert.equal(results[0].score, results[1].score);
+    await assert.rejects(db.hybridSearch({ queryVector: [1, 0, 0], k: 2, alpha: 0 }), /KIMPACT_REMOVED/);
+    await assert.rejects(db.addEdge({ from: first.id, to: 'same-vector-b', rel: 'LINK', impact: 0.5 }), /KIMPACT_REMOVED/);
+    await assert.rejects(db.executeQueryIr({
+      contract_version: 'query-ir.v1', request_id: 'retired-hybrid',
+      operation: { kind: 'search', mode: 'hybrid', query_vector: [1, 0, 0], k: 2 },
+    }), /KIMPACT_REMOVED/);
+  } finally {
+    cleanup(dbPath);
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Read-your-write: add a node with a vector, flush the HNSW index, then
 // hybridSearch must return that node as the nearest neighbour.
@@ -36,7 +60,7 @@ test('NAPI: read-your-write — addNode + flushIndex + hybridSearch', async () =
     const db = GenesisDatabase.open({ path: dbPath, vectorDim: 3 });
     await db.addNode({ id: 'v1', labels: ['Vec'], embedding: [1.0, 0.0, 0.0] });
     await db.flushIndex();
-    const results = await db.hybridSearch({ queryVector: [0.9, 0.1, 0.0], k: 1, alpha: 0.0 });
+    const results = await db.hybridSearch({ queryVector: [0.9, 0.1, 0.0], k: 1 });
     assert.strictEqual(results.length, 1, 'search must return exactly one result');
     assert.strictEqual(results[0].node.id, 'v1', 'nearest neighbour must be the inserted node');
   } finally {
@@ -63,7 +87,6 @@ test('NAPI: hybridSearch accepts oversample on a quantized+rerank collection', a
     const results = await db.hybridSearch({
       queryVector: [0.9, 0.1, 0.0, 0.0],
       k: 1,
-      alpha: 0.0,
       collection: 'ovq',
       oversample: 16,
     });
@@ -130,7 +153,7 @@ test('NAPI: collection isolation — node in alpha invisible from beta search', 
     await db.flushIndex();
 
     // Querying [1,0,0] in beta: alpha-node MUST NOT appear; beta-node may.
-    const results = await db.hybridSearch({ queryVector: [1.0, 0.0, 0.0], k: 5, alpha: 0.0, collection: 'beta' });
+    const results = await db.hybridSearch({ queryVector: [1.0, 0.0, 0.0], k: 5, collection: 'beta' });
     const ids = results.map(r => r.node.id);
     assert.ok(!ids.includes('alpha-node'),
       `alpha-node must not appear in beta search; got: ${JSON.stringify(ids)}`);

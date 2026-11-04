@@ -59,7 +59,7 @@ Goal set by the product owner: (a) beat **same-tier** competitors (embedded grap
 
 **Write path:** client → NAPI/REST → `add_node` → `validate_governance` (engine-level MASTER lockout, ~524 ns, <0.1% of a write) → id interning (u32, SeqCst) → per-collection arena staging + **async HNSW enqueue** (bounded-4096 channel, one indexing thread per Storage) → `insert_node_lean` (DashMap) → `persist()` = ed25519-sign + WAL group-commit (5 ms / 1024-event batch, fsync, ack) — durable-synchronous, index-eventually-consistent (`flush_index()` = read-your-write).
 
-**Read paths:** `hybrid_search` (per-collection dim-validated HNSW, optional on-disk f32 sidecar rerank, K-Impact opt-in at α=0.0 default) · `neighbors` (bitemporal-aware BFS over sharded adjacency) · `retrieve_context`/GRL (BFS + all-or-nothing SuperNode compression) · `execute_hql` dispatches directly, no planner.
+**Read paths:** `hybrid_search` (per-collection dim-validated HNSW, optional on-disk f32 sidecar rerank, vector relevance only) · `neighbors` (bitemporal-aware BFS over sharded adjacency) · `retrieve_context`/GRL (BFS + all-or-nothing SuperNode compression) · `execute_hql` dispatches directly, no planner.
 
 **Production-relevant structural findings** (previously undocumented; each is an action item in §7):
 
@@ -134,7 +134,7 @@ Bar set by best-of (Qdrant / Weaviate / Milvus / Neo4j / SurrealDB / pgvector / 
 | Encryption at rest | **BELOW** | plain JSON/bincode on disk → Qdrant volumes + CMK; OpenSearch KMS free tier |
 | Multi-tenancy | **BELOW** | collections = partitioning primitive, not tenants (no quota/RBAC-per-tenant) → Weaviate 1M+ tenants; Milvus 4 levels |
 | Observability/metrics | **BELOW** | no /metrics endpoint at all → Qdrant & Weaviate native Prometheus |
-| Hybrid dense+sparse | **BELOW** | K-Impact is a graph signal (α=0 default), not lexical; NotiKeeper had to build RRF+BM25 **outside** the engine → Qdrant/Weaviate/Milvus native sparse+dense; Neo4j HybridRetriever |
+| Hybrid dense+sparse | **BELOW** | Native dense+sparse fusion is not implemented; NotiKeeper built RRF+BM25 **outside** the engine → Qdrant/Weaviate/Milvus native sparse+dense; Neo4j HybridRetriever |
 | Ops tooling (CLI/console) | **BELOW** | /v1/status + dashboard only → neo4j-admin, Attu, Qdrant console |
 | Compliance (SOC2/HIPAA) | **BELOW** | none → Qdrant Cloud SOC2 Type 2 + HIPAA |
 
@@ -146,7 +146,7 @@ Bar set by best-of (Qdrant / Weaviate / Milvus / Neo4j / SurrealDB / pgvector / 
 
 Claims audited against primary audits (20/20 Opus-CONFIRMED):
 
-**Real and stable (the moat):** bitemporal + ed25519-signed governance survived every internal AND external verification pass, across two audit rounds three weeks apart, with zero stale-number risk. These are also the *only* axes simultaneously ahead of the whole same-tier and enterprise fields. Incremental K-Impact (O(V_affected), up to 398,105× vs full recompute) and <0.1% governance overhead are real but currently opt-in/default-off (α=0.0 since 2026-06-29, ADR--KIMPACT-AS-SIGNAL).
+**Historical audit conclusion:** bitemporal + ed25519-signed governance passed the cited audit rounds. Earlier incremental K-Impact cost measurements describe a retired implementation; computation, blending and authority-score consumers are removed by [the current retirement decision](adr/ADR--GENESISDB-RETIRE-KIMPACT.md). Those measurements do not qualify this source revision's performance.
 
 **Real but narrower than marketed (fix the copy, keep the claim):**
 - "52× vs DuckDB" is hop1-only; same audit says hop6 is "effectively tied" — POSITIONING.md omits it.
@@ -221,7 +221,7 @@ Claims audited against primary audits (20/20 Opus-CONFIRMED):
 **Query-language track (HQL vs Cypher) — strengthen-the-moat work; slots into Waves 2–3 without displacing the blockers** *(added 2026-07-03 after follow-up analysis)*
 
 Verdict: "sole custom QL in this category" is **false** (HelixDB ships custom compiled HelixQL; LadybugDB ships Cypher; GQL is now an ISO standard and Neo4j Cypher 25 gained a vector `SEARCH` clause, GA 2026.02). HQL's defensible surface is not syntax ownership but **semantics Cypher/GQL cannot express** — and those map exactly onto the two moat axes of §2.1:
-`AS OF` bitemporal time-travel on every command (`src/query/hql.pest:22`), `SIMILAR TO … ALPHA` single-statement vector+graph blending, and `CONTEXT … TIER … BUDGET` token-budgeted retrieval (an agent-native primitive no engine has). Meanwhile the syntax tax is already shrinking: Cypher-style pattern `MATCH` shipped (PR #60, `hql.pest:47-76`) and WHERE/ORDER BY/LIMIT/RETURN shipped (PRs #43/#44) — HQL is converging on Cypher exactly where LLM familiarity pays.
+`AS OF` bitemporal time-travel on every command (`src/query/hql.pest:22`), `MATCH … SIMILAR TO` vector retrieval alongside graph queries, and `CONTEXT … TIER … BUDGET` token-budgeted retrieval (an agent-native primitive no engine has). Meanwhile the syntax tax is already shrinking: Cypher-style pattern `MATCH` shipped (PR #60, `hql.pest:47-76`) and WHERE/ORDER BY/LIMIT/RETURN shipped (PRs #43/#44) — HQL is converging on Cypher exactly where LLM familiarity pays.
 
 Decision: **refine HQL (convergent-syntax strategy); do NOT build a full Cypher/GQL engine** (planner + write semantics + openCypher TCK ≈ multi-quarter, would consume Wave 1–2 capacity for a surface that surrenders the moat semantics).
 

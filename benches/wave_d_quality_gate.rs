@@ -183,7 +183,7 @@ fn main() {
                         .hybrid_search(HybridSearchInput {
                             query_vector: query.iter().map(|value| *value as f64).collect(),
                             k: k as u32,
-                            alpha: Some(0.0),
+                            alpha: None,
                             lang: None,
                             as_of: None,
                             collection: Some("quality".into()),

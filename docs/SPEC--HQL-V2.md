@@ -16,6 +16,11 @@ related:
 
 # SPEC — HQL v2 (refinement target)
 
+> Retirement update (2026-11-02): `ALPHA` is removed by
+> [ADR--GENESISDB-RETIRE-KIMPACT](adr/ADR--GENESISDB-RETIRE-KIMPACT.md).
+> Compatibility promises below apply to retained query syntax; they do not
+> preserve importance blending or the retired clause.
+
 **This is the normative target contract for [PLAN--HQL-REFINEMENT](PLAN--HQL-REFINEMENT.md).** Everything here is either (a) fixed by the plan's task definitions, or (b) marked **⚙ design-gated** — the recommended form is written here and P0-T0/P1-T0/P3-T0 may amend it; if a gate amends, this spec is updated in the same PR. Sections not restated (clause null semantics, collections, AS OF, surfaces, return shapes) are **inherited unchanged from [SPEC--HQL-V1](SPEC--HQL-V1.md)**.
 
 **Track boundary (2026-07-05):** `P0` is a native HQL correctness/exposure milestone and remains intentionally separable from the SQLite substrate implementation track. SQLite may change the execution strategy for `P2/P3`, but `P0` semantics in this spec must remain implementable and shippable without waiting for `S0/S1`. See [SPEC--SQLITE-SUBSTRATE-S0-S1](SPEC--SQLITE-SUBSTRATE-S0-S1.md).
@@ -27,7 +32,7 @@ related:
 ## 1. Compatibility contract
 
 1. **Every semantically valid v1 query parses in v2 and returns the same result**, with exactly one documented exception (rule 2). Existing test files are the enforcement mechanism: they must pass **unedited**.
-2. **The only breaking change:** a numeric token that overflows/fails value-parsing is now a **parse error**, not a silent default (v1 §4.5). Rationale: silently converting `K 99999999999999999999` into `K 5` is a wrong-answer generator. `LIMIT`'s saturate-to-max stays (deliberate v1 semantics).
+2. **Numeric parsing change:** a numeric token that overflows/fails value-parsing is now a **parse error**, not a silent default (v1 §4.5). Rationale: silently converting `K 99999999999999999999` into `K 5` is a wrong-answer generator. `LIMIT`'s saturate-to-max stays (deliberate v1 semantics).
 3. All grammar additions are optional clauses or new alternatives — omitting them reproduces v1 behavior (modulo the defect fixes, which change *wrong* behavior only: the discarded target now errors-or-acts, per §2.1).
 4. No planner, no EXPLAIN, no on-disk format change, no new required fields on compatibility surfaces. The separately selected UEE `hql.v2` pipeline is governed by the owner-approved [HQL2 execution ADR](adr/ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY.md); this exception does not change existing callers.
 
@@ -43,7 +48,7 @@ related:
 SEARCH [~]<target> [SIMILAR TO [ <vector> ]] K <k> [EF <n>] [OVERSAMPLE <n>]
        [IN <collection>] [LANGUAGE "…"] [AS OF "…"] [<clauses>]
 
-MATCH  [~]<target> [SIMILAR TO [ <vector> ]] ALPHA <a> [K <k>] [EF <n>] [OVERSAMPLE <n>]
+MATCH  [~]<target> [SIMILAR TO [ <vector> ]] [K <k>] [EF <n>] [OVERSAMPLE <n>]
        [IN <collection>] [LANGUAGE "…"] [AS OF "…"] [<clauses>]
 ```
 

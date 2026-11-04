@@ -1,7 +1,8 @@
 ---
 proposed_id: ADR--GENESISDB-KIMPACT-AS-SIGNAL
 type: adr
-status: candidate
+status: superseded
+superseded_by: ADR--GENESISDB-RETIRE-KIMPACT.md
 aliases:
   - ADR
 phase: 2
@@ -15,6 +16,10 @@ amends: ADR--GENESISDB-KIMPACT-ALGORITHM
 ---
 
 # ADR--GENESISDB-KIMPACT-AS-SIGNAL
+
+> Historical decision, superseded on 2026-11-02 by
+> [K-Impact retirement](ADR--GENESISDB-RETIRE-KIMPACT.md).
+> Opt-in scoring and retaining compute/refresh are no longer supported.
 
 ## Context
 
