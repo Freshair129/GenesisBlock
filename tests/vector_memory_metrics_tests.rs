@@ -159,7 +159,7 @@ fn all_modes_report_distinct_arena_and_hnsw_widths_and_rebuild_search() {
             .hybrid_search(HybridSearchInput {
                 query_vector: vec![-1.0, 0.5, -0.25, 0.125, -0.5, 1.0, 0.25, -0.125],
                 k: 1,
-                alpha: Some(0.0),
+                alpha: None,
                 lang: None,
                 as_of: None,
                 collection: Some("test".into()),

@@ -211,16 +211,16 @@ export interface CollectionInfo {
   efSearch?: number
   /** Whether this (quantized) collection keeps an f32 sidecar for exact rerank. */
   rerank: boolean
-    /**
-     * Legacy full-file sidecar residency (0 for the positioned-read backing).
-     * Excludes the bounded decoded-row cache: see `sidecar_cache_bytes`.
-     * This is not process RSS or filesystem page-cache residency.
-     */
+   /**
+    * Legacy full-file sidecar residency (0 for the positioned-read backing).
+    * Excludes the bounded decoded-row cache: see `sidecar_cache_bytes`.
+    * This is not process RSS or filesystem page-cache residency.
+    */
   sidecarResidentBytes: number
-    /**
-     * Allocated f32 row payload in the bounded sidecar cache (capacity * 4).
-     * Excludes HashMap/VecDeque bookkeeping and transient caller-owned clones.
-     */
+   /**
+    * Allocated f32 row payload in the bounded sidecar cache (capacity * 4).
+    * Excludes HashMap/VecDeque bookkeeping and transient caller-owned clones.
+    */
     sidecarCacheBytes: number
   /**
    * Ops/credibility (P2c): on-disk bytes of the rerank sidecar
