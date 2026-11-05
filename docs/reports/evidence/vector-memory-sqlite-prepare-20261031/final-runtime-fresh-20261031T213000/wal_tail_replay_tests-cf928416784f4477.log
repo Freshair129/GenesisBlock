@@ -1,0 +1,10 @@
+
+running 5 tests
+test acked_writes_after_snapshot_survive_crash_reopen ... ok
+test current_manifest_without_frontier_recovers_only_from_wal ... ok
+test graceful_reopen_replays_nothing ... ok
+test snapshot_without_frontier_still_loads ... ok
+test stale_wal_prefix_falls_back_to_full_replay ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.78s
+

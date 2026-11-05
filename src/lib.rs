@@ -247,6 +247,8 @@ pub const ENGINE_VERSION: &str = env!("CARGO_PKG_VERSION");
 mod journal_authorization_budget_tests;
 #[cfg(test)]
 mod projection_rebuild_tests;
+#[cfg(test)]
+mod vector_memory_tests;
 
 // --- Types (PROTOCOL §3) ---
 
@@ -1975,23 +1977,31 @@ pub struct CollectionInfo {
     pub ef_search: Option<u32>,
     /// Whether this (quantized) collection keeps an f32 sidecar for exact rerank.
     pub rerank: bool,
-    /// Ops/credibility (P2c): resident (RAM) bytes held by the exact-f32 rerank
-    /// sidecar. **≈0 post-P0**: the sidecar is on-disk (`fvec_<name>.bin`) behind a
-    /// positioned-read `SidecarReader`, not a resident `Vec<f32>`, so its vector
-    /// data consumes no heap. This field exists to PROVE the P0 RAM win (see
-    /// docs/RCA--VECTOR-QUANTIZATION.md); a non-zero value here would mean the
-    /// resident-sidecar regression came back. (`i64` not `u64`: byte counts fit a
-    /// JS-safe integer and NAPI maps `i64`→JS number; `u64` would force BigInt.)
+    /// Legacy full-file sidecar residency (0 for the positioned-read backing).
+    /// Excludes the bounded decoded-row cache: see `sidecar_cache_bytes`.
+    /// This is not process RSS or filesystem page-cache residency.
     pub sidecar_resident_bytes: i64,
+    /// Allocated f32 row payload in the bounded sidecar cache (capacity * 4).
+    /// Excludes HashMap/VecDeque bookkeeping and transient caller-owned clones.
+    #[serde(default)]
+    pub sidecar_cache_bytes: i64,
     /// Ops/credibility (P2c): on-disk bytes of the rerank sidecar
     /// (`len_rows * dim * 4`), i.e. where the exact-f32 vectors actually live now.
     /// `0` when the collection has no sidecar. Shows RAM → disk is where the bytes
     /// went, not that they vanished.
     pub sidecar_disk_bytes: i64,
-    /// Ops/credibility (P2c): resident (RAM) bytes of this collection's vector
-    /// arena (`arena.byte_size()` — f32=4B/elem, SQ8=1B/elem, BQ=1bit/elem).
-    /// Context for the residency story: this is the RAM the quantized arena costs.
+    /// Legacy logical arena payload (length * element width), not physical RSS.
+    /// Excludes spare capacity; overlaps `arena_allocated_bytes`, so do not add them.
     pub arena_resident_bytes: i64,
+    /// Arena Vec allocation (capacity * element width), excluding allocator overhead.
+    /// Allocated capacity is not a measurement of physically resident pages.
+    #[serde(default)]
+    pub arena_allocated_bytes: i64,
+    /// HNSW vector payload only: indexed points * per-row element bytes. F16 uses
+    /// f32 here; BQ rounds dim up to u64 words. Excludes graph links, point/table
+    /// allocations and allocator overhead: this is a lower bound, not total HNSW RAM.
+    #[serde(default)]
+    pub hnsw_vector_bytes: i64,
     /// Ops/credibility (P2c): engine-global async-indexing backlog
     /// (`Storage::index_lag()`) — vectors staged into the arena but not yet
     /// inserted into HNSW. Not per-collection (one indexing thread serves all
@@ -2179,10 +2189,18 @@ fn encode_compacted_envelope<T: Serialize>(
 ) -> Result<Vec<u8>> {
     let json =
         serde_json::to_vec(envelope).map_err(|error| Error::from_reason(error.to_string()))?;
+    encode_compacted_envelope_json(magic, &json, max_uncompressed_bytes)
+}
+
+fn encode_compacted_envelope_json(
+    magic: &[u8],
+    json: &[u8],
+    max_uncompressed_bytes: usize,
+) -> Result<Vec<u8>> {
     if json.len() > max_uncompressed_bytes {
         return Err(Error::from_reason("COMPACTION_PROOF_TOO_LARGE"));
     }
-    let compressed = lz4_flex::compress_prepend_size(&json);
+    let compressed = lz4_flex::compress_prepend_size(json);
     if compressed.len() > max_uncompressed_bytes.saturating_add(4) {
         return Err(Error::from_reason("COMPACTION_PROOF_TOO_LARGE"));
     }
@@ -2267,23 +2285,317 @@ struct CompactedRowRevisionExpectation<'a> {
     payload: &'a Value,
 }
 
+// References tie cached encodings to the exact immutable source for this build.
+// No verification/authorization decision is cached here. Full caches fall back.
+const COMPACTION_ENCODING_CACHE_MAX_BYTES: usize = 8 * 1024 * 1024;
+const COMPACTION_ENCODING_CACHE_MAX_ENTRIES: usize = 4096;
+struct SerializedCompactionProof<'a> {
+    source: &'a SignedEvent,
+    canonical: Box<[u8]>,
+    json: Box<[u8]>,
+}
+
+#[derive(Default)]
+struct CompactionProofBytesCache<'a> {
+    entries: HashMap<usize, SerializedCompactionProof<'a>>,
+    bytes: usize,
+    admission_closed: bool,
+}
+
+impl<'a> CompactionProofBytesCache<'a> {
+    fn prepare(
+        &mut self,
+        source: &'a SignedEvent,
+    ) -> Result<Option<&SerializedCompactionProof<'a>>> {
+        let identity = std::ptr::from_ref(source) as usize;
+        if self.entries.contains_key(&identity) {
+            return Ok(self.entries.get(&identity));
+        }
+        if self.admission_closed
+            || self.bytes >= COMPACTION_ENCODING_CACHE_MAX_BYTES
+            || self.entries.len() >= COMPACTION_ENCODING_CACHE_MAX_ENTRIES
+        {
+            return Ok(None);
+        }
+        let canonical = canonical_event_bytes(&source.event)
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let json =
+            serde_json::to_vec(source).map_err(|error| Error::from_reason(error.to_string()))?;
+        let bytes = canonical.len().saturating_add(json.len());
+        if bytes > COMPACTION_ENCODING_CACHE_MAX_BYTES.saturating_sub(self.bytes) {
+            // Retained hits remain usable. Stop probing new admissions so a
+            // shared over-budget source is not serialized twice on every leaf.
+            self.admission_closed = true;
+            return Ok(None);
+        }
+        self.entries.insert(
+            identity,
+            SerializedCompactionProof {
+                source,
+                canonical: canonical.into_boxed_slice(),
+                json: json.into_boxed_slice(),
+            },
+        );
+        self.bytes += bytes;
+        Ok(self.entries.get(&identity))
+    }
+}
+
+// Pure signature math may repeat across journal preflight, proof discovery and
+// materialization. Reuse only inside one synchronous checkpoint on this thread.
+// Membership/key resolution and stateful authorization always run at each caller.
+const SIGNATURE_CACHE_MAX_ENTRIES: usize = 16_384;
+const SIGNATURE_CACHE_MAX_PAYLOAD_BYTES: usize = 8 * 1024 * 1024;
+type SignatureVerificationKey = ([u8; 32], [u8; 64], [u8; 32]);
+
+struct SignatureVerificationEntry {
+    payload: Box<[u8]>,
+    valid: bool,
+}
+
+#[derive(Default)]
+struct SignatureVerificationCache {
+    entries: HashMap<SignatureVerificationKey, SignatureVerificationEntry>,
+    payload_bytes: usize,
+}
+
+impl SignatureVerificationCache {
+    fn remember(&mut self, identity: SignatureVerificationKey, payload: &[u8], valid: bool) {
+        if self.entries.len() >= SIGNATURE_CACHE_MAX_ENTRIES
+            || payload.len() > SIGNATURE_CACHE_MAX_PAYLOAD_BYTES.saturating_sub(self.payload_bytes)
+            || self.entries.contains_key(&identity)
+        {
+            return;
+        }
+        self.entries.insert(
+            identity,
+            SignatureVerificationEntry {
+                payload: payload.into(),
+                valid,
+            },
+        );
+        self.payload_bytes += payload.len();
+    }
+}
+
+thread_local! {
+    static SIGNATURE_VERIFICATION_CACHE: std::cell::RefCell<Option<SignatureVerificationCache>> = const { std::cell::RefCell::new(None) };
+}
+
+struct SignatureVerificationScope {
+    owns_cache: bool,
+    // A guard must be destroyed on the thread whose cache it owns.
+    _thread_bound: std::marker::PhantomData<std::rc::Rc<()>>,
+}
+
+impl SignatureVerificationScope {
+    fn enter() -> Self {
+        let owns_cache = SIGNATURE_VERIFICATION_CACHE.with(|slot| {
+            let mut slot = slot.borrow_mut();
+            if slot.is_some() {
+                false
+            } else {
+                *slot = Some(SignatureVerificationCache::default());
+                true
+            }
+        });
+        Self {
+            owns_cache,
+            _thread_bound: std::marker::PhantomData,
+        }
+    }
+}
+
+impl Drop for SignatureVerificationScope {
+    fn drop(&mut self) {
+        if self.owns_cache {
+            SIGNATURE_VERIFICATION_CACHE.with(|slot| {
+                slot.borrow_mut().take();
+            });
+        }
+    }
+}
+
+fn verify_signature_math(key: &VerifyingKey, payload: &[u8], signature: &Signature) -> bool {
+    let identity = SIGNATURE_VERIFICATION_CACHE.with(|slot| {
+        if slot.borrow().is_none() {
+            return None;
+        }
+        Some((
+            key.to_bytes(),
+            signature.to_bytes(),
+            Sha256::digest(payload).into(),
+        ))
+    });
+    if let Some(identity) = &identity {
+        let cached = SIGNATURE_VERIFICATION_CACHE.with(|slot| {
+            let slot = slot.borrow();
+            // The digest is only a lookup accelerator. Exact bytes are checked
+            // too, so a digest collision cannot reuse a different message's result.
+            slot.as_ref()?
+                .entries
+                .get(identity)
+                .filter(|entry| entry.payload.as_ref() == payload)
+                .map(|entry| entry.valid)
+        });
+        if let Some(valid) = cached {
+            return valid;
+        }
+    }
+    #[cfg(test)]
+    vector_memory_tests::record_signature_verification(key, payload, signature);
+    let valid = key.verify(payload, signature).is_ok();
+    if let Some(identity) = identity {
+        SIGNATURE_VERIFICATION_CACHE.with(|slot| {
+            if let Some(cache) = slot.borrow_mut().as_mut() {
+                cache.remember(identity, payload, valid);
+            }
+        });
+    }
+    valid
+}
+
+/// Borrowed lookup indexes preserve first-match order and duplicate identity counts.
+/// Tiny transactions stay allocation-free; large batches avoid scans per leaf.
+struct RevisionBindingIndex<'a> {
+    mutations: &'a [uee_v2::RecordRevisionMutationV1],
+    indexed: Option<IndexedRevisionBindings<'a>>,
+}
+
+#[derive(Default)]
+struct IndexedRevisionBindings<'a> {
+    identities: HashMap<(&'static str, &'a str), (&'a uee_v2::RecordRevisionMutationV1, usize)>,
+    owners: HashMap<&'a str, &'a uee_v2::RecordRevisionMutationV1>,
+    vectors: HashMap<&'a str, Vec<&'a uee_v2::RecordRevisionMutationV1>>,
+}
+
+impl<'a> RevisionBindingIndex<'a> {
+    fn new(mutations: &'a [uee_v2::RecordRevisionMutationV1]) -> Self {
+        let indexed = (mutations.len() >= 16).then(|| {
+            let mut index = IndexedRevisionBindings::default();
+            for mutation in mutations {
+                #[cfg(test)]
+                vector_memory_tests::record_revision_binding_visit();
+                index
+                    .identities
+                    .entry((
+                        Storage::revision_kind_name(&mutation.kind),
+                        mutation.id.as_str(),
+                    ))
+                    .and_modify(|(_, count)| *count += 1)
+                    .or_insert((mutation, 1));
+                if mutation.kind == uee_v2::RecordKindV2::Node && mutation.namespace == "default" {
+                    index.owners.entry(mutation.id.as_str()).or_insert(mutation);
+                }
+                if mutation.kind == uee_v2::RecordKindV2::Vector
+                    && mutation.namespace == "default"
+                    && mutation.operation == uee_v2::RevisionOperationV1::Upsert
+                {
+                    if let Some(owner) = mutation.payload["owner_id"].as_str() {
+                        index.vectors.entry(owner).or_default().push(mutation);
+                    }
+                }
+            }
+            index
+        });
+        Self { mutations, indexed }
+    }
+
+    fn first(
+        &self,
+        kind: &uee_v2::RecordKindV2,
+        id: &str,
+    ) -> Option<&'a uee_v2::RecordRevisionMutationV1> {
+        if let Some(index) = &self.indexed {
+            return index
+                .identities
+                .get(&(Storage::revision_kind_name(kind), id))
+                .map(|(first, _)| *first);
+        }
+        self.mutations.iter().find(|mutation| {
+            #[cfg(test)]
+            vector_memory_tests::record_revision_binding_visit();
+            mutation.kind == *kind && mutation.id == id
+        })
+    }
+
+    fn unique(
+        &self,
+        kind: &uee_v2::RecordKindV2,
+        id: &str,
+    ) -> Option<&'a uee_v2::RecordRevisionMutationV1> {
+        if let Some(index) = &self.indexed {
+            return index
+                .identities
+                .get(&(Storage::revision_kind_name(kind), id))
+                .and_then(|(first, count)| (*count == 1).then_some(*first));
+        }
+        let mut matches = self.mutations.iter().filter(|mutation| {
+            #[cfg(test)]
+            vector_memory_tests::record_revision_binding_visit();
+            mutation.kind == *kind && mutation.id == id
+        });
+        let first = matches.next()?;
+        matches.next().is_none().then_some(first)
+    }
+
+    fn owner(&self, id: &str) -> Option<&'a uee_v2::RecordRevisionMutationV1> {
+        if let Some(index) = &self.indexed {
+            return index.owners.get(id).copied();
+        }
+        self.mutations.iter().find(|candidate| {
+            candidate.kind == uee_v2::RecordKindV2::Node
+                && candidate.namespace == "default"
+                && candidate.id == id
+        })
+    }
+
+    fn matching_vector(
+        &self,
+        owner: &str,
+        embedding: &Value,
+        lang: &str,
+    ) -> Option<&'a uee_v2::RecordRevisionMutationV1> {
+        let matches = |mutation: &&uee_v2::RecordRevisionMutationV1| {
+            #[cfg(test)]
+            vector_memory_tests::record_revision_binding_visit();
+            mutation.payload["embedding"] == *embedding
+                && mutation.payload["lang"].as_str() == Some(lang)
+        };
+        if let Some(index) = &self.indexed {
+            return index.vectors.get(owner)?.iter().copied().find(matches);
+        }
+        self.mutations
+            .iter()
+            .filter(|mutation| {
+                mutation.kind == uee_v2::RecordKindV2::Vector
+                    && mutation.namespace == "default"
+                    && mutation.operation == uee_v2::RevisionOperationV1::Upsert
+                    && mutation.payload["owner_id"].as_str() == Some(owner)
+            })
+            .find(matches)
+    }
+}
+
 #[derive(Default)]
 struct CompactedBaseMaterializationProofs {
-    nodes: HashMap<String, SignedEvent>,
-    edges: HashMap<String, SignedEvent>,
-    vectors: HashMap<String, SignedEvent>,
+    // A transaction can justify thousands of leaves. Share its immutable source
+    // in memory; the public SignedEvent and encoded proof envelopes stay owned.
+    nodes: HashMap<String, Arc<SignedEvent>>,
+    edges: HashMap<String, Arc<SignedEvent>>,
+    vectors: HashMap<String, Arc<SignedEvent>>,
 }
 
 #[derive(Default)]
 struct CompactedMasterAuthorityProofs {
-    master_nodes: HashMap<String, SignedEvent>,
-    user_nodes: HashMap<String, (NodeOutput, SignedEvent)>,
-    retractions: HashMap<String, SignedEvent>,
-    master_vectors: HashMap<(String, String), SignedEvent>,
+    master_nodes: HashMap<String, Arc<SignedEvent>>,
+    user_nodes: HashMap<String, (NodeOutput, Arc<SignedEvent>)>,
+    retractions: HashMap<String, Arc<SignedEvent>>,
+    master_vectors: HashMap<(String, String), Arc<SignedEvent>>,
 }
 
 enum CompactedMasterIdentityAction {
-    Node(Box<NodeOutput>, Box<SignedEvent>),
+    Node(Box<NodeOutput>, Arc<SignedEvent>),
     Retraction(NodeRetractionEvent),
 }
 
@@ -2835,10 +3147,20 @@ fn canonical_event_bytes(event: &Event) -> serde_json::Result<Vec<u8>> {
         if transaction.local_frame_seq.is_some() {
             let mut canonical = transaction.clone();
             canonical.local_frame_seq = None;
-            return serde_json::to_vec(&Event::Transaction(canonical));
+            let bytes = serde_json::to_vec(&Event::Transaction(canonical));
+            #[cfg(test)]
+            if let Ok(bytes) = &bytes {
+                vector_memory_tests::record_source_encoding(bytes);
+            }
+            return bytes;
         }
     }
-    serde_json::to_vec(event)
+    let bytes = serde_json::to_vec(event);
+    #[cfg(test)]
+    if let Ok(bytes) = &bytes {
+        vector_memory_tests::record_source_encoding(bytes);
+    }
+    bytes
 }
 
 fn compacted_master_proof_payload(
@@ -2894,6 +3216,15 @@ fn compacted_base_event_payload(
 ) -> serde_json::Result<Vec<u8>> {
     let event_bytes = canonical_event_bytes(event)?;
     let proof_bytes = serde_json::to_vec(proof)?;
+    compacted_base_event_payload_bytes(relay_peer_id, &event_bytes, &proof_bytes, envelope_version)
+}
+
+fn compacted_base_event_payload_bytes(
+    relay_peer_id: &str,
+    event_bytes: &[u8],
+    proof_bytes: &[u8],
+    envelope_version: u32,
+) -> serde_json::Result<Vec<u8>> {
     let version_bytes = envelope_version.to_le_bytes();
     let mut payload = match envelope_version {
         1 => b"genesis-block/compacted-base-event/v1\0".to_vec(),
@@ -2905,16 +3236,12 @@ fn compacted_base_event_payload(
         }
     };
     let parts: Vec<&[u8]> = if envelope_version == 1 {
-        vec![
-            relay_peer_id.as_bytes(),
-            event_bytes.as_slice(),
-            proof_bytes.as_slice(),
-        ]
+        vec![relay_peer_id.as_bytes(), event_bytes, proof_bytes]
     } else {
         vec![
             relay_peer_id.as_bytes(),
-            event_bytes.as_slice(),
-            proof_bytes.as_slice(),
+            event_bytes,
+            proof_bytes,
             &version_bytes,
         ]
     };
@@ -4171,13 +4498,22 @@ impl ArenaStore {
             ArenaStore::F16(v) => v.len(),
         }
     }
-    /// Actual heap bytes consumed by the vector data.
+    /// Logical vector payload bytes; excludes spare Vec capacity and overhead.
     pub fn byte_size(&self) -> usize {
         match self {
             ArenaStore::F32(v) => v.len() * 4,
             ArenaStore::U8 { data, .. } => data.len(),
             ArenaStore::Binary { data, .. } => data.len() * 8,
             ArenaStore::F16(v) => v.len() * 2,
+        }
+    }
+    /// Vec allocation bytes, including spare capacity, excluding allocator overhead.
+    pub fn allocated_bytes(&self) -> usize {
+        match self {
+            ArenaStore::F32(v) => v.capacity() * 4,
+            ArenaStore::U8 { data, .. } => data.capacity(),
+            ArenaStore::Binary { data, .. } => data.capacity() * 8,
+            ArenaStore::F16(v) => v.capacity() * 2,
         }
     }
     pub fn is_empty(&self) -> bool {
@@ -4189,13 +4525,6 @@ impl ArenaStore {
         if let ArenaStore::U8 { scale, bias, .. } = self {
             *scale = s;
             *bias = b;
-        }
-    }
-    /// This arena's SQ8 (scale, bias), or `SQ8_FIXED` for non-U8 arenas.
-    fn sq8_scale(&self) -> (f32, f32) {
-        match self {
-            ArenaStore::U8 { scale, bias, .. } => (*scale, *bias),
-            _ => SQ8_FIXED,
         }
     }
     /// Append a prepared f32 vector, quantizing per mode. `center` is the BQ
@@ -4267,15 +4596,34 @@ impl ArenaStore {
             _ => {} // a collection never mixes variants
         }
     }
-    /// Raw little-endian bytes for the `vec_<name>.bin` snapshot.
-    fn to_bytes(&self) -> Vec<u8> {
-        match self {
-            ArenaStore::F32(v) => {
-                unsafe { std::slice::from_raw_parts(v.as_ptr() as *const u8, v.len() * 4) }.to_vec()
+    /// Stream the existing little-endian snapshot layout with at most 8 KiB of
+    /// encoding scratch. No full-arena byte Vec, unsafe cast or file-format change.
+    fn write_bytes(&self, writer: &mut impl std::io::Write) -> std::io::Result<()> {
+        fn encoded<T, const N: usize>(
+            values: &[T],
+            writer: &mut impl std::io::Write,
+            encode: impl Fn(&T) -> [u8; N],
+        ) -> std::io::Result<()> {
+            let mut buffer = [0u8; 8192];
+            for chunk in values.chunks(buffer.len() / N) {
+                let encoded = &mut buffer[..chunk.len() * N];
+                for (value, bytes) in chunk.iter().zip(encoded.chunks_mut(N)) {
+                    bytes.copy_from_slice(&encode(value));
+                }
+                writer.write_all(&buffer[..chunk.len() * N])?;
             }
-            ArenaStore::U8 { data, .. } => data.clone(),
-            ArenaStore::Binary { data, .. } => data.iter().flat_map(|w| w.to_le_bytes()).collect(),
-            ArenaStore::F16(v) => v.iter().flat_map(|b| b.to_le_bytes()).collect(),
+            Ok(())
+        }
+        match self {
+            ArenaStore::F32(v) => encoded(v, writer, |v| v.to_le_bytes()),
+            ArenaStore::U8 { data, .. } => {
+                for chunk in data.chunks(8192) {
+                    writer.write_all(chunk)?;
+                }
+                Ok(())
+            }
+            ArenaStore::Binary { data, .. } => encoded(data, writer, |v| v.to_le_bytes()),
+            ArenaStore::F16(v) => encoded(v, writer, |v| v.to_le_bytes()),
         }
     }
     fn from_bytes(data: &[u8], q: Quant, dim: usize) -> Self {
@@ -4514,11 +4862,11 @@ impl VecIndex {
     }
 }
 
-/// Fixed capacity (in rows) of the per-`SidecarReader` LRU decode cache. Bounds
-/// the resident bytes at `SIDECAR_CACHE_ROWS * dim * 4` regardless of collection
-/// size, so the cache can never re-create the resident-RAM problem the on-disk
-/// sidecar exists to solve. 4096 rows × 1024 dim × 4 B ≈ 16 MiB worst case.
+/// Fixed capacity (in rows) of the per-`SidecarReader` LRU decode cache.
 pub const SIDECAR_CACHE_ROWS: usize = 4096;
+/// Retained decoded-row payload limit for one `SidecarReader`, excluding cache
+/// metadata, caller-owned/transient copies, other readers, and process RSS.
+const SIDECAR_CACHE_BYTES: usize = 16 * 1024 * 1024;
 
 /// Positioned-read view over `fvec_<name>.bin` — the exact-f32 rerank sidecar,
 /// kept ON DISK (post-P0) instead of resident in a `Vec<f32>`. Row `d_id` lives
@@ -4527,16 +4875,16 @@ pub const SIDECAR_CACHE_ROWS: usize = 4096;
 /// use `seek_read` (Windows) / `read_at` (Unix) behind `#[cfg]` — NEVER mmap
 /// (see ADR--GENESISDB-ONDISK-RERANK-SIDECAR for the Windows-safety rationale).
 ///
-/// A small bounded LRU (`SIDECAR_CACHE_ROWS`) fronts the disk so hot rerank rows
-/// don't re-hit the file. The cache `Mutex` is strictly nested: `row()` takes it
-/// only to look up / insert a decoded row and releases it before/after the disk
-/// read — it is never held across, and never wraps, the arena or `meta` locks,
-/// so the `meta → arena → sidecar` order is preserved.
+/// A small bounded LRU (`SIDECAR_CACHE_ROWS`, `SIDECAR_CACHE_BYTES`) fronts the
+/// disk so hot rerank rows don't re-hit the file. The cache `Mutex` is strictly
+/// nested: `row()` takes it only to look up / insert a decoded row and releases
+/// it before/after the disk read — it is never held across, and never wraps, the
+/// arena or `meta` locks, so the `meta → arena → sidecar` order is preserved.
 pub struct SidecarReader {
     file: File,
     dim: usize,
     /// Bounded LRU: `(d_id -> decoded row)` newest-last. Hand-rolled over a
-    /// `Vec` (no new crate dep); capacity == `SIDECAR_CACHE_ROWS`.
+    /// `Vec` (no new crate dep); bounded by rows and retained payload bytes.
     cache: parking_lot::Mutex<SidecarCache>,
 }
 
@@ -4547,6 +4895,7 @@ pub struct SidecarReader {
 struct SidecarCache {
     map: HashMap<usize, Vec<f32>>,
     order: VecDeque<usize>,
+    bytes: usize,
 }
 
 impl SidecarCache {
@@ -4554,6 +4903,7 @@ impl SidecarCache {
         SidecarCache {
             map: HashMap::new(),
             order: VecDeque::new(),
+            bytes: 0,
         }
     }
 
@@ -4576,24 +4926,47 @@ impl SidecarCache {
     }
 
     fn put(&mut self, d_id: usize, row: Vec<f32>) {
-        if self.map.insert(d_id, row).is_some() {
-            // Key already resident: the value is overwritten above; just bump recency.
+        if self.map.contains_key(&d_id) {
+            // A concurrent miss may have populated this key while the disk read
+            // was in flight. Keep the accounted resident row and bump recency.
             self.touch(d_id);
             return;
         }
-        while self.order.len() >= SIDECAR_CACHE_ROWS {
+
+        let Some(row_bytes) = row.capacity().checked_mul(std::mem::size_of::<f32>()) else {
+            return;
+        };
+        if row_bytes > SIDECAR_CACHE_BYTES {
+            return;
+        }
+
+        while self.map.len() >= SIDECAR_CACHE_ROWS || self.bytes > SIDECAR_CACHE_BYTES - row_bytes {
             if let Some(evict) = self.order.pop_front() {
-                self.map.remove(&evict);
+                if let Some(evicted_row) = self.map.remove(&evict) {
+                    let evicted_bytes = evicted_row
+                        .capacity()
+                        .saturating_mul(std::mem::size_of::<f32>());
+                    self.bytes = self.bytes.saturating_sub(evicted_bytes);
+                }
             } else {
-                break;
+                // An inconsistent order/map must not let the cache exceed either
+                // bound. Refuse this admission and leave existing rows intact.
+                return;
             }
         }
-        // Row was inserted above; the new key just needs its recency slot.
+
+        self.bytes += row_bytes;
+        self.map.insert(d_id, row);
         self.order.push_back(d_id);
     }
 }
 
 impl SidecarReader {
+    /// Allocated decoded-row payload only; excludes cache container overhead and
+    /// caller-owned copies. Taking this metric never reads or populates the file.
+    pub fn cache_bytes(&self) -> usize {
+        self.cache.lock().bytes
+    }
     /// `pub` (not just `pub(crate)`) so `tests/*.rs` integration crates — which
     /// link against this crate as an external dependency — can construct a
     /// reader directly against a hand-written `fvec_<name>.bin` fixture. Query
@@ -4658,6 +5031,7 @@ impl SidecarReader {
         let mut c = self.cache.lock();
         c.map.clear();
         c.order.clear();
+        c.bytes = 0;
         Ok(())
     }
 
@@ -5026,22 +5400,39 @@ impl VectorCollection {
     fn rehydrate(&self, ef_c: usize) {
         let meta = self.metadata.read();
         if meta.is_empty() {
+            // Compaction may have removed the final row. Retaining the old graph
+            // here would keep every old vector/link allocated and fail coverage.
+            *self.hnsw.write() = None;
+            *self.coverage.write() = None;
             return;
         }
         let index = VecIndex::build(self.quant, ef_c, meta.len());
         let arena = self.arena.read();
-        // SQ8: re-quantize with the ARENA's own scale (what f32_at just dequantized
-        // with), so the rehydrated HNSW codes match the arena exactly.
-        let sq8 = arena.sq8_scale();
         for m in meta.iter() {
             let start = m.embedding_offset as usize;
             let len = m.vector_dim as usize;
             if start + len <= arena.len() {
-                let v = arena.f32_at(start, len);
-                // The arena already holds centered BQ codes; `f32_at` returns them
-                // as ±1, so re-packing must NOT center again (pass `None`) — the
-                // sign of ±1 reproduces the stored centered code exactly.
-                index.insert_f32(&v, m.arena_id as usize, None, sq8);
+                let id = m.arena_id as usize;
+                // insert copies its input before returning (hnsw_rs 0.3.4).
+                // Borrow only while the arena guard is held; no shared lifetime.
+                match (&index, &*arena) {
+                    (VecIndex::F32(h), ArenaStore::F32(data)) => {
+                        h.insert((&data[start..start + len], id))
+                    }
+                    (VecIndex::U8(h), ArenaStore::U8 { data, .. }) => {
+                        h.insert((&data[start..start + len], id))
+                    }
+                    (VecIndex::Binary(h), ArenaStore::Binary { data, dim, .. }) => {
+                        let words = bq_words(*dim);
+                        let offset = (start / *dim) * words;
+                        h.insert((&data[offset..offset + words], id));
+                    }
+                    (VecIndex::F16(h), ArenaStore::F16(_)) => {
+                        // Decode f16 once; hnsw_rs still owns an f32 point copy.
+                        h.insert((&arena.f32_at(start, len), id));
+                    }
+                    _ => unreachable!("index and arena quantization must agree"),
+                }
             }
         }
         *self.hnsw.write() = Some(index);
@@ -5140,15 +5531,21 @@ impl VectorCollection {
     /// `Storage::list_collections()` so every entry carries it — `info()` lives on
     /// the collection and has no view of the Storage-wide indexing backlog.
     fn info(&self, index_lag: u32) -> CollectionInfo {
-        // Sidecar is ON DISK post-P0: its vector data is not resident, so resident
-        // bytes are 0. On-disk bytes = live rows * dim * 4 (fixed dim).
-        let (sidecar_resident_bytes, sidecar_disk_bytes) = match &self.f32_sidecar {
-            Some(s) => {
-                let rows = s.read().len_rows() as i64;
-                (0i64, rows * (self.dim as i64) * 4)
-            }
-            None => (0i64, 0i64),
-        };
+        // Preserve legacy full-file residency semantics and report the bounded
+        // cache separately. Neither value is process RSS.
+        let (sidecar_resident_bytes, sidecar_disk_bytes, sidecar_cache_bytes) =
+            match &self.f32_sidecar {
+                Some(s) => {
+                    let reader = s.read();
+                    let rows = reader.len_rows() as i64;
+                    (
+                        0i64,
+                        rows * (self.dim as i64) * 4,
+                        reader.cache_bytes() as i64,
+                    )
+                }
+                None => (0i64, 0i64, 0i64),
+            };
         let indexed = self
             .hnsw
             .read()
@@ -5156,6 +5553,12 @@ impl VectorCollection {
             .map(|h| h.point_count() as u32)
             .unwrap_or(0);
         let coverage = self.coverage_report(index_lag);
+        let row_bytes = match self.quant {
+            Quant::None | Quant::F16 => self.dim as usize * 4,
+            Quant::ScalarU8 => self.dim as usize,
+            Quant::Binary => bq_words(self.dim as usize) * 8,
+        };
+        let arena = self.arena.read();
 
         CollectionInfo {
             name: self.name.clone(),
@@ -5168,8 +5571,11 @@ impl VectorCollection {
             ef_search: self.ef_search,
             rerank: self.f32_sidecar.is_some(),
             sidecar_resident_bytes,
+            sidecar_cache_bytes,
             sidecar_disk_bytes,
-            arena_resident_bytes: self.arena.read().byte_size() as i64,
+            arena_resident_bytes: arena.byte_size() as i64,
+            arena_allocated_bytes: arena.allocated_bytes() as i64,
+            hnsw_vector_bytes: indexed as i64 * row_bytes as i64,
             index_lag,
             coverage,
         }
@@ -8540,6 +8946,7 @@ impl Storage {
         transaction
             .validate()
             .map_err(|error| Error::from_reason(error.to_string()))?;
+        let index = RevisionBindingIndex::new(&transaction.mutations);
         let mut seen = HashSet::new();
         for mutation in &transaction.mutations {
             if mutation.kind == uee_v2::RecordKindV2::Artifact {
@@ -8585,11 +8992,7 @@ impl Storage {
                 {
                     return Err(Error::from_reason("HQL2_VECTOR_REVISION_INVALID"));
                 }
-                let owner_mutation = transaction.mutations.iter().find(|candidate| {
-                    candidate.kind == uee_v2::RecordKindV2::Node
-                        && candidate.namespace == "default"
-                        && candidate.id == owner_id
-                });
+                let owner_mutation = index.owner(owner_id);
                 let owner_is_valid = if let Some(owner_mutation) = owner_mutation {
                     owner_mutation.operation == uee_v2::RevisionOperationV1::Upsert
                         && owner_mutation.revision_id == owner_revision_id
@@ -14216,24 +14619,38 @@ impl Storage {
         // SQLite holds the destination write transaction until the backup
         // reaches SQLITE_DONE. Dropping an unfinished rusqlite Backup calls
         // sqlite3_backup_finish, which rolls that transaction back on errors.
-        let backup = rusqlite::backup::Backup::new(source, &mut destination)
-            .map_err(Self::projection_backup_error)?;
-        loop {
-            match backup.step(256).map_err(Self::projection_backup_error)? {
-                rusqlite::backup::StepResult::Done => return Ok(()),
-                rusqlite::backup::StepResult::More => {}
-                rusqlite::backup::StepResult::Busy | rusqlite::backup::StepResult::Locked => {
-                    return Err(Error::from_reason(
-                        "PROJECTION_REBUILD_BUSY: projection publication could not acquire SQLite locks",
-                    ));
-                }
-                _ => {
-                    return Err(Error::from_reason(
-                        "PROJECTION_REBUILD_FAILED: SQLite backup returned an unsupported step state",
-                    ));
+        {
+            let backup = rusqlite::backup::Backup::new(source, &mut destination)
+                .map_err(Self::projection_backup_error)?;
+            loop {
+                match backup.step(256).map_err(Self::projection_backup_error)? {
+                    rusqlite::backup::StepResult::Done => break,
+                    rusqlite::backup::StepResult::More => {}
+                    rusqlite::backup::StepResult::Busy | rusqlite::backup::StepResult::Locked => {
+                        return Err(Error::from_reason(
+                            "PROJECTION_REBUILD_BUSY: projection publication could not acquire SQLite locks",
+                        ));
+                    }
+                    _ => {
+                        return Err(Error::from_reason(
+                            "PROJECTION_REBUILD_FAILED: SQLite backup returned an unsupported step state",
+                        ));
+                    }
                 }
             }
         }
+        // Backup commits below SQLite's SQL executor and resets the schema.
+        // Its pending WAL hook would otherwise checkpoint the published pages
+        // during schema loading in the first query's prepare. Complete that
+        // maintenance here, after Backup::drop releases the destination handle.
+        // PASSIVE preserves pinned reader snapshots and accepts partial progress.
+        destination
+            .execute_batch("PRAGMA wal_checkpoint(PASSIVE);")
+            .map_err(|error| {
+                Error::from_reason(format!(
+                    "PROJECTION_CHECKPOINT_FAILED: projection publication committed; {error}"
+                ))
+            })
     }
 
     fn projection_backup_error(error: rusqlite::Error) -> Error {
@@ -16727,6 +17144,7 @@ impl Storage {
                 Err(Error::from_reason("REVISION_ENVELOPE_REQUIRED"))
             };
         };
+        let index = RevisionBindingIndex::new(&revisions.mutations);
         let graph_revision_count = revisions
             .mutations
             .iter()
@@ -16745,10 +17163,8 @@ impl Storage {
                         operation: uee_v2::RevisionOperationV1,
                         payload_matches: &dyn Fn(&Value) -> bool|
          -> Result<()> {
-            let mutation = revisions
-                .mutations
-                .iter()
-                .find(|mutation| mutation.kind == kind && mutation.id == id)
+            let mutation = index
+                .first(&kind, id)
                 .ok_or_else(|| Error::from_reason("REVISION_EVENT_MISMATCH"))?;
             if mutation.namespace != "default"
                 || mutation.operation != operation
@@ -16810,16 +17226,10 @@ impl Storage {
             if !vector_targets.insert(id.clone()) {
                 return Err(Error::from_reason("REVISION_DUPLICATE_TARGET"));
             }
-            let mutation = revisions
-                .mutations
-                .iter()
-                .find(|mutation| mutation.kind == uee_v2::RecordKindV2::Vector && mutation.id == id)
+            let mutation = index
+                .first(&uee_v2::RecordKindV2::Vector, &id)
                 .ok_or_else(|| Error::from_reason("REVISION_EVENT_MISMATCH"))?;
-            let owner_revision = revisions.mutations.iter().find(|candidate| {
-                candidate.kind == uee_v2::RecordKindV2::Node
-                    && candidate.namespace == "default"
-                    && candidate.id == owner_id
-            });
+            let owner_revision = index.owner(owner_id);
             if mutation.namespace != "default"
                 || mutation.operation != uee_v2::RevisionOperationV1::Upsert
                 || mutation.schema_ref.as_deref() != Some(collection.name.as_str())
@@ -17168,6 +17578,31 @@ impl Storage {
         event: &Event,
         proof: Option<&SignedEvent>,
     ) -> Result<SignedEvent> {
+        self.sign_compacted_base_materialization_impl(event, proof, None)
+    }
+
+    fn sign_compacted_base_materialization_cached<'a>(
+        &self,
+        event: &Event,
+        proof: Option<&'a SignedEvent>,
+        cache: &mut CompactionProofBytesCache<'a>,
+    ) -> Result<SignedEvent> {
+        match proof {
+            Some(proof) => self.sign_compacted_base_materialization_impl(
+                event,
+                Some(proof),
+                cache.prepare(proof)?,
+            ),
+            None => self.sign_compacted_base_materialization(event, None),
+        }
+    }
+
+    fn sign_compacted_base_materialization_impl(
+        &self,
+        event: &Event,
+        proof: Option<&SignedEvent>,
+        prepared: Option<&SerializedCompactionProof<'_>>,
+    ) -> Result<SignedEvent> {
         if !matches!(
             event,
             Event::Node(_) | Event::Edge(_) | Event::VectorMaterialized(_)
@@ -17189,7 +17624,11 @@ impl Storage {
                 })?;
             return self.sign_compacted_base_materialization(event, Some(&proof));
         };
-        if !self.verify_raw_event_signature(proof) {
+        let prepared = prepared.filter(|encoded| std::ptr::eq(encoded.source, proof));
+        if !self.verify_raw_event_signature_with_canonical(
+            proof,
+            prepared.map(|encoded| encoded.canonical.as_ref()),
+        ) {
             return Err(Error::from_reason(
                 "COMPACTION_BASE_EVENT_PROOF_INVALID: source signature is invalid",
             ));
@@ -17215,19 +17654,48 @@ impl Storage {
                 "COMPACTION_BASE_EVENT_PROOF_INVALID: source event does not bind {target}"
             )));
         }
-        let payload = compacted_base_event_payload(&self.local_peer_id, event, proof, 2)
-            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let payload = match prepared {
+            Some(encoded) => {
+                let event_bytes = canonical_event_bytes(event)
+                    .map_err(|error| Error::from_reason(error.to_string()))?;
+                compacted_base_event_payload_bytes(
+                    &self.local_peer_id,
+                    &event_bytes,
+                    &encoded.json,
+                    2,
+                )
+            }
+            None => compacted_base_event_payload(&self.local_peer_id, event, proof, 2),
+        }
+        .map_err(|error| Error::from_reason(error.to_string()))?;
         let relay_signature = self.signing_key.sign(&payload).to_bytes().to_vec();
-        let envelope = CompactedBaseEventEnvelope {
-            version: 2,
-            proof: proof.clone(),
-            relay_signature,
+        let signature = if let Some(encoded) = prepared {
+            // Exact serde struct field order, with the already encoded immutable
+            // proof inserted verbatim. Caps/compression share the existing encoder.
+            let mut json = Vec::with_capacity(encoded.json.len() + 512);
+            json.extend_from_slice(br#"{"version":2,"proof":"#);
+            json.extend_from_slice(&encoded.json);
+            json.extend_from_slice(br#","relay_signature":"#);
+            serde_json::to_writer(&mut json, &relay_signature)
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            json.push(b'}');
+            encode_compacted_envelope_json(
+                COMPACTED_BASE_EVENT_V2_MAGIC,
+                &json,
+                COMPACTED_BASE_EVENT_MAX_BYTES,
+            )?
+        } else {
+            let envelope = CompactedBaseEventEnvelope {
+                version: 2,
+                proof: proof.clone(),
+                relay_signature,
+            };
+            encode_compacted_envelope(
+                COMPACTED_BASE_EVENT_V2_MAGIC,
+                &envelope,
+                COMPACTED_BASE_EVENT_MAX_BYTES,
+            )?
         };
-        let signature = encode_compacted_envelope(
-            COMPACTED_BASE_EVENT_V2_MAGIC,
-            &envelope,
-            COMPACTED_BASE_EVENT_MAX_BYTES,
-        )?;
         let signed = SignedEvent {
             event: event.clone(),
             signature,
@@ -19248,19 +19716,33 @@ impl Storage {
     }
 
     fn verify_raw_event_signature(&self, se: &SignedEvent) -> bool {
+        self.verify_raw_event_signature_with_canonical(se, None)
+    }
+
+    fn verify_raw_event_signature_with_canonical(
+        &self,
+        se: &SignedEvent,
+        canonical: Option<&[u8]>,
+    ) -> bool {
         let vkey = match self.peer_verifying_key(&se.signer_peer_id) {
             Some(k) => k,
             None => return false,
         };
-        let data = match canonical_event_bytes(&se.event) {
-            Ok(d) => d,
-            Err(_) => return false,
+        let owned;
+        let data = if let Some(canonical) = canonical {
+            canonical
+        } else {
+            owned = match canonical_event_bytes(&se.event) {
+                Ok(data) => data,
+                Err(_) => return false,
+            };
+            &owned
         };
         let sig = match Signature::from_slice(&se.signature) {
             Ok(s) => s,
             Err(_) => return false,
         };
-        vkey.verify(&data, &sig).is_ok()
+        verify_signature_math(&vkey, data, &sig)
     }
 
     fn verify_compacted_base_materialization_with_collection_definitions(
@@ -19305,7 +19787,7 @@ impl Storage {
         let Ok(signature) = Signature::from_slice(&envelope.relay_signature) else {
             return false;
         };
-        key.verify(&payload, &signature).is_ok()
+        verify_signature_math(&key, &payload, &signature)
     }
 
     fn compacted_row_revision_schemas(
@@ -20128,7 +20610,7 @@ impl Storage {
         let Ok(signature) = Signature::from_slice(&envelope.relay_signature) else {
             return false;
         };
-        key.verify(&payload, &signature).is_ok()
+        verify_signature_math(&key, &payload, &signature)
     }
 
     /// Projection replay runs before an operator can restore the in-memory
@@ -20262,6 +20744,7 @@ impl Storage {
             return false;
         }
 
+        let index = RevisionBindingIndex::new(&revisions.mutations);
         let graph_revision_count = revisions
             .mutations
             .iter()
@@ -20284,17 +20767,12 @@ impl Storage {
                                        operation: uee_v2::RevisionOperationV1,
                                        payload_matches: &dyn Fn(&Value) -> bool|
          -> bool {
-            let mut matching = revisions
-                .mutations
-                .iter()
-                .filter(|mutation| mutation.kind == kind && mutation.id == id);
-            let Some(mutation) = matching.next() else {
+            let Some(mutation) = index.unique(&kind, id) else {
                 return false;
             };
             mutation.namespace == "default"
                 && mutation.operation == operation
                 && payload_matches(&mutation.payload)
-                && matching.next().is_none()
         };
 
         let mut graph_ids = HashSet::new();
@@ -20371,14 +20849,9 @@ impl Storage {
             let Ok(embedding_payload) = serde_json::to_value(embedding) else {
                 return false;
             };
-            let Some(mutation) = revisions.mutations.iter().find(|mutation| {
-                mutation.kind == uee_v2::RecordKindV2::Vector
-                    && mutation.namespace == "default"
-                    && mutation.operation == uee_v2::RevisionOperationV1::Upsert
-                    && mutation.payload["owner_id"].as_str() == Some(owner_id)
-                    && mutation.payload["embedding"] == embedding_payload
-                    && mutation.payload["lang"].as_str() == Some(lang.unwrap_or("en"))
-            }) else {
+            let Some(mutation) =
+                index.matching_vector(owner_id, &embedding_payload, lang.unwrap_or("en"))
+            else {
                 return false;
             };
             let Some(collection) = mutation.payload["collection"].as_str() else {
@@ -20398,11 +20871,7 @@ impl Storage {
                 return false;
             }
             if let Some(owner_valid_from) = owner_valid_from {
-                if let Some(owner) = revisions.mutations.iter().find(|candidate| {
-                    candidate.kind == uee_v2::RecordKindV2::Node
-                        && candidate.namespace == "default"
-                        && candidate.id == owner_id
-                }) {
+                if let Some(owner) = index.owner(owner_id) {
                     if owner.operation != uee_v2::RevisionOperationV1::Upsert
                         || mutation.payload["owner_revision_id"].as_str()
                             != Some(owner.revision_id.as_str())
@@ -20876,7 +21345,9 @@ impl Storage {
         )
         .ok()?;
         let relay_signature = Signature::from_slice(&envelope.relay_signature).ok()?;
-        key.verify(&payload, &relay_signature).ok()?;
+        if !verify_signature_math(&key, &payload, &relay_signature) {
+            return None;
+        }
         Some(envelope.proof)
     }
 
@@ -26712,11 +27183,12 @@ impl Storage {
         for c in self.collections.iter() {
             let coll = c.value();
             let arena = coll.arena.read();
-            fs::write(
-                temp_dir.join(format!("vec_{}.bin", coll.name)),
-                arena.to_bytes(),
-            )
-            .map_err(|e| Error::from_reason(e.to_string()))?;
+            let mut arena_file = File::create(temp_dir.join(format!("vec_{}.bin", coll.name)))
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            arena
+                .write_bytes(&mut arena_file)
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            drop(arena_file);
             let meta = coll.metadata.read();
             let meta_data = encode_metadata_snapshot(&meta)?;
             fs::write(temp_dir.join(format!("meta_{}.bin", coll.name)), meta_data)
@@ -29047,7 +29519,7 @@ impl Storage {
             let sidecar_guard = coll.f32_sidecar.as_ref().map(|s| s.write());
             let dim = coll.dim as usize;
 
-            let mut new_meta = Vec::with_capacity(live_nodes.len());
+            let mut new_meta = Vec::with_capacity(meta_arena.len().min(live_nodes.len()));
             let mut new_vec = ArenaStore::new(coll.quant, coll.dim as usize);
             // Old arena row indices of the survivors, in new-arena order.
             let mut surviving_old_rows: Vec<usize> = Vec::new();
@@ -29693,10 +30165,10 @@ impl Storage {
         fn record_vector_source(
             owner_id: &str,
             collection: Option<&str>,
-            proof: &SignedEvent,
+            proof: &Arc<SignedEvent>,
             default_collection: &str,
             order: &mut u64,
-            latest: &mut HashMap<(String, String), (u64, SignedEvent)>,
+            latest: &mut HashMap<(String, String), (u64, Arc<SignedEvent>)>,
         ) {
             *order = order.saturating_add(1);
             latest.insert(
@@ -29710,10 +30182,10 @@ impl Storage {
 
         fn record_vector_sources(
             event: &Event,
-            proof: &SignedEvent,
+            proof: &Arc<SignedEvent>,
             default_collection: &str,
             order: &mut u64,
-            latest: &mut HashMap<(String, String), (u64, SignedEvent)>,
+            latest: &mut HashMap<(String, String), (u64, Arc<SignedEvent>)>,
         ) {
             match event {
                 Event::Vector(vector) | Event::VectorMaterialized(vector) => {
@@ -29771,7 +30243,7 @@ impl Storage {
 
         fn record_actions(
             event: &Event,
-            proof: &SignedEvent,
+            proof: &Arc<SignedEvent>,
             order: &mut u64,
             latest: &mut HashMap<String, (u64, CompactedMasterIdentityAction)>,
         ) {
@@ -29840,7 +30312,7 @@ impl Storage {
                             &node.id,
                             CompactedMasterIdentityAction::Node(
                                 Box::new(node.clone()),
-                                Box::new(proof.clone()),
+                                Arc::clone(proof),
                             ),
                             order,
                             latest,
@@ -29887,7 +30359,7 @@ impl Storage {
                                     *order,
                                     CompactedMasterIdentityAction::Node(
                                         Box::new(node.clone()),
-                                        Box::new(proof.clone()),
+                                        Arc::clone(proof),
                                     ),
                                 ),
                             );
@@ -29908,8 +30380,8 @@ impl Storage {
             }
         }
 
-        let mut latest_proofs: HashMap<String, (u64, SignedEvent)> = HashMap::new();
-        let mut latest_master_vectors: HashMap<(String, String), (u64, SignedEvent)> =
+        let mut latest_proofs: HashMap<String, (u64, Arc<SignedEvent>)> = HashMap::new();
+        let mut latest_master_vectors: HashMap<(String, String), (u64, Arc<SignedEvent>)> =
             HashMap::new();
         let mut vector_source_order = 0u64;
         let mut latest_actions: HashMap<String, (u64, CompactedMasterIdentityAction)> =
@@ -29936,6 +30408,7 @@ impl Storage {
             let Some(proof) = proof else {
                 return;
             };
+            let proof = Arc::new(proof);
             record_vector_sources(
                 &proof.event,
                 &proof,
@@ -30017,7 +30490,7 @@ impl Storage {
                 {
                     proofs
                         .user_nodes
-                        .insert(node.id.clone(), ((**proof_node).clone(), (**proof).clone()));
+                        .insert(node.id.clone(), ((**proof_node).clone(), Arc::clone(proof)));
                 }
                 Some(_) => missing.push(format!(
                     "MASTER-authorized USER transition for node {}",
@@ -30067,6 +30540,7 @@ impl Storage {
             {
                 return;
             }
+            let proof = Arc::new(proof);
             let Event::Transaction(transaction) = &proof.event else {
                 return;
             };
@@ -30114,7 +30588,7 @@ impl Storage {
                 baseline.embedding = None;
                 let event = Event::Node(baseline);
                 if let Some(proof) = self.schema6_migration_revision_proof_for(&event)? {
-                    proofs.nodes.insert(node.id.clone(), proof);
+                    proofs.nodes.insert(node.id.clone(), Arc::new(proof));
                 }
             }
             for entry in self.edges.iter() {
@@ -30124,7 +30598,7 @@ impl Storage {
                 }
                 let event = Event::Edge(edge.clone());
                 if let Some(proof) = self.schema6_migration_revision_proof_for(&event)? {
-                    proofs.edges.insert(edge.id.clone(), proof);
+                    proofs.edges.insert(edge.id.clone(), Arc::new(proof));
                 }
             }
         }
@@ -30139,6 +30613,7 @@ impl Storage {
     /// live state cannot move between the build and the fold).
     fn build_compacted_wal(&self) -> Result<(Vec<u8>, usize)> {
         self.ensure_writable()?;
+        let _signature_scope = SignatureVerificationScope::enter();
         // The current projection is final state, so validate source proofs by
         // their retained journal order before creating checkpoints. Checking
         // each historical source against the live MASTER state would reject
@@ -30168,6 +30643,7 @@ impl Storage {
             CompactedBaseMaterializationProofs::default()
         };
         let authority_proofs = self.compacted_master_authority_proofs(&now)?;
+        let mut serialized_proofs = CompactionProofBytesCache::default();
 
         // Sign only the current protected projection and carry the original
         // MASTER event as detached signature evidence. Replaying the original
@@ -30195,7 +30671,7 @@ impl Storage {
             let signed = self.sign_compacted_master_materialization(
                 &event,
                 proof,
-                base_proofs.nodes.get(id),
+                base_proofs.nodes.get(id).map(Arc::as_ref),
             )?;
             let json =
                 serde_json::to_vec(&signed).map_err(|e| Error::from_reason(e.to_string()))?;
@@ -30299,7 +30775,7 @@ impl Storage {
                     materializations.push(self.sign_compacted_master_materialization(
                         &transition_event,
                         master_proof,
-                        base_proofs.nodes.get(&node.id),
+                        base_proofs.nodes.get(&node.id).map(Arc::as_ref),
                     )?);
                     if !node_base_projection_matches_proof(&node, &transition) {
                         if node.clock <= transition.clock {
@@ -30308,7 +30784,7 @@ impl Storage {
                                 node.id
                             )));
                         }
-                        let proof = base_proofs.nodes.get(&node.id);
+                        let proof = base_proofs.nodes.get(&node.id).map(Arc::as_ref);
                         let current_source = proof
                             .and_then(|proof| find_base_proof_node(&proof.event, &node))
                             .ok_or_else(|| {
@@ -30320,11 +30796,14 @@ impl Storage {
                         let mut current_source = current_source;
                         current_source.embedding = None;
                         let event = Event::Node(current_source);
-                        materializations
-                            .push(self.sign_compacted_base_materialization(&event, proof)?);
+                        materializations.push(self.sign_compacted_base_materialization_cached(
+                            &event,
+                            proof,
+                            &mut serialized_proofs,
+                        )?);
                     }
                 } else {
-                    let proof = base_proofs.nodes.get(&node.id);
+                    let proof = base_proofs.nodes.get(&node.id).map(Arc::as_ref);
                     let mut source = proof
                         .and_then(|proof| find_base_proof_node(&proof.event, &node))
                         .ok_or_else(|| {
@@ -30335,7 +30814,11 @@ impl Storage {
                         })?;
                     source.embedding = None;
                     let event = Event::Node(source);
-                    materializations.push(self.sign_compacted_base_materialization(&event, proof)?);
+                    materializations.push(self.sign_compacted_base_materialization_cached(
+                        &event,
+                        proof,
+                        &mut serialized_proofs,
+                    )?);
                 }
                 for signed in materializations {
                     let json = serde_json::to_vec(&signed)
@@ -30362,8 +30845,12 @@ impl Storage {
             };
             if keep {
                 let event = Event::Edge(edge.clone());
-                let proof = base_proofs.edges.get(&edge.id);
-                let signed = self.sign_compacted_base_materialization(&event, proof)?;
+                let proof = base_proofs.edges.get(&edge.id).map(Arc::as_ref);
+                let signed = self.sign_compacted_base_materialization_cached(
+                    &event,
+                    proof,
+                    &mut serialized_proofs,
+                )?;
                 let json = serde_json::to_string(&signed)
                     .map_err(|error| Error::from_reason(error.to_string()))?;
                 buf.extend_from_slice(json.as_bytes());
@@ -30421,12 +30908,13 @@ impl Storage {
                     arena.f32_at(m.embedding_offset as usize, m.vector_dim as usize)
                 };
                 let vector_id = Self::vector_revision_record_id(&node.id, &c.name)?;
-                let proof = base_proofs.vectors.get(&vector_id);
+                let proof = base_proofs.vectors.get(&vector_id).map(Arc::as_ref);
                 let master_proof = if Self::labels_are_master(&node.labels) {
                     Some(
                         authority_proofs
                             .master_vectors
                             .get(&(node.id.clone(), c.name.clone()))
+                            .map(Arc::as_ref)
                             .ok_or_else(|| {
                                 Error::from_reason(format!(
                                     "COMPACTION_MASTER_AUTHORITY_PROOF_MISSING: vector mapping {}/{}",
@@ -30464,7 +30952,11 @@ impl Storage {
                     }
                     self.sign_compacted_master_materialization(&event, master_proof, proof)?
                 } else {
-                    self.sign_compacted_base_materialization(&event, proof)?
+                    self.sign_compacted_base_materialization_cached(
+                        &event,
+                        proof,
+                        &mut serialized_proofs,
+                    )?
                 };
                 let json =
                     serde_json::to_vec(&signed).map_err(|e| Error::from_reason(e.to_string()))?;

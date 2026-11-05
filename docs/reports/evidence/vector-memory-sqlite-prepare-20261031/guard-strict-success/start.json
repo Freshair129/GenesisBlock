@@ -1,0 +1,20 @@
+{
+  "pid": 36080,
+  "start": "2026-10-31T22:11:39.1353049+07:00",
+  "config": {
+    "cap_seconds": 30,
+    "exe": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe",
+    "kind": "functional_test",
+    "env": {},
+    "args": [
+      "--test",
+      "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\guard-success-fixture.test.cjs"
+    ],
+    "output": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\guard-strict-success",
+    "cwd": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031"
+  },
+  "query_deadline_ms": 5000,
+  "cap_seconds": 30,
+  "rss_cap": 2147483648,
+  "identity": "PID+CreationDate+path+name; require live matching parent and child born after root"
+}

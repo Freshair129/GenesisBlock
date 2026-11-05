@@ -1,0 +1,9 @@
+{
+  "applies_to": "run-config.json",
+  "run_started": "2026-10-31T15:23:01.771080+07:00",
+  "field": "candidate_lib_sha256",
+  "recorded_value": "AE2D416AF3F083EA8AFBB68C6A7173A6580185A9CB48018685729D378BA80553",
+  "actual_compiled_candidate_lib_sha256": "d64ec0ac47f35ccc70f8a4251fc5dbac763bc556f7085049104c8d760795ca7b",
+  "reason": "Run-config provenance correction landed after launch. Do not rewrite original run-config.json; build-context.json plus patched-querytrace-lib.rs and exe correspond to actual source.",
+  "controller_patch_landed_after_launch": true
+}

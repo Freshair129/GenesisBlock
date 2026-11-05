@@ -1,0 +1,18 @@
+{
+  "attempt": 2,
+  "exit_code": 0,
+  "start_local": "2026-10-31T15:18:07.8349554+07:00",
+  "end_local": "2026-10-31T15:20:21.6142125+07:00",
+  "elapsed_seconds": 133.779,
+  "command": "cargo build --locked --offline --release --no-default-features --features bins --bin vbench-genesis -j2",
+  "target_dir": "D:\\GenesisBlock_Dev\\GenesisBlock\\target",
+  "environment": {
+    "CARGO_PROFILE_RELEASE_LTO": "false",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "16",
+    "CARGO_TARGET_DIR": "D:\\GenesisBlock_Dev\\GenesisBlock\\target"
+  },
+  "lib_sha256": "d64ec0ac47f35ccc70f8a4251fc5dbac763bc556f7085049104c8d760795ca7b",
+  "bench_sha256": "5bfde2c3b897c316bed557fc3037ae9a44d9eead07053db4f835bf1bd7d27c62",
+  "log": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\projection-props-split-20261031T151315\\diagnostic-release-build-attempt-2.log",
+  "exe_sha256": "43b25c6c8daa639595af0329f7b9a1e3a6572fa08ff7bd7fadbbaf61b52495a7"
+}

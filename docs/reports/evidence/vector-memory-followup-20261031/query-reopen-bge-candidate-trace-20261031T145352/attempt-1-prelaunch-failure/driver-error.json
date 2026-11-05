@@ -1,0 +1,5 @@
+{
+  "at_local": "2026-10-31T14:56:42.941376+07:00",
+  "error": "RuntimeError('frozen candidate diagnostic binary hash mismatch')",
+  "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-bge-candidate-trace-20261031T145352\\spawn-benchmark.py\", line 127, in <module>\n    sys.exit(main())\n             ~~~~^^\n  File \"C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-bge-candidate-trace-20261031T145352\\spawn-benchmark.py\", line 28, in main\n    raise RuntimeError(\"frozen candidate diagnostic binary hash mismatch\")\nRuntimeError: frozen candidate diagnostic binary hash mismatch\n"
+}

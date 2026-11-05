@@ -1,0 +1,17 @@
+
+running 12 tests
+test cross_group_and_foreign_key_constraints_are_checked_before_wal ... ok
+test durable_apply_failure_blocks_reads_writes_and_checkpoint_until_reopen ... ok
+test failed_consensus_and_sync_writes_do_not_publish_graph ... ok
+test failed_edge_write_does_not_publish_adjacency ... ok
+test failed_node_upsert_preserves_old_graph_row_and_vector ... ok
+test failed_retraction_and_first_supersede_frame_preserve_live_state ... ok
+test failed_unified_wal_rolls_back_preflight_rows ... ok
+test lost_ack_after_fsync_is_unknown_and_reopen_recovers_the_write ... ok
+test readers_wait_for_a_write_ack_before_observing_node ... ok
+test rejected_constraints_leave_no_wal_and_database_reopens ... ok
+test rest_rejection_preserves_frontier_and_corrected_retry_succeeds ... ok
+test second_supersede_write_failure_keeps_durable_closing_frame_for_recovery ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.25s
+

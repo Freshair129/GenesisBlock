@@ -1,0 +1,110 @@
+{
+  "label": "nov02-seed43f-before",
+  "seed": 43,
+  "side": "before",
+  "dataset": "bge-m3-repository-fixture",
+  "vectors": 11266,
+  "dimension": 1024,
+  "queries": 24,
+  "quantization": "none",
+  "rerank": false,
+  "ef_construction": 200,
+  "ef_search": 200,
+  "query_contract": {
+    "deadline_ms": 5000,
+    "initial_k": 10,
+    "initial_k100": 100,
+    "reopened_queries": 24,
+    "fresh_child_query_index": 0,
+    "ef": 200,
+    "alpha": 0.0
+  },
+  "limits": {
+    "host_admission_seconds": 10,
+    "cpu_average_max_percent": 20,
+    "minimum_free_ram_bytes": 6442450944,
+    "process_tree_working_set_bytes": 2147483648,
+    "per_job_deadline_seconds": 1200,
+    "query_deadline_ms": 5000
+  },
+  "input_sha256": {
+    "corpus": "20978d757c33a29dcd8e89e5708762738b10fc8da0f01358bcb325741f2f6057",
+    "queries": "6ccad031b956c6111519e6b0dfe97e7c63bd85801d9934efe4438f76d152ca68",
+    "truth": "2c133fd68ed2b60345715c24667a830ebf3ab303528e8eec0300385125e37c9c",
+    "meta": "f79c423a069d8c4faa9a2bf8fff920d0dc4102261b28c35692544974137a89de"
+  },
+  "input_unchanged": true,
+  "driver_exit_code": 0,
+  "duration_seconds": 355.088,
+  "started_at_local": "2026-11-02T09:16:37.839099+07:00",
+  "finished_at_local": "2026-11-02T09:22:32.927552+07:00",
+  "binary_sha256": "a209694310b0f08265f681a299d3d26edc7f36da74b780843c1039f8241d965f",
+  "guard": {
+    "exit": 0,
+    "reason": null,
+    "seconds": 356.3279766,
+    "peak_process_tree_working_set_bytes": 357781504,
+    "peak_private_bytes": 466259968,
+    "admission_cpu_average_percent": 18.727272727272727,
+    "admission_free_ram_bytes": 18580520960,
+    "cleanup_complete": true,
+    "monitor_error": null,
+    "rss_scope": "tracked owned process tree",
+    "admission_samples": [
+      {
+        "cpu_percent": 10,
+        "free_ram_bytes": 18677895168
+      },
+      {
+        "cpu_percent": 7,
+        "free_ram_bytes": 18681810944
+      },
+      {
+        "cpu_percent": 17,
+        "free_ram_bytes": 18675757056
+      },
+      {
+        "cpu_percent": 15,
+        "free_ram_bytes": 18646061056
+      },
+      {
+        "cpu_percent": 21,
+        "free_ram_bytes": 18632159232
+      },
+      {
+        "cpu_percent": 22,
+        "free_ram_bytes": 18627813376
+      },
+      {
+        "cpu_percent": 15,
+        "free_ram_bytes": 18624864256
+      },
+      {
+        "cpu_percent": 16,
+        "free_ram_bytes": 18621890560
+      },
+      {
+        "cpu_percent": 40,
+        "free_ram_bytes": 18589691904
+      },
+      {
+        "cpu_percent": 16,
+        "free_ram_bytes": 18596868096
+      },
+      {
+        "cpu_percent": 27,
+        "free_ram_bytes": 18580520960
+      }
+    ]
+  },
+  "topology": {
+    "initial": {
+      "sha256_raw": "7f7d0d8679789e399f2e3b9810fb6a47acc1e95637a0a0a472e093dadb2f1d14",
+      "raw_bytes": 8171121
+    },
+    "reopen": {
+      "sha256_raw": "7f7d0d8679789e399f2e3b9810fb6a47acc1e95637a0a0a472e093dadb2f1d14",
+      "raw_bytes": 8171121
+    }
+  }
+}

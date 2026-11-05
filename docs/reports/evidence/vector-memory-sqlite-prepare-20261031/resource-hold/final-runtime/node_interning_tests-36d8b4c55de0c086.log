@@ -1,0 +1,9 @@
+
+running 4 tests
+test exact_id_still_resolves ... ok
+test fuzzy_resolves_real_node_after_reverse_map_removal ... ok
+test reload_preserves_fuzzy_and_traversal ... ok
+test traversal_direction_resolves_without_reverse_map ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s
+

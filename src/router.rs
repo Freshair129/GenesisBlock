@@ -302,8 +302,9 @@ struct ExtendedStatus {
     pub index_lag: u32,
     /// Ops/credibility (P2c): per-collection quant + residency ops. Each entry is
     /// a `CollectionInfo` carrying `quant`, `count`, `sidecar_resident_bytes`
-    /// (≈0 post-P0 — the sidecar is on-disk; this PROVES the RAM win),
-    /// `sidecar_disk_bytes`, `arena_resident_bytes`, and `index_lag`.
+    /// (legacy full-file residency, excluding the decoded-row cache),
+    /// `sidecar_cache_bytes`, `sidecar_disk_bytes`, `arena_resident_bytes`,
+    /// `arena_allocated_bytes`, `hnsw_vector_bytes`, and `index_lag`.
     pub collections: Vec<CollectionInfo>,
 }
 
@@ -1493,7 +1494,7 @@ fn render_metrics(storage: &Storage) -> String {
     out.push_str(&format!("genesisdb_index_lag {}\n", index_lag));
 
     out.push_str(
-        "# HELP genesisdb_memory_usage_mb Approximate resident memory used by vector arenas, nodes, and edges, in megabytes.\n",
+        "# HELP genesisdb_memory_usage_mb Legacy logical estimate for vector arenas, nodes, and edges in megabytes; excludes HNSW and caches and is not process RSS.\n",
     );
     out.push_str("# TYPE genesisdb_memory_usage_mb gauge\n");
     out.push_str(&format!("genesisdb_memory_usage_mb {}\n", memory_usage_mb));
@@ -1518,7 +1519,7 @@ fn render_metrics(storage: &Storage) -> String {
     }
 
     out.push_str(
-        "# HELP genesisdb_collection_sidecar_resident_bytes Resident (RAM) bytes held by a collection's exact-f32 rerank sidecar.\n",
+        "# HELP genesisdb_collection_sidecar_resident_bytes Legacy full-file sidecar residency, zero for positioned-read backing; excludes the separately reported decoded-row cache.\n",
     );
     out.push_str("# TYPE genesisdb_collection_sidecar_resident_bytes gauge\n");
     for c in &collections {
@@ -1542,7 +1543,7 @@ fn render_metrics(storage: &Storage) -> String {
     }
 
     out.push_str(
-        "# HELP genesisdb_collection_arena_resident_bytes Resident (RAM) bytes held by a collection's vector arena.\n",
+        "# HELP genesisdb_collection_arena_resident_bytes Legacy logical vector payload bytes; overlaps arena_allocated_bytes and is not physical RSS.\n",
     );
     out.push_str("# TYPE genesisdb_collection_arena_resident_bytes gauge\n");
     for c in &collections {
@@ -1553,6 +1554,33 @@ fn render_metrics(storage: &Storage) -> String {
         ));
     }
 
+    out.push_str("# HELP genesisdb_collection_sidecar_cache_bytes Allocated decoded-row payload in the bounded cache, excluding containers and caller copies.\n");
+    out.push_str("# TYPE genesisdb_collection_sidecar_cache_bytes gauge\n");
+    for c in &collections {
+        out.push_str(&format!(
+            "genesisdb_collection_sidecar_cache_bytes{{collection=\"{}\"}} {}\n",
+            escape_label_value(&c.name),
+            c.sidecar_cache_bytes
+        ));
+    }
+    out.push_str("# HELP genesisdb_collection_arena_allocated_bytes Vector Vec capacity bytes including spare capacity; overlaps arena_resident_bytes and is not physical RSS.\n");
+    out.push_str("# TYPE genesisdb_collection_arena_allocated_bytes gauge\n");
+    for c in &collections {
+        out.push_str(&format!(
+            "genesisdb_collection_arena_allocated_bytes{{collection=\"{}\"}} {}\n",
+            escape_label_value(&c.name),
+            c.arena_allocated_bytes
+        ));
+    }
+    out.push_str("# HELP genesisdb_collection_hnsw_vector_bytes HNSW vector payload lower bound only; excludes graph, point, table, and allocator overhead.\n");
+    out.push_str("# TYPE genesisdb_collection_hnsw_vector_bytes gauge\n");
+    for c in &collections {
+        out.push_str(&format!(
+            "genesisdb_collection_hnsw_vector_bytes{{collection=\"{}\"}} {}\n",
+            escape_label_value(&c.name),
+            c.hnsw_vector_bytes
+        ));
+    }
     out
 }
 

@@ -1,0 +1,26 @@
+{
+  "recorded_at": "2026-11-01T00:42:20.681494+07:00",
+  "status": "RESOURCE_HELD_NOT_COMPLETE",
+  "checkpoint_commit": "f98a324c6ac9c16bbd98679622012519107628a3",
+  "same_process_two_open": {
+    "status": "TIMEOUT",
+    "query0_exercised": false,
+    "parent_seconds": 1200.7737842,
+    "peak_tree_rss_bytes": 750157824,
+    "cleanup_complete": true
+  },
+  "fresh_variants": "BUILT: both pinnedRust1.96, observer scoped identically toq0",
+  "fixture_setup": "NOT_LAUNCHED: bounded resource wait expired",
+  "last_admission": {
+    "cpu_average_percent": 32.72727272727273,
+    "minimum_available_ram_bytes": 3905114112,
+    "required_cpu_below_percent": 20,
+    "required_minimum_ram_bytes": 6442450944
+  },
+  "fresh_rw_reopen_100k": "NOT_RUN",
+  "current_real_bge_pair": "NOT_RUN",
+  "new_memory_savings_MB_or_percent": "NOT_MEASURED",
+  "current_production_engine": "unchanged5b8bb9...; verified287source paths and253Cmirror paths; sevenH2a staged paths preserved",
+  "no_deployment_or_production_database_change": true,
+  "full_original_two_open_qualification": "OPEN; no split-workload substitute claim"
+}

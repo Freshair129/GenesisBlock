@@ -1,0 +1,9 @@
+{
+  "driver_pid": 22804,
+  "benchmark_pid": 2876,
+  "started_at_local": "2026-11-02T06:24:44.136400+07:00",
+  "binary_sha256": "a209694310b0f08265f681a299d3d26edc7f36da74b780843c1039f8241d965f",
+  "output_dir": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\seeded-topology-20261101\\runs\\nov02-seed43-before\\output",
+  "direct_file_handles": true,
+  "process_tree_root_pid": 22804
+}

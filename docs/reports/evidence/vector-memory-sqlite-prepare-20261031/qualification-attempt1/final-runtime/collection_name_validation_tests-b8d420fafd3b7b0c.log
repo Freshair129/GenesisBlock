@@ -1,0 +1,8 @@
+
+running 3 tests
+test hostile_peer_collection_name_is_inert ... ok
+test ordinary_names_still_work ... ok
+test traversal_names_are_rejected_and_write_nothing_outside_the_db ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s
+

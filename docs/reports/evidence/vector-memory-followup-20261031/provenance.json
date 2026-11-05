@@ -1,0 +1,29 @@
+{
+  "recorded_at": "2026-10-31T15:40:42.794052+07:00",
+  "head": "ad94aa2e46025b7729d117ff376ab281ac15c49d",
+  "source": {
+    "src/lib.rs": "812afdbe74e96aee4f0c08b93488dda4ac5a6c0e4784b72bb9f615d30c7877a9",
+    "src/vector_memory_tests.rs": "ffa1a7ab290dd9735414205ddb6169d28b409077a67b8a31b3a61c8938ddbd17",
+    "Cargo.toml": "00550fbac8edb5c1316b5eb21983b078039604ed3c1460689515ba5539f30e25",
+    "Cargo.lock": "eda5bfa67c1077c96f2b84e44f740273e695c87a1a51b352cf18f2a031a4f8d2",
+    "benches/vector_memory.rs": "46694637e7e028f8a12c5c5f5eb83c8bac3ca33e7e276b1236e097f970f53c3f",
+    "benches/scripts/vector_memory_matrix.ps1": "c989f95bfa1795a874be890aea227b587d18c019f27fe8e54b098b52b9827bb3",
+    "index.d.ts": "718b6f7114d62218afb502b218f4e2d1334d750f9cd8d792ded218dc439bc449"
+  },
+  "engine_stages": {
+    "baseline-lib.rs": "b40119d97da983aa00499ebc47968dfa4cf95532ffd49284351a388ca3436ca0",
+    "index-and-cache-lib.rs": "d28fbfc1ecd1c53af46b73616febee8e2d5dc0b4a1ee9b67243c488abb64da50",
+    "encoding-cache-lib.rs": "061ce20234f6862589a63d105cb6154e8aa3b6318672b363aca0dabbc4623c73"
+  },
+  "binaries": {
+    "baseline-release.exe": "d820a5af8a54f9a95e2722dd953d3dc50dff074687ec361bfe1464b02f0a6c87",
+    "candidate-release.exe": "eedf2ce01df03c2ce32d629131e896166fd895166b8a3acd823cde68c5d26ff8",
+    "baseline-profiled.node": "8bde8388d401f82cb03d4a7c039ef45963ac77b8b39f7741daecc260d08ff4c2",
+    "candidate-profiled.node": "8e3aac3a8bd6a33eadb5b170f27d1a8c345fd08effad13e4396190b23f9cfbb5"
+  },
+  "diagnostic_binaries": {
+    "query-reopen-rw-20261031T122655/diagnostic-vbench-genesis-repeat.exe": "d3956b12359b73458bb3483f78d951d0f0c767c39f441e64bef1c7bce1392172",
+    "candidate-repeat-build-20261031T131156/candidate-vbench-genesis-repeat.exe": "959dfa8f6348082046bcbfad744a422e2bd7f5a43c702c2dba7d2d86d26aeaf1",
+    "projection-props-split-20261031T151315/projection-props-split-vbench.exe": "43b25c6c8daa639595af0329f7b9a1e3a6572fa08ff7bd7fadbbaf61b52495a7"
+  }
+}

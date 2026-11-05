@@ -1,0 +1,162 @@
+[
+  {
+    "file": "analyze-real-bge-pair-retry4.py",
+    "bytes": 2603,
+    "sha256": "7c32f725fda43b63ed3e928f89f4e0c68b38cfdfba0a07ad1d12a4d88c896047"
+  },
+  {
+    "file": "real-bge-pair-retry4-analysis.json",
+    "bytes": 9820,
+    "sha256": "11732d3af157df2400193343d20fb8de8f9d359ed33bec4d1e1543792639fa42"
+  },
+  {
+    "file": "after/case/benchmark-start.json",
+    "bytes": 364,
+    "sha256": "50905b707d7e268adb14ac6bf79ef7cb86d97b4b37ec2b9c7f385912f538451c"
+  },
+  {
+    "file": "after/case/driver-context.json",
+    "bytes": 2612,
+    "sha256": "5b9d0b7b5d94c7c085c70b622c9dc8a9e05d1ef3fb696415bc946aa061695ded"
+  },
+  {
+    "file": "after/case/driver-status.json",
+    "bytes": 1097,
+    "sha256": "49b186a8c8bd28015a7b10f14ee3aac62a47c8d06709a16cc59ae27461565a39"
+  },
+  {
+    "file": "after/case/run-config.json",
+    "bytes": 2114,
+    "sha256": "d26eb1e83b48068862c5a75c8817b28dbbd71dc274ea3106e7fd5d04064febd9"
+  },
+  {
+    "file": "after/case/stderr.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "file": "after/case/stdout.log",
+    "bytes": 945,
+    "sha256": "c0956047aff7d578548972c61834a82b08dac184a94d659fd7d2bd38cc887678"
+  },
+  {
+    "file": "after/case/output/before_snapshot.json",
+    "bytes": 3832,
+    "sha256": "08c998fa1efce3292eee2f700848fcf04560d969a19fe71cf24de5baa46ec6dc"
+  },
+  {
+    "file": "after/case/output/fresh_reopen.json",
+    "bytes": 2314,
+    "sha256": "e6bd5b91e7e09e2ecf6d25586eea1808d01d5b9bae0136fc9ddd797081702a39"
+  },
+  {
+    "file": "after/case/output/memory.json",
+    "bytes": 7868,
+    "sha256": "3d45f7d6ebd7dc75ad20ef8fc6367dcfc8697e7c9b4322435d25f7b23cc9f05e"
+  },
+  {
+    "file": "after/guard/admission.json",
+    "bytes": 730,
+    "sha256": "9c36f3e2801d8f489370e4d040984792d0e879d73fd5fd649c699c191d3eeab3"
+  },
+  {
+    "file": "after/guard/start.json",
+    "bytes": 1084,
+    "sha256": "923eade8dd1a773d241fae1547da6ca65f8417eb6c88c27e0b52cdc90d19b7a9"
+  },
+  {
+    "file": "after/guard/status.json",
+    "bytes": 2353,
+    "sha256": "f814ca22a4d36d796fe50948cc1b41e96937fa42bee557a3241bee542f5b7c95"
+  },
+  {
+    "file": "after/guard/stderr.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "file": "after/guard/stdout.log",
+    "bytes": 976,
+    "sha256": "fec018af96879a1c693fbbaa98bfdb629dbc94fe732868151df79d2ea44e56f7"
+  },
+  {
+    "file": "after/guard/timeline.jsonl",
+    "bytes": 120729,
+    "sha256": "99e37d03cd1f83e832ddd803ed489f0d20ea8d150560d26a6530591188793f8a"
+  },
+  {
+    "file": "before/case/benchmark-start.json",
+    "bytes": 374,
+    "sha256": "ca154fc0071dec3ebf1f86f0a92240bb2a681b0f60fff939b7861455fe585bae"
+  },
+  {
+    "file": "before/case/driver-context.json",
+    "bytes": 2620,
+    "sha256": "a456096ac412d97731a8acc095580413a30968e295dd0041a0b4c9930572b785"
+  },
+  {
+    "file": "before/case/driver-status.json",
+    "bytes": 1098,
+    "sha256": "aedcb8466b74be012eb1fa4ba21ea46d295bdb8e991ba4fd6362a955618683f9"
+  },
+  {
+    "file": "before/case/run-config.json",
+    "bytes": 2137,
+    "sha256": "4c1239f092fa5ccac75b57f2d2a4cc22cc7294950b6d55a0a96bbe42efed132c"
+  },
+  {
+    "file": "before/case/stderr.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "file": "before/case/stdout.log",
+    "bytes": 986,
+    "sha256": "ceb44d5b1228196e62a99f1b55996c0a79f86af5a51363ea0e13dd22f0c5825f"
+  },
+  {
+    "file": "before/case/output/before_snapshot.json",
+    "bytes": 3866,
+    "sha256": "ff16f301ad01c5656fcc7ee5f6cc8ebaa71dc8675d4a2f39e0ef7b4df992f83a"
+  },
+  {
+    "file": "before/case/output/fresh_reopen.json",
+    "bytes": 2314,
+    "sha256": "bcf84002279cf63164360990d3e1d40d8c10f68488b4fcf809469243ac51b54a"
+  },
+  {
+    "file": "before/case/output/memory.json",
+    "bytes": 7893,
+    "sha256": "7d0995f70356c84fbbf62fbb779b6a8daabb899496664f955b4cee5aaa9b7055"
+  },
+  {
+    "file": "before/guard/admission.json",
+    "bytes": 728,
+    "sha256": "a62b1e865b3bcf764231cb575849aa2a66b4dbf5f715cfd2fcc31210fbc87fed"
+  },
+  {
+    "file": "before/guard/start.json",
+    "bytes": 1109,
+    "sha256": "c76fc0dc060e5384d32af3800b5fef42a32001e24c30926f2cefa2fb56a3da4c"
+  },
+  {
+    "file": "before/guard/status.json",
+    "bytes": 2337,
+    "sha256": "badc35c42460c5b90c3e2359eb3d2a9a40c7de466f45498c0fd734d5cbc3f516"
+  },
+  {
+    "file": "before/guard/stderr.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "file": "before/guard/stdout.log",
+    "bytes": 977,
+    "sha256": "ae232a898a6e3c94db1fe822063fa4af21bed8ccc7e3d0fc73e73696527620be"
+  },
+  {
+    "file": "before/guard/timeline.jsonl",
+    "bytes": 131667,
+    "sha256": "5c66a27e7179eb1dd31087fa51d8dda7e8e295019e8f771be23a28c602a4a191"
+  }
+]

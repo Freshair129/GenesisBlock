@@ -1,0 +1,27 @@
+
+running 22 tests
+test change_scan_emits_ordered_revision_events_with_typed_sequences_and_operations ... ok
+test change_scan_floor_is_an_exclusive_cursor_and_equality_is_valid ... ok
+test change_scan_includes_owner_bound_vector_revision_events ... ok
+test change_scan_matches_p7_for_edge_row_vector_and_annotation_revisions ... ok
+test change_scan_matches_p7_for_exclusive_after_inclusive_through_windows ... ok
+test change_scan_rejects_a_cursor_beyond_the_pinned_frontier ... ok
+test empty_history_sources_report_measured_zero_in_both_frontends ... ok
+test explain_plan_tx_as_of_obeys_generation_frontier_without_publishing_or_writing ... ok
+test history_and_change_scans_fail_without_partial_rows_when_source_budget_is_exhausted ... ok
+test history_and_changes_output_budgets_fail_in_normal_and_analyze ... ok
+test history_artifact_source_and_unknown_change_families_fail_closed ... ok
+test history_scan_includes_retract_tombstones_without_user_properties ... ok
+test history_scan_matches_p7_for_edge_revisions_and_endpoint_acl ... ok
+test history_scan_reads_closed_revisions_and_hydrates_the_exact_revision ... ok
+test history_scan_reads_vector_revisions_with_hql_ir_and_p7_parity ... ok
+test history_scan_rejects_a_source_floor_beyond_the_pinned_frontier ... ok
+test hql_and_typed_ir_tx_as_of_are_bounded_by_the_pinned_generation_frontier ... ok
+test hql_change_scan_accepts_decimal_u64_floor_and_take_parameters ... ok
+test plan_uses_candidate_frontier_after_generation_becomes_stale ... ok
+test transaction_time_history_scan_rejects_a_selected_frontier_below_vector_floor ... ok
+test transaction_time_uses_one_selected_frontier_for_sources_hydration_and_snapshot ... ok
+test vector_history_scan_rejects_a_vector_floor_beyond_the_pinned_frontier ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.08s
+

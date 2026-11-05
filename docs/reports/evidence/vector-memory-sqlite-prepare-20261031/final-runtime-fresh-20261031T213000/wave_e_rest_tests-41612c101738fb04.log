@@ -1,0 +1,7 @@
+
+running 2 tests
+test query_ir_context_and_capability_details_are_exposed ... ok
+test query_ir_context_rejects_temporal_selector_with_typed_error ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+

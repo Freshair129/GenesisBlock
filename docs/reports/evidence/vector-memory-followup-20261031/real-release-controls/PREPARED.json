@@ -1,0 +1,110 @@
+{
+  "status": "prepared_not_run",
+  "prepared_at_utc": "2026-10-31T07:09:16.2931265Z",
+  "repo_path": "D:\\GenesisBlock_Dev\\GenesisBlock",
+  "repo_head_at_preparation": "ad94aa2e46025b7729d117ff376ab281ac15c49d",
+  "repo_worktree_was_dirty": true,
+  "benchmark_source": "benches/vector_memory.rs",
+  "benchmark_source_sha256": "46694637e7e028f8a12c5c5f5eb83c8bac3ca33e7e276b1236e097f970f53c3f",
+  "baseline_exe": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\baseline-release.exe",
+  "baseline_exe_sha256": "d820a5af8a54f9a95e2722dd953d3dc50dff074687ec361bfe1464b02f0a6c87",
+  "candidate_exe": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\candidate-release.exe",
+  "candidate_exe_sha256": "eedf2ce01df03c2ce32d629131e896166fd895166b8a3acd823cde68c5d26ff8",
+  "input": {
+    "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\inputs\\real-11266-1024",
+    "n": 11266,
+    "dim": 1024,
+    "q": 24,
+    "model": "bge-m3-repository-fixture",
+    "metric": "cosine",
+    "corpus_sha256": "20978d757c33a29dcd8e89e5708762738b10fc8da0f01358bcb325741f2f6057",
+    "queries_sha256": "6ccad031b956c6111519e6b0dfe97e7c63bd85801d9934efe4438f76d152ca68",
+    "truth_sha256": "2c133fd68ed2b60345715c24667a830ebf3ab303528e8eec0300385125e37c9c",
+    "meta_sha256": "f79c423a069d8c4faa9a2bf8fff920d0dc4102261b28c35692544974137a89de",
+    "corpus_bytes": 46145536,
+    "query_bytes": 98304,
+    "read_only_reuse": true
+  },
+  "case": {
+    "name": "real-11266-1024-none-r0",
+    "quant": "none",
+    "rerank": false,
+    "compact": true,
+    "retention": "full",
+    "rayon_threads": 4,
+    "ef_construction": 200,
+    "ef_search": 200,
+    "search_queries": 24,
+    "measured_search_k": [
+      10,
+      100
+    ],
+    "batch_rows": 256
+  },
+  "order": [
+    "baseline",
+    "candidate"
+  ],
+  "caps": {
+    "process_tree_working_set_bytes": 2147483648,
+    "per_job_deadline_seconds": 1200,
+    "host_cpu_average_window_seconds": 10,
+    "host_cpu_percent_must_be_less_than": 20,
+    "host_free_ram_bytes_must_be_at_least": 6442450944,
+    "maximum_pair_deadline_seconds": 2400
+  },
+  "clear_marker": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\followuproot\\vector-real-release-controller\\vector-release-clear",
+  "host_observed_prior": {
+    "os": "Windows 11 10.0.26300",
+    "cpu": "Intel64 Family 6 Model 158",
+    "logical_cpus": 12,
+    "ram_gb": 32.0,
+    "data_disk": "D:",
+    "prior_free_disk_gb": 37.4,
+    "rustc": "1.96.0",
+    "cargo": "1.96.0",
+    "source": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\env.json"
+  },
+  "harness_facts": {
+    "corpus_streamed_in_256_row_batches": true,
+    "input_load_mode": "File::open read only; no preparation or copying",
+    "existing_harness_phases": [
+      "ingest",
+      "rebuild",
+      "search10",
+      "search100",
+      "compaction",
+      "snapshot",
+      "same_process_reopen",
+      "fresh_read_only_reopen"
+    ],
+    "query_limit_5s": "No harness per-query timeout override is added; the engine default five-second query budget stays unchanged, with the existing 24-query fixture and latency percentiles.",
+    "statistical_scope": "One baseline and one candidate run; this pair is a confirmation only and does not qualify tail behavior."
+  },
+  "previous_matrix_reference": {
+    "baseline_none_r0": {
+      "ingest_s": 227.0866766,
+      "rebuild_s": 124.9937579,
+      "compaction_s": 103.8256222,
+      "snapshot_s": 22.5581454,
+      "same_process_reopen_s": 247.3425115,
+      "fresh_read_only_reopen_s": 154.0831205,
+      "search10_recall": 0.9916666666666667,
+      "search100_recall": 0.9754166666666667,
+      "retention": "full"
+    },
+    "candidate_none_r0": {
+      "ingest_s": 73.1446877,
+      "rebuild_s": 47.290486,
+      "compaction_s": 47.8401084,
+      "snapshot_s": 9.1440733,
+      "same_process_reopen_s": 103.5921705,
+      "fresh_read_only_reopen_s": 75.8623418,
+      "search10_recall": 0.9875,
+      "search100_recall": 0.9791666666666666,
+      "retention": "full"
+    },
+    "caveat": "Historical phase totals are scheduling estimates only; they are from earlier matrix binaries and are not a fair comparison of the pinned release binaries."
+  },
+  "benchmark_entry_source_sha256": "2f73000dfc60fd6d4e01f24b7670ff94987e4d5e76acebabf3f20ea28ee4c6c5"
+}

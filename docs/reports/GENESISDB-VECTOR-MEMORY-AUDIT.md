@@ -1,0 +1,1708 @@
+---
+status: evidence
+lifecycle: frozen
+date: 2026-10-31
+---
+
+# GenesisBlockDB vector memory audit
+
+Scope: local nonproduction audit of baseline `ad94aa2e46025b7729d117ff376ab281ac15c49d`.
+Existing staged HQL2 documentation/tests are outside this change. The user explicitly
+authorized audit, benchmark, justified optimization and verification without stopping
+at the plan. No deployment, release, production data or destructive scale experiment.
+
+## Audit decision
+
+Retain the Arena/HNSW two-copy vector design. The pinned insertion API requires
+owned point vectors; the arena remains authoritative for persistence, history,
+exact fallback and rebuild. No unsafe sharing or index replacement is introduced.
+
+The audit also found a much larger avoidable **default-checkpoint proof cache**:
+whole signed transactions were cloned per materialized leaf. Private immutable
+proof sharing removes that quadratic resident expansion while preserving public
+proofs, bytes, authentication and caps. At the initial Arc-sharing-only stage, a
+successful default-retention NAPI checkpoint diagnostic (128 rows, D=8) reduced
+OS peak working set 435.20 -> 100.80 MB,
+a measured 334.40 MB (76.84%). This is a matched Windows debug-addon diagnostic,
+not a cloud instance-size guarantee. The separate initial release/full-retention F32
+10k/768 repeat reduced snapshot peak 187.00 -> 158.62 MB (15.18%); its largest
+named-phase peak barely changed. Neither number means vector payload was halved.
+The later timeout fixes retain sharing and add bounded checkpoint caches; their
+separate final-candidate RSS increases and performance observations are reported
+below. The initial savings are not relabeled as measurements of that later source.
+
+Default checkpoint limits remain open: the explicit 1000-row diagnostic returns
+`COMPACTION_PROOF_TOO_LARGE` at the unchanged 1 MiB envelope cap. WAL reopen
+count/indexed and search sanity pass after that rejection. Passing a bulk test or
+seeing the existing shutdown message is not proof of checkpoint success.
+
+<!-- SQLITE_PREPARE_FOLLOWUP_START -->
+## SQLite prepare follow-up: confirmed deferral, final correctness gates passed
+
+Production core SHA256: `5b8bb9bed5dde5fa6e7d4d255da3acce6c1bfe892092456133adb65a78998fdd`.
+Final projection-test SHA256: `e69dc7dd5cbc5043aa5ed9c717e449e50246a8fbd8ad56ac95ed135718c99be2`.
+This section supersedes the current-status interpretation of earlier stages;
+all earlier timings retain their original source and workload provenance.
+
+**The deferral mechanism is fixed, regression-tested and reproduced with pinned
+SQLite on the saved 1 GB projection. The 100k reopen deadline remains unqualified.**
+It must not be inferred from library tests, historical timings or an exit code alone.
+The source-bound correctness receipt is `passed:true` for the final immutable source; it does not qualify the pending timed workloads.
+
+The pinned versions are rusqlite **0.32.1**, libsqlite3-sys **0.30.1**, and bundled
+SQLite **3.46.0**. The amalgamation SHA256 is
+`c01235302fe80da901fb70c7622c39147e29d9f29b7f6eb746b23517f320c90d`.
+Backup commits the live destination WAL through SQLite's lower-level B-tree API,
+sets a pending WAL callback and resets the schema. It bypasses the SQL executor's
+callback dispatch. The next prepare loads schema through a nested SELECT; when
+that statement reaches DONE, it dispatches the default 1,000-frame passive
+checkpoint. Thus publication I/O can be charged to the first query's prepare.
+This is an engine lifecycle mismatch with the pinned API, not evidence of an
+upstream SQLite defect. The standalone matrix reproduces this class of prepare stall on the saved real
+projection without Genesis replay. It cannot retroactively observe the callback
+state of the historical 2.631-second trace.
+
+| Real pinned SQLite callback fixture | Before | After |
+|---|---:|---:|
+| Hook calls during publication | 0 | 1 |
+| Hook calls during first property read | 1 | 0 |
+| Frames checkpointed during publication | Deferred | 2,352 / 2,352 |
+| First-read callback after releasing an old reader | 1 | 0 |
+
+The production change scopes/drops `Backup`, keeps the destination mutex held,
+and fully executes `PRAGMA wal_checkpoint(PASSIVE)` before publication returns.
+This completes real maintenance at its ownership boundary; it does not execute a
+dummy search or prime a query cache. It moves page I/O into open/publication and
+**does not remove that I/O or claim a RAM saving**. PASSIVE accepts partial/busy
+progress, preserves old read-only snapshots, and does not truncate the WAL. Hard
+maintenance errors explicitly say that projection publication already committed.
+Open's existing recovery-required guard then prevents a failed recovery from
+checkpointing its state on Drop. A direct FFI checkpoint alone was rejected as a
+fix because it can leave the pending SQL-layer callback undispatched.
+
+Three regressions cover deferred callback ownership, a reader held across
+publication and released before the first new read, and committed data observed
+through an independent connection after a denied maintenance PRAGMA. The hook
+mirrors SQLite's default passive 1,000-frame behavior; it has no wall-clock gate.
+Read-only review found no actionable production or test issues after cleanup.
+
+| Verification stage | Result and scope |
+|---|---|
+| RED, original core `812afd...`, new regressions | Existing 2 passed; new 3 failed as expected; first read dispatched the deferred callback |
+| GREEN library, production core `5b8bb9...` | 57 passed / 0 failed / 1 existing manual-profiler ignore |
+| Whole 159-target core suite, pre-lint test source `40c4a1...` | 1,328 passed / 0 failed / 7 ignored; all six formerly timed-out targets completed under the original limits |
+| Strict Clippy, pre-lint test source | Failed on the new test's manual NUL-terminated string literal; raw failure retained |
+| Final test source `e69dc7...` | Replaced that literal with `c"main"`; production core unchanged; locked/offline compile completed |
+| Final library tests | 57 passed / 0 failed / 1 ignored on `e69dc7...` |
+| Earlier final-source attempt (preserved) | 85 targets completed, zero failures; `hql_cypher_tests` interrupted by resource hold at 216.8 s, before its 300 s cap; not a complete suite or a timeout result |
+| Fresh complete final-source suite | 159 targets; 1,328 passed / 0 failed / 7 ignored; original 300 s / 4 GiB per executable; frozen executable hashes and 287-path source manifest bound to receipt |
+| Final strict Clippy, Node/NAPI and host-mobile checks | All 8 gates passed: strict Clippy core/default, host-mobile compile, doctests, isolated NAPI build, DTS freshness, native smoke, Node 88 passed / 0 failed / 0 skipped |
+| Pinned-SQLite matrix | Fresh isolated four-mode run passed: SQLite 3.46.0, exact payloads, source unchanged, deferred backfill observed; original interfered attempt retained separately |
+| 100k / new real-embedding pair | NOT_RUN; fresh admission required |
+
+The final rebuild changed all 159 executable hashes, so earlier binary results
+were not reused as if they qualified the final set. All binaries were frozen and
+hashed; a fresh complete final-source run supersedes the interrupted attempt.
+Final-source rerun of the six previously incomplete groups (functional timings,
+not an idle-host throughput comparison):
+
+| Complete target | Seconds | Result |
+|---|---:|---|
+| concurrency | 67.177 | PASS |
+| consensus_checkpoint_race_tests | 41.522 | PASS |
+| hql_cypher_tests | 155.210 | PASS |
+| journal_format_tests | 27.344 | PASS |
+| rebuild_from_truth_tests | 58.174 | PASS |
+| wal_compaction_tests | 20.697 | PASS |
+
+Raw fresh logs are under `final-runtime-fresh-20261031T213000/`;
+`qualification-receipt.json` binds the full source manifest and four final gate files.
+The receipt covers correctness only, not the pending timing/100k claims.
+The seven pre-existing staged files remain protected and unchanged. No commit,
+deployment, release, production database write, or structural vector change was made.
+
+At 20:26 local time the host had 84% CPU, seven unrelated compiler processes and
+10.57 GiB free RAM; earlier samples reached 98% CPU with thirteen compilers.
+Only the owned test controller and its owned current test were stopped. Their
+birth/path identities and zero remaining owned tests are recorded in the hold
+receipt. Unrelated processes were preserved. The unchanged limits are:
+
+- Core tests: 300 seconds / 4 GiB per executable.
+- Timed benchmark jobs: 1,200 seconds / 2 GiB tracked process-tree RSS.
+- Engine query deadline: 5,000 ms.
+- Benchmark admission: 10-second CPU average below 20%, at least 6 GiB free RAM,
+  and no competing compiler/benchmark job.
+
+Compilation and callback/content tests were explicitly separated from idle-host
+latency qualification. No rejected admission is treated as a measurement. A
+PID-only early monitor mistakenly waited for an older VCTIP helper; the helper was
+not stopped. Raw corrections and a fresh successful Cargo receipt are retained.
+The replacement controller validates PID, birth, path/name and the original
+process handle, bounds cleanup, and fails closed on uncertain ownership. Release
+build preparation uses an exclusive lock, source/gate-bound receipts, a fresh
+private source clone and a private target directory. It never edits/restores C/D
+sources or D target artifacts. Toolchain telemetry/PDB services are not killed or
+claimed terminated; successful compiler-client completion is a separate condition
+for subsequent edits inside the private clone. Normal-completion and owned-child
+timeout fixtures both passed on the current controller: cleanup completed and no
+tracked owner remained. The deliberate three-second timeout is a controller test,
+not a workload failure or a benchmark pass. The validation receipt binds its SHA256.
+
+The prepared causal matrix opens the source read-only and uses disposable copies:
+direct open; backup without Genesis replay; the same backup with automatic
+checkpointing disabled only as a diagnostic control; and backup followed by the
+explicit publication maintenance. It records prepare/row/finalization timing and
+WAL/backfill state. It never treats disabling checkpointing as a production fix.
+
+
+<!-- SQLITE_MATRIX_RESULTS_START -->
+Standalone pinned-SQLite diagnostic attempt (no Genesis replay; **interfered timing,
+not isolated performance qualification**):
+
+| Mode | First prepare ms | First row us | Publication maintenance ms | Backfill during first prepare |
+|---|---:|---:|---:|---|
+| direct | 1.469 | 56 | n/a | 0 -> 0 |
+| backup | 2902.725 | 62 | n/a | 0 -> 248368 |
+| backup-noauto | 0.262 | 40 | n/a | 0 -> 0 |
+| backup-checkpoint | 0.034 | 67 | 4087.699 | 248368 -> 248368 |
+
+All four modes returned the exact `{}` payload; source SHA256 stayed
+`c9bee7777ff99c1632eabf64ffc46bbbea7970655f67902727a838a9c3ceb77b`.
+Backup produced 248,368 WAL frames. Disabling autocheckpoint is a diagnostic control
+only; the production fix retains it. Maintenance moves work to publication.
+Whole-case wall times include backup, connections and close-time checkpoint work;
+they are not claimed to improve. Unrelated gs-creator compilers started at
+22:26:04 local time after admission, so the raw timing attempt is preserved with
+`matrix-real-interference.json` and excluded from isolated performance conclusions.
+The next guard continuously rejects newly arriving competing compiler/benchmark
+processes, stops only its owned tree, and retains the original time/RSS limits.
+
+Fresh isolated rerun (`matrix-isolated/`, `matrix-isolated-analysis.json`):
+
+| Mode | First prepare ms | First row us | Publication maintenance ms |
+|---|---:|---:|---:|
+| direct | 1.205 | 54 | n/a |
+| backup | 2915.156 | 42 | n/a |
+| backup-noauto | 0.546 | 40 | n/a |
+| backup-checkpoint | 0.027 | 43 | 3220.885 |
+
+All payloads and source hashes passed. Normal backup again left 248,368 frames
+unbackfilled, and first prepare backfilled all of them. The no-autocheckpoint
+control left them unbackfilled through prepare; the production maintenance
+completed backfill before the first SELECT. The runtime reported SQLite 3.46.0
+in every case. No Genesis replay or SQL/search warm-up ran in this harness.
+Admission CPU averaged 16.55%; free RAM minimum 12.92 GiB;
+the complete four-mode guarded job took 33.489 s and sampled tree RSS peaked at
+51.63 MB. Continuous process checks found no competing compiler/benchmark.
+This fixed-order single observation does not establish total-I/O or statistical
+performance improvement, and the OS file cache was not reset. Maintenance
+includes schema loading and real checkpoint work; it is not a dummy cache prime.
+<!-- SQLITE_MATRIX_RESULTS_END -->
+
+The prepared 100k workload makes one legitimate non-vector `Storage.add_node`,
+uses normal Drop/snapshot, reopens read/write in the same process and runs query 0
+before searches, coverage, metadata or marker probes. It retains 100,000 vectors /
+1,024 dimensions and checks 100,001 nodes, complete k10/k100 result counts, READY
+coverage of all 100,000 vectors, and marker recovery. Both 24-query sweeps report
+recall; lifecycle `state:ok` alone cannot qualify retrieval quality. The run parser
+must prove the second open's marker miss and actual backup publication. Reading
+the 100-byte SHM header is disclosed diagnostic observation; no filesystem-cold
+claim is made. The original full 100k ingest lifecycle remains a separate
+historical NOT_RUN under its unchanged cap.
+
+Latest resource hold (22:48 local time): six external compiler processes remained,
+instantaneous host CPU was 43%, and available RAM was 11,527,102,464 bytes.
+Earlier fresh 10-second admissions failed at 22.09% and 35.18% average CPU; a later
+attempt was rejected before sampling because compilers were active. The first
+100k copy/hash job was interrupted at 80.148 s when an unrelated Cargo arrived;
+the current monitor stopped only its owned Python and recorded complete cleanup.
+No SQLite/Storage open occurred. Both copies contain 109 files / 12,689,795,140 B
+with identical file-size lists, but **this is not full hash qualification**.
+`complete-100k-copy-verification.py` must finish byte hashes against the unchanged
+closed source before either engine case can start. The source-bound run configs,
+frozen binaries and strict result parsers are ready. The optional resource-window
+question remains pending; no permission or elapsed time substitutes for admission.
+No benchmark deadline, RSS limit, correctness gate or CPU threshold was widened.
+The 100k deadline and current real-BGE performance remain explicitly open.
+At 22:53:45 a fresh sample briefly found zero compiler processes but 42% CPU;
+the next copy-verification admission was again rejected because an external
+compiler had arrived. No engine run started. Final source recheck matched all
+287 qualified paths, and 1,089 recorded owned process identities had no live
+PID/birth/name match. Source and resource receipts are separate from performance
+qualification.
+
+Remaining timing gates: the matched
+100k before/after reopen cases; and real BGE before/after latency/recall/RSS.
+No new MB/percentage RAM saving or statistical performance non-regression is
+claimed. Retain the Arena/HNSW two-copy design and existing quantization/sidecars.
+Evidence: [SQLite follow-up artifacts](evidence/vector-memory-sqlite-prepare-20261031/README.md).
+
+<!-- SQLITE_POSTCOMMIT_START -->
+### Authorized checkpoint commit and subsequent workload qualification
+
+Audit checkpoint: `f98a324c6ac9c16bbd98679622012519107628a3` on the existing
+branch. It commits 1,742 audit/runtime/test/report/evidence paths and excludes all
+seven pre-existing staged H2a paths. Their cached patch is byte-identical before
+and after commit. All 287 qualified working-tree source hashes remain unchanged.
+The recorded 1,328-test qualification includes the additional uncommitted H2a
+tests; the original committed tests are unchanged as their prefix. This is a
+source-identity bridge, not a claim of a fresh whole-suite CI run at the new HEAD.
+The scoped evidence `.gitattributes` preserves verbatim bytes under Windows
+`core.autocrlf`; all 1,730 evidence blobs matched their source bytes before commit.
+
+The first actual same-process mutation/two-open 100k workload hit its original
+1,200-second cap (controller receipt 1,200.774 s including bounded cleanup),
+with sampled tree RSS peak 750,157,824 B. It reached a genuine second-open
+`marker_miss`, `force_rebuild=false`, but did not reach backup-complete/query 0.
+First open took 420.429 s; the legitimate non-vector insert took 0.0023 s;
+normal Drop/snapshot took 76.201 s. Later projection replay took 103.545 s,
+edge-history rebuild 51.385 s and backfill 1 us. This is **TIMEOUT / query deadline
+NOT_EXERCISED**, not a pass or evidence that the maintenance fix failed.
+The owned process tree was terminated with complete cleanup; no unrelated
+process was stopped. Raw artifacts are retained under the relocated
+`100k-two-open-attempt1/`, mapped by `100k-archive-relocation.json`.
+
+The diagnostic observer emitted 100,001 per-property messages during replay,
+making the raw trace 37,144,276 B. The next paired diagnostic variants use the
+same extra observer gate in both binaries: per-property trace is enabled only
+around query 0. SQL, data, query budgets and retrieval code remain unchanged.
+This removes observer allocations/I/O; it is not an engine RAM/performance win.
+Both variants build with Rust 1.96 and the same pinned dependencies/release
+profile in a private clone. Production source remains the committed `5b8bb9...`.
+
+The requested separated-workload measurement now distinguishes:
+
+- **Fixture preparation:** one RW open, one non-vector `Storage.add_node`, normal
+  Drop, zero search queries. It creates a valid closed snapshot with 100,001
+  nodes / 100,000 vectors through the real API; no SQLite/P6 edits.
+- **Fresh-process RW reopen:** byte-identical copies of that fixture; all snapshot
+  loading, marker-miss replay, backup, maintenance, query 0, 24 k10/k100 queries,
+  coverage/count/marker checks and normal Drop remain inside its own unchanged
+  1,200 s / 2 GiB parent job. Query 0 remains first, with the 5,000 ms deadline.
+
+This does not qualify or rename the failed same-process two-open lifecycle.
+Preparation time and fresh-reopen time are reported separately; their sum is not
+presented as a lifecycle pass. No warm-up query or OS-cache-cold claim is made.
+New fixture/fresh-reopen and real-BGE results remain pending until their actual
+guarded executions complete. Recurrent unrelated Rust 1.99.1 compiler activity
+has blocked additional admissions; those processes were preserved.
+
+**2026-11-01 rerun:** A new admission passed at 18.45% average CPU and
+13,802,835,968 B minimum available memory. The 100k fixture preparation then
+stopped at 488.016 s because three external Cargo processes appeared during the
+run (`resource_competition`). Its sampled owned-tree peak RSS was 564,862,976 B;
+cleanup completed with no owned processes remaining. The log reached snapshot
+loading and index reconstruction, but not a completed open, marker insertion,
+normal close, or any query. This interrupted fixture must not be reused for the
+paired measurement. The fresh-reopen before/after and real BGE runs were not
+executed, so their deadline, recall and RSS remain unverified. The guard receipt,
+admission samples, competing-process identities and logs are preserved in
+`evidence/vector-memory-resource-recheck-20261101/`. No query warm-up or budget
+change was used; preparation must restart from a verified pristine copy when
+the host can remain uncontended.
+
+A subsequent 2026-11-01 pristine-copy attempt passed admission at 14.18% CPU
+and 13,599,981,568 B minimum available memory, but external compiler activity
+caused the guard to stop it after 11.796 s. Cleanup completed; the destination
+fixture directory was never created, and no database or query was opened. The
+before/after 100k and real-BGE measurements remain pending. The copy script and
+guard receipts are retained in `evidence/vector-memory-pristine-recheck-20261101/`.
+
+A further 10-minute resource wait on 2026-11-01 expired without launching the
+pristine copy; six external Cargo/rustc processes were observed immediately
+afterward. No new fixture or benchmark result was produced. The wait receipt is
+`evidence/vector-memory-pristine-retry2-20261101/wait-status.json`; query
+deadline, recall, and benchmark RSS remain unverified.
+
+### Fresh 100k and real-embedding follow-up (2026-11-01)
+
+A new pristine copy matched the prior manifest for all 109 files (12,689,795,140
+bytes). The separate fixture preparation completed in 579.813 s with zero
+queries; its two closed copies were byte-identical. Both fresh-process RW reopen
+runs used the same prepared marker, 100,000 binary-quantized 1,024-dimensional
+synthetic vectors, 24 queries per sweep, a 5,000 ms query deadline, and the
+unchanged 1,200 s / 2 GiB parent guard. No warm-up query was issued. These runs
+do not qualify the earlier timed-out same-process two-open lifecycle.
+
+| Measurement | Before checkpoint change | After checkpoint change |
+|---|---:|---:|
+| First query | deadline error after 34.184 s | 21.262 ms, 10 results |
+| First property prepare | 34,176.400 ms | 0.020 ms |
+| Reopen | 778.997 s | 747.104 s |
+| Peak sampled tree RSS | 745.845 MB | 750.277 MB |
+| Search k=10 p50/p95/p99 | 3.353 / 4.355 / 4.695 ms | 3.157 / 3.886 / 3.970 ms |
+| Search k=100 p50/p95/p99 | 7.620 / 8.648 / 9.325 ms | 6.234 / 8.183 / 8.459 ms |
+| Synthetic recall@10 / @100 | 0.1583 / 0.0996 | 0.1375 / 0.0971 |
+
+Both runs recovered the marker and validated READY coverage of 100,000/100,000
+vectors; both later 24-query sweeps returned exactly k results. The baseline
+first query did not return results, so its result-count contract failed. The
+after run passed its first-query deadline and result-count contract. Before
+publication left 2,198,969 WAL frames pending; after publication checkpointed
+all of them in 31.005 s before the first query. This moves work into reopen;
+it is not an observed RAM saving. A single pair of randomized HNSW builds and
+24 queries is not a statistical recall or latency non-regression qualification;
+the observed synthetic recall decreases remain visible.
+
+The separately guarded untraced real BGE-m3 run after the change completed in
+356.604 s with 328.364 MB peak sampled tree RSS. For 11,266 vectors and 24
+queries it reported recall@10 0.9875, recall@100 0.9829, and same-process
+reopen recall@10 0.9708; its validated coverage was 11,266/11,266, and input
+hashes were unchanged. Its fresh read-only child checked open and coverage but
+did not issue a query. The two baseline attempts were interrupted by external
+compiler activity during that child after 352.626 s and 337.649 s respectively;
+both owned trees were cleaned up. The later completed baseline is compared below.
+Raw results and receipts are in
+`evidence/vector-memory-fresh-100k-20261101/`.
+
+Two further clean-directory baseline attempts on 2026-11-01 passed admission
+(11.91% and 18.55% CPU respectively), but external Cargo processes started
+while they were running. The resource guard stopped them after 30.710 s and
+203.257 s, with sampled tree RSS peaks of 227.582 MB and 313.364 MB. Both owned
+trees were cleaned up. Neither produced a complete baseline result, so no
+before/after real-BGE recall, latency, or RSS comparison could be qualified from
+those attempts.
+Receipts and logs are in `evidence/vector-memory-real-bge-retries-20261101/`.
+
+### Completed real BGE baseline comparison (2026-11-01)
+
+A further baseline ran from an empty directory and completed with the original
+1,200 s / 2 GiB guard and 5,000 ms query budget. The baseline and the prior
+after-change run used the same hash-verified BGE-m3 corpus (11,266 vectors,
+1,024 dimensions), inputs unchanged, F32, ef=200, and 24 queries per sweep.
+Both returned validated READY coverage of 11,266/11,266 and completed their
+fresh read-only child open and coverage checks. That child did not run queries;
+the reopen query measurements below are from the main process.
+
+| Measurement | Before | After |
+|---|---:|---:|
+| Recall@10 / @100 | 0.9958 / 0.9829 | 0.9875 / 0.9829 |
+| Search k=10 p50 / p95 / p99 | 4.554 / 5.174 / 5.469 ms | 4.482 / 4.986 / 5.184 ms |
+| Search k=100 p50 / p95 / p99 | 6.705 / 8.840 / 8.860 ms | 6.062 / 6.522 / 6.587 ms |
+| Same-process reopen recall@10 | 0.9750 | 0.9708 |
+| Same-process reopen k=10 p50 / p95 / p99 | 4.765 / 5.615 / 2,949.655 ms | 4.402 / 5.040 / 5.398 ms |
+| Peak sampled owned-tree RSS | 325.222 MB | 328.364 MB |
+| Guarded job duration | 420.832 s | 356.604 s |
+
+RSS is the guard's sampled process-tree working set, which may include shared
+pages; it is not an allocation or a measured RAM saving. The after-change
+recall@10 is 0.00833 lower in this sample (reopen recall@10 0.00417 lower),
+while recall@100 is equal. The baseline's high reopen p99 remains part of the
+result. This is one serial pair of independently built HNSW graphs with only 24
+queries per sweep, not proof of recall or latency non-regression. Receipts,
+results and the validation script are in
+`evidence/vector-memory-real-bge-complete-20261101/`.
+
+### Recall investigation and repeat (2026-11-01)
+
+The original 0.00833 recall@10 difference is two hits out of 240. The corpus,
+queries and truth hashes match; the persisted 46,145,536-byte `vec_bench.bin`
+also has the same SHA-256 (`f83b5bc3b3d1057f01114196cd37ac95ecbeefe2f04ad0168d723e0860af3133`)
+in both original and repeat before/after runs. Each run independently rebuilds
+HNSW. The pinned `hnsw_rs` 0.3.4 `LayerGenerator` initializes its RNG with
+`StdRng::from_os_rng()`, so graph variation is a plausible explanation, not a
+proven cause of the observed difference. The benchmark retains aggregate hits,
+not per-query result IDs, and cannot identify which queries or graph edges
+caused it. No change to retrieval or correctness gates was made.
+
+An additional serial pair ran under the same input, resource and query budgets:
+
+| Metric | Repeat before | Repeat after |
+|---|---:|---:|
+| Recall@10 / @100 | 0.9750 / 0.9800 | 0.9875 / 0.9758 |
+| Search k=10 p50 / p95 / p99 | 4.691 / 5.333 / 5.782 ms | 4.330 / 4.846 / 5.003 ms |
+| Search k=100 p50 / p95 / p99 | 6.593 / 7.150 / 8.623 ms | 5.928 / 6.495 / 7.320 ms |
+| Main-process reopen search k=10 | deadline error, 0/24 completed | recall 0.9833; p50/p95/p99 4.231/4.721/4.729 ms |
+| Peak sampled owned-tree RSS | 363.180 MB | 323.088 MB |
+
+Both jobs exited cleanly within their guards, input hashes and 11,266/11,266
+READY coverage passed, and the fresh child checked open/coverage. The baseline
+reopen query nevertheless failed `QUERY_BUDGET_EXCEEDED: reason=deadline`;
+exit zero is not a retrieval correctness pass. Recall@10 moved in the opposite
+direction from the original pair, while recall@100 decreased in this repeat.
+Two observations per variant are insufficient to establish non-regression or
+identify a causal change, and the repeat does not qualify the failed baseline
+reopen query. Three other launched runs were stopped by external compiler
+competition, and the next wait expired without launch. Results and evidence:
+`evidence/vector-memory-real-bge-repeat-20261101/`. More isolated pairs and
+per-query IDs are needed before a causal or statistical conclusion.
+
+### Per-query investigation: three real-BGE pairs (2026-11-01)
+
+The opt-in `GB_MEMORY_QUERY_EVIDENCE` benchmark mode records query index,
+elapsed time, ordered returned IDs, ground-truth IDs, hit count, and errors in
+the existing result JSON. It takes the search duration before constructing the
+record and does no per-query file I/O; record construction between queries can
+still affect subsequent timing. Both variants used this same instrumentation.
+The default output remains unchanged when the switch is absent. A 1,000-vector
+smoke run checked all 72 records against aggregate recall, and the helper's two
+unit tests cover ordered results and a failed query.
+
+Three additional serial pairs used the same hash-verified BGE-m3 input, 11,266
+F32 vectors, ef=200, 24 queries per sweep, 5,000 ms query deadline and original
+1,200 s / 2 GiB guard. All six jobs completed, input hashes matched, all six
+persisted vector files shared SHA-256 `f83b5bc3b3d1057f01114196cd37ac95ecbeefe2f04ad0168d723e0860af3133`,
+and validated main and fresh-child coverage was 11,266/11,266. The fresh child
+checks open/coverage only. Query evidence and analysis are in
+`evidence/vector-memory-query-evidence-20261101/`.
+
+| Pair | Recall@10 before / after | Recall@100 before / after | First query after main reopen before / after | Peak tree RSS before / after |
+|---|---:|---:|---:|---:|
+| 1 | 0.9875 / 0.9750 | 0.9808 / 0.9758 | 3,167.31 / 4.64 ms | 329.21 / 375.48 MB |
+| 2 | 0.9792 / 0.9833 | 0.9746 / 0.9808 | 3,519.29 / 5.78 ms | 324.27 / 388.20 MB |
+| 3 | 0.9833 / 0.9833 | 0.9746 / 0.9808 | **deadline error**, 6,057.61 / 4.68 ms | 323.97 / 338.49 MB |
+
+| Pair | k=10 p50/p95/p99 before / after (ms) | k=100 p50/p95/p99 before / after (ms) |
+|---|---|---|
+| 1 | 4.687/5.685/5.752 / 4.248/4.970/5.333 | 6.066/6.710/6.801 / 5.900/8.354/9.022 |
+| 2 | 4.788/6.517/6.534 / 4.250/4.893/5.157 | 6.816/9.270/9.984 / 6.002/6.513/6.546 |
+| 3 | 4.439/5.074/5.303 / 4.199/4.805/5.128 | 6.013/6.588/6.891 / 6.053/6.450/6.458 |
+
+For pair 3 before, the failed query is index 0 and no reopen queries completed;
+the parent process still exited zero, so that run is not a full query correctness
+pass. All after-change reopen sweeps returned the requested results without
+error. On pair 1, eight k=10 queries changed hits: after lost six and gained three
+(net -3/240). In pair 2 it gained four and lost three (net +1/240); in pair 3
+the aggregate was equal despite changed returned IDs. Even within the same
+binary, query hit counts vary across independently built graphs (11 queries for
+before and 10 for after). Together with the pinned HNSW OS-seeded layer RNG,
+this supports graph-build variability as a plausible contributor, but the graph
+topology was not captured and the checkpoint change has not been causally ruled
+out. These three pairs are not a statistical non-regression proof; per-query
+records expose the precise result differences and preserve the failed deadline.
+RSS is sampled working set for owned process trees, not unique allocation.
+
+Latest post-commit resource disposition (2026-11-01): the bounded preparation
+wait ended after nine admission attempts without opening the relocated pristine
+fixture. Last 10-second admission averaged 32.73% CPU with
+3,905,114,112 B (3.64 GiB) available RAM, against unchanged <20% /
+>=6 GiB thresholds. No preparation result/query exists. Initial StrictMode config
+rejections were infrastructure errors with no launch; explicit original defaults
+(`kind=benchmark`, `cap_seconds=1200`) fixed the schema, and future waiters fail
+fast on non-resource exceptions. These are not benchmark passes. Both fresh
+diagnostic binaries built successfully under pinned Rust 1.96; fresh 100k
+query deadline/quality and the new real-BGE pair remain NOT_RUN. No new RAM
+savings percentage or MB delta is claimed. See `postcommit-resource-hold.json`.
+<!-- SQLITE_POSTCOMMIT_END -->
+
+<!-- SQLITE_PREPARE_FOLLOWUP_END -->
+
+<!-- VECTOR_MEMORY_FOLLOWUP_START -->
+## Timeout follow-up and isolated-performance remeasurement
+
+This follow-up is a separate candidate stage after the initial audit. The original
+24 observations and their source/binary hashes remain frozen under the original
+evidence directory; they are not measurements of the later implementation.
+Follow-up raw logs, regression failures, build profiles and source/binary hashes
+are indexed in [the separate follow-up evidence](evidence/vector-memory-followup-20261031/README.md).
+Status: the six test-timeout groups are closed by complete bounded runs. The
+historical 100k query deadline and statistical performance non-regression remain
+open; successful smaller diagnostics are not substituted for those gates.
+
+### Confirmed causes and bounded fixes
+
+- Large graph transactions scanned every revision mutation for each leaf; folding
+  revalidated the source for each materialization. The new borrowed identity/owner
+  indexes preserve first-match order and duplicate rejection. Small transactions
+  remain allocation-free. The regression failed at 8,385 probes for 129 mutations;
+  the indexed representative workload passes its linear-work bound.
+- A CPU diagnostic matching the 2,000-node journal fixture spent 5.873 s inserting
+  and 132.207 s in explicit checkpoint, with 124.70 s process CPU. The delay was
+  checkpoint work, not evidence that the durable append/fsync contract should change.
+- Identical signature math ran seven times per checkpoint. A thread-bound RAII
+  cache now reuses only exact verifying-key/message/signature results; SHA256 is
+  a lookup accelerator and full message bytes are compared. Current peer-key lookup,
+  membership/authority and graph/revision/target binding checks still run.
+  The cache is scoped to the outermost checkpoint, limited to 16,384 entries and
+  8 MiB retained message payload; it is cleared on return/error/unwind.
+- Canonicalization cloned and encoded the entire source transaction once per leaf.
+  A regression observed 70 encodings for one shared source. A separate borrowed
+  cache now retains at most 8 MiB of canonical/source JSON and 4,096 source entries
+  during one fold. Its references cannot outlive the immutable source. It carries
+  no authorization result. Existing hits survive admission closure; after the first
+  byte-budget rejection new admissions stop, avoiding repeated failed preparation.
+  Uncached sources use the original signing path. One initial refused preparation
+  can still allocate transient buffers; the cap is retained payload, not peak RSS.
+- Cached envelopes preserve the exact serde field order, signature domain, LZ4
+  encoding and proof caps. Node/Edge/Vector byte equality, escaped/Unicode values,
+  real verification, mismatched-cache fallback and capacity fallbacks pass.
+- The unchanged wire protocol still hashes full detached proofs for every leaf.
+  Unoptimized dependency code amplified this cost: four representative signatures
+  took 0.4557 s and four SHA512 hashes 0.2275 s. The explicit dev-package overrides
+  optimize only sha2, curve25519-dalek and lz4_flex. Cargo artifact metadata confirms
+  all three at opt-level 3 with debug assertions/overflow checks enabled; engine
+  code remains opt-level 0 with both checks enabled. Release settings and locked
+  versions are unchanged. This is not a larger test/query budget or fewer assertions.
+
+The two new caches add at most 16 MiB retained byte payload together, plus bounded
+map metadata, per active outer checkpoint/thread. Indexes also trade O(M) transient
+lookup metadata for fewer scans. These are deliberate CPU/RAM tradeoffs and are
+included in process RSS; do not add them to sidecar cache metrics or claim they
+reduce persistent vector payload. Repeated-owner vector buckets retain source-order
+scans; this is not a universal linear-time claim for all adversarial transactions.
+
+### Verification of the six complete groups
+
+All tests in these groups ran without filtering, with the original 300 s per-target
+and 4 GiB process guard. Source-only stages and dependency profile changes are
+shown separately so a compiler speedup is not attributed solely to source changes.
+
+| Group | Initial candidate | Indexed/math-cache stage, unoptimized deps | Encoding-cache stage, unoptimized deps | Final checked dev profile |
+|---|---|---|---|---|
+| concurrency | timeout 300 s | timeout 300 s | PASS 276.266 s | PASS 72.061 s |
+| consensus checkpoint race | timeout 300 s | PASS 181.817 s | PASS 170.912 s | PASS 45.826 s |
+| HQL Cypher | timeout 300 s | timeout 300 s | timeout 300 s | PASS 156.357 s |
+| journal format | timeout 300 s | PASS 148.984 s | PASS 145.551 s | PASS 28.519 s |
+| rebuild from truth | timeout 300 s | timeout 300 s | timeout 300 s | PASS 64.285 s |
+| WAL compaction | timeout 300 s | PASS 95.028 s | PASS 100.998 s | PASS 21.720 s |
+
+Final core run: **159/159 executable targets completed, 1,325 tests passed,
+0 failed, 7 ignored**. The seventh ignored test is a new explicitly invoked manual
+CPU profiler; the six previous ignores are unchanged. All six formerly incomplete
+groups completed with no skipped cases. Native/Node: **88/88 passed**. Strict
+Clippy core/default, Windows-host mobile compile, NAPI build/smoke and TypeScript
+freshness checks passed. Local Windows results do not certify hosted CI or a release.
+Final formatting, documentation validation (0 violations in 247 files), diff
+whitespace and source-provenance checks passed. All 253 compiled code/config/API
+files match the restored verification checkout; the seven original staged paths
+also match their protected hashes and exact staged path set. Evolving report/RCA
+files are recorded separately from compiled source, not forced to match an older
+documentation snapshot. The first verifier attempt misclassified those documents;
+that receipt and its corrected scope are retained explicitly.
+
+An independent read-only reviewer checked acceptance/rejection equivalence,
+source lifetimes, cache key/context, bounds, codec bytes and checked build profiles,
+then rechecked the fixes and final profile changes.
+The over-budget admission issue found during review was reproduced by a RED
+encoding-count assertion, fixed, and reviewed again with no actionable findings.
+
+### Isolated native checkpoint performance
+
+Six fresh writer processes ran ABBAAB (three per binary), one at a time, each
+followed by a separate read-only verifier. Both binaries used the same checked,
+optimized dependency profile; the engine remained opt-level 0. Each writer streamed
+2,000 individual node mutations with a 32 MB page cache. Every writer and verifier
+exited successfully; all verifiers found exactly 2,000 unique rows and checked both
+endpoint values. No vector query was part of this checkpoint workload.
+
+| Median measurement | Before follow-up | Final candidate | Change |
+|---|---:|---:|---:|
+| Open | 41.671 ms | 44.232 ms | +6.15% |
+| Ingest | 4,105.625 ms | 4,025.749 ms | -1.95% |
+| Explicit checkpoint | 6,173.717 ms | 5,484.191 ms | -11.17% |
+| Whole process wall | 11.059 s | 11.015 s | -0.40% |
+| Whole process CPU | 9.766 s | 9.078 s | -7.04% |
+| OS peak RSS | 120.361 MB | 131.625 MB | **+11.264 MB / +9.36%** |
+
+MB is decimal. This workload demonstrates a bounded-cache CPU/RAM tradeoff, not
+additional RAM savings. Process wall time is essentially unchanged. Host admission
+samples averaged 7.7-11.3% CPU with at least 18.84 GB free RAM; no owned compiler or
+test workload overlapped. The 300 s / 4 GiB guards were unchanged. A pilot with an
+incorrect verifier field name is retained and excluded from these six observations.
+
+The before binary includes inactive query-trace helpers; no vector queries execute
+in this workload and its diagnostic stderr is empty. Source/profile/binary hashes
+are retained separately. The earlier 132.207 s diagnostic used unoptimized
+dependencies and is not the matched-profile performance denominator above.
+
+Native wrapper finalization does not measure `Storage::drop`: an autonomic worker
+retains an Arc to Storage. These runs measure explicit save and then terminate the
+writer. Worker lifecycle/explicit close behavior needs a separate design and test;
+there is no new close API in this patch.
+
+### Reopen deadline investigation and measurement status
+
+The initial 100k first-query failures remain historical evidence. Fresh-process
+read-only and read-write diagnostics both returned 10 results within the unchanged
+5,000 ms budget (outer query measurements about 11.9 ms and 9.2 ms respectively).
+Both found 20/20 eligible
+candidates, no refills, no retired/missing/invisible nodes, and READY coverage.
+Those observations do not establish the cause of the original same-process failure.
+No speculative query algorithm or budget change is included.
+
+The controlled old/new same-process open/query/drop/reopen runs both completed
+within 1,200 s / 2 GiB, with Rayon=4, ef=200 and identical input hashes. Metadata
+scans and warm sweeps occurred after the first query; only the original coverage
+validation preceded the second open's first query. No owned build/test workload
+overlapped. Each binary queried the first open before Drop, reopened in that same
+process, then queried again. All four first queries returned 10 results.
+
+| 100k/1024 BQ, no rerank | Before follow-up | Final candidate |
+|---|---:|---:|
+| First open | 411.645 s | 415.183 s |
+| First-open q0, traced outer measurement | 179.507 ms | 177.030 ms |
+| First Drop/save | 74.198 s | 74.545 s |
+| Same-process second open | 414.557 s | 410.170 s |
+| Second-open q0, traced outer measurement | 176.303 ms | 177.970 ms |
+| Second Drop/save | 74.365 s | 74.376 s |
+| Largest sampled named-phase RSS | 608.391 MB | 611.303 MB |
+| Additional warm q@10 p50/p95/p99 | 2.281/2.708/2.979 ms | 2.268/2.704/2.899 ms |
+| Additional warm Recall@10 | 0.14167 | 0.17500 |
+
+The warm sweep is **24 unique queries repeated five times**, not 120 independent
+queries. It follows first q0 and disables query tracing. BQ recall is low without
+rerank; random rebuilt HNSW graphs vary and these observations do not establish a
+quality improvement. No threshold was reduced. Recall@100 was not measured in
+this diagnostic. Both final summaries show 100k metadata/current-visible nodes,
+zero retired/missing rows and READY coverage. No deadline was reproduced. Sampled
+phase peaks are distinct from OS lifetime PeakWorkingSet; this pair shows a
+2.912 MB RSS increase, not savings. The traced HNSW subcalls took about 2.2 ms;
+the remaining first-query interval is not fully attributed by these probes.
+Traced q0 includes synchronous diagnostic output and is not a clean uninstrumented
+latency benchmark. The OS file cache was not cleared; "first" describes query
+order, not a cold-storage guarantee. The trace return timer starts after the
+commit lock, from `QueryBudgetState::started`.
+
+Candidate startup attempts that omitted dispatch environment flags exited before
+opening the database. Their logs are retained as controller failures and excluded;
+the completed run explicitly matched all 16 old-run environment keys, substituting
+only scratch/output paths, and passed a fresh CPU/RAM admission check.
+
+Exact-main-sequence replay
+(streamed ingest through same-process reopen and fresh-child reopen) is **NOT_RUN**
+under the unchanged 1,200 s / 2 GiB follow-up guard. Summing the historical audit's
+named phases gives 2,394 s and 2,439 s before Drop; those contended observations
+are directional evidence, not isolated estimates for the new binaries. They exceed
+the cap by about twofold and suggest a cutoff before the target query. No phases
+are excluded or split across budgets to manufacture a complete lifecycle result.
+The exact cause of the original deadline remains unconfirmed.
+
+### Isolated real-embedding release workload
+
+One serial before/after pair used the frozen repository BGE-M3 corpus
+(11,266 x 1024 F32, no rerank), 24 fixed perturbed-row queries, full retention,
+compaction enabled, Rayon=4 and ef=200. Both used the original streamed harness
+and matched release flags; dev-package overrides do not affect this comparison.
+Both completed all phases within the unchanged 1,200 s / 2 GiB process-tree guard.
+Admission CPU averages were 11.09% and 8.45%, with at least 18.9 GB free RAM.
+
+| Measurement | Before follow-up | Final candidate | Change |
+|---|---:|---:|---:|
+| Ingest | 64.111 s | 63.080 s | -1.61% |
+| Rebuild | 42.454 s | 42.238 s | -0.51% |
+| Snapshot | 8.630 s | 8.574 s | -0.65% |
+| Compaction | 42.754 s | 42.413 s | -0.80% |
+| Same-process reopen | 97.950 s | 96.017 s | -1.97% |
+| Fresh read-only reopen | 69.254 s | 68.510 s | -1.07% |
+| Whole process tree wall | 345.914 s | 342.135 s | -1.09% |
+| Root OS lifetime peak RSS | 360.493 MB | 361.288 MB | +0.795 MB / +0.22% |
+| Snapshot sampled peak RSS | 202.146 MB | 204.358 MB | +1.09% |
+| Compaction sampled peak RSS | 256.299 MB | 265.458 MB | +3.57% |
+| Reopen sampled peak RSS | 352.121 MB | 358.457 MB | +1.80% |
+
+Root OS PeakWorkingSet is read from the monitoring timeline. Summed process-tree
+RSS samples are a conservative guard and may double-count shared pages; they are
+not substituted for root lifetime peaks or unique physical RAM.
+
+| Search | Before p50/p95/p99 ms | Final p50/p95/p99 ms | Recall before -> final |
+|---|---|---|---|
+| k=10 | 4.166/4.540/4.690 | 4.185/4.656/4.677 | 0.97500 -> 0.97500 |
+| k=100 | 5.877/6.436/6.632 | 6.322/6.917/6.972 | 0.97833 -> 0.97833 |
+| Reopened k=10 | 4.356/5.257/2760.362 | 4.317/4.846/2657.669 | 0.97917 -> 0.98333 |
+
+Search@100 p95 increased **7.47%** in this pair; search@10 p95 increased 2.55%.
+These observations are retained rather than called non-regression passes. One
+pair with 24 queries and random HNSW rebuilds cannot qualify tail behavior or
+assign causality to the patch. Real vectors are used, but the queries are not
+semantic relevance labels. Existing correctness/quality tests remain the contracts.
+
+Both snapshots and both fresh reopens passed; all search errors were null and
+coverage was READY, validated, indexed=source=11,266 with no missing/extra rows.
+The persisted 46,145,536-byte `vec_bench.bin` files are byte-identical (SHA256
+`f83b5bc3b3d1057f01114196cd37ac95ecbeefe2f04ad0168d723e0860af3133`).
+Arena logical payload and HNSW point payload remain 46.146 MB each; sidecar cache
+and disk bytes are zero for this F32 case. Disk footprint was 1,501.142 ->
+1,501.161 MB, with timestamped/authenticated metadata differing between runs.
+This follow-up pair demonstrates no additional vector-payload or RSS saving.
+See `isolated-real-comparison.json` and the raw release-control run receipts.
+
+### Real-workload tail attribution
+
+An additional candidate-only full-main diagnostic used the same real F32 input,
+compaction/retention settings and unchanged guards, with direct-file trace output.
+It completed in 347.077 s, engine exit 0, no guard hit, and unchanged input hashes.
+The 73 trace groups cover initial k10 x24, initial k100 x24, reopened k10 x24 and
+fresh-child q0. Reopened **query 0** was the single large sample: core 2,550.755 ms,
+including **2,539.473 ms hydrating node 5932**. The other 19 hydrations summed to
+0.310 ms; HNSW took 4.103 ms, eligibility 0.033 ms, serialization 0.010 ms.
+There was no refill and all 20 candidates were eligible. Initial/fresh-child
+hydration of the same node took 0.070/0.065 ms.
+
+The supported attribution is the projection-property hydration path:
+`hydrated_node -> hydrated_props -> projection_props_unlocked`, which acquires
+the projection connection mutex, executes a primary-key SELECT and parses JSON.
+The timer covers that entire path. A separate read-only SQLite probe after engine
+close found the payload was two-byte `{}`, used INTEGER PRIMARY KEY lookup, and
+returned in 7.85 ms. That is a different connection/state and does not establish
+the subcause during the timed engine query. It also uses Python SQLite 3.50.4;
+the engine pins rusqlite 0.32.1 / libsqlite3-sys 0.30.1 with bundled SQLite 3.46.0.
+Writable open can replay/publish a projection candidate via SQLite backup on a
+journal-fingerprint miss; read-only open skips that sync. This is a relevant source
+path difference, not proof of delayed backup or checkpoint work. The pinned
+SQLite backup step commits before reporting DONE and finish rolls back only a
+still-open destination transaction. The existing hydration fallback swallows
+lookup errors, so a second diagnostic measured both status and individual stages.
+See `query-reopen-bge-candidate-trace-20261031T145352/analysis-summary.json`.
+
+The split-stage run completed successfully in 353.038 s with no guard hit and
+unchanged inputs. Reopened q0 core time was 2,650.856 ms. For node 5932:
+
+| Hydration stage | Time |
+|---|---:|
+| Projection mutex acquisition | 0 us at timer resolution |
+| SQLite `Connection::prepare` | **2,631,425 us** |
+| Row step/read | 37 us |
+| Statement finalize | 0 us at timer resolution |
+| JSON parse | 0 us at timer resolution |
+
+The SELECT returned a row, payload length 2, and JSON parsing succeeded. No lookup
+error was hidden in this observation. HNSW took 4.014 ms; all 20 candidates were
+eligible with no refill. This confirms a **successful prepare-stage stall**, not
+mutex contention, large JSON decoding or a slow HNSW lookup. It does not establish
+which SQLite/OS operation inside prepare waited or prove that the historical
+100k deadline has the same cause.
+
+No speculative query fix, eager query warm-up, budget increase or changed error
+contract is shipped. Preparing a statement early merely to move this unproven
+cost outside the query timer is not presented as an optimization. The historical
+100k full-main gate remains unresolved under the unchanged resource/time cap.
+The next investigation should isolate the pinned SQLite RW-publication/prepare
+state and obtain SQLite/OS profiling in a bounded reproducer.
+
+`projection-props-split-20261031T151315/split-stage-result.json` records the run.
+Its helper-only source/binary hashes are frozen; delivery source remains the
+qualified `812afdbe...` core. The raw launch context retained an old base-source
+metadata field (AE2D); the build context and binary identify the actual split
+source D64EC0. A separate provenance-correction sidecar records that distinction;
+the observation is not relabeled as a different executable. The C verification
+checkout was restored to delivery source, and all owned run processes exited.
+
+<!-- VECTOR_MEMORY_FOLLOWUP_END -->
+
+## Design and implementation plan
+
+Parent contracts reviewed: AGENTS.md, AGENT.md, MASTER-SPEC--GENESIS-DB.md,
+C4 architecture map, BENCHMARKING.md; peer decisions: vector quantization,
+on-disk rerank sidecar, HNSW capacity, async indexing and documentation governance.
+Historical prose is contextual; current source and Cargo.lock are the evidence.
+
+Risk: C-3 architecture evaluation; MEDIUM additive collection metrics; LOW snapshot
+serialization and typed rebuild input changes, contingent on byte/parity tests.
+
+1. Record ownership, pinned dependency implementation, resource limits and baseline.
+2. Extend the existing vbench-genesis infrastructure with an opt-in memory audit:
+   streamed corpus, bounded batches, sampled phase RSS, search@10/@100, rebuild,
+   checkpoint and reopen. Preserve legacy benchmark behavior. Use fresh directories.
+3. Before engine changes, freeze baseline JSON/logs and binary/source hashes.
+4. Add tests for cache payload accounting/bounds, arena capacity, legacy metric
+   deserialization, snapshot bytes and rebuilt index parity in every quantization mode.
+5. Replace full-arena snapshot buffers with bounded little-endian writes; insert
+   arena-native F32/SQ8/BQ slices into HNSW during rebuild, decoding F16 once.
+6. Add separate cache and arena allocation metrics, retain legacy metric meanings.
+   Report HNSW vector payload estimate explicitly; do not invent graph allocation totals.
+7. Repeat the identical workloads, run relevant and full Rust tests, formatting,
+   feature checks and documentation validation. Record limits and open gates.
+
+Acceptance: unchanged snapshot layout/durability orchestration, quantization results,
+coverage, historical vectors, sidecar replacement and capacity floor; bounded cache;
+no unsafe storage sharing or HNSW replacement. RSS and logical byte counts remain
+separate. Synthetic recall is characterization, not real-embedding acceptance.
+
+Alternatives: retain both copies and remove transient copies (selected); share a
+growing arena with borrowed HNSW points (rejected for this scope); replace/fork the
+index (deferred architecture project). Cache clone changes require measured benefit
+and are not included merely because a clone exists.
+
+## Execution ledger
+
+- Source audit: snapshot calls arena.to_bytes(), which allocates the full payload.
+- Rehydrate: every row allocates f32, then SQ8/BQ/F16 allocates another conversion.
+- Sidecar metrics omit the bounded cache; arena byte_size uses length, not capacity.
+- Compaction holds Vec<Vec<f32>> for all surviving rerank rows; calibrated SQ8 also
+  flattens/sorts those rows. Comments claiming row-bounded compaction are inaccurate.
+  Changing the truncate/rewrite/calibration algorithm is deferred pending a dedicated
+  crash-safe streaming design; measured compaction results are recorded below.
+- HNSW rebuild retains the old graph until the new graph is installed. Keeping this
+  availability behavior is deliberate; peak memory is larger than steady state.
+- Additional lifecycle finding: rehydrate returns early for empty metadata without
+  dropping a previous index. After retracting the last vector and compacting, the
+  entire stale graph remained owned. The new regression reproduced this before the
+  fix; empty rebuild now clears the derived view while non-empty rebuild retains
+  its existing availability behavior.
+- Compaction reserves global live-node count for metadata in every collection,
+  including empty ones. Bound that reservation by the collection's source metadata
+  length; Vec growth remains available for retained history. The new regression
+  covers unrelated live nodes and empty vector spaces.
+- Original and candidate attempts retain both successful and failed evidence. Query
+  deadline errors are recorded without widening engine query budgets. The first
+  harness used unwrap in search and lost later phase JSON on a post-reopen deadline;
+  a harness-only correction returns explicit error/null recall while retaining RAM
+  phases. Both engines use the same correction for subsequent cells.
+
+### Baseline failures captured before any engine changes
+
+Frozen original-profile binary SHA-256:
+`b0f7e82e12b167fe7b381904295600c7b752bc4883400eeb6c6afea049350ce9`.
+The default frontier-only checkpoint at 10,000 x 768 F32 failed with
+`JOURNAL_AUTH_PREFLIGHT_LIMIT`: segment declares 76,267,081 uncompressed bytes,
+authorization source limit 68,708,864 bytes. A 1,000 x 768 control instead reached
+`SYNC_AUTH_REQUIRED: invalid signature or unauthorized event signer` during folding.
+Both scratch databases and stderr/stdout are retained; neither is a successful run.
+
+An independent small executable linked to the baseline serde_json dependency
+round-tripped the first 768 streamed f32 values promoted to f64 through JSON:
+66 changed f64 bits (e.g. 0.014804803766310215 -> 0.014804803766310217).
+This is evidence of a floating-point serialization/signature compatibility hazard,
+not permission to change signed-event canonicalization or weaken authentication.
+The exact engine failure and this diagnostic are reported separately; no general
+signature repair is included in this memory change.
+
+The measurement harness now records phase/error JSON instead of aborting before
+writing results. Its explicitly selected `full` retention measures snapshot writes
+without the frontier-only fold; errors and reopen coverage remain acceptance gates.
+Do not extrapolate those snapshot results to a successful default checkpoint.
+Build profile for comparable measured runs: optimized release, LTO disabled,
+16 codegen units, 2 build jobs. The initial failed original-profile attempts remain
+separate from that comparison. Benchmarks use fresh processes, 256-row streaming
+batches, ef construction/search 200, 24 queries and 20 ms sampled working sets.
+
+First completed measured baseline, recorded before engine optimization:
+F32 10,000 x 768, `full` retention, binary SHA-256
+`4d2b475a430db0553a9243b801eb4268c89f36211f8d06c9ae5a4e53cdab1b78`.
+RSS after ingest 144,572,416 B; rebuild peak 202,117,120 B; snapshot peak
+182,153,216 B; fresh-process reopen RSS 120,582,144 B (peak 204,107,776 B).
+Ingest 71.130 s, rebuild 48.951 s, snapshot 6.407 s. Recall@10 0.87917,
+Recall@100 0.73542; search@10 p50/p95/p99 5.552/6.322/6.326 ms.
+Snapshot and both reopen paths succeeded; source/index ID coverage READY.
+Subsequent baseline cells use the frozen original production engine, even while
+implementation proceeds. Later cells use a second immutable baseline executable
+with the harness-only query-error recording correction described above; exact
+per-cell binary/source mappings are in provenance. Source/harness copies and
+executables are retained outside git.
+
+## Current ownership map (source-verified)
+
+| Owner | Payload/lifetime | Classification |
+|---|---|---|
+| VectorCollection.arena | One contiguous growable Vec: f32, u8, packed u64 or f16 bits; includes retained historical/re-embedded rows | Required persistence, exact fallback and rebuild source in current design |
+| hnsw_rs PointData::V | Per-point owned Vec copied by generate_new_point(data.to_vec()); F16 uses f32 here | Required by pinned index insertion API; separate from arena |
+| HNSW graph | Arc<Point>, 16 Vec headers per point, neighbor Arc<PointWithOrder>, lock/control allocations and per-layer point tables | Required ANN topology; no exact byte total exposed by library |
+| Metadata/maps | NodeMetadata rows, current node-to-arena DashMap, engine node interning/maps, coverage sets | Required identity, temporal filtering and graph/vector resolution; separate from vector payload |
+| Rerank file | fvec file of raw prepared exact-f32 rows for SQ8/BQ rerank | Disk, not a heap-sized resident vector; OS page cache is separate |
+| Sidecar LRU | At most 4096 owned decoded rows plus HashMap/VecDeque storage | Bounded resident payload; previously absent from metrics |
+| Sidecar row caller | clone on hit, clone into cache on miss; byte decode buffer | Transient per-row allocation; changing return ownership deferred |
+| Async ingest | f64 NodeInput, WAL serialization/signatures, staged f32 IndexJob; queue bounded at 4096 jobs (a Batch can contain many vectors) | Required transport/durability staging; job bound is not a byte bound |
+| Rebuild | Old HNSW plus new HNSW until atomic lock-protected installation; decoded row scratch | Old/new overlap preserves read availability; row conversions avoidable |
+| Snapshot | Compacted WAL payload/proofs; metadata encode; cloned node/edge JSON; baseline per-leaf signed-source copies and full vec buffer; sidecar row streaming fills LRU | This patch removes deep source clones and full arena buffer; wire proof repetition and other checkpoint peaks remain |
+| Compaction | Old/new arenas and metadata, old/new HNSW, all survivor f32 rows, optional SQ8 flattened sorted values | Significant remaining transient peak; changing calibration/rewrite is a separate durability design |
+
+In-memory lean nodes clear their embedding (`insert_node_lean`); there is no
+persistent third f64 embedding on every current node. Signed WAL/transaction and
+revision-projection representations still carry source payloads for durability.
+`execute_batch` transiently owns input/output/event clones and groups f64 rows
+before producing staged f32 jobs. `VecIndex::insert_f32` borrows F32, but allocates
+SQ8/BQ/F16 conversion scratch before the library copy. `parallel_insert_f32`
+materializes a whole batch of converted rows for quantized modes plus a reference
+list (F32 uses only a reference list). Those ingest conversions are unchanged;
+removing them needs a typed staged-job design and concurrency/byte-admission tests.
+The 256-row benchmark batch bounds harness-induced traffic without pretending the
+engine's 4096-job queue bounds bytes. On reopen, snapshot reads and decoded arena
+buffers can overlap; the new serializer does not remove reader-side allocations.
+
+Pinned dependency: Cargo.lock hnsw_rs 0.3.4, checksum
+`43a5258f079b97bf2e8311ff9579e903c899dcbac0d9a138d62e9a066778bd07`.
+Local registry source `src/hnsw.rs`: PointData V/S at 130-152; Point at 163-205;
+point tables at 447-461; insertion copy at 508; parallel_insert at 1212-1225
+delegates to insert. S/mmap-backed points exist for library loading, but the public
+live insert API used here owns a Vec. This is not evidence of a safe shared-arena API.
+The cached crate archive hash matches Cargo.lock, and the registry source file
+matches that archive (see dependency provenance). `PointIndexation::drop` at
+408-444 explicitly clears neighbor references to break Arc cycles before releasing
+layer ownership. Clearing a stale index releases graph ownership; allocator pages
+need not immediately leave RSS.
+Vec::push grows point tables; the existing 1024 minimum/lazy index policy stays intact.
+
+## Structural deduplication decision
+
+Retain the two-copy design. Borrowing the growing arena would invalidate slices on
+reallocation; the stored index is Hnsw<'static,...>, while arena reads are scoped
+RwLock guards. Owned per-point memory allows concurrent distance evaluations without
+holding an arena guard for the index lifetime. SQ8/BQ could share codes only with a
+new stable-storage adapter; F16 additionally uses a different representation in HNSW.
+
+The arena is also used by exact-search fallbacks, persisted snapshots and recovery,
+historical vector visibility, compaction and re-embedding. HNSW is a rebuildable
+derived view; removing the arena in favor of HNSW would reverse that authority and
+must account for staged/unindexed and historical rows. Removing the HNSW copy would
+require stable immutable chunks/owned row handles and an index API accepting them,
+with generations pinned through concurrent reads and a persisted recovery mapping.
+No unsafe lifetime extension, mmap, HNSW replacement or new ownership architecture
+is justified by this bounded audit.
+
+A concrete future safe ownership direction is immutable `Arc<[T]>` row/chunk
+storage shared by arena handles and an upstream index point-data variant that owns
+an Arc. Growing the arena would grow its handle/offset table, not move row bytes.
+Concurrent readers retain generation handles; compaction/re-embedding create new
+rows and release old generations only after historical retention and active reads
+permit it. Recovery reconstructs row handles from persisted encoded bytes before
+index rebuild. This requires a compatible point-storage API extension and careful
+Arc/header/locality accounting, rather than lifetime transmutation. It is not
+implemented or benchmark-qualified here.
+
+A separate F16 option is HNSW owned u16 codes with a custom half-decoding distance,
+still retaining two copies. That could remove 2*N*D bytes from the current f32 index
+payload (3.072 GB at 1M/1536), but changes the distance implementation and needs
+numeric parity, overflow policy, throughput and concurrency evaluation. These are
+design estimates only; current F16 distance behavior stays unchanged.
+
+Potential payload-only savings from a future compatible shared representation:
+N*D*4 bytes F32, N*D bytes SQ8, N*ceil(D/64)*8 bytes BQ. F16 cannot simply share its
+u16 arena with the current f32 index. Graph, metadata and pending jobs would remain.
+These are theoretical payload savings, not measured RSS reductions.
+
+## Implemented optimizations and accounting contract
+
+- **Snapshot:** `ArenaStore::write_bytes` replaces `to_bytes` at its only production
+  caller. F32/F16/BQ encode little-endian into an 8192-byte stack buffer; SQ8 writes
+  borrowed chunks. The output ordering, temporary path and replacement sequence are
+  unchanged. Write failures still propagate. This removes one whole logical-arena
+  heap buffer per serialized collection, not every checkpoint allocation.
+- **Rebuild:** borrow native arena rows for F32/SQ8/BQ until synchronous HNSW insert
+  returns. hnsw_rs still makes its required owned copy. F16 decodes once into a row
+  buffer instead of decoding, rounding and decoding again. Old/new graph overlap
+  and insertion order remain unchanged. No unsafe references or live index API change.
+- **Empty lifecycle:** rebuilding an empty metadata set drops its stale HNSW and
+  invalidates coverage. The last-vector retract/compact regression reproduced the
+  previous `count=0,indexed=1` state before this change.
+- **Compaction metadata:** reserve `min(collection_metadata_len, global_live_nodes)`
+  instead of global node count for every collection. Survivors cannot exceed source
+  rows. A regression reproduced 128 allocated metadata slots in empty collections
+  with unrelated live nodes; the corrected empty reservation is zero.
+- **Default checkpoint proof caches:** private base/master maps and action records
+  now share one immutable `Arc<SignedEvent>` per scanned source. The public event
+  and envelope types, source order, overwrite rules, all verification calls and
+  serialization/caps are unchanged. Different collector scans still own separate
+  sources; encoded envelopes and the final fold buffer remain duplicated on wire.
+- **Observability:** expose separate allocation categories through CollectionInfo,
+  REST/NAPI/TypeScript and Prometheus. Existing fields retain their meanings.
+
+The table uses Rust/REST/benchmark snake_case names. NAPI/TypeScript uses
+`sidecarCacheBytes`, `arenaAllocatedBytes` and `hnswVectorBytes`, as generated from
+the same fields and verified by the declaration check and isolated native smoke.
+
+| Field | Meaning and exclusions |
+|---|---|
+| `arena_resident_bytes` (legacy) | Logical occupied arena payload, despite the historical name; not actual resident pages |
+| `arena_allocated_bytes` (new) | Backing Vec capacity times element width; includes spare capacity, excludes allocator overhead; overlaps the legacy field |
+| `sidecar_resident_bytes` (legacy) | Zero for positioned on-disk reads; preserved for compatibility; excludes decoded cache |
+| `sidecar_cache_bytes` (new) | Sum of cached decoded Vec capacities times 4, under the cache lock; excludes map/deque headers, caller clones and OS file cache |
+| `sidecar_disk_bytes` | Referenced row count times D times 4; disk payload, never add as process RAM |
+| `hnsw_vector_bytes` (new) | Point count times D*4 for F32/F16, D for SQ8, ceil(D/64)*8 for BQ; vector-payload lower bound, excludes graph, headers, allocator capacity/overhead |
+| `process_rss_bytes` (benchmark) | sysinfo process working set on Windows; includes other engine/allocator resident pages; not a sum of collection fields |
+| `index_rebuild_peak_rss_bytes` (benchmark) | Maximum 20 ms sampled working set during rebuild, including endpoints; short spikes can be missed |
+
+A total `hnsw_estimated_bytes` is deliberately not published: the dependency exposes
+point count and payload width but no trustworthy total allocation accounting. The
+narrower name prevents a vector-only lower bound being mistaken for graph-inclusive
+RAM. Runtime `memory_usage_mb` remains a logical engine estimate; Prometheus HELP
+now explicitly excludes HNSW/cache and distinguishes it from RSS. New JSON fields
+use serde defaults so old serialized CollectionInfo values continue to deserialize.
+
+Metrics are individually observed, not an atomic snapshot under concurrent mutation.
+Do not add arena logical bytes to arena capacity, or add either category to process
+RSS. Cache inspection does not touch/populate entries. The cache still owns at most
+4096 rows. Its full decoded payload cap is 12.58/16.78/25.17 MB at D=768/1024/1536,
+plus container overhead and simultaneous caller results. Cache clone behavior is
+retained because this audit did not establish a material measured benefit from an
+ownership/API change. Sidecar replacement and eviction code remain unchanged.
+
+## Allocation-level savings and scale projections
+
+Decimal MB (1,000,000 bytes) are used below. These are removed snapshot temporary
+payloads, not measured steady-state RSS savings or total memory requirements.
+Subtract at most 0.008192 MB of bounded serializer scratch (stack) from each entry.
+
+| Rows | Dimension | F32 MB | SQ8 MB | BQ MB | F16 MB |
+|---:|---:|---:|---:|---:|---:|
+| 10,000 | 768 | 30.72 | 7.68 | 0.96 | 15.36 |
+| 10,000 | 1024 | 40.96 | 10.24 | 1.28 | 20.48 |
+| 10,000 | 1536 | 61.44 | 15.36 | 1.92 | 30.72 |
+| 100,000 | 768 | 307.20 | 76.80 | 9.60 | 153.60 |
+| 100,000 | 1024 | 409.60 | 102.40 | 12.80 | 204.80 |
+| 100,000 | 1536 | 614.40 | 153.60 | 19.20 | 307.20 |
+| 500,000 | 768 | 1536.00 | 384.00 | 48.00 | 768.00 |
+| 500,000 | 1024 | 2048.00 | 512.00 | 64.00 | 1024.00 |
+| 500,000 | 1536 | 3072.00 | 768.00 | 96.00 | 1536.00 |
+| 1,000,000 | 768 | 3072.00 | 768.00 | 96.00 | 1536.00 |
+| 1,000,000 | 1024 | 4096.00 | 1024.00 | 128.00 | 2048.00 |
+| 1,000,000 | 1536 | 6144.00 | 1536.00 | 192.00 | 3072.00 |
+
+Rerank does not alter these arena figures; its on-disk F32 file and bounded cache
+remain additional categories. Removing the full-arena temporary reduces that
+specific allocation by almost 100%, but persistent vector payload savings from
+snapshot/rebuild changes are **zero**. Freed memory from stale empty indexes or
+excess metadata capacity depends on collection history, not only N and D.
+
+Metadata reservation savings are separate: Rust 1.96.0/MSVC x64 evaluates
+`size_of::<NodeMetadata>()` to 96 bytes (compiler IR retained). For an empty
+collection, the old compaction hint requested 96*global_live_nodes bytes and the
+new hint requests zero backing slots. The regression's 128 unrelated nodes imply
+12,288 bytes per empty collection; 100k global nodes would imply 9.60 MB per empty
+collection (614.40 MB over 64 empty collections). Those larger examples are
+capacity projections, not measured resident savings. Vec headers remain, and the
+allocator/OS can keep untouched reserved pages nonresident.
+
+An observed F32 10k/768 candidate arena has 30.72 MB logical bytes but 50.33 MB
+backing capacity after ingest, versus 30.72 MB capacity after fresh reopen. Spare
+capacity supports amortized growth; removing it on every checkpoint could add
+reallocation/copy peaks and ingest latency. No automatic shrink policy is added.
+
+Each rebuilt F32/SQ8/BQ row avoids an intermediate D*4-byte f32 allocation;
+SQ8 additionally avoids a D-byte requantized scratch Vec, BQ a ceil(D/64)*8-byte
+scratch Vec. F16 avoids repeated conversion buffers but retains one D*4 decode
+buffer. These rows were sequential and short-lived: cumulative allocation traffic
+falls with N; it is incorrect to claim N*D*4 of simultaneous rebuild RSS savings.
+N counts stored arena/index rows, including retained historical versions, rather
+than only currently visible nodes. The required hnsw_rs per-point copy remains. The old graph overlap is usually the
+larger rebuild peak.
+
+```mermaid
+flowchart LR
+  Ingest[Streamed ingest / WAL] --> Arena[Arena: authoritative encoded rows]
+  Arena -->|owned copy per insert| HNSW[HNSW points and graph]
+  Arena -->|bounded 8 KiB encoding| Snapshot[vec snapshot temporary file]
+  HNSW --> Candidates[Approximate candidates]
+  Candidates --> Rerank[Exact rerank when enabled]
+  Sidecar[On-disk F32 sidecar] -->|positioned read| Cache[Bounded decoded LRU]
+  Cache --> Rerank
+  Snapshot -->|reopen and rebuild| Arena
+```
+
+## Benchmark reproducibility and interpretation
+
+Use the opt-in branch of the existing `vbench-genesis` target, not the legacy
+harness that retains a full input matrix. Example PowerShell (fresh EVIDENCE path):
+
+```powershell
+$env:CARGO_PROFILE_RELEASE_LTO='false'
+$env:CARGO_PROFILE_RELEASE_CODEGEN_UNITS='16'
+cargo build --locked --release --no-default-features --features bins --bin vbench-genesis -j2
+.\benches\scripts\vector_memory_matrix.ps1 -Exe .\target\release\vbench-genesis.exe -Evidence C:\scratch\vector-memory -Stage prepare -Dims 768
+.\benches\scripts\vector_memory_matrix.ps1 -Exe .\target\release\vbench-genesis.exe -Evidence C:\scratch\vector-memory -Stage candidate -Dims 768
+```
+
+`GB_MEMORY_AUDIT=1` selects this harness; `GB_MEMORY_PREPARE=1` prepares inputs in
+an independent process. `GB_MEMORY_CORPUS` supplies an external little-endian unit
+F32 corpus. Preparation rejects nonfinite or nonunit rows because the exact dot
+truth requires normalized rows. The run retains 24 queries/truth lists and one
+256-row ingest batch, not the corpus. Each batch flushes async indexing. Throughput
+therefore includes index work, signatures and durability. Preparation's O(N) truth
+ranking scratch is outside the measured database process.
+
+Sampler: sysinfo on this Windows host, every 20 ms plus endpoints. A working set
+is an observation of resident pages, not allocator live bytes or Linux cgroup
+memory. Initial runs use a 4 GiB process cap/6 GiB free-memory admission. After
+all small baselines measured below 434 MiB, remaining small candidates use a tighter
+1 GiB child cap/3 GiB free admission; the selected 100k Binary pair uses a 2 GiB
+cap/4 GiB admission, baseline then candidate after the small matrix and first
+bounded pass. Final verification/compilation overlapped the scale runs; timing is
+therefore descriptive. These
+are safety budgets, not measured requirements. See `resource-admission.json`.
+No completed row is censored by a cap; guard-stopped attempts remain separate. `fresh_reopen` runs read-only in a new process to separate prior allocator
+high-water marks. Same-process reopen remains recorded. File-backed OS cache is
+not attributed to a collection. `disk_bytes` is file length at checkpoint before
+Drop, including projection database and retained journal/WAL, not vector payload
+alone. Full retention deliberately retains more disk than frontier-only retention.
+
+This is a characterization with one run per cell and 24 queries, not an isolated
+performance qualification or statistically stable p99. Other host work and the
+small-cell baseline/candidate jobs overlapped. Timing differences must not be
+attributed entirely to this patch. HNSW graph construction uses random layers and
+parallel insertion: approximate recall can vary between rebuilds without changed
+vector bytes. Native-code parity, coverage and existing recovery tests are separate
+correctness evidence. No similarity threshold was weakened to make a result pass.
+
+The available real corpus is the repository's 11,266 x 1024 BGE-M3 embedding fixture
+(`benchmark/fixtures/corpus_bge_m3.f32`, SHA-256
+`20978d757c33a29dcd8e89e5708762738b10fc8da0f01358bcb325741f2f6057`).
+It embeds repository prose, not synthetic random rows. Independent streamed norm
+validation found norm-squared 0.99999998518..1.00000001662. Queries are deterministic
+perturbations of actual fixture rows; this is real-corpus ANN characterization,
+**not** a labeled real-user semantic relevance evaluation. Synthetic recall alone
+is not claimed as acceptance.
+
+The six-mode/real/1536 matrix uses the vector-optimization stage-one candidate.
+The final proof-sharing candidate runs the 100k comparison and separate default
+checkpoint diagnostics. Full retention skips the proof-cache builder, so the earlier
+matrix does not measure that later optimization. Per-measurement source versions,
+immutable executable hashes and reconstructible engine patches are in provenance.
+
+Scratch evidence lives at `C:\Users\suanr\genesis-vector-memory-20261031`.
+The immutable baseline executable/source, failed attempts, database files and raw
+logs are retained there. A compact portable JSON evidence bundle accompanies this
+report; no benchmark database, executable or duplicate corpus is checked into git.
+
+<!-- VECTOR_MEMORY_RESULTS_START -->
+## Measured results
+
+Decimal MB; one run per matrix cell. All rows below have completed `memory.json`; error fields remain in raw JSON. Only matched cells appear in comparisons. See [portable provenance and raw JSON](evidence/vector-memory-20261031/provenance.json).
+
+### Baseline working sets and disk
+
+| Workload (rows/dimension) | Idle MB | Ingest RSS MB | Rebuild peak MB | Snapshot peak MB | Fresh reopen RSS MB | Disk MB |
+|---|---:|---:|---:|---:|---:|---:|
+| real 11,266/1024 Binary+R | 16.39 | 90.42 | 119.58 | 129.22 | 65.20 | 1502.58 |
+| real 11,266/1024 F32 | 13.37 | 176.90 | 249.18 | 239.78 | 152.51 | 1501.17 |
+| real 11,266/1024 SQ8+R | 12.92 | 110.89 | 147.26 | 150.64 | 81.42 | 1512.72 |
+| 10,000/1536 F32 | 12.24 | 216.82 | 308.02 | 290.62 | 181.17 | 1980.11 |
+| 10,000/768 Binary | 13.19 | 81.64 | 109.10 | 101.06 | 61.30 | 989.20 |
+| 10,000/768 Binary+R | 13.21 | 81.64 | 107.63 | 106.09 | 58.56 | 1019.94 |
+| 10,000/768 F16 | 13.24 | 124.97 | 183.70 | 148.34 | 103.58 | 1003.66 |
+| 10,000/768 F32 | 13.18 | 144.57 | 202.12 | 182.15 | 120.58 | 1019.01 |
+| 10,000/768 SQ8 | 13.19 | 91.91 | 127.39 | 110.41 | 74.68 | 996.01 |
+| 10,000/768 SQ8+R | 13.22 | 92.59 | 127.93 | 124.32 | 74.42 | 1026.69 |
+| 100,000/1024 Binary | 12.12 | 549.54 | 945.16 | 712.73 | 529.50 | 12713.61 |
+
+### Before/after memory (baseline → candidate)
+
+| Workload | Snapshot peak MB | Observed reduction MB (%) | Rebuild peak MB | Fresh reopen RSS MB | Largest named-phase peak MB |
+|---|---:|---:|---:|---:|---:|
+| real 11,266/1024 Binary+R | 129.22 → 130.83 | -1.61 (-1.24%) | 119.58 → 116.58 | 65.20 → 64.69 | 270.25 → 267.78 |
+| real 11,266/1024 F32 | 239.78 → 193.48 | 46.29 (19.31%) | 249.18 → 248.91 | 152.51 → 150.98 | 355.64 → 348.95 |
+| real 11,266/1024 SQ8+R | 150.64 → 152.05 | -1.41 (-0.94%) | 147.26 → 141.71 | 81.42 → 79.99 | 288.92 → 286.46 |
+| 10,000/1536 F32 | 290.62 → 235.95 | 54.67 (18.81%) | 308.02 → 304.71 | 181.17 → 180.40 | 454.75 → 438.95 |
+| 10,000/768 Binary | 101.06 → 101.96 | -0.89 (-0.88%) | 109.10 → 107.19 | 61.30 → 59.51 | 261.09 → 256.84 |
+| 10,000/768 Binary+R | 106.09 → 112.72 | -6.63 (-6.25%) | 107.63 → 109.31 | 58.56 → 57.95 | 267.16 → 261.66 |
+| 10,000/768 F16 | 148.34 → 147.14 | 1.21 (0.81%) | 183.70 → 181.90 | 103.58 → 101.92 | 312.06 → 306.06 |
+| 10,000/768 F32 | 182.15 → 160.93 | 21.22 (11.65%) | 202.12 → 202.35 | 120.58 → 122.63 | 319.58 → 326.30 |
+| 10,000/768 SQ8 | 110.41 → 113.96 | -3.55 (-3.22%) | 127.39 → 129.27 | 74.68 → 73.64 | 280.92 → 278.73 |
+| 10,000/768 SQ8+R | 124.32 → 119.56 | 4.76 (3.83%) | 127.93 → 127.18 | 74.42 → 73.37 | 274.42 → 279.31 |
+| 100,000/1024 Binary | 712.73 → 714.50 | -1.77 (-0.25%) | 945.16 → 960.62 | 529.50 → 530.76 | 945.16 → 960.62 |
+| 10,000/768 F32 repeat | 187.00 → 158.62 | 28.39 (15.18%) | 202.21 → 197.21 | 122.08 → 119.57 | 327.40 → 326.62 |
+
+The repeat F32 pair was launched 24 ms apart on the same loaded host. It is a matched-contention control, not isolated qualification. Largest named-phase peak excludes unsampled search/Drop checkpoints; it is not process-lifetime PeakWorkingSet. Snapshot allocation removal does not imply lower steady-state payload or a smaller required cloud instance. Negative reductions mean observed increases.
+
+### Throughput, latency and recall (baseline → candidate)
+
+| Workload | Ingest rows/s | Search@10 p50/p95/p99 ms | Recall@10 | Search@100 p50/p95/p99 ms | Recall@100 |
+|---|---:|---|---:|---|---:|
+| real 11,266/1024 Binary+R | 203.4 → 340.9 | 6.016/23.900/25.763 → 2.727/3.773/4.309 | 0.93750 → 0.95000 | 41.479/63.714/69.037 → 16.786/19.108/20.091 | 0.95875 → 0.95875 |
+| real 11,266/1024 F32 | 49.6 → 154.0 | 9.626/77.935/78.197 → 4.521/5.171/5.587 | 0.99167 → 0.98750 | 14.874/97.213/138.128 → 6.357/7.174/7.268 | 0.97542 → 0.97917 |
+| real 11,266/1024 SQ8+R | 96.6 → 162.6 | 12.218/16.258/16.683 → 6.188/9.059/9.216 | 0.99167 → 0.97500 | 39.089/46.916/47.395 → 24.388/27.985/33.298 | 0.98875 → 0.97750 |
+| 10,000/1536 F32 | 66.4 → 93.6 | 11.856/14.382/14.954 → 10.113/11.296/11.656 | 0.83750 → 0.78750 | 14.442/16.236/17.494 → 11.544/12.932/13.019 | 0.69958 → 0.68208 |
+| 10,000/768 Binary | 299.2 → 235.7 | 1.681/2.321/2.559 → 2.936/4.509/6.082 | 0.23750 → 0.24167 | 3.784/5.790/6.425 → 6.768/12.117/12.822 | 0.27625 → 0.28167 |
+| 10,000/768 Binary+R | 273.4 → 312.1 | 3.112/4.746/74.498 → 4.087/5.007/5.242 | 0.57500 → 0.57500 | 26.514/35.697/42.535 → 20.430/24.722/28.260 | 0.74875 → 0.75333 |
+| 10,000/768 F16 | 115.6 → 148.1 | 7.057/8.477/10.606 → 6.276/7.417/7.432 | 0.84167 → 0.83750 | 9.499/10.990/11.048 → 8.707/10.165/10.759 | 0.73542 → 0.72917 |
+| 10,000/768 F32 | 140.6 → 97.8 | 5.552/6.322/6.326 → 8.220/9.612/9.818 | 0.87917 → 0.85417 | 7.806/9.568/9.830 → 11.816/20.789/24.444 | 0.73542 → 0.72667 |
+| 10,000/768 SQ8 | 163.5 → 99.2 | 5.436/5.803/6.154 → 8.530/13.702/17.691 | 0.80417 → 0.78750 | 7.217/9.514/9.572 → 11.942/14.954/15.500 | 0.72250 → 0.72125 |
+| 10,000/768 SQ8+R | 117.7 → 105.8 | 10.910/18.276/29.766 → 10.435/14.807/17.816 | 0.87500 → 0.86667 | 34.617/51.764/52.336 → 38.092/44.452/50.779 | 0.94708 → 0.94333 |
+| 100,000/1024 Binary | 211.7 → 185.8 | 4.176/5.118/5.269 → 4.475/5.815/5.886 | 0.16250 → 0.16667 | 7.960/9.697/11.118 → 7.982/11.507/12.377 | 0.10542 → 0.09417 |
+| 10,000/768 F32 repeat | 93.9 → 94.4 | 7.204/10.882/11.747 → 6.815/11.576/13.904 | 0.85000 → 0.84167 | 14.681/21.214/21.407 → 10.553/17.112/17.321 | 0.74375 → 0.72792 |
+
+Timing and approximate-recall variation are reported, not hidden. With 24 queries, random HNSW layers and host contention, these data do not establish isolated p95/p99 non-regression or semantic quality. Query errors have null recall, never a fabricated successful value. Native point parity and byte-identical snapshot files are independent correctness evidence.
+
+### Candidate allocation counters after search
+
+| Workload | Arena logical MB | Arena capacity MB | HNSW vector lower bound MB | Cache MB | Sidecar disk MB |
+|---|---:|---:|---:|---:|---:|
+| real 11,266/1024 Binary+R | 1.44 | 2.10 | 1.44 | 16.78 | 46.15 |
+| real 11,266/1024 F32 | 46.15 | 67.11 | 46.15 | 0.00 | 0.00 |
+| real 11,266/1024 SQ8+R | 11.54 | 16.78 | 11.54 | 16.78 | 46.15 |
+| 10,000/1536 F32 | 61.44 | 100.66 | 61.44 | 0.00 | 0.00 |
+| 10,000/768 Binary | 0.96 | 1.57 | 0.96 | 0.00 | 0.00 |
+| 10,000/768 Binary+R | 0.96 | 1.57 | 0.96 | 12.58 | 30.72 |
+| 10,000/768 F16 | 15.36 | 25.17 | 30.72 | 0.00 | 0.00 |
+| 10,000/768 F32 | 30.72 | 50.33 | 30.72 | 0.00 | 0.00 |
+| 10,000/768 SQ8 | 7.68 | 12.58 | 7.68 | 0.00 | 0.00 |
+| 10,000/768 SQ8+R | 7.68 | 12.58 | 7.68 | 12.58 | 30.72 |
+| 100,000/1024 Binary | 12.80 | 16.78 | 12.80 | 0.00 | 0.00 |
+
+### Compaction and recovery
+
+| Workload | Compaction peak MB | Compaction seconds | Snapshot/open errors | Post-reopen query errors |
+|---|---:|---:|---|---|
+| real 11,266/1024 Binary+R | 172.85 → 173.72 | 14.913 → 8.525 | [] → [] | None → None |
+| real 11,266/1024 F32 | 255.33 → 251.53 | 103.826 → 47.840 | [] → [] | None → None |
+| real 11,266/1024 SQ8+R | 193.10 → 194.41 | 87.174 → 46.244 | [] → [] | None → None |
+| 10,000/1536 F32 | NOT_RUN | NOT_RUN | [] → [] | QUERY_BUDGET_EXCEEDED: reason=deadline → None |
+| 10,000/768 Binary | NOT_RUN | NOT_RUN | [] → [] | None → None |
+| 10,000/768 Binary+R | NOT_RUN | NOT_RUN | [] → [] | None → None |
+| 10,000/768 F16 | NOT_RUN | NOT_RUN | [] → [] | None → None |
+| 10,000/768 F32 | NOT_RUN | NOT_RUN | [] → [] | None → None |
+| 10,000/768 SQ8 | NOT_RUN | NOT_RUN | [] → [] | None → None |
+| 10,000/768 SQ8+R | NOT_RUN | NOT_RUN | [] → [] | None → None |
+| 100,000/1024 Binary | NOT_RUN | NOT_RUN | [] → [] | QUERY_BUDGET_EXCEEDED: reason=deadline → QUERY_BUDGET_EXCEEDED: reason=deadline |
+| 10,000/768 F32 repeat | NOT_RUN | NOT_RUN | [] → [] | None → None |
+
+Snapshot vector/sidecar file hash matches: 12/12 paired cells; this checks vector payload bytes, not timestamped metadata or all database files.
+
+<!-- VECTOR_MEMORY_RESULTS_END -->
+
+## Default-retention proof sharing: separate evidence
+
+These lifecycle/default-retention observations are separate from the release
+vector matrix, whose explicit `full` retention skips folding. Retention confounded
+the original 1000-versus-256 batch comparison; the 4 GiB observations must not be
+called ingest or HNSW peaks. `Storage::drop` calls `save_state`, which constructs
+proof maps before publishing snapshots. Read-only scratch inspection found the
+expected committed transactions/revisions while snapshots stayed initially empty.
+No allocation-stack profiler was used; source ownership plus matched RSS and the
+pointer-identity regression support attribution.
+
+The base maps previously cloned a whole `SignedEvent` per node, edge and vector;
+the master scan also retained a whole proof per vector before filtering USER rows.
+A 1000 embedded-node frame therefore made 2000 base-map copies. The 1500-row
+capacity test made 2048 copies of its 1024-row source plus 952 of its 476-row source;
+1000 edges made 1000 copies. Source JSON sizes 1,260,981; 1,331,730/623,039; and
+808,204 bytes imply serialized-equivalent clone volumes 2.52/3.32/0.81 GB.
+Those products illustrate duplication and are **not measured heap sizes**.
+
+Private Arc handles keep source objects immutable and shared without changing any
+public Rust type, envelope or authentication logic. The RED test observed 12 Event
+addresses; GREEN observes one, with unchanged raw signatures, source bytes and
+encoded materialization bytes. A second read-only review found no change to
+selection/order, MASTER transitions/retractions, migration or validation. Assurance
+risk is high because these private caches feed persistence; final regression gates
+are recorded separately below.
+
+Matched existing integration executables use the same debug/core profile, exact
+cases, 20 ms RSS sampling, 4 GiB guard and 180 s per-case cap, including Drop.
+Frozen executable hashes and both sets of scratch fixtures are retained. Baselines
+that hit guards/timeouts are censored; reported reductions are observed/lower-bound
+comparisons, not completed-baseline peaks. Test exit and checkpoint success are
+separate fields in `proof-lifecycle.json`.
+
+The explicit NAPI companion directly awaits `save_state()` and then reopens in a
+fresh read-only child. At 128 rows/D=8, both checkpoints succeed; count/indexed and
+search sanity pass. At 1000 rows/D=8, the old process hits the 4 GiB guard; the
+candidate returns `COMPACTION_PROOF_TOO_LARGE`, and WAL reopen recovers count/indexed
+1000 with search sanity. The existing Drop discards save_state's error; its log
+message must not be used as a durability receipt. See `proof-explicit.json`.
+
+### Initial Arc-sharing-stage default-retention lifecycle RSS
+
+Debug/core, sampled peak MB; OS lifetime peaks are also in raw JSON. A capped baseline is a lower bound. Passing these tests does not assert checkpoint success.
+
+| Case | Before MB | After MB | Observed reduction MB (%) | Before outcome | After outcome |
+|---|---:|---:|---:|---|---|
+| bulk_add_nodes_1000 | 4302.88 | 38.29 | 4264.58 (99.11%) | rss_limit_4_GiB | PASS |
+| bulk_add_edges_1000 | 4136.78 | 62.75 | 4074.02 (98.48%) | timeout_180s | timeout_180s |
+| index_grows_past_initial_floor | 4300.20 | 49.26 | 4250.94 (98.85%) | rss_limit_4_GiB | PASS |
+
+### Explicit checkpoint and fresh reopen
+
+| Rows/D | Before OS peak MB | After OS peak MB | Checkpoint before → after | Fresh reopen count/index/search sanity |
+|---|---:|---:|---|---|
+| 128/8 | 435.20 | 100.80 | PASS → PASS | True |
+| 1000/8 | 4303.71 | 106.01 | rss_limit_4_GiB → COMPACTION_PROOF_TOO_LARGE | True |
+
+The successful 128-row explicit checkpoint took 30.853 -> 31.390 seconds
+(+1.74% in this one debug observation); fresh reopen took 4.082 -> 4.045 seconds.
+That Arc-sharing-only stage reduced resident source copies without reducing
+cryptographic work. Its 1000-edge lifecycle exceeded the diagnostic's 180-second
+limit despite its much smaller working set. The later follow-up now passes
+`bulk_add_edges_1000` inside the complete six-case concurrency target (72.061 s
+for the whole target under the unchanged 300 s qualification cap). The historical
+table above is not a final-follow-up failure. Neither initial diagnostic establishes
+a throughput gain or production latency gate.
+
+Encoded source repetition, per-leaf verification/signing CPU and the final fold
+buffer remain. Neither the proof cap, source-budget checks, transaction boundaries
+nor authentication were loosened. A normalized/versioned proof-pool format and
+explicit shutdown checkpoint error reporting require separate persistence work.
+
+### 100k BQ interpretation and open performance gate
+
+The initial-candidate 100k/1024 BQ pair does **not** show a measured RSS saving:
+snapshot 712.73 -> 714.50 MB (-0.25% reduction), rebuild 945.16 -> 960.62 MB,
+fresh reopen 529.50 -> 530.76 MB. Its arena payload is only 12.80 MB; graph,
+engine/WAL/recovery allocations dominate. Removing an arena-sized temporary is an
+allocation-level improvement, not a demonstrated total-RSS gain at this cell.
+
+Ingest took 472.477 -> 538.194 s (+13.91%); rebuild 289.817 -> 300.307 s
+(+3.62%); snapshot 87.553 -> 91.567 s (+4.59%). Search@10 p95 was
+5.118 -> 5.815 ms; Recall@100 was 0.10542 -> 0.09417. These single runs used
+random HNSW layers on a host with different overlapping work; the changes cannot
+be assigned causally to this patch, and a performance non-regression gate is
+**not qualified**. The low absolute BQ recall also argues against choosing BQ
+solely from RAM payload formulas.
+
+Snapshot, open and fresh-open errors were null for both. However the first
+post-reopen search hit `QUERY_BUDGET_EXCEEDED: reason=deadline` in both engines,
+with zero of 24 queries completed and null recall. The budget was preserved. Thus
+successful recovery/count/coverage at 100k does not qualify post-reopen query
+availability. Isolated repetition and query-budget/recovery analysis remain open.
+
+## Scale admission and unmeasured combinations
+
+The completed matrix covers six modes at 10k/768, three modes on the real
+11,266/1024 BGE-M3 fixture, F32 at 10k/1536 and BQ at 100k/1024. Synthetic
+10k/1024 was prepared but not run; the real 1024-dimensional corpus provides the
+measured 1024-dimensional small tier. Other dimension/mode/scale combinations
+are **NOT_RUN**, not inferred passes. Each cell is one observation, plus the
+explicit F32 same-window repeat.
+
+500k and 1M tiers were not admitted under the bounded shared-host protocol. The
+100k baseline BQ rebuild alone reached 945.16 MB; a simple linear extrapolation
+would reach 4.73 GB at 500k and 9.45 GB at 1M before safety margin, exceeding the
+4 GiB default experiment cap. This extrapolation is a safety screen, not a measured
+scaling law. Baseline full-retention disk usage was 12.71 GB at 100k; a linear
+1M baseline/candidate pair would require about 254 GB before scratch/headroom.
+The host runs unrelated work, which was preserved. Larger F32/F16 and rerank tiers
+need an independently provisioned test host and explicit resource admission.
+No claim is made that those scales intrinsically cannot run on this engine.
+
+## Cloud and self-hosted sizing implications
+
+Use a deployment's **largest measured phase**, not arena size or on-disk sidecar
+size, as the starting point for RAM sizing. F32 has about 8*N*D bytes of vector
+payload across arena plus index before arena spare capacity, graph, metadata,
+projection caches, node payloads and the rest of the runtime. SQ8 has about 2*N*D;
+BQ has about 16*N*ceil(D/64); F16 about 6*N*D because its HNSW points remain F32.
+These are payload formulas, not instance-size recommendations. For 100,000 stored
+1024-dimensional rows, current arena-plus-index vector payload is approximately
+819.20 MB F32, 204.80 MB SQ8, 25.60 MB BQ or 614.40 MB F16, before spare capacity
+and graph/engine overhead. An enabled full sidecar cache adds up to 16.78 MB of
+decoded payload at that dimension; its 409.60 MB file remains a disk category.
+
+During rebuild allow another HNSW point set and graph; during compaction allow
+survivor rows, calibration and replacement arenas. Snapshot streaming removes one
+arena-sized temporary but WAL authorization, JSON and metadata allocations remain.
+Full retention can dominate disk footprint. Multiple collections, retained temporal
+versions, ingest batches and concurrent reader results need additional headroom.
+
+The existing process memory usage gauge does not implement an allocator limit.
+The benchmark's separate process RSS guard is a harness safety cap, not engine admission
+control. Small Windows working sets and formulas cannot qualify a Linux cloud
+instance or a memory cgroup. Re-run representative workloads on the deployment OS
+with its actual memory limit and retention policy before reducing instance RAM.
+The follow-up adds up to 16 MiB retained checkpoint-cache payload plus bounded
+metadata per active outer checkpoint/thread. The isolated 2,000-node native
+checkpoint comparison increased peak RSS by 11.264 MB (9.36%) while reducing median
+save time by 11.17%. Include this tradeoff and overlapping checkpoint threads when
+sizing the final candidate; historical snapshot savings are not a new steady-state
+memory guarantee.
+
+Reserve explicit operating-system and service headroom; no 500k/1M capacity claim
+is inferred from a 10k point observation.
+
+## Remaining architectural limitations and follow-up work
+
+1. Keep Arena/HNSW ownership separate now. A future design may use immutable stable
+   row chunks and owned handles in a compatible index, with generation pinning,
+   concurrent indexing, distance access, historical rows and rebuild/recovery tests.
+   For F16, first choose whether the graph can compute distances from u16 rows.
+   Benchmark real workloads before any engine replacement or unsafe lifetime design.
+2. Design crash-safe bounded compaction separately: current survivor F32 matrix,
+   sidecar truncate/rewrite, old/new graph overlap and calibrated SQ8 full sorting
+   remain. A temporary replacement file and streaming/two-pass calibration must
+   preserve Windows close/rename ordering and persistence authority.
+3. Design versioned proof pooling and bounded per-leaf verification separately;
+   private Arc sharing fixes resident source duplication but does not remove repeated
+   wire proofs, signing/verification CPU or the 1 MiB proof-envelope cap. Add explicit
+   shutdown checkpoint error reporting rather than interpreting the existing Drop
+   message as success. Investigate default-retention authorization source-size and signed floating-point
+   round-trip failures as a separate security/persistence contract task. Preserve
+   authentication checks and failed evidence. Full-retention benchmark success does
+   not close those failures.
+4. Add allocator/heap profiling for graph/link/header overhead and per-collection
+   attribution. `hnsw_vector_bytes` is an honest lower bound, not a total estimate.
+5. Qualify Linux/cgroup RAM peaks and isolated repeated latency/recall measurements
+   at larger scales, including semantic query labels and write/read concurrency.
+6. Consider byte-aware async indexing admission. A bounded job count with large
+   bulk jobs does not bound vector memory by bytes. This patch uses bounded input
+   batches only in the harness, not a new engine scheduling policy.
+7. Consider an Arc-backed sidecar return API only after allocation/latency profiling
+   shows caller clones matter. Keep eviction/concurrency and compatibility tests.
+8. Capture the exact lifecycle and query-stage trace if the historical 100k
+   deadline recurs. Fresh-process and two-open diagnostics are separate from the
+   original streamed-ingest/rebuild lifecycle; do not treat a passing diagnostic
+   as proof of the original cause. Keep the 5,000 ms query contract.
+9. Define explicit native close/autonomic-worker lifecycle semantics. Current
+   wrapper finalization leaves the worker's Storage Arc alive; explicit checkpoint
+   is the measured operation. Do not infer checkpoint durability from process exit
+   or a graceful-shutdown message.
+
+Existing ADRs are unchanged: this patch preserves their quantization, sidecar and
+HNSW-capacity decisions. New structural storage sharing or a durability rewrite
+requires a separately reviewed ADR through the repository documentation workflow.
+
+
+<!-- VECTOR_MEMORY_VALIDATION_START -->
+## Initial-candidate verification and unresolved gates (before follow-up)
+
+The initial candidate was compiled in an isolated local worktree. Its 253 checked source/test/bench/config/declaration files matched that delivery stage; all seven pre-existing staged files matched their original hashes. No production addon was replaced. The `source-verification.json` and `final-test-summary.json` in the original evidence folder describe that stage, not the follow-up source.
+
+| Gate | Result |
+|---|---|
+| Rust core bounded run | 159 executable targets attempted; 153 completed: 1271 passed, 0 failed, 6 ignored. Other targets below are incomplete. |
+| Additional final-source subsets | 31 passed across journal/rebuild/HQL filtered subsets; 4/4 individually filtered concurrency cases passed. These do not turn the excluded large cases into passes. |
+| New regressions | Five unit tests included in 48/48 library tests; five new metrics/lifecycle integration tests passed. Existing REST metrics assertions passed. |
+| Native/Node | 88/88 passed using the isolated final debug addon; native allocation-counter smoke passed. |
+| Static/feature checks | Strict Clippy core and default all-targets passed; mobile feature compiled on Windows host; TypeScript declaration freshness passed. Final formatting, docs and diff checks are in `final-static-validation.json`. |
+| Vector persistence parity | 12/12 baseline/candidate vec/sidecar file hash pairs equal; signed materialized-proof parity regression passed. |
+
+Core build: `cargo test --locked --offline --target x86_64-pc-windows-msvc --no-default-features --no-run -j1`, then each executable with `--test-threads=1`, a 4 GiB RSS guard and 300 s per executable. Native tests: `node --test --test-concurrency=1 __test__/*.mjs`. Exact build/diagnostic adapters are retained under the evidence directory.
+
+Incomplete full targets (300 s each; none count as assertion passes):
+
+- `concurrency`: timeout_300s; peak 104.57 MB.
+- `consensus_checkpoint_race_tests`: timeout_300s; peak 17.03 MB.
+- `hql_cypher_tests`: timeout_300s; peak 108.13 MB.
+- `journal_format_tests`: timeout_300s; peak 66.21 MB.
+- `rebuild_from_truth_tests`: timeout_300s; peak 77.36 MB.
+- `wal_compaction_tests`: timeout_300s; peak 46.44 MB.
+- Additional filtered `consensus_checkpoint_race_tests`: timeout_180s.
+
+No completed initial-candidate target reported an assertion failure. Its resource/time-limited targets were unqualified and its suite was **not fully green**. The follow-up section above records their later full-group passes and all 159 completed targets; the historical failures here remain intact. Earlier phase-one test evidence is not substituted for either candidate's results.
+
+Crash simulation, WAL replay, snapshot round-trips, re-embedding/historical visibility, quantization, coverage, multi-collection isolation, retraction, compaction, sidecar bounds and concurrent reads/writes have passing focused or completed-target evidence. This is local Windows evidence, not physical-device/mobile, Linux/cgroup, live-provider, hosted CI, deployment or release acceptance.
+
+Search-performance qualification remains open: 24-query single-run distributions, random graphs, host contention and observed slowdowns cannot establish non-regression. The 100k post-reopen deadline failures and default-retention signature/source-budget/proof-envelope failures remain explicit. Authentication, caps, query budgets and durability contracts were not relaxed.
+
+<!-- VECTOR_MEMORY_VALIDATION_END -->
+
+## Files changed
+
+| File | Change |
+|---|---|
+| `src/lib.rs` | Snapshot/rebuild/metrics fixes, proof sharing, indexed revision binding and bounded verification/encoding caches |
+| `src/router.rs` | Three allocation gauges and clarified legacy metric HELP |
+| `index.d.ts` | Generated CollectionInfo additions; handwritten QueryIR declarations preserved |
+| `Cargo.toml` | Checked dev-package optimization for SHA2/curve/LZ4; release profile and dependency versions unchanged |
+| `src/vector_memory_tests.rs` | Eleven vector-memory regressions plus an ignored manual phase profiler; bytes, bounds, binding, signature scope, codec parity and lifecycle |
+| `tests/vector_memory_metrics_tests.rs` | Five integration regressions for counters, concurrent cache bounds, quantization/rebuild and lifecycle |
+| `tests/rest_api_tests.rs` | Existing metrics test asserts new gauges |
+| `benches/vbench_genesis.rs` | Opt-in memory audit route; legacy benchmark behavior retained |
+| `benches/vector_memory.rs` | Streamed input, external unit-corpus validation, phase RSS, recall/latency, errors and fresh reopen |
+| `benches/scripts/vector_memory_matrix.ps1` | Fresh-directory matrix runner, free-memory admission and owned-process RSS guard |
+| `.brain/rca/2026-10-31-vector-memory-allocations.md` and `2026-10-31-vector-memory-timeouts.md` | Source evidence, staged hypotheses, RED/GREEN, causes, review and prevention |
+| This report and `docs/reports/evidence/vector-memory-20261031/`, `docs/reports/evidence/vector-memory-followup-20261031/` | Separate initial/follow-up raw results, provenance and validation receipts |
+| docs/reports/evidence/vector-memory-nov02-seeded-topology-20261102/ | Four seeded real-BGE before/after pairs, cross-seed/query comparisons, per-query records, guard receipts and checksums |
+
+No production database, deployed addon, release or ADR was changed. Seven original
+staged HQL2 documentation/test files were kept intact; their hashes are in baseline
+provenance and the source-verification receipt. Verification uses separate local
+worktrees and scratch database directories. The scoped audit report and evidence
+commits are recorded in Git; nothing was pushed or deployed.
+
+### Seed-controlled topology investigation (2026-11-01 through 2026-11-02)
+
+The pinned `hnsw_rs 0.3.4` constructs its level generator with OS-seeded
+`StdRng`; a fixed seed alone is not proof of an identical graph. A diagnostic-only
+private copy now accepts a `u64` seed in both level-generator constructors.
+The existing rehydration loop inserts arena rows serially. Large ingest batches
+can still use concurrent insertion, and hash-map iteration or equal distances
+may also change graph construction. Therefore paired evidence must compare the
+actual graph, not just seeds or aggregate recall.
+
+The private benchmark captures each F32 node's origin ID, level, internal slot,
+ordered neighbor IDs, neighbor point IDs, and distance bits **after** each
+measured query sweep. It captures the initial rebuilt graph and the same-process
+reopened graph independently. Capture is intentionally after the query to avoid
+warming the graph before the measured query; it can still perturb later snapshot,
+open, and RSS measurements, so those remain diagnostic. The fresh subprocess in
+this harness checks open/coverage and does not execute a query. A graph hash and
+node-level comparisons distinguish equal topology from a seed-only match.
+
+The two private diagnostic binaries compiled under the original guard, and the
+graph comparator passed four small tests. In a separate 1,000-vector synthetic
+smoke pair with seed 42, all four captured initial/reopen graphs were byte
+identical (SHA-256 `2e056c016a32f1d7cb53186f0fba7f7946e3da4293ffeb3043ce3426d99346f5`),
+and all query IDs matched. This smoke verifies the instrumentation for that input;
+it does not establish BGE recall or production latency.
+
+Seed 42's completed real-BGE before/after pair had the same 11,266-node graph
+before snapshot and after reopen on both sides (all four SHA-256
+`e603f3f3b1a7afcd5dba03c6e85aa4141cab994240f15d62f5da98cc421a80dd`), and every
+returned ID matched in each 24-query sweep. Recall@10 was 0.983333 on both sides,
+recall@100 0.981667 on both sides, and reopened recall@10 0.983333 on both sides.
+The first same-process reopened query took 2,961.071 ms before and 5.111 ms after,
+both within 5,000 ms. Peak sampled process-tree working set was 327.336 MB before
+and 347.570 MB after; it can include shared pages and is not an allocation-by-
+allocation measurement: the after value is higher by 20.234 MB (6.18%). This is
+one controlled pair, not statistical proof that a recall regression is impossible.
+The seed 43 baseline did not launch: the 10-minute resource wait expired after
+14 rejected admission windows; the lowest average CPU among them was 30.82%,
+above the unchanged 20% gate. Some samples also lacked the required 6 GiB free.
+No seed 43 result or second completed pair is claimed.
+
+| Seed 42 search, ms | Before p50 / p95 / p99 | After p50 / p95 / p99 |
+|---|---:|---:|
+| Initial k=10 | 4.495 / 5.098 / 5.207 | 4.364 / 4.844 / 5.031 |
+| Initial k=100 | 6.291 / 6.754 / 9.565 | 6.221 / 6.783 / 7.366 |
+| Reopened k=10 | 4.250 / 4.862 / 2,961.071 | 5.111 / 6.282 / 6.514 |
+
+Each percentile comes from 24 queries and is sensitive to individual samples;
+the reopened p99 includes the first query and should not be interpreted as a
+stable latency distribution. The identical graphs and IDs demonstrate this
+particular result is consistent with graph-build variation explaining earlier
+recall differences; they do not prove the cause of every earlier difference.
+
+The first BGE baseline attempt was stopped by its guard at 160.13 s
+when an external `rustc.exe` appeared; a fresh retry was stopped after 1.09 s
+when external Cargo/rustc processes appeared. Both cleanups completed. Their
+partial outputs are retained separately, not counted as completed runs. Seed
+instrumentation is not part of the production runtime. The diagnostic scripts,
+source patches, complete query evidence and compressed topologies are retained under
+`docs/reports/evidence/vector-memory-seeded-topology-20261101/`.
+
+#### Seed 43 resource-gate recheck
+
+A fresh retry on 2026-11-01 used the same frozen diagnostic binaries and original
+resource guard. Its ten-minute wait expired without launching the benchmark:
+all 17 admission windows had average CPU at or above 20%, ranging from 20.55%
+to 92.09%; one window also fell below the 6 GiB free-memory requirement, with
+6,134,050,816 bytes free. There was no seed 43 before or after measurement,
+and no additional multi-seed comparison or fresh deadline result. Admission
+samples, configuration, and the no-launch receipt are recorded in
+`docs/reports/evidence/vector-memory-seed43-gate-recheck-20261101/`.
+At that point, the previously completed seed 42 pair was the only controlled
+real-BGE pair; its topology, recall, latency and RSS results above have not
+changed.
+
+On 2026-11-02, two independently launched seed 43 before-side attempts produced
+the same initial graph byte for byte (SHA-256
+`7f7d0d8679789e399f2e3b9810fb6a47acc1e95637a0a0a472e093dadb2f1d14`) and identical
+returned IDs on both initial query sweeps (recall@10 0.9875; recall@100
+0.982917). This confirms repeatable seeded rebuilds for this benchmark input and
+binary even though one run was stopped before reopening. It strengthens the
+interpretation that different seeds change approximate recall. It still does
+not qualify a seed 43 before/after checkpoint pair.
+
+#### 2026-11-02 seed 43 diagnostic
+
+The first before-side attempt passed admission but its guard stopped it at
+144.48 s when external `rustc` processes appeared. Cleanup completed. The
+initial-query and topology files were already written, but the run did not
+complete snapshot/reopen, so its timing and RSS are not qualified benchmark
+results. For diagnosis only, its seed 43 initial graph was compared with the
+completed seed 42 baseline: all 11,266 node IDs were present, 1,283 nodes had
+different levels, and all 11,266 had different neighbor ID sets. Initial
+recall@10 was 0.9875 versus 0.983333, with returned IDs differing on six of 24
+queries. These observations are consistent with graph construction affecting
+recall, but the interrupted run does not establish a before/after checkpoint
+comparison or reopen correctness. Its partial evidence is retained under
+`docs/reports/evidence/vector-memory-nov02-seed43/`.
+
+A fresh before-side retry then exhausted the existing ten-minute admission wait
+without launching. All 13 admission windows exceeded the 20% CPU threshold; the
+lowest average was 26.82%. External compiler processes also appeared during the
+wait. At that point, the seed 43 after-side and additional complete pairs had not
+run; the retry admission samples and no-launch receipt remain retained with the
+interrupted evidence. The subsequent successful pairs are recorded below. No
+budget or warm-up policy was changed.
+
+#### 2026-11-02 seeded real-BGE before/after pairs
+
+The final host resource-gate recheck before starting seed 45 passed: five CPU
+samples averaged 13.39%, free RAM was 17.64 GiB, and no Cargo/rustc process was
+active. Each of the eight individual run launches also passed its own original
+admission and process-tree guard. Each run used a clean directory, the same real BGE-M3 repository fixture
+(11,266 vectors × 1,024 dimensions), 24 fixed queries, F32, no rerank, ef=200,
+and the existing 5,000 ms query deadline and 2 GiB process-tree RSS ceiling.
+Corpus, query, truth and metadata hashes matched in each pair and inputs were
+unchanged after every run. No warm-up query was issued. Per-query outputs,
+guard/admission receipts, graph snapshots, and checksums are in
+docs/reports/evidence/vector-memory-nov02-seeded-topology-20261102/.
+
+Two independent seed 43 pairs and one pair each at seeds 44 and 45 completed.
+For every pair, the initial graph and post-reopen graph had identical bytes
+before and after the code change. Each graph contained 11,266 nodes with no
+missing nodes and zero differences in level, slot, ordered neighbor records or
+neighbor ID sets. The two seed 43 repetitions produced the same graph hash and
+identical returned IDs across all 24 queries for k=10, k=100 and reopened k=10,
+on both binaries. Seeds 44 and 45 produced distinct graph hashes and changed
+returned IDs versus the seed 43 reference on 3/24 and 4/24 k=10 queries, and
+22/24 and 23/24 k=100 queries, respectively. Seed 44 kept aggregate recall@10
+unchanged while seed 45 raised it from 0.987500 to 0.991667; recall@100 moved
+from 0.982917 to 0.981667 and 0.975000. This supports a link between seeded
+HNSW topology and candidate variation in this fixture. It does not establish
+that every prior recall difference has the same cause.
+
+| Pair / seed | Graph SHA-256 (initial and reopened) | Recall@10 before/after | Recall@100 before/after | Reopened recall@10 before/after | First reopened query, ms before → after | Peak process-tree RSS, MB before → after |
+|---|---|---:|---:|---:|---:|---:|
+| 43d / 43 | 7f7d0d8679789e399f2e3b9810fb6a47acc1e95637a0a0a472e093dadb2f1d14 | 0.987500 / 0.987500 | 0.982917 / 0.982917 | 0.987500 / 0.987500 | 3,228.393 → 4.665 | 334.705 → 331.383 (-0.99%) |
+| 43f / 43 | 7f7d0d8679789e399f2e3b9810fb6a47acc1e95637a0a0a472e093dadb2f1d14 | 0.987500 / 0.987500 | 0.982917 / 0.982917 | 0.987500 / 0.987500 | 2,842.761 → 4.833 | 357.782 → 325.706 (-8.97%) |
+| 44a / 44 | bdf213a04e0ebb73ea583f2b81034859138501a95a81969b4f12dcc3bd77d844 | 0.987500 / 0.987500 | 0.981667 / 0.981667 | 0.987500 / 0.987500 | 3,380.844 → 4.477 | 377.496 → 334.238 (-11.46%) |
+| 45a / 45 | 9618183f6195839ca81338f3de8bcbe53e311951a092d13f319efb3718c216b1 | 0.991667 / 0.991667 | 0.975000 / 0.975000 | 0.991667 / 0.991667 | 3,148.684 → 5.046 | 323.478 → 338.379 (+4.61%) |
+
+All 24 queries completed without error in each initial k=10, initial k=100 and
+same-process reopened k=10 sweep. Returned IDs and hit IDs were identical
+before/after within every pair. The first query after reopen took 2.843–3.381 s
+before and 4.477–5.046 ms after, within the unchanged 5,000 ms deadline. The
+separate fresh-child reopen check confirmed READY index coverage for all 11,266
+vectors, with no missing, pending or extra entries; that child check does not
+issue a query.
+
+| Pair / seed | Initial k=10 p50 / p95 / p99, ms before → after | Initial k=100 p50 / p95 / p99, ms before → after | Reopened k=10 p50 / p95 / p99, ms before → after |
+|---|---:|---:|---:|
+| 43d / 43 | 4.511 / 5.824 / 5.856 → 4.340 / 5.551 / 5.937 | 5.975 / 6.785 / 6.874 → 5.734 / 6.226 / 6.234 | 4.385 / 4.931 / 3,228.393 → 4.598 / 5.214 / 5.507 |
+| 43f / 43 | 4.304 / 4.749 / 5.179 → 4.695 / 5.224 / 5.784 | 6.300 / 7.176 / 7.803 → 6.663 / 8.572 / 9.305 | 4.342 / 4.830 / 2,842.761 → 4.769 / 5.591 / 6.233 |
+| 44a / 44 | 4.510 / 4.938 / 5.226 → 4.461 / 4.874 / 4.924 | 6.214 / 6.782 / 7.139 → 6.202 / 6.966 / 6.997 | 4.739 / 6.018 / 3,380.844 → 4.283 / 4.709 / 4.742 |
+| 45a / 45 | 4.357 / 4.913 / 4.940 → 4.359 / 4.748 / 4.779 | 6.004 / 6.780 / 7.342 → 6.218 / 7.861 / 10.903 | 4.366 / 4.878 / 3,148.684 → 4.936 / 6.880 / 7.123 |
+
+Each latency percentile is based on 24 queries. The reopened p99 includes the
+single first-query latency shown above; it is therefore a cold-after-reopen
+sample rather than a stable steady-state estimate. Steady-state latency moved
+in both directions across pairs, especially at k=100. The peak RSS sample also
+fell in three of these four pairs and rose 4.61% in the seed 45 pair. Including
+the earlier seed 42 pair (+6.18% RSS), these small-fixture runs do not establish
+a consistent RSS reduction. RSS is sampled process-tree working set, not an
+exact allocation count. The fresh-child checker reports open/coverage only, so
+the query deadline result here is specifically for the same-process reopen
+sweep. This 11,266-vector result does not replace the separate 100k
+fresh-reopen qualification.
+
+The earlier seed 42 pair remains in its original evidence directory. Together,
+the five controlled pairs show exact topology and query-result parity within
+each fixed-seed pair, with no recall loss from the measured checkpoint/reopen
+path. Recall differs across seeds, confirming that seed control is necessary
+when investigating ANN recall. The pinned production implementation and data
+format were not changed for this diagnostic; no unsafe vector sharing or
+structural deduplication was introduced.
+
+#### 2026-11-02 clean 100k fixture admission recheck
+
+The 11-sample, one-second resource check passed the CPU/RAM/process gates:
+average CPU was 16.36%, minimum free RAM was 17,625,829,376 bytes, and no
+compiler or benchmark process was active. The pristine paired-copy helper still
+requires at least 50 GiB free on its C: scratch volume; C: had 31.84 GiB free
+and D: had 1.59 GiB. The storage prerequisite therefore failed. No new fixture
+copy or engine process was launched, and existing run directories were not
+reused as pristine inputs. This check adds no new 100k query, recall or RSS
+result; the historical before/after fresh-process results above retain their
+original scope and limitations. The 5,000 ms query deadline, 1,200 s job cap,
+2 GiB process-tree RSS cap and no-warm-up policy were unchanged. The exact
+no-launch admission receipt and its checksum are in
+`docs/reports/evidence/vector-memory-resource-recheck-20261102/`.
+
+#### 2026-11-05 per-reader sidecar-cache byte-bound follow-up
+
+Source review found that the existing `SIDECAR_CACHE_ROWS = 4096` limit did
+not bound retained decoded-row bytes independently of collection dimension.
+At the admitted maximum dimension of 65,535, a row-count-only full cache can
+retain about 1.0 GiB of decoded `f32` payload in one reader. This is an
+analytical source bound; no runtime OOM, customer impact, or unauthenticated
+remote reachability has been observed or established.
+
+The implementation candidate now keeps both the 4,096-row ceiling and a
+16 MiB per-`SidecarReader` decoded-row-capacity ceiling. It evicts least-recent
+rows until both limits admit a new row, skips caching an individually
+over-budget row while returning its disk-decoded value, and clears accounted
+bytes when truncation clears the cache. The metric covers retained `Vec<f32>`
+capacity only; it excludes LRU metadata, returned/transient copies, other
+readers or collections, allocator overhead, and process RSS. This is not a
+global memory guarantee and does not bound the public constructor's transient
+allocation for arbitrary caller-provided dimensions.
+
+Test-first hosted evidence is tied to the exact test-only candidate, not to
+the historical benchmark runs above. On `b96f36497045498e40ee7c648c10bc4d666adab2`,
+Ubuntu job `126718951950` ran 73 tests: 70 passed, two cache-bound tests failed,
+and one existing test was ignored. The maximum-dimension case exceeded the
+16 MiB assertion; the single-row case retained 16,777,220 bytes instead of
+zero. The ordinary-dimension row-limit and truncate-accounting tests passed.
+The byte-aware implementation and this dated report update are not yet
+qualified by hosted green checks at this point in the record. The original
+seeded topology, query, and RSS measurements above retain their original
+candidate and provenance; they are not measurements of this cache change.

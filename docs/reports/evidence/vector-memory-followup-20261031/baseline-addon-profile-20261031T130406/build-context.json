@@ -1,0 +1,16 @@
+{
+  "status": "running",
+  "source": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\verify-src",
+  "source_head": "ad94aa2e46025b7729d117ff376ab281ac15c49d",
+  "target_dir": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\baseline-native-target",
+  "command": "cargo build --locked --offline --lib -j1",
+  "features": "default (napi-bindings)",
+  "profile": "dev",
+  "CARGO_PROFILE_DEV_DEBUG": "0",
+  "CARGO_PROFILE_DEV_PACKAGE_SHA2_OPT_LEVEL": "3",
+  "CARGO_PROFILE_DEV_PACKAGE_CURVE25519_DALEK_OPT_LEVEL": "3",
+  "CARGO_PROFILE_DEV_PACKAGE_LZ4_FLEX_OPT_LEVEL": "3",
+  "lock_sha256": "EDA5BFA67C1077C96F2B84E44F740273E695C87A1A51B352CF18F2A031A4F8D2",
+  "cargo_version": "cargo 1.96.0 (30a34c682 2026-05-25)",
+  "build_started_local": "2026-10-31T13:04:24.4774884+07:00"
+}

@@ -1,0 +1,11 @@
+
+running 6 tests
+test add_vector_dim_mismatch_errors ... ok
+test add_vector_to_missing_node_errors ... ok
+test add_vector_unknown_collection_errors ... ok
+test attached_vector_survives_wal_replay ... ok
+test node_carries_vectors_in_two_collections ... ok
+test readding_vector_does_not_duplicate_search_hits ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.55s
+

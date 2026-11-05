@@ -1,0 +1,87 @@
+[
+  {
+    "sha256": "A3AE43B60BE1C8F2E77A39D6D0A18589BB00F53B67C1123C7656A1D48B23035E",
+    "length": 6974464,
+    "name": "diagnostic-vbench-genesis.exe"
+  },
+  {
+    "sha256": "8C804017B9FAAADABE9DEC94F4F9DB306B84F24001BC1BEBB131616B1ED51214",
+    "length": 166,
+    "name": "diagnostic-release-build.log"
+  },
+  {
+    "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+    "length": 3,
+    "name": "diagnostic-release-build.status"
+  },
+  {
+    "sha256": "9AD5A59005313BB9DEBB3877949AE3DFA537155F3F590FAEDC832EB75BC7F553",
+    "length": 6295,
+    "name": "open-only.console.log"
+  },
+  {
+    "sha256": "24E8CE0AA28F7DA50174B2A7671E0DA74715FC5F327A146182822E575F23E685",
+    "length": 5401,
+    "name": "open-only.json"
+  },
+  {
+    "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+    "length": 3,
+    "name": "open-only.status"
+  },
+  {
+    "sha256": "94B5A35D98DDD26602460B83B8A10AD788EA4E97D0602A569B164B45579D8E13",
+    "length": 163,
+    "name": "open-only-process.json"
+  },
+  {
+    "sha256": "4E6A2F10EB96937822DF85BAE006C09F89948B8CD0D960A37F124B34AAC9E7D2",
+    "length": 963,
+    "name": "open-only-context.json"
+  },
+  {
+    "sha256": "55B990DFEAD23086485CAE58E48C1C0650BDF89B29CF76DB3FCC18A5E04631D9",
+    "length": 8719,
+    "name": "query-events.json"
+  },
+  {
+    "sha256": "A4B2293A8C5C088EFB6A5989603DE0FED5D67A9BB84ACD53F20AE5BEC3F9BE99",
+    "length": 7817,
+    "name": "diagnostic-summary.json"
+  },
+  {
+    "sha256": "596E44D17053098C6EA70EEDFBEEDFAAC20B4265C3BF9CB57FA5A925FD776DAC",
+    "length": 836,
+    "name": "candidate-db-after-run-files.txt"
+  },
+  {
+    "sha256": "175ECA16F3A8E41C311EE08F5A77304B04E0309B6F8856DAE0BF81B322642837",
+    "length": 18372,
+    "name": "lib-instrumentation.patch"
+  },
+  {
+    "sha256": "0BAE0BD76B044FD06992A3D6C2E58C0F9A9E3F4D07CEC91F0DA82484DBAB4265",
+    "length": 6775,
+    "name": "bench-instrumentation.patch"
+  },
+  {
+    "sha256": "60DB70FBC9FE2B133BD345DC697A1E0D823654617F27F9754328B7DE19FF61FE",
+    "length": 1543100,
+    "name": "instrumented-lib.rs"
+  },
+  {
+    "sha256": "B68D1F6CBFC631F3EA50E9627061396E29339F5C850B987CA4C868C4A31227C7",
+    "length": 20310,
+    "name": "instrumented-vector_memory.rs"
+  },
+  {
+    "sha256": "AED205CFD5E15B170C221BF9DC70AA47BF34C28A0D7A314BEAE0217B05C49807",
+    "length": 912,
+    "name": "source-hashes.txt"
+  },
+  {
+    "sha256": "B8C6CB8BF60AB2613E90BD407CF6F5C197A4992A54F20A5E5F82F3BB9D0359ED",
+    "length": 645,
+    "name": "diagnostic-build-context.json"
+  }
+]

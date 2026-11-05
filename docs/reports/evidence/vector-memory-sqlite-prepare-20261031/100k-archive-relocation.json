@@ -1,0 +1,11 @@
+{
+  "at": "2026-11-01T00:04:43.7551861+07:00",
+  "old_case_root": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\100k-cases",
+  "archived_case_root": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\100k-two-open-attempt1",
+  "failed_before_preserved": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\100k-two-open-attempt1\\before",
+  "pristine_after_input_relocated": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\100k-fixture-preparation\\gdb",
+  "same_volume_rename": true,
+  "database_content_rewrite": false,
+  "source_protected": "Original Rold source untouched",
+  "prior_byte_verification": "100k-copy-verification-postcommit/status.json + archived copy-manifest.json"
+}

@@ -1,0 +1,69 @@
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-api-error-query-24716
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-api-error-query-24716
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-api-error-query-legacy-code-24716
+✔ NAPI typed query contract returns versioned validation envelopes and success data (249.0914ms)
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-api-error-transaction-24716
+✔ NAPI query contract preserves the structured legacy code beside the stable code (98.1792ms)
+✔ NAPI transaction contract returns stable conflict while legacy commit remains rejected (101.2492ms)
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-napi-test-ryw-7096
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-napi-test-oversample-7096
+✔ NAPI: read-your-write — addNode + flushIndex + hybridSearch (136.7633ms)
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-napi-test-lag-7096
+✔ NAPI: hybridSearch accepts oversample on a quantized+rerank collection (128.9889ms)
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-napi-test-dim-mismatch-7096
+✔ NAPI: indexLag is zero after flushIndex (188.7584ms)
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-napi-test-coll-iso-7096
+✔ NAPI: wrong-dim embedding rejects cleanly (101.3202ms)
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-napi-test-edge-persist-7096
+Journal folded to base segment @seq 5 (8 live events).
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-napi-test-edge-persist-7096
+snapshot: attempting instant load from binary state...
+snapshot: loading 2 nodes
+snapshot: loading 1 edges
+snapshot: instant load complete in 35.2531ms
+✔ NAPI: collection isolation — node in alpha invisible from beta search (112.4084ms)
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-napi-test-quant-ops-7096
+✔ NAPI: edge survives saveState + reopen (831.6744ms)
+✔ NAPI: listCollections exposes quant ops (sidecar resident bytes ~0, index_lag) (132.8537ms)
+GRL: Initializing GenesisBlockDB at C:\Users\suanr\genesis-vector-memory-20261031\verify-src\.brain\mcp_test_db
+GenesisBlock MCP Server running on Stdio
+▶ MCP Server: Life-cycle and Tools
+  ✔ list tools returns all five tools (14.2733ms)
+  ✔ gks_knowledge_promote is idempotent and returns structured canonical evidence (23.4547ms)
+  ✔ add_knowledge with explicit ID (8.6108ms)
+  ✔ add_knowledge generates ID when omitted (7.1141ms)
+  ✔ query_hql traverses known node (11.425ms)
+  ✔ query_ir context returns a structured envelope (10.6678ms)
+  ✔ query_ir unsupported temporal context returns structured error (3.5205ms)
+  ✔ retrieve_tiered_context H0 returns target node (2.8888ms)
+  ✔ retrieve_tiered_context H1 returns context package shape (4.7586ms)
+  ✔ query_hql error path: malformed HQL returns structured error (3.1324ms)
+  ✔ add_knowledge missing labels returns error (1.0915ms)
+  ✔ query_hql tool — malformed HQL returns structured error, not crash (2.2374ms)
+✔ MCP Server: Life-cycle and Tools (4772.1271ms)
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-query-ir-parity-24324
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-query-ir-validation-24324
+✔ NAPI: executeQueryIr supports search and traverse envelopes (174.0268ms)
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-query-ir-unsupported-24324
+✔ NAPI: executeQueryIr rejects unknown envelope fields (100.9392ms)
+✔ NAPI: unsupported Query IR capabilities fail closed (102.8735ms)
+✔ engineNameSync returns the stable identifier (1.3771ms)
+✔ versionSync matches package.json version (single source of truth) (0.819ms)
+✔ schemaVersionSync matches modules.json engine.schemaVersion (11.3956ms)
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-wave-a-On1TdJ
+✔ NAPI rejected unified constraints preserve frontier and allow corrected retry (133.4535ms)
+snapshot: attempting instant load from binary state...
+snapshot: loading 0 nodes
+snapshot: loading 0 edges
+snapshot: instant load complete in 31.7098ms
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-wave-b-edge-efeI3J
+✔ NAPI collection definition survives child exit without checkpoint (441.0854ms)
+✔ NAPI edge rebind preserves transaction-time endpoints (154.208ms)
+ℹ tests 32
+ℹ suites 0
+ℹ pass 32
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 20434.0783

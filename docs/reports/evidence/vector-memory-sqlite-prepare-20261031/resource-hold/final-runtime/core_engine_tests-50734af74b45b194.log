@@ -1,0 +1,10 @@
+
+running 5 tests
+test test_edge_creation_and_graph_traversal ... ok
+test test_edge_wal_durability_without_snapshot ... ok
+test test_node_creation_and_interning ... ok
+test test_vector_arena_and_hybrid_search ... ok
+test test_wal_group_commit_durability ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.89s
+

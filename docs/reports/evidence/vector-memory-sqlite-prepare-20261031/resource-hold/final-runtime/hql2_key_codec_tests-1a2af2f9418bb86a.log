@@ -1,0 +1,8 @@
+
+running 3 tests
+test key_codec_v1_canonicalizes_zero_and_rejects_nonfinite_reals ... ok
+test key_codec_v1_enforces_component_and_encoded_size_bounds ... ok
+test key_codec_v1_uses_fixed_tags_typed_bytes_and_order ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -1,0 +1,11 @@
+{
+  "private_bytes": 4297555968,
+  "rss_bytes": 4173070336,
+  "executable": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\concurrency-948a29ec82ad9112.exe",
+  "recorded_at": "2026-10-31T07:44:17.6799197+07:00",
+  "pid": 25332,
+  "parent": 23348,
+  "reason": "debug concurrency target approached the 10 minute observation budget at about 4.16 GB RSS",
+  "observed_process_start": "2026-10-31T07:34:25+07:00",
+  "elapsed_seconds_approx": 592
+}

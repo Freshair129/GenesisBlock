@@ -1,0 +1,26 @@
+---
+status: investigation
+lifecycle: active
+date: 2026-10-31
+---
+# SQLite post-backup checkpoint deferral
+
+Symptom: first props prepare after real11k RW reopen took2.631425s, row37us, mutex0. Separate historical100k querydeadline failure remains a distinct acceptance gate.
+
+Confirmed mechanism: pinnedrusqlite0.32.1/libsqlite3-sys0.30.1/SQLite3.46.0 backup commits destination WAL below SQLexecutor, sets pendingWal.iCallback, resets schema, returns. Firstschema-loadingSQLprepare runsnestedSELECT; sqlite3Step DONE invokes doWalCallbacks and default1000framePASSIVEcheckpoint. This can defer publicationI/O to firstread.
+
+Runtime evidence: external R=C:/Users/suanr/genesis-sqlite-prepare-20261031. Baseline libSHA812afd...; finalregressionSHA40c4a131c4137304764b38a61d5d4a1482893796fd5e032d8292653a966cd342. red2-run ran5projection tests: existing2passed,new3failed. WALhookfixture publicationcallbacks0, firstreadcallbacks1 after >1000frames. ActiveROsnapshot control also deferredcallback1 afterreaderended. Hardmaintenancefault test correctly RED because baseline neverattemptscheckpointPRAGMA. These are functionalcallback/contents tests under300stestcap, notlatency measurements; host was busy. Large1GBtimedreproducer and100k are stillpendingoriginalCPUadmission.
+
+Root cause: backupAPI completion omits the SQL-layer WALhookdispatch at the engine projectionpublication boundary. Detectiongap: prior correctnessfixtures were small and didnot assert which API call paid deferredcheckpointwork.
+
+Approved-scope correction (MEDIUM/C-2): scope/dropBackup, retain destinationmutex, fullyexecute PRAGMAwal_checkpoint(PASSIVE) beforepublicationreturns. This is explicitmaintenance, no dummyread, no searchwarmup, no change in5squery/1200sjob/2GiBbenchmarklimits. PASSIVEpermitspartialprogress/pinnedreaders and neverrequiresWALtruncate. HardSQLerrors explicitlysay projectionpublicationalreadycommitted; no rollbackclaim.
+
+Before/after measurements remain pending; work is moved toopen/publication, not eliminated. No RAMsavings claimed. Sourcechain and independentproposalreview are external. Prevention: callbackcounter, active-reader snapshot, postcommit-error regression plusreplay/backup/reopenexistingcontracts and100kfirstquerybeforecoverageorwarmqueries.
+
+GREEN: full58librarytests completed57passed/0failed/1manualprofilerignored. Publicationhook1, frames/log/checkpointed2352each, firstreadhook0. CandidatecoreSHA5b8bb9bed5dde5fa6e7d4d255da3acce6c1bfe892092456133adb65a78998fdd. Sourceand3regressions appliedtoD afterfunctionalGREEN andindependentread-onlyreview. Integration/performancequalificationpending.
+
+FinalsourceE69testliteral cleanup:57librarytests passed/0failed/1ignored. Wholeproductioncore5B8prelint40Cstage:159targets1328passed/0failed/7ignored. StrictClippycaughtmanualCstringliteration; fixedtoCstrliteralwithoutlintallow. Final159binariesallchangedandwererun;85targetsdone0fail, HQLtargetinterruptedat216.8sforCPU84-98percent/unrelatedcompilerresourcepressure. No newtimedbenchmarks or100kqualification. Ownedcontroller36628+ownedHQL4076stoppedwithbirth/pathproof;unrelatedprocessesuntouched. Finalqualificationpassedfalse;requiresfreshcomplete159afterresourcewindowplusstatic/native andtimedgates. SeeRnew/resource-hold/hold-receipt.json,qualification-summary.json,RESUME.txt.
+
+Fresh final-source correctness qualification supersedes that hold: the frozen E69 executables completed all 159 targets, 1328 passed / 0 failed / 7 ignored. Strict Clippy core/default, host-mobile compile, doctests, isolated NAPI build/DTS/native smoke and all 88 Node tests passed. qualification-receipt.json now has passed:true for correctness only, bound to 287 source paths and four final gate-file hashes. The 300s/4GiB per-executable limits were unchanged. Normal completion and owned-child timeout controller fixtures passed with zero remaining owned identities. Timed pinned matrix, 100k deadline and current-source real-embedding performance remain separate pending gates; correctness does not imply their completion.
+
+Pinned causal runtime confirmation: matrix-isolated-analysis.json runs SQLite3.46.0 on the saved1017315328B real projection, without any Genesis replay. Normal backup left248368frames/nBackfill0; firstprepare2.915156s backfilled all248368. Diagnostic no-autocheckpoint firstprepare546us left backfill0. Production PASSIVEmaintenance took3.220885s, completed backfill before SELECT; firstprepare27us. Exact payloads/sourceSHA passed. Complete guarded matrix33.489s, peak trackedtree51.63MB; admission16.55percentCPU/free12.92GiB; no monitored competing compiler/benchmark. Original interfered matrix retained separately. These single fixed-order observations show maintenance ownership, not elimination of totalI/O or statistical performance improvement. No SQL/searchwarmup, OSfilecache reset, deadline/RAMcap increase or new RAMsaving. 100k and realBGEpair remain pending due recurrent external compiler/CPU admission holds.

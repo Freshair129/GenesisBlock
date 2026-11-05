@@ -1,0 +1,9 @@
+   Compiling genesis-block-native v0.2.10 (D:\GenesisBlock_Dev\GenesisBlock)
+    Finished `test` profile [unoptimized] target(s) in 7.99s
+     Running unittests src\lib.rs (C:\Users\suanr\genesis-vector-memory-20261031\napi-target\x86_64-pc-windows-msvc\debug\deps\genesis_block_native-b7af0321854b0aac.exe)
+
+running 1 test
+test vector_memory_tests::reopen_reuses_identical_signature_math_and_releases_the_cache ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 51 filtered out; finished in 0.32s
+

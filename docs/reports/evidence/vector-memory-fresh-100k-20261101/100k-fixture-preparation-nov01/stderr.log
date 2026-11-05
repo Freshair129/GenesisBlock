@@ -1,0 +1,5 @@
+GB_MEMORY_MUTATE_REOPEN {"extra":{"dim":1024,"input_n":100000,"path":"C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\100k-fixture-preparation-nov01\\gdb"},"stage":"first_open_start"}
+GB_VECTOR_QUERY_DIAG {"branch":"marker_match","event":"projection_sync_on_open","force_rebuild":false,"marker_check_us":112,"marker_match":true,"read_only":false}
+GB_MEMORY_MUTATE_REOPEN {"extra":{"memory":{"before_rss_bytes":8556544,"peak_rss_bytes":532832256,"process_rss_bytes":532832256,"seconds":494.454722}},"stage":"first_open_complete"}
+GB_MEMORY_MUTATE_REOPEN {"extra":{"id":"sqlite-publication-probe-1793490548861283600","memory":{"before_rss_bytes":532815872,"peak_rss_bytes":532877312,"process_rss_bytes":532877312,"seconds":0.0043593}},"stage":"marker_added"}
+GB_MEMORY_MUTATE_REOPEN {"extra":{"memory":{"before_rss_bytes":532860928,"peak_rss_bytes":595476480,"process_rss_bytes":23138304,"seconds":81.8712964},"snapshot":"normal Storage::drop"},"stage":"first_drop_complete"}

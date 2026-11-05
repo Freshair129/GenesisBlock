@@ -1,0 +1,13 @@
+snapshot: state persisted successfully to C:\Users\suanr\genesis-sqlite-prepare-20261031\real-repeat\round2-before\output\gdb
+snapshot: state persisted successfully to C:\Users\suanr\genesis-sqlite-prepare-20261031\real-repeat\round2-before\output\gdb
+compaction: starting index compaction...
+compaction: index compaction complete in 42.8932004s. Arenas resized to 11266 nodes.
+snapshot: state persisted successfully to C:\Users\suanr\genesis-sqlite-prepare-20261031\real-repeat\round2-before\output\gdb
+shutdown: graceful shutdown, state saved.
+snapshot: attempting instant load from binary state...
+snapshot: loading 11266 nodes
+snapshot: loading 0 edges
+snapshot: instant load complete in 9.7041021s
+snapshot: state persisted successfully to C:\Users\suanr\genesis-sqlite-prepare-20261031\real-repeat\round2-before\output\gdb
+shutdown: graceful shutdown, state saved.
+memory audit: 11266x1024 none rerank=false: C:\Users\suanr\genesis-sqlite-prepare-20261031\real-repeat\round2-before\output

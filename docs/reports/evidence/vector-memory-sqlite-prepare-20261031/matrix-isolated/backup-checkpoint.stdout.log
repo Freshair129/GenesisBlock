@@ -1,0 +1,24 @@
+run mode=backup-checkpoint sqlite_version="3.46.0" sqlite_source_id="2024-05-23 13:25:27 96c92aba00c8375bc32fafcdf12429c58bd8aabfcadab6683e35bbb9cdebf19e" source="C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\projection-props-split-20261031T151315\\output\\gdb\\projection.sqlite" destination=Some("C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\matrix-isolated\\backup-checkpoint.sqlite") node_u32=5932
+wal_index stage=before_backup mx_frame=0 n_backfill=0
+files stage=before_backup main=1017315328 wal=0 shm=32768
+wal_index stage=immediately_after_backup mx_frame=248368 n_backfill=0
+files stage=immediately_after_backup main=1017315328 wal=1023276192 shm=1998848
+wal_index stage=after_source_drop_before_select mx_frame=248368 n_backfill=0
+files stage=after_source_drop_before_select main=1017315328 wal=1023276192 shm=1998848
+publication_maintenance_us=3220885
+wal_index stage=after_publication_maintenance mx_frame=248368 n_backfill=248368
+files stage=after_publication_maintenance main=1017315328 wal=1023276192 shm=1998848
+wal_index stage=first_before_prepare mx_frame=248368 n_backfill=248368
+files stage=first_before_prepare main=1017315328 wal=1023276192 shm=1998848
+wal_index stage=first_after_prepare mx_frame=248368 n_backfill=248368
+files stage=first_after_prepare main=1017315328 wal=1023276192 shm=1998848
+query=first prepare_us=27 row_us=43 finalize_us=0 payload_len_bytes=2 payload={}
+wal_index stage=first_after_query mx_frame=248368 n_backfill=248368
+files stage=first_after_query main=1017315328 wal=1023276192 shm=1998848
+wal_index stage=second_before_prepare mx_frame=248368 n_backfill=248368
+files stage=second_before_prepare main=1017315328 wal=1023276192 shm=1998848
+wal_index stage=second_after_prepare mx_frame=248368 n_backfill=248368
+files stage=second_after_prepare main=1017315328 wal=1023276192 shm=1998848
+query=second prepare_us=19 row_us=20 finalize_us=0 payload_len_bytes=2 payload={}
+wal_index stage=second_after_query mx_frame=248368 n_backfill=248368
+files stage=second_after_query main=1017315328 wal=1023276192 shm=1998848

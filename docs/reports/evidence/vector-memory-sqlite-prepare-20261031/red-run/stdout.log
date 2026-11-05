@@ -1,0 +1,15 @@
+
+running 1 test
+test projection_rebuild_tests::first_read_does_not_run_deferred_publication_checkpoint ... snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmppQnV3l
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmppQnV3l
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmppQnV3l
+shutdown: graceful shutdown, state saved.
+FAILED
+
+failures:
+
+failures:
+    projection_rebuild_tests::first_read_does_not_run_deferred_publication_checkpoint
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 56 filtered out; finished in 0.38s
+

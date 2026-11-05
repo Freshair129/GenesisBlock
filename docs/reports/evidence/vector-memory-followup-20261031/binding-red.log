@@ -1,0 +1,25 @@
+   Compiling genesis-block-native v0.2.10 (D:\GenesisBlock_Dev\GenesisBlock)
+    Finished `test` profile [unoptimized] target(s) in 1m 02s
+     Running unittests src\lib.rs (C:\Users\suanr\genesis-vector-memory-20261031\napi-target\x86_64-pc-windows-msvc\debug\deps\genesis_block_native-b7af0321854b0aac.exe)
+
+running 1 test
+test vector_memory_tests::revision_binding_work_is_linear_and_tampering_stays_rejected ... FAILED
+
+failures:
+
+---- vector_memory_tests::revision_binding_work_is_linear_and_tampering_stays_rejected stdout ----
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmp63pOgz
+
+thread 'vector_memory_tests::revision_binding_work_is_linear_and_tampering_stays_rejected' (33528) panicked at src\vector_memory_tests.rs:338:5:
+whole-source binding must index mutations once, not rescan per leaf: 8385 probes for 129 mutations
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmp63pOgz
+shutdown: graceful shutdown, state saved.
+
+
+failures:
+    vector_memory_tests::revision_binding_work_is_linear_and_tampering_stays_rejected
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 48 filtered out; finished in 0.39s
+
+error: test failed, to rerun pass `--lib`

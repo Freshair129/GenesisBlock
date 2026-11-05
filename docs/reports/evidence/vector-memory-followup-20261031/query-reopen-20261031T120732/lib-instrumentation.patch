@@ -1,0 +1,377 @@
+diff --git "a/C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-20261031T120732\\pre-instrumentation\\lib.rs" b/src/lib.rs
+index 508a82c..5d650f0 100644
+--- "a/C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-20261031T120732\\pre-instrumentation\\lib.rs"
++++ b/src/lib.rs
+@@ -9477,6 +9477,79 @@ impl Storage {
+             .collect())
+     }
+ 
++    /// Diagnostic-only view used by the isolated `vbench-genesis` reopen probe.
++    #[cfg(feature = "bins")]
++    pub fn diagnostic_vector_metadata_summary(
++        &self,
++        name: &str,
++        sample_limit: usize,
++    ) -> Result<Value> {
++        self.ensure_readable()?;
++        let _read_guard = self.commit_lock.lock();
++        let coll = self.resolve_collection(&Some(name.to_string()))?;
++        let metadata = coll.metadata.read();
++        let now = Utc::now().to_rfc3339();
++        let mut retired_count = 0usize;
++        let mut missing_node_count = 0usize;
++        let mut missing_current_node_count = 0usize;
++        let mut visible_current_count = 0usize;
++        let mut metadata_samples = Vec::new();
++        let mut missing_node_samples = Vec::new();
++
++        for row in metadata.iter() {
++            let retired = row.retired_seq != 0;
++            if retired {
++                retired_count += 1;
++            }
++            let node = self.nodes.get(&row.node_u32);
++            let node_id = node.as_ref().map(|node| node.value().id.clone());
++            let visible = node
++                .as_ref()
++                .map(|node| Self::is_node_visible(node.value(), &None, false, &now))
++                .unwrap_or(false);
++            if !retired && visible {
++                visible_current_count += 1;
++            }
++            if node.is_none() {
++                missing_node_count += 1;
++                if !retired {
++                    missing_current_node_count += 1;
++                }
++                if missing_node_samples.len() < sample_limit {
++                    missing_node_samples.push(serde_json::json!({
++                        "arena_id": row.arena_id,
++                        "node_u32": row.node_u32,
++                        "retired_seq": row.retired_seq,
++                    }));
++                }
++            }
++            if metadata_samples.len() < sample_limit {
++                metadata_samples.push(serde_json::json!({
++                    "arena_id": row.arena_id,
++                    "node_u32": row.node_u32,
++                    "node_id": node_id,
++                    "retired_seq": row.retired_seq,
++                    "visible_current": !retired && visible,
++                }));
++            }
++        }
++
++        let summary = serde_json::json!({
++            "event": "metadata_summary",
++            "collection": coll.name.clone(),
++            "metadata_count": metadata.len(),
++            "node_count": self.nodes.len(),
++            "retired_count": retired_count,
++            "missing_node_count": missing_node_count,
++            "missing_current_node_count": missing_current_node_count,
++            "visible_current_count": visible_current_count,
++            "metadata_samples": metadata_samples,
++            "missing_node_samples": missing_node_samples,
++        });
++        eprintln!("GB_VECTOR_QUERY_DIAG {summary}");
++        Ok(summary)
++    }
++
+     /// Insert one vector into the named (or default) collection. Validates the
+     /// embedding length against the collection dim, stages it into the arena
+     /// (durable, immediately in-memory), and defers the HNSW insert to the
+@@ -23278,10 +23351,43 @@ impl Storage {
+         self.ensure_readable()?;
+         self.require_unscoped_read()?;
+ 
++        let diagnostics = std::env::var_os("GB_VECTOR_QUERY_DIAGNOSTICS").is_some()
++            && args.as_of.is_none();
+         let limits = QueryBudget::default().resolve()?;
+         let mut budget = QueryBudgetState::new(limits);
+-        let results = self.hybrid_search_impl(args, None, &mut budget)?;
+-        budget.serialized(&results)?;
++        let results = self.hybrid_search_impl(args, None, &mut budget);
++        if diagnostics {
++            let outcome = match &results {
++                Ok(rows) => serde_json::json!({"status": "ok", "row_count": rows.len()}),
++                Err(error) => serde_json::json!({"status": "error", "error": error.to_string()}),
++            };
++            eprintln!(
++                "GB_VECTOR_QUERY_DIAG {}",
++                serde_json::json!({
++                    "event": "hybrid_search_return",
++                    "elapsed_us": budget.started.elapsed().as_micros(),
++                    "outcome": outcome,
++                })
++            );
++        }
++        let results = results?;
++        let serialization_started = Instant::now();
++        let serialized = budget.serialized(&results);
++        if diagnostics {
++            let outcome = match &serialized {
++                Ok(()) => serde_json::json!({"status": "ok"}),
++                Err(error) => serde_json::json!({"status": "error", "error": error.to_string()}),
++            };
++            eprintln!(
++                "GB_VECTOR_QUERY_DIAG {}",
++                serde_json::json!({
++                    "event": "serialization_return",
++                    "elapsed_us": serialization_started.elapsed().as_micros(),
++                    "outcome": outcome,
++                })
++            );
++        }
++        serialized?;
+         Ok(results)
+     }
+ 
+@@ -23300,6 +23406,10 @@ impl Storage {
+         tx_as_of: Option<u64>,
+         budget: &mut QueryBudgetState,
+     ) -> Result<Vec<NeighborOutput>> {
++        let diagnostics = std::env::var_os("GB_VECTOR_QUERY_DIAGNOSTICS").is_some()
++            && tx_as_of.is_none()
++            && args.as_of.is_none();
++        let query_started = diagnostics.then(Instant::now);
+         budget.check_deadline()?;
+         Self::validate_temporal_selector(&args.as_of)?;
+         if args.k == 0 {
+@@ -23457,10 +23567,39 @@ impl Storage {
+             // matching the indexed codes. Non-SQ8 ⇒ SQ8_FIXED, ignored by the arm.
+             let sq8 = coll.sq8_snapshot();
+             let slots = coll.metadata.read().len();
++            if let Some(started) = query_started {
++                eprintln!(
++                    "GB_VECTOR_QUERY_DIAG {}",
++                    serde_json::json!({
++                        "event": "query_plan",
++                        "collection": coll.name.clone(),
++                        "metric": format!("{:?}", coll.metric),
++                        "quant": format!("{:?}", coll.quant),
++                        "rerank": coll.f32_sidecar.is_some(),
++                        "slots": slots,
++                        "query_dim": query_f32.len(),
++                        "k": args.k,
++                        "fetch": fetch,
++                        "ef_override": args.ef_search,
++                        "resolved_ef": ef,
++                        "elapsed_us": started.elapsed().as_micros(),
++                    })
++                );
++            }
+             if slots == 0 {
+                 Vec::new()
+             } else {
++                let search_calls = std::cell::Cell::new(0usize);
++                let eligibility_calls = std::cell::Cell::new(0usize);
+                 let run_search = |limit: usize| -> Result<Vec<(usize, f32)>> {
++                    let call = if diagnostics {
++                        let next = search_calls.get() + 1;
++                        search_calls.set(next);
++                        Some(next)
++                    } else {
++                        None
++                    };
++                    let search_started = diagnostics.then(Instant::now);
+                     let hnsw_lock = coll.hnsw.read();
+                     match &*hnsw_lock {
+                         Some(idx) => {
+@@ -23468,14 +23607,29 @@ impl Storage {
+                             // graph exploration budget. Keeping `ef` fixed
+                             // can leave every expanded shortlist inside a
+                             // retired prefix on large collections.
+-                            Ok(idx.search_f32(
++                            let search_ef = ef.max(limit);
++                            let hits = idx.search_f32(
+                                 &query_f32,
+                                 limit,
+-                                ef.max(limit),
++                                search_ef,
+                                 center.as_deref(),
+                                 sq8,
+                                 None,
+-                            ))
++                            );
++                            if let (Some(call), Some(started)) = (call, search_started) {
++                                eprintln!(
++                                    "GB_VECTOR_QUERY_DIAG {}",
++                                    serde_json::json!({
++                                        "event": "hnsw_search",
++                                        "call": call,
++                                        "limit": limit,
++                                        "ef": search_ef,
++                                        "hits": hits.len(),
++                                        "elapsed_us": started.elapsed().as_micros(),
++                                    })
++                                );
++                            }
++                            Ok(hits)
+                         }
+                         None => Err(Error::from_reason("HNSW not init")),
+                     }
+@@ -23483,20 +23637,102 @@ impl Storage {
+                 let eligible_count = |candidates: &[(usize, f32)]| -> usize {
+                     let meta_guard = coll.metadata.read();
+                     let mut seen = HashSet::new();
+-                    candidates
+-                        .iter()
+-                        .filter_map(|(d_id, _)| meta_guard.get(*d_id))
+-                        .filter(|meta| meta.retired_seq == 0)
+-                        .filter(|meta| {
+-                            self.nodes
+-                                .get(&meta.node_u32)
+-                                .map(|node| {
+-                                    Self::is_node_visible(node.value(), &args.as_of, false, &now)
+-                                })
+-                                .unwrap_or(false)
++                    if !diagnostics {
++                        return candidates
++                            .iter()
++                            .filter_map(|(d_id, _)| meta_guard.get(*d_id))
++                            .filter(|meta| meta.retired_seq == 0)
++                            .filter(|meta| {
++                                self.nodes
++                                    .get(&meta.node_u32)
++                                    .map(|node| {
++                                        Self::is_node_visible(
++                                            node.value(),
++                                            &args.as_of,
++                                            false,
++                                            &now,
++                                        )
++                                    })
++                                    .unwrap_or(false)
++                            })
++                            .filter(|meta| seen.insert(meta.node_u32))
++                            .count();
++                    }
++
++                    let call = eligibility_calls.get() + 1;
++                    eligibility_calls.set(call);
++                    let started = Instant::now();
++                    let mut eligible = 0usize;
++                    let mut missing_metadata_slots = 0usize;
++                    let mut retired = 0usize;
++                    let mut missing_nodes = 0usize;
++                    let mut invisible = 0usize;
++                    let mut duplicate_nodes = 0usize;
++                    let mut samples = Vec::new();
++                    for (d_id, distance) in candidates {
++                        let Some(meta) = meta_guard.get(*d_id) else {
++                            missing_metadata_slots += 1;
++                            if samples.len() < 8 {
++                                samples.push(serde_json::json!({
++                                    "slot": d_id,
++                                    "distance": distance,
++                                    "status": "missing_metadata",
++                                }));
++                            }
++                            continue;
++                        };
++                        let node_u32 = meta.node_u32;
++                        let retired_seq = meta.retired_seq;
++                        let mut node_id = None;
++                        let status = if retired_seq != 0 {
++                            retired += 1;
++                            "retired"
++                        } else if let Some(node) = self.nodes.get(&node_u32) {
++                            node_id = Some(node.value().id.clone());
++                            if Self::is_node_visible(node.value(), &args.as_of, false, &now) {
++                                if seen.insert(node_u32) {
++                                    eligible += 1;
++                                    "eligible"
++                                } else {
++                                    duplicate_nodes += 1;
++                                    "duplicate_node"
++                                }
++                            } else {
++                                invisible += 1;
++                                "invisible"
++                            }
++                        } else {
++                            missing_nodes += 1;
++                            "missing_node"
++                        };
++                        if samples.len() < 8 {
++                            samples.push(serde_json::json!({
++                                "slot": d_id,
++                                "distance": distance,
++                                "node_u32": node_u32,
++                                "node_id": node_id,
++                                "retired_seq": retired_seq,
++                                "status": status,
++                            }));
++                        }
++                    }
++                    eprintln!(
++                        "GB_VECTOR_QUERY_DIAG {}",
++                        serde_json::json!({
++                            "event": "eligibility",
++                            "call": call,
++                            "candidate_count": candidates.len(),
++                            "eligible_count": eligible,
++                            "missing_metadata_slot_count": missing_metadata_slots,
++                            "retired_count": retired,
++                            "missing_node_count": missing_nodes,
++                            "invisible_count": invisible,
++                            "duplicate_node_count": duplicate_nodes,
++                            "elapsed_us": started.elapsed().as_micros(),
++                            "first_candidates": samples,
+                         })
+-                        .filter(|meta| seen.insert(meta.node_u32))
+-                        .count()
++                    );
++                    eligible
+                 };
+                 // A full-sized HNSW shortlist is still approximate and can
+                 // omit nearer rows. For a small lossless current view, use
+@@ -23517,7 +23753,20 @@ impl Storage {
+                     hits = coll.exact_candidates(&query_f32, requested);
+                 }
+                 while eligible_count(&hits) < args.k as usize && requested < slots {
++                    let previous_requested = requested;
+                     requested = requested.saturating_mul(2).min(slots);
++                    if diagnostics {
++                        eprintln!(
++                            "GB_VECTOR_QUERY_DIAG {}",
++                            serde_json::json!({
++                                "event": "refill",
++                                "from_limit": previous_requested,
++                                "to_limit": requested,
++                                "ef": ef.max(requested),
++                                "slots": slots,
++                            })
++                        );
++                    }
+                     hits = if exact_small_lossless {
+                         coll.exact_candidates(&query_f32, requested)
+                     } else {
+@@ -23611,7 +23860,24 @@ impl Storage {
+                         // and keep the old last-writer-wins behavior.)
+                         continue;
+                     } else if let Some(node) = self.nodes.get(&u32_id) {
+-                        let node_out = self.hydrated_node(u32_id, node.value());
++                        let node_out = if diagnostics {
++                            let props_were_null = node.value().props.is_null();
++                            let hydration_started = Instant::now();
++                            let hydrated = self.hydrated_node(u32_id, node.value());
++                            eprintln!(
++                                "GB_VECTOR_QUERY_DIAG {}",
++                                serde_json::json!({
++                                    "event": "hydration",
++                                    "node_u32": u32_id,
++                                    "node_id": &hydrated.id,
++                                    "props_were_null": props_were_null,
++                                    "elapsed_us": hydration_started.elapsed().as_micros(),
++                                })
++                            );
++                            hydrated
++                        } else {
++                            self.hydrated_node(u32_id, node.value())
++                        };
+ 
+                         if Self::is_node_visible(&node_out, &args.as_of, false, &now) {
+                             node_out

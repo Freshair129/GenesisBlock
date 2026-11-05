@@ -1,0 +1,92 @@
+{
+  "targets": 159,
+  "complete": true,
+  "counts": {
+    "passed": 1325,
+    "failed": 0,
+    "ignored": 7
+  },
+  "limited": [],
+  "failed_targets": [],
+  "previous_timeout_groups": [
+    {
+      "target": "concurrency-d39b1179de3f2047.exe",
+      "args": [
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 345505792,
+      "seconds": 72.061,
+      "log": "concurrency-d39b1179de3f2047.log"
+    },
+    {
+      "target": "consensus_checkpoint_race_tests-4028d1334adb472a.exe",
+      "args": [
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 25079808,
+      "seconds": 45.826,
+      "log": "consensus_checkpoint_race_tests-4028d1334adb472a.log"
+    },
+    {
+      "target": "hql_cypher_tests-0a96672a3c154a17.exe",
+      "args": [
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 338956288,
+      "seconds": 156.357,
+      "log": "hql_cypher_tests-0a96672a3c154a17.log"
+    },
+    {
+      "target": "journal_format_tests-db402d7edf72c286.exe",
+      "args": [
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 107884544,
+      "seconds": 28.519,
+      "log": "journal_format_tests-db402d7edf72c286.log"
+    },
+    {
+      "target": "rebuild_from_truth_tests-466f03d07e0264b0.exe",
+      "args": [
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 116473856,
+      "seconds": 64.285,
+      "log": "rebuild_from_truth_tests-466f03d07e0264b0.log"
+    },
+    {
+      "target": "wal_compaction_tests-a811d805cfcd8a3f.exe",
+      "args": [
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 62554112,
+      "seconds": 21.72,
+      "log": "wal_compaction_tests-a811d805cfcd8a3f.log"
+    }
+  ],
+  "node": {
+    "passed": 88,
+    "failed": 0,
+    "exit_code": 0
+  },
+  "qualification": {
+    "core": 0,
+    "mobile": 0,
+    "default": 0
+  },
+  "native_smoke_exit": 0,
+  "napi_build_exit": 0,
+  "dts_exit": 0
+}

@@ -1,0 +1,84 @@
+{
+  "status": "prepared_before_final_admission",
+  "binary": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\candidate-repeat-build-20261031T131156\\candidate-vbench-genesis-repeat.exe",
+  "binary_sha256": "959DFA8F6348082046BCBFAD744A422E2BD7F5A43C702C2DBA7D2D86D26AEAF1",
+  "bench_source": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\candidate-repeat-build-20261031T131156\\candidate-repeat-vector_memory.rs",
+  "bench_sha256": "5BFDE2C3B897C316BED557FC3037AE9A44D9EEAD07053DB4F835BF1BD7D27C62",
+  "querytrace_lib_source": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\candidate-repeat-build-20261031T131156\\candidate-querytrace-lib.rs",
+  "querytrace_lib_sha256": "AE2D416AF3F083EA8AFBB68C6A7173A6580185A9CB48018685729D378BA80553",
+  "input": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\inputs\\synthetic-100000-1024",
+  "input_meta": {
+    "dim": 1024,
+    "metric": "cosine",
+    "model": "synthetic-unit-seed42",
+    "n": 100000,
+    "q": 24
+  },
+  "input_files": [
+    {
+      "bytes": 409600000,
+      "name": "corpus.f32",
+      "sha256": "A4D885AB3C6D6A0559E07F35E5A3BCEAA285AB5E42C309E1691B9B648347AA30"
+    },
+    {
+      "bytes": 98304,
+      "name": "queries.f32",
+      "sha256": "630A95758E4BC7861E3868435B7178B96FB2A790577A0C95D28616A14B2C3421"
+    },
+    {
+      "bytes": 14198,
+      "name": "truth.json",
+      "sha256": "7608A283E2251AAA82424A6268C63B045FA17ED47D583E308A3FC4967FFC580E"
+    }
+  ],
+  "database": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-repeat-20261031T134858\\new\\gdb",
+  "database_role": "candidate equivalent disposable full copy; source database untouched",
+  "output_json": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-repeat-20261031T134858\\new\\repeat-open-only.json",
+  "whitelist_count": 16,
+  "old_context_exact_whitelist_keys": true,
+  "old_context_values_match_after_path_substitution": true,
+  "effective_whitelist_values_match": true,
+  "cleared_conflicting_variable_names": [
+    "GB_MEMORY_PREPARE",
+    "GB_MEMORY_COMPACT",
+    "GB_MEMORY_CORPUS"
+  ],
+  "conflicting_variables_absent": true,
+  "whitelisted_env": {
+    "GB_VBENCH": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\inputs\\synthetic-100000-1024",
+    "GB_QUANT": "bq",
+    "GB_MEMORY_RETENTION": "full",
+    "GB_VEC_Q": "24",
+    "GB_MEMORY_AUDIT": "1",
+    "GB_MEMORY_OPEN_QUERY_SAMPLES": "120",
+    "RAYON_NUM_THREADS": "4",
+    "GB_VECTOR_QUERY_DIAGNOSTICS": "1",
+    "GB_MEMORY_OPEN_ONLY": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-repeat-20261031T134858\\new\\gdb",
+    "GB_MEMORY_OPEN_READ_WRITE": "1",
+    "GB_EF": "200",
+    "GB_MEMORY_OPEN_OUT": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-repeat-20261031T134858\\new\\repeat-open-only.json",
+    "GB_MEMORY_RSS_LIMIT_BYTES": "2147483648",
+    "GB_MEMORY_INPUT": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\inputs\\synthetic-100000-1024",
+    "GB_MEMORY_OPEN_REPEAT": "2",
+    "GB_RERANK": "0"
+  },
+  "query": {
+    "deadline_ms": 5000,
+    "k": 10,
+    "alpha": 0.0,
+    "ef_search": 200,
+    "query_index": 0
+  },
+  "open_options": {
+    "retention": "full",
+    "vector_dim": 1024,
+    "page_cache_mb": 64,
+    "read_only": false
+  },
+  "runtime_guards": {
+    "max_runtime_seconds": 1200,
+    "external_working_set_cap_bytes": 2147483648,
+    "rss_limit_bytes": 2147483648
+  },
+  "no_budget_changes": true
+}

@@ -1,0 +1,15 @@
+
+running 10 tests
+test active_journal_uses_framed_format ... ok
+test checkpoint_produces_sealed_segment_files ... ok
+test checkpointed_journal_alone_recovers_live_state ... ok
+test corrupt_frame_crc_stops_replay_at_the_tear ... ok
+test frame_and_txn_frontier_split ... ok
+test journal_compresses_authenticated_compaction_proofs ... ok
+test journal_only_recovery_without_snapshot ... ok
+test orphan_tmp_segment_is_cleaned_on_open ... ok
+test tail_replay_recovers_post_snapshot_writes ... ok
+test torn_active_tail_is_truncated_not_fatal ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 29.11s
+

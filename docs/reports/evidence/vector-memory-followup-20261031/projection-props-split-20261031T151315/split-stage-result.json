@@ -1,0 +1,95 @@
+{
+  "run": "same-process full-main real BGE F32 reopen with diagnostic-only projection_props timers",
+  "result": "completed",
+  "admission": {
+    "cpu_samples": 11,
+    "window_seconds": 10,
+    "average_cpu_percent": 11.1818181818,
+    "minimum_free_gib": 18.383
+  },
+  "guard": {
+    "query_deadline_ms": 5000,
+    "rss_bytes": 2147483648,
+    "runtime_cap_seconds": 1200,
+    "controller_elapsed_seconds": 353.038,
+    "peak_tree_working_set_bytes": 350785536,
+    "peak_tree_private_bytes": 466833408,
+    "deadline_hit": false,
+    "rss_hit": false,
+    "timeout": false,
+    "engine_exit_code": 0,
+    "driver_exit_code": 0
+  },
+  "inputs": {
+    "corpus_sha256": "20978d757c33a29dcd8e89e5708762738b10fc8da0f01358bcb325741f2f6057",
+    "queries_sha256": "6ccad031b956c6111519e6b0dfe97e7c63bd85801d9934efe4438f76d152ca68",
+    "truth_sha256": "2c133fd68ed2b60345715c24667a830ebf3ab303528e8eec0300385125e37c9c",
+    "meta_sha256": "f79c423a069d8c4faa9a2bf8fff920d0dc4102261b28c35692544974137a89de",
+    "unchanged": true
+  },
+  "query": {
+    "trace_plan_ordinal": 48,
+    "phase": "same-process reopened search10",
+    "input_query_index": 0,
+    "k": 10,
+    "ef": 200,
+    "hybrid_return_us": 2650856,
+    "hnsw_us": 4014,
+    "eligibility_us": [
+      23,
+      11
+    ],
+    "candidate_count": 20,
+    "eligible_count": 20,
+    "missing": 0,
+    "retired": 0,
+    "invisible": 0,
+    "hydration_node_u32": 5932,
+    "hydration_us": 2631911,
+    "serialization_us": 10
+  },
+  "projection": {
+    "lock_acquire_us": 0,
+    "prepare_us": 2631425,
+    "query_row_us": 37,
+    "statement_finalize_us": 0,
+    "json_parse_us": 0,
+    "select_status": "row",
+    "payload_len_bytes": 2,
+    "json_parse_status": "ok",
+    "select_error": null,
+    "prepare_error": null,
+    "hydration_candidate_count": 20,
+    "total_prepare_us_for_20": 2631507,
+    "total_query_row_us_for_20": 233,
+    "other_19_hydrations_normal": true
+  },
+  "interpretation": "Observed latency is within Connection::prepare for the projection SELECT. The split timer does not identify why SQLite prepare took 2.63s (for example, internal SQLite/schema wait versus OS/storage delay); it does exclude application projection mutex acquisition, query row/read, statement finalization, JSON parsing, eligibility, and HNSW as the measured source.",
+  "provenance": {
+    "binary_sha256": "43b25c6c8daa639595af0329f7b9a1e3a6572fa08ff7bd7fadbbaf61b52495a7",
+    "patched_lib_sha256": "d64ec0ac47f35ccc70f8a4251fc5dbac763bc556f7085049104c8d760795ca7b",
+    "base_querytrace_lib_sha256": "AE2D416AF3F083EA8AFBB68C6A7173A6580185A9CB48018685729D378BA80553",
+    "bench_sha256": "5BFDE2C3B897C316BED557FC3037AE9A44D9EEAD07053DB4F835BF1BD7D27C62",
+    "patch_sha256": "19bfcdc9d1ace1eaf2d24961fc3aa0654051967090db92fce679cf997fbe5e4e",
+    "lib_restored_to_D_sha256": "812afdbe74e96aee4f0c08b93488dda4ac5a6c0e4784b72bb9f615d30c7877a9",
+    "bench_restored_to_D_sha256": "46694637e7e028f8a12c5c5f5eb83c8bac3ca33e7e276b1236e097f970f53c3f",
+    "tests_restored_to_D_sha256": "ffa1a7ab290dd9735414205ddb6169d28b409077a67b8a31b3a61c8938ddbd17",
+    "source_cargo_changes": false
+  },
+  "caveat": "Original run-config.json candidate_lib_sha256 retained stale AE2D base-querytrace value because parent provenance patch arrived after run startup. Actual frozen build context and binary correspond to patched lib d64ec0ac...; correction is recorded in separate sidecar.",
+  "artifacts": [
+    "stderr.log",
+    "stdout.log",
+    "controller-status.json",
+    "driver-status.json",
+    "process-tree-timeline.jsonl",
+    "host-admission.json",
+    "process-start.json",
+    "build-context.json",
+    "build-status.json",
+    "patched-querytrace-lib.rs",
+    "projection-props-stages.patch",
+    "projection-props-split-vbench.exe",
+    "c-restoration.json"
+  ]
+}

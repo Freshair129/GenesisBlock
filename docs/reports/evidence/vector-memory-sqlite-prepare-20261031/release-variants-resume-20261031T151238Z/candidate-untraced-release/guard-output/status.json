@@ -1,0 +1,60 @@
+{
+  "exit": 0,
+  "reason": null,
+  "seconds": 223.6459306,
+  "peak_rss": 1393733632,
+  "peak_private": 1587814400,
+  "identities": [
+    {
+      "ProcessId": 25956,
+      "ParentProcessId": 8492,
+      "CreationDate": "2026-10-31T22:21:14.103065+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    },
+    {
+      "ProcessId": 37804,
+      "ParentProcessId": 8492,
+      "CreationDate": "2026-10-31T22:21:14.149076+07:00",
+      "Name": "cargo.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\cargo.exe"
+    },
+    {
+      "ProcessId": 8492,
+      "ParentProcessId": 19196,
+      "CreationDate": "2026-10-31T22:21:14.095654+07:00",
+      "Name": "cargo.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.cargo\\bin\\cargo.exe"
+    },
+    {
+      "ProcessId": 19792,
+      "ParentProcessId": 37804,
+      "CreationDate": "2026-10-31T22:21:14.6599+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    },
+    {
+      "ProcessId": 37148,
+      "ParentProcessId": 19792,
+      "CreationDate": "2026-10-31T22:24:45.233149+07:00",
+      "Name": "link.exe",
+      "ExecutablePath": "C:\\GenesisBlockW1Tools\\vs2022\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe"
+    },
+    {
+      "ProcessId": 6088,
+      "ParentProcessId": 37804,
+      "CreationDate": "2026-10-31T22:24:46.295675+07:00",
+      "Name": "rustc.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+    }
+  ],
+  "excluded_build_helpers": [],
+  "helper_finished_parent_condition": true,
+  "helper_scope": "Helpers are not terminated; successful Cargo completion and stopped tracked compiler clients are required before private-source edits. No shared source/target mutation.",
+  "admission_cpu": 3.909090909090909,
+  "admission_free": 18545176576.0,
+  "remaining": [],
+  "cleanup_complete": true,
+  "monitor_error": null,
+  "rss_scope": "tracked processes; compiler telemetry/daemon helpers excluded"
+}

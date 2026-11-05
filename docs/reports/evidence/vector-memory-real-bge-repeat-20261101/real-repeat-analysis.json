@@ -1,0 +1,326 @@
+{
+  "before": {
+    "guard": {
+      "seconds": 357.4658487,
+      "peak_rss": 363180032,
+      "admission_cpu": 8.363636363636363,
+      "admission_free": 15444516864,
+      "cleanup_complete": true
+    },
+    "input_hashes": {
+      "corpus": "20978d757c33a29dcd8e89e5708762738b10fc8da0f01358bcb325741f2f6057",
+      "queries": "6ccad031b956c6111519e6b0dfe97e7c63bd85801d9934efe4438f76d152ca68",
+      "truth": "2c133fd68ed2b60345715c24667a830ebf3ab303528e8eec0300385125e37c9c",
+      "meta": "f79c423a069d8c4faa9a2bf8fff920d0dc4102261b28c35692544974137a89de"
+    },
+    "vec_sha256": "f83b5bc3b3d1057f01114196cd37ac95ecbeefe2f04ad0168d723e0860af3133",
+    "metrics": {
+      "search10": {
+        "k": 10,
+        "p50_us": 4691.4,
+        "p95_us": 5333.400000000001,
+        "p99_us": 5781.5,
+        "recall": 0.975
+      },
+      "search100": {
+        "k": 100,
+        "p50_us": 6592.7,
+        "p95_us": 7150.1,
+        "p99_us": 8623.199999999999,
+        "recall": 0.98
+      },
+      "reopen_search10": {
+        "completed_queries": 0,
+        "error": "QUERY_BUDGET_EXCEEDED: reason=deadline",
+        "k": 10,
+        "p50_us": null,
+        "p95_us": null,
+        "p99_us": null,
+        "recall": null,
+        "requested_queries": 24
+      },
+      "ingest": {
+        "before_rss_bytes": 12095488,
+        "peak_rss_bytes": 342581248,
+        "process_rss_bytes": 175378432,
+        "seconds": 67.4629058
+      },
+      "rebuild": {
+        "before_rss_bytes": 175382528,
+        "peak_rss_bytes": 249360384,
+        "process_rss_bytes": 191762432,
+        "seconds": 43.0070951
+      },
+      "snapshot": {
+        "before_rss_bytes": 192106496,
+        "peak_rss_bytes": 200396800,
+        "process_rss_bytes": 195756032,
+        "seconds": 12.3713232
+      },
+      "reopen": {
+        "before_rss_bytes": 18042880,
+        "peak_rss_bytes": 354668544,
+        "process_rss_bytes": 161624064,
+        "seconds": 96.6076921
+      },
+      "fresh_reopen": {
+        "collections": [
+          {
+            "arena_allocated_bytes": 46145536,
+            "arena_resident_bytes": 46145536,
+            "count": 11266,
+            "coverage": {
+              "built_frontier": 0,
+              "collection": "bench",
+              "extra_count": 0,
+              "indexed_count": 11266,
+              "missing_count": 0,
+              "pending_count": 0,
+              "source_count": 11266,
+              "source_frontier": 48,
+              "state": "UNVERIFIED",
+              "validated": false
+            },
+            "dim": 1024,
+            "ef_search": null,
+            "hnsw_vector_bytes": 46145536,
+            "index_lag": 0,
+            "indexed": 11266,
+            "metric": "Cosine",
+            "model": "bge-m3-repository-fixture",
+            "name": "bench",
+            "quant": "none",
+            "rerank": false,
+            "sidecar_cache_bytes": 0,
+            "sidecar_disk_bytes": 0,
+            "sidecar_resident_bytes": 0
+          },
+          {
+            "arena_allocated_bytes": 0,
+            "arena_resident_bytes": 0,
+            "count": 0,
+            "coverage": {
+              "built_frontier": 0,
+              "collection": "default",
+              "extra_count": 0,
+              "indexed_count": 0,
+              "missing_count": 0,
+              "pending_count": 0,
+              "source_count": 0,
+              "source_frontier": 0,
+              "state": "UNVERIFIED",
+              "validated": false
+            },
+            "dim": 1024,
+            "ef_search": null,
+            "hnsw_vector_bytes": 0,
+            "index_lag": 0,
+            "indexed": 0,
+            "metric": "L2",
+            "model": "default",
+            "name": "default",
+            "quant": "none",
+            "rerank": false,
+            "sidecar_cache_bytes": 0,
+            "sidecar_disk_bytes": 0,
+            "sidecar_resident_bytes": 0
+          }
+        ],
+        "coverage": [
+          {
+            "built_frontier": 48,
+            "collection": "bench",
+            "extra_count": 0,
+            "indexed_count": 11266,
+            "missing_count": 0,
+            "pending_count": 0,
+            "source_count": 11266,
+            "source_frontier": 48,
+            "state": "READY",
+            "validated": true
+          },
+          {
+            "built_frontier": 0,
+            "collection": "default",
+            "extra_count": 0,
+            "indexed_count": 0,
+            "missing_count": 0,
+            "pending_count": 0,
+            "source_count": 0,
+            "source_frontier": 0,
+            "state": "READY",
+            "validated": true
+          }
+        ],
+        "error": null,
+        "memory": {
+          "before_rss_bytes": 11554816,
+          "peak_rss_bytes": 211398656,
+          "process_rss_bytes": 150687744,
+          "seconds": 69.4571635
+        }
+      }
+    }
+  },
+  "after": {
+    "guard": {
+      "seconds": 346.18812679999996,
+      "peak_rss": 323088384,
+      "admission_cpu": 7.090909090909091,
+      "admission_free": 14791004160,
+      "cleanup_complete": true
+    },
+    "input_hashes": {
+      "corpus": "20978d757c33a29dcd8e89e5708762738b10fc8da0f01358bcb325741f2f6057",
+      "queries": "6ccad031b956c6111519e6b0dfe97e7c63bd85801d9934efe4438f76d152ca68",
+      "truth": "2c133fd68ed2b60345715c24667a830ebf3ab303528e8eec0300385125e37c9c",
+      "meta": "f79c423a069d8c4faa9a2bf8fff920d0dc4102261b28c35692544974137a89de"
+    },
+    "vec_sha256": "f83b5bc3b3d1057f01114196cd37ac95ecbeefe2f04ad0168d723e0860af3133",
+    "metrics": {
+      "search10": {
+        "k": 10,
+        "p50_us": 4329.6,
+        "p95_us": 4846.0,
+        "p99_us": 5002.8,
+        "recall": 0.9875
+      },
+      "search100": {
+        "k": 100,
+        "p50_us": 5928.2,
+        "p95_us": 6494.9,
+        "p99_us": 7319.799999999999,
+        "recall": 0.9758333333333333
+      },
+      "reopen_search10": {
+        "k": 10,
+        "p50_us": 4230.6,
+        "p95_us": 4721.4,
+        "p99_us": 4728.7,
+        "recall": 0.9833333333333333
+      },
+      "ingest": {
+        "before_rss_bytes": 12140544,
+        "peak_rss_bytes": 346140672,
+        "process_rss_bytes": 175898624,
+        "seconds": 65.0077282
+      },
+      "rebuild": {
+        "before_rss_bytes": 175906816,
+        "peak_rss_bytes": 249040896,
+        "process_rss_bytes": 188219392,
+        "seconds": 42.4649374
+      },
+      "snapshot": {
+        "before_rss_bytes": 188575744,
+        "peak_rss_bytes": 194555904,
+        "process_rss_bytes": 191123456,
+        "seconds": 8.702733
+      },
+      "reopen": {
+        "before_rss_bytes": 18132992,
+        "peak_rss_bytes": 353280000,
+        "process_rss_bytes": 179535872,
+        "seconds": 99.2653642
+      },
+      "fresh_reopen": {
+        "collections": [
+          {
+            "arena_allocated_bytes": 0,
+            "arena_resident_bytes": 0,
+            "count": 0,
+            "coverage": {
+              "built_frontier": 0,
+              "collection": "default",
+              "extra_count": 0,
+              "indexed_count": 0,
+              "missing_count": 0,
+              "pending_count": 0,
+              "source_count": 0,
+              "source_frontier": 0,
+              "state": "UNVERIFIED",
+              "validated": false
+            },
+            "dim": 1024,
+            "ef_search": null,
+            "hnsw_vector_bytes": 0,
+            "index_lag": 0,
+            "indexed": 0,
+            "metric": "L2",
+            "model": "default",
+            "name": "default",
+            "quant": "none",
+            "rerank": false,
+            "sidecar_cache_bytes": 0,
+            "sidecar_disk_bytes": 0,
+            "sidecar_resident_bytes": 0
+          },
+          {
+            "arena_allocated_bytes": 46145536,
+            "arena_resident_bytes": 46145536,
+            "count": 11266,
+            "coverage": {
+              "built_frontier": 0,
+              "collection": "bench",
+              "extra_count": 0,
+              "indexed_count": 11266,
+              "missing_count": 0,
+              "pending_count": 0,
+              "source_count": 11266,
+              "source_frontier": 48,
+              "state": "UNVERIFIED",
+              "validated": false
+            },
+            "dim": 1024,
+            "ef_search": null,
+            "hnsw_vector_bytes": 46145536,
+            "index_lag": 0,
+            "indexed": 11266,
+            "metric": "Cosine",
+            "model": "bge-m3-repository-fixture",
+            "name": "bench",
+            "quant": "none",
+            "rerank": false,
+            "sidecar_cache_bytes": 0,
+            "sidecar_disk_bytes": 0,
+            "sidecar_resident_bytes": 0
+          }
+        ],
+        "coverage": [
+          {
+            "built_frontier": 0,
+            "collection": "default",
+            "extra_count": 0,
+            "indexed_count": 0,
+            "missing_count": 0,
+            "pending_count": 0,
+            "source_count": 0,
+            "source_frontier": 0,
+            "state": "READY",
+            "validated": true
+          },
+          {
+            "built_frontier": 48,
+            "collection": "bench",
+            "extra_count": 0,
+            "indexed_count": 11266,
+            "missing_count": 0,
+            "pending_count": 0,
+            "source_count": 11266,
+            "source_frontier": 48,
+            "state": "READY",
+            "validated": true
+          }
+        ],
+        "error": null,
+        "memory": {
+          "before_rss_bytes": 11558912,
+          "peak_rss_bytes": 210989056,
+          "process_rss_bytes": 149938176,
+          "seconds": 69.2876531
+        }
+      }
+    }
+  },
+  "scope": "Single additional guarded serial pair; baseline reopen query deadline error retained; guard exit 0 is not correctness pass."
+}

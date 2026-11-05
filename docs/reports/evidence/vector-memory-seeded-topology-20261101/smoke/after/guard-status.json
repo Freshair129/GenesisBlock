@@ -1,0 +1,50 @@
+{
+    "exit":  0,
+    "reason":  null,
+    "seconds":  19.1256094,
+    "peak_rss":  109293568,
+    "peak_private":  78729216,
+    "identities":  [
+                       {
+                           "ProcessId":  13212,
+                           "ParentProcessId":  28980,
+                           "CreationDate":  "\/Date(1793541286149)\/",
+                           "Name":  "seeded-after.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\seeded-topology-20261101\\seeded-after.exe"
+                       },
+                       {
+                           "ProcessId":  23440,
+                           "ParentProcessId":  45736,
+                           "CreationDate":  "\/Date(1793541271125)\/",
+                           "Name":  "python.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\AppData\\Local\\Programs\\Python\\Python314\\python.exe"
+                       },
+                       {
+                           "ProcessId":  38552,
+                           "ParentProcessId":  23440,
+                           "CreationDate":  "\/Date(1793541271133)\/",
+                           "Name":  "conhost.exe",
+                           "ExecutablePath":  "C:\\WINDOWS\\system32\\conhost.exe"
+                       },
+                       {
+                           "ProcessId":  28980,
+                           "ParentProcessId":  23440,
+                           "CreationDate":  "\/Date(1793541271552)\/",
+                           "Name":  "seeded-after.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\seeded-topology-20261101\\seeded-after.exe"
+                       }
+                   ],
+    "excluded_build_helpers":  [
+
+                               ],
+    "helper_finished_parent_condition":  true,
+    "helper_scope":  "Helpers are not terminated; successful Cargo completion and stopped tracked compiler clients are required before private-source edits. No shared source/target mutation.",
+    "admission_cpu":  17.727272727272727,
+    "admission_free":  13794033664,
+    "remaining":  [
+
+                  ],
+    "cleanup_complete":  true,
+    "monitor_error":  null,
+    "rss_scope":  "tracked owned process tree"
+}

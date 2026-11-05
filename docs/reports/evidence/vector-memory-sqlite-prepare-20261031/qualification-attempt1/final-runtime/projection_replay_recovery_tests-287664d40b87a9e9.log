@@ -1,0 +1,11 @@
+
+running 6 tests
+test abandoned_sqlite_backup_rolls_back_after_copying_a_page ... ok
+test failed_incremental_replay_does_not_mutate_the_live_projection ... ok
+test failed_rebuild_keeps_the_preexisting_projection_usable ... ok
+test journal_append_invalidates_the_projection_sync_marker ... ok
+test journal_compaction_invalidates_the_projection_sync_marker ... ok
+test upgraded_relational_schema_reopens_and_preserves_rows ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.93s
+

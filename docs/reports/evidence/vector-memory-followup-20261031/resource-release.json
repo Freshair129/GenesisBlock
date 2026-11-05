@@ -1,0 +1,10 @@
+{
+  "recorded_at": "2026-10-31T15:38:00.3571437+07:00",
+  "scope": "Owned frozen benchmark executables and Python/Node drivers with this evidence path; completed test/controller exit receipts are separate",
+  "remaining_owned_processes": [],
+  "released": true,
+  "free_physical_bytes": 20041736192,
+  "stopped_processes_in_release_check": [],
+  "vector_gate_present": false,
+  "native_gate_present": false
+}

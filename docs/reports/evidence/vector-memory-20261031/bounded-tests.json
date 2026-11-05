@@ -1,0 +1,1610 @@
+[
+  {
+    "target": "concurrency-948a29ec82ad9112.exe",
+    "args": [
+      "--test-threads=1",
+      "--skip",
+      "bulk_add_edges_1000"
+    ],
+    "exit_code": 1,
+    "reason": "rss_limit_4_GiB",
+    "peak_rss_bytes": 4348768256,
+    "seconds": 13.481,
+    "log": "concurrency-948a29ec82ad9112.log"
+  },
+  {
+    "target": "concurrent_writers_tests-20874950a6843e11.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 18997248,
+    "seconds": 23.809,
+    "log": "concurrent_writers_tests-20874950a6843e11.log"
+  },
+  {
+    "target": "consensus_checkpoint_race_tests-23a17829175f7dbc.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 1,
+    "reason": "timeout_180s",
+    "peak_rss_bytes": 21061632,
+    "seconds": 180.358,
+    "log": "consensus_checkpoint_race_tests-23a17829175f7dbc.log"
+  },
+  {
+    "target": "consensus_commit_tests-784991f68c98898f.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 16015360,
+    "seconds": 3.424,
+    "log": "consensus_commit_tests-784991f68c98898f.log"
+  },
+  {
+    "target": "consensus_vote_sig_tests-b32fb845df0d2470.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 14761984,
+    "seconds": 3.096,
+    "log": "consensus_vote_sig_tests-b32fb845df0d2470.log"
+  },
+  {
+    "target": "core_engine_tests-50d63a50efded7e9.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 17055744,
+    "seconds": 5.315,
+    "log": "core_engine_tests-50d63a50efded7e9.log"
+  },
+  {
+    "target": "crash_simulation_tests-a164e47d7bf31752.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 18546688,
+    "seconds": 63.222,
+    "log": "crash_simulation_tests-a164e47d7bf31752.log"
+  },
+  {
+    "target": "crdt_sync_tests-f7fea981400380fc.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 14934016,
+    "seconds": 2.84,
+    "log": "crdt_sync_tests-f7fea981400380fc.log"
+  },
+  {
+    "target": "durability_slice0_tests-c7660389e04357cb.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 16617472,
+    "seconds": 9.217,
+    "log": "durability_slice0_tests-c7660389e04357cb.log"
+  },
+  {
+    "target": "durability_slice1_tests-3adf01bb6921ae4e.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 16785408,
+    "seconds": 8.428,
+    "log": "durability_slice1_tests-3adf01bb6921ae4e.log"
+  },
+  {
+    "target": "edge_interning_tests-abd854c89e040128.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 20017152,
+    "seconds": 12.324,
+    "log": "edge_interning_tests-abd854c89e040128.log"
+  },
+  {
+    "target": "edge_projection_tests-9be73acbc1b6b365.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 15568896,
+    "seconds": 14.8,
+    "log": "edge_projection_tests-9be73acbc1b6b365.log"
+  },
+  {
+    "target": "edge_u128_tests-60a1c9e71084a37a.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 15167488,
+    "seconds": 7.008,
+    "log": "edge_u128_tests-60a1c9e71084a37a.log"
+  },
+  {
+    "target": "ef_search_tests-27af05332e138211.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 16150528,
+    "seconds": 3.605,
+    "log": "ef_search_tests-27af05332e138211.log"
+  },
+  {
+    "target": "ephemeral_nodes_tests-f85866107c0794d1.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 14282752,
+    "seconds": 4.741,
+    "log": "ephemeral_nodes_tests-f85866107c0794d1.log"
+  },
+  {
+    "target": "epoch_e1_tests-86354fc5ea296ce5.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 20484096,
+    "seconds": 3.585,
+    "log": "epoch_e1_tests-86354fc5ea296ce5.log"
+  },
+  {
+    "target": "epoch_e2_tests-e269bda2778b9c67.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 16920576,
+    "seconds": 3.732,
+    "log": "epoch_e2_tests-e269bda2778b9c67.log"
+  },
+  {
+    "target": "f16_quant_tests-3768f4c56ae7054d.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 16908288,
+    "seconds": 7.063,
+    "log": "f16_quant_tests-3768f4c56ae7054d.log"
+  },
+  {
+    "target": "g3_oracle_differential_tests-b27f16c90c89d325.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 14983168,
+    "seconds": 1.736,
+    "log": "g3_oracle_differential_tests-b27f16c90c89d325.log"
+  },
+  {
+    "target": "gossip_membership_security_tests-815f44d18be4bde9.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 20803584,
+    "seconds": 23.807,
+    "log": "gossip_membership_security_tests-815f44d18be4bde9.log"
+  },
+  {
+    "target": "governance_tests-21886f425ccb5870.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 13680640,
+    "seconds": 1.5,
+    "log": "governance_tests-21886f425ccb5870.log"
+  },
+  {
+    "target": "graph_traversal-33114739781b3caa.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 19722240,
+    "seconds": 40.389,
+    "log": "graph_traversal-33114739781b3caa.log"
+  },
+  {
+    "target": "grl_retrieval_tests-f084b97909874e56.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 22839296,
+    "seconds": 9.696,
+    "log": "grl_retrieval_tests-f084b97909874e56.log"
+  },
+  {
+    "target": "hardening_tests-d1a1703fda1ff9e0.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 16257024,
+    "seconds": 6.44,
+    "log": "hardening_tests-d1a1703fda1ff9e0.log"
+  },
+  {
+    "target": "hnsw_capacity_tests-e07a5c94f455a979.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 1,
+    "reason": "rss_limit_4_GiB",
+    "peak_rss_bytes": 4299395072,
+    "seconds": 16.923,
+    "log": "hnsw_capacity_tests-e07a5c94f455a979.log"
+  },
+  {
+    "target": "hnsw_recall_floor_tests-14dc9db55085e84e.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 1,
+    "reason": "timeout_180s",
+    "peak_rss_bytes": 20516864,
+    "seconds": 180.363,
+    "log": "hnsw_recall_floor_tests-14dc9db55085e84e.log"
+  },
+  {
+    "target": "hql-bb1b33aa5a491535.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 16994304,
+    "seconds": 6.513,
+    "log": "hql-bb1b33aa5a491535.log"
+  },
+  {
+    "target": "hql2_annotation_acl_tests-451809100d89a24a.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 25047040,
+    "seconds": 3.866,
+    "log": "hql2_annotation_acl_tests-451809100d89a24a.log"
+  },
+  {
+    "target": "hql2_annotation_lookup_tests-1aa533862291a94a.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 25198592,
+    "seconds": 3.89,
+    "log": "hql2_annotation_lookup_tests-1aa533862291a94a.log"
+  },
+  {
+    "target": "hql2_annotation_source_tests-2b4e63402b628641.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 26095616,
+    "seconds": 5.024,
+    "log": "hql2_annotation_source_tests-2b4e63402b628641.log"
+  },
+  {
+    "target": "hql2_durable_revision_tests-2f179f1ac35c23b1.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 19763200,
+    "seconds": 6.007,
+    "log": "hql2_durable_revision_tests-2f179f1ac35c23b1.log"
+  },
+  {
+    "target": "hql2_execution_tests-2dffd58cc97c0058.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 19230720,
+    "seconds": 4.735,
+    "log": "hql2_execution_tests-2dffd58cc97c0058.log"
+  },
+  {
+    "target": "hql2_expand_sequence_tests-577f567ded71f23f.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 19001344,
+    "seconds": 6.081,
+    "log": "hql2_expand_sequence_tests-577f567ded71f23f.log"
+  },
+  {
+    "target": "hql2_expand_tests-dec4d9a6da89305a.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 18628608,
+    "seconds": 6.932,
+    "log": "hql2_expand_tests-dec4d9a6da89305a.log"
+  },
+  {
+    "target": "hql2_explain_source_tests-18c183b572fa1e5c.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 18706432,
+    "seconds": 3.081,
+    "log": "hql2_explain_source_tests-18c183b572fa1e5c.log"
+  },
+  {
+    "target": "hql2_g4_contract_tests-2b668cb00a4ea725.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 15364096,
+    "seconds": 1.95,
+    "log": "hql2_g4_contract_tests-2b668cb00a4ea725.log"
+  },
+  {
+    "target": "hql2_g4_plan_identity_tests-7fc3bd3e73910ff2.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 17608704,
+    "seconds": 3.857,
+    "log": "hql2_g4_plan_identity_tests-7fc3bd3e73910ff2.log"
+  },
+  {
+    "target": "hql2_g4_provenance_completeness_tests-9392c6ad41489a62.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 27561984,
+    "seconds": 11.347,
+    "log": "hql2_g4_provenance_completeness_tests-9392c6ad41489a62.log"
+  },
+  {
+    "target": "hql2_g4_scalar_counter_tests-2085b8575688bea3.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 44728320,
+    "seconds": 31.0,
+    "log": "hql2_g4_scalar_counter_tests-2085b8575688bea3.log"
+  },
+  {
+    "target": "hql2_g4_source_counter_tests-59fc0682f0fbd7a8.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 25088000,
+    "seconds": 4.612,
+    "log": "hql2_g4_source_counter_tests-59fc0682f0fbd7a8.log"
+  },
+  {
+    "target": "hql2_graph_oracle_tests-92d06f696959b259.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 6766592,
+    "seconds": 0.671,
+    "log": "hql2_graph_oracle_tests-92d06f696959b259.log"
+  },
+  {
+    "target": "hql2_history_change_tests-c9fca2dc20de8aa8.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 22958080,
+    "seconds": 10.208,
+    "log": "hql2_history_change_tests-c9fca2dc20de8aa8.log"
+  },
+  {
+    "target": "hql2_hql1_adapter_tests-62555fef0ca8ccaa.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 18960384,
+    "seconds": 4.588,
+    "log": "hql2_hql1_adapter_tests-62555fef0ca8ccaa.log"
+  },
+  {
+    "target": "hql2_hql1_labeled_filter_tests-8849264ba21d6166.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 17727488,
+    "seconds": 2.006,
+    "log": "hql2_hql1_labeled_filter_tests-8849264ba21d6166.log"
+  },
+  {
+    "target": "hql2_hql1_ordering_tests-ce934318aafddae5.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 17371136,
+    "seconds": 2.139,
+    "log": "hql2_hql1_ordering_tests-ce934318aafddae5.log"
+  },
+  {
+    "target": "hql2_hql1_property_projection_tests-ed798d293c5979a1.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 18235392,
+    "seconds": 2.783,
+    "log": "hql2_hql1_property_projection_tests-ed798d293c5979a1.log"
+  },
+  {
+    "target": "hql2_hql_reference_differential_tests-1d7c80e92d5f358d.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 17874944,
+    "seconds": 2.339,
+    "log": "hql2_hql_reference_differential_tests-1d7c80e92d5f358d.log"
+  },
+  {
+    "target": "hql2_key_codec_tests-aa451a34a4aade22.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 2551808,
+    "seconds": 0.396,
+    "log": "hql2_key_codec_tests-aa451a34a4aade22.log"
+  },
+  {
+    "target": "hql2_lower_tests-03bafb7b2e77f64e.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 12759040,
+    "seconds": 1.197,
+    "log": "hql2_lower_tests-03bafb7b2e77f64e.log"
+  },
+  {
+    "target": "hql2_oracle_tests-6f2ee11f6fa955c7.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 6086656,
+    "seconds": 0.644,
+    "log": "hql2_oracle_tests-6f2ee11f6fa955c7.log"
+  },
+  {
+    "target": "hql2_p8_completion_tests-4cc1d16fb37fcc2b.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 21184512,
+    "seconds": 7.059,
+    "log": "hql2_p8_completion_tests-4cc1d16fb37fcc2b.log"
+  },
+  {
+    "target": "hql2_parser_tests-fd5153f28351846c.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 11153408,
+    "seconds": 3.459,
+    "log": "hql2_parser_tests-fd5153f28351846c.log"
+  },
+  {
+    "target": "hql2_pattern_constraint_oracle_tests-75dc2228dab5e941.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 20267008,
+    "seconds": 5.409,
+    "log": "hql2_pattern_constraint_oracle_tests-75dc2228dab5e941.log"
+  },
+  {
+    "target": "hql2_pipeline_oracle_tests-2860bf27e95673b4.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 2551808,
+    "seconds": 0.53,
+    "log": "hql2_pipeline_oracle_tests-2860bf27e95673b4.log"
+  },
+  {
+    "target": "hql2_rank_oracle_tests-0903f4c16eeecf36.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 2551808,
+    "seconds": 0.414,
+    "log": "hql2_rank_oracle_tests-0903f4c16eeecf36.log"
+  },
+  {
+    "target": "hql2_request_tests-bc1a61c517104dd0.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 2580480,
+    "seconds": 0.534,
+    "log": "hql2_request_tests-bc1a61c517104dd0.log"
+  },
+  {
+    "target": "hql2_restore_generation_tests-b030de984edf3b53.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 15716352,
+    "seconds": 3.861,
+    "log": "hql2_restore_generation_tests-b030de984edf3b53.log"
+  },
+  {
+    "target": "hql2_revision_backup_restore_tests-581def520b1e7f74.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 26750976,
+    "seconds": 3.289,
+    "log": "hql2_revision_backup_restore_tests-581def520b1e7f74.log"
+  },
+  {
+    "target": "hql2_root_match_oracle_differential_tests-f186e2d996effc5d.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 17473536,
+    "seconds": 1.707,
+    "log": "hql2_root_match_oracle_differential_tests-f186e2d996effc5d.log"
+  },
+  {
+    "target": "hql2_row_history_tests-4733d8504bc4ddc6.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 17092608,
+    "seconds": 1.634,
+    "log": "hql2_row_history_tests-4733d8504bc4ddc6.log"
+  },
+  {
+    "target": "hql2_scalar_execution_tests-7cbab4239a9bdad9.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 2584576,
+    "seconds": 0.535,
+    "log": "hql2_scalar_execution_tests-7cbab4239a9bdad9.log"
+  },
+  {
+    "target": "hql2_storage_aggregate_oracle_differential_tests-756baa4ef9871a91.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 19394560,
+    "seconds": 8.302,
+    "log": "hql2_storage_aggregate_oracle_differential_tests-756baa4ef9871a91.log"
+  },
+  {
+    "target": "hql2_storage_hql_join_oracle_differential_tests-6babb126c2ce2a34.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 22474752,
+    "seconds": 15.499,
+    "log": "hql2_storage_hql_join_oracle_differential_tests-6babb126c2ce2a34.log"
+  },
+  {
+    "target": "hql2_storage_join_oracle_differential_tests-cb700d398a23640e.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 15253504,
+    "seconds": 2.046,
+    "log": "hql2_storage_join_oracle_differential_tests-cb700d398a23640e.log"
+  },
+  {
+    "target": "hql2_storage_set_oracle_differential_tests-3c9606220dbff61a.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 19275776,
+    "seconds": 6.409,
+    "log": "hql2_storage_set_oracle_differential_tests-3c9606220dbff61a.log"
+  },
+  {
+    "target": "hql2_storage_source_tests-60edce7e51dcafab.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 26820608,
+    "seconds": 8.549,
+    "log": "hql2_storage_source_tests-60edce7e51dcafab.log"
+  },
+  {
+    "target": "hql2_value_tests-674a3d3c817a63b7.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 2551808,
+    "seconds": 0.446,
+    "log": "hql2_value_tests-674a3d3c817a63b7.log"
+  },
+  {
+    "target": "hql2_vector_operator_tests-2140c64c97d4e8f1.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 25862144,
+    "seconds": 7.334,
+    "log": "hql2_vector_operator_tests-2140c64c97d4e8f1.log"
+  },
+  {
+    "target": "hql2_vector_oracle_differential_tests-f8d88f6487381e64.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 19103744,
+    "seconds": 1.658,
+    "log": "hql2_vector_oracle_differential_tests-f8d88f6487381e64.log"
+  },
+  {
+    "target": "hql2_vector_revision_tests-f3107cde69980819.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 19972096,
+    "seconds": 1.843,
+    "log": "hql2_vector_revision_tests-f3107cde69980819.log"
+  },
+  {
+    "target": "hql2_wire_tests-a4cdf2df2a68972d.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 15355904,
+    "seconds": 1.076,
+    "log": "hql2_wire_tests-a4cdf2df2a68972d.log"
+  },
+  {
+    "target": "hql_collection_tests-dbeca70806ca73e6.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 17039360,
+    "seconds": 4.651,
+    "log": "hql_collection_tests-dbeca70806ca73e6.log"
+  },
+  {
+    "target": "hql_cypher_tests-cf7711df2414f595.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 1,
+    "reason": "timeout_180s",
+    "peak_rss_bytes": 3002036224,
+    "seconds": 180.494,
+    "log": "hql_cypher_tests-cf7711df2414f595.log"
+  },
+  {
+    "target": "hql_filter_tests-975952d055b9f356.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 17989632,
+    "seconds": 26.541,
+    "log": "hql_filter_tests-975952d055b9f356.log"
+  },
+  {
+    "target": "hql_fuzz_tests-2c3ec3a2a1708682.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 2568192,
+    "seconds": 0.612,
+    "log": "hql_fuzz_tests-2c3ec3a2a1708682.log"
+  },
+  {
+    "target": "hql_p0_tests-c8aaea5bf0657a44.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 18501632,
+    "seconds": 16.562,
+    "log": "hql_p0_tests-c8aaea5bf0657a44.log"
+  },
+  {
+    "target": "index_coverage_tests-74767bcacfa799b5.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 14622720,
+    "seconds": 1.428,
+    "log": "index_coverage_tests-74767bcacfa799b5.log"
+  },
+  {
+    "target": "jit_chunk_schema-42915f589e146ef6.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 16867328,
+    "seconds": 13.877,
+    "log": "jit_chunk_schema-42915f589e146ef6.log"
+  },
+  {
+    "target": "journal_format_tests-fe6b4cd9fa0e01d3.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 1,
+    "reason": "timeout_180s",
+    "peak_rss_bytes": 71696384,
+    "seconds": 180.285,
+    "log": "journal_format_tests-fe6b4cd9fa0e01d3.log"
+  },
+  {
+    "target": "journal_migration_tests-693aeebf82a3ba0c.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 16359424,
+    "seconds": 3.376,
+    "log": "journal_migration_tests-693aeebf82a3ba0c.log"
+  },
+  {
+    "target": "journal_recovery_p4_tests-11b34d1ada48eb59.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 15003648,
+    "seconds": 2.36,
+    "log": "journal_recovery_p4_tests-11b34d1ada48eb59.log"
+  },
+  {
+    "target": "merkle_convergence_tests-299eba865531118c.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 16658432,
+    "seconds": 5.355,
+    "log": "merkle_convergence_tests-299eba865531118c.log"
+  },
+  {
+    "target": "meta_format_migration_tests-42825cbb6c553145.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 20865024,
+    "seconds": 6.742,
+    "log": "meta_format_migration_tests-42825cbb6c553145.log"
+  },
+  {
+    "target": "multi_collection_tests-bcd80d1c0e14ac1e.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 16699392,
+    "seconds": 5.171,
+    "log": "multi_collection_tests-bcd80d1c0e14ac1e.log"
+  },
+  {
+    "target": "napi_rest_parity_tests-b284da41fdd27ef1.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 2588672,
+    "seconds": 0.37,
+    "log": "napi_rest_parity_tests-b284da41fdd27ef1.log"
+  },
+  {
+    "target": "neighbors_direction_rels_tests-d7bc68d7717fcf77.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 15335424,
+    "seconds": 8.276,
+    "log": "neighbors_direction_rels_tests-d7bc68d7717fcf77.log"
+  },
+  {
+    "target": "node_interning_tests-ff1e77ccb939c5c8.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 15200256,
+    "seconds": 4.242,
+    "log": "node_interning_tests-ff1e77ccb939c5c8.log"
+  },
+  {
+    "target": "node_meta_a2_tests-03d30a14b3f8a41b.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 20619264,
+    "seconds": 4.818,
+    "log": "node_meta_a2_tests-03d30a14b3f8a41b.log"
+  },
+  {
+    "target": "node_versions_wp21_tests-00968df092e8c791.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 15970304,
+    "seconds": 2.715,
+    "log": "node_versions_wp21_tests-00968df092e8c791.log"
+  },
+  {
+    "target": "p6_generation_tests-7d2c16f96b434d14.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 16867328,
+    "seconds": 3.515,
+    "log": "p6_generation_tests-7d2c16f96b434d14.log"
+  },
+  {
+    "target": "p6_lease_tests-8212483e0e824cf9.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 14389248,
+    "seconds": 3.313,
+    "log": "p6_lease_tests-8212483e0e824cf9.log"
+  },
+  {
+    "target": "p6_peer_authority_tests-e64faa2d16761dcf.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 30834688,
+    "seconds": 36.456,
+    "log": "p6_peer_authority_tests-e64faa2d16761dcf.log"
+  },
+  {
+    "target": "p6_snapshot_authority_tests-d24878e26f5399a5.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 19730432,
+    "seconds": 3.58,
+    "log": "p6_snapshot_authority_tests-d24878e26f5399a5.log"
+  },
+  {
+    "target": "p6_visibility_tests-b50d64fec35ec3d0.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 21958656,
+    "seconds": 6.122,
+    "log": "p6_visibility_tests-b50d64fec35ec3d0.log"
+  },
+  {
+    "target": "persistence_tests-723ed255c0f1853a.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 16809984,
+    "seconds": 3.538,
+    "log": "persistence_tests-723ed255c0f1853a.log"
+  },
+  {
+    "target": "projection_reopen_tests-8383b308c969b4d3.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 19066880,
+    "seconds": 1.702,
+    "log": "projection_reopen_tests-8383b308c969b4d3.log"
+  },
+  {
+    "target": "projection_replay_recovery_tests-133abee1a18a4179.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 19959808,
+    "seconds": 4.108,
+    "log": "projection_replay_recovery_tests-133abee1a18a4179.log"
+  },
+  {
+    "target": "quantization_tests-aab3a528c175452c.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 16936960,
+    "seconds": 7.69,
+    "log": "quantization_tests-aab3a528c175452c.log"
+  },
+  {
+    "target": "query_ir_tests-5578e57bbb19453c.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 17559552,
+    "seconds": 4.983,
+    "log": "query_ir_tests-5578e57bbb19453c.log"
+  },
+  {
+    "target": "readonly_sql_surface_tests-84adecdaeebec816.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 17498112,
+    "seconds": 10.645,
+    "log": "readonly_sql_surface_tests-84adecdaeebec816.log"
+  },
+  {
+    "target": "rebuild_from_truth_tests-afd2a683c957236a.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 1,
+    "reason": "timeout_180s",
+    "peak_rss_bytes": 86839296,
+    "seconds": 180.333,
+    "log": "rebuild_from_truth_tests-afd2a683c957236a.log"
+  },
+  {
+    "target": "relational_schema_resource_limit_tests-efac28344c1e1692.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 21225472,
+    "seconds": 6.898,
+    "log": "relational_schema_resource_limit_tests-efac28344c1e1692.log"
+  },
+  {
+    "target": "relational_u2_contract_tests-dbb10ea8f97f7686.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 15323136,
+    "seconds": 3.85,
+    "log": "relational_u2_contract_tests-dbb10ea8f97f7686.log"
+  },
+  {
+    "target": "relational_u2_tests-65b2369328233637.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 15183872,
+    "seconds": 3.335,
+    "log": "relational_u2_tests-65b2369328233637.log"
+  },
+  {
+    "target": "rerank_tests-8d568dfa8caa87cb.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 16793600,
+    "seconds": 8.627,
+    "log": "rerank_tests-8d568dfa8caa87cb.log"
+  },
+  {
+    "target": "rest_api-175dc19b9176c019.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 26222592,
+    "seconds": 6.445,
+    "log": "rest_api-175dc19b9176c019.log"
+  },
+  {
+    "target": "rest_api_tests-f69726cc42538111.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 23134208,
+    "seconds": 19.412,
+    "log": "rest_api_tests-f69726cc42538111.log"
+  },
+  {
+    "target": "rest_index_coverage_tests-9e32caeb543ff273.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 25690112,
+    "seconds": 2.36,
+    "log": "rest_index_coverage_tests-9e32caeb543ff273.log"
+  },
+  {
+    "target": "retention_wp13_tests-06404a2cf66de7bf.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 20860928,
+    "seconds": 19.484,
+    "log": "retention_wp13_tests-06404a2cf66de7bf.log"
+  },
+  {
+    "target": "retract_edge_tests-3d2f093409c6a6f2.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 15319040,
+    "seconds": 5.677,
+    "log": "retract_edge_tests-3d2f093409c6a6f2.log"
+  },
+  {
+    "target": "robustness-193cbfd5fe41a92e.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 20492288,
+    "seconds": 64.407,
+    "log": "robustness-193cbfd5fe41a92e.log"
+  },
+  {
+    "target": "schema6_migration_tests-cc21dd577242c7f9.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 16334848,
+    "seconds": 10.794,
+    "log": "schema6_migration_tests-cc21dd577242c7f9.log"
+  },
+  {
+    "target": "schema_version_tests-eeb58ae8caa56464.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 15052800,
+    "seconds": 3.535,
+    "log": "schema_version_tests-eeb58ae8caa56464.log"
+  },
+  {
+    "target": "sidecar_migration_tests-892e1a1b2b29a380.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 16510976,
+    "seconds": 7.753,
+    "log": "sidecar_migration_tests-892e1a1b2b29a380.log"
+  },
+  {
+    "target": "sidecar_ondisk_tests-a16a84525330372f.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 16904192,
+    "seconds": 13.512,
+    "log": "sidecar_ondisk_tests-a16a84525330372f.log"
+  },
+  {
+    "target": "sidecar_reader_tests-19171d1db9d8f79c.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 5849088,
+    "seconds": 0.942,
+    "log": "sidecar_reader_tests-19171d1db9d8f79c.log"
+  },
+  {
+    "target": "soak_tests-68f53525be8ba5d2.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 2551808,
+    "seconds": 1.166,
+    "log": "soak_tests-68f53525be8ba5d2.log"
+  },
+  {
+    "target": "sq8_calibration_tests-f58ccb082adcc9a9.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 16588800,
+    "seconds": 6.613,
+    "log": "sq8_calibration_tests-f58ccb082adcc9a9.log"
+  },
+  {
+    "target": "sqlite_substrate_s0_tests-e3b7a02f8b5fe491.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 20647936,
+    "seconds": 6.835,
+    "log": "sqlite_substrate_s0_tests-e3b7a02f8b5fe491.log"
+  },
+  {
+    "target": "state_transition_tests-c9b5f29d2338f62c.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 21241856,
+    "seconds": 1.802,
+    "log": "state_transition_tests-c9b5f29d2338f62c.log"
+  },
+  {
+    "target": "storage_lock_tests-5dd478d9d4365305.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 16482304,
+    "seconds": 2.003,
+    "log": "storage_lock_tests-5dd478d9d4365305.log"
+  },
+  {
+    "target": "storage_reliability-ff8c542ddc94c623.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 18407424,
+    "seconds": 39.11,
+    "log": "storage_reliability-ff8c542ddc94c623.log"
+  },
+  {
+    "target": "studio_contract_tests-a7839c227e5ce006.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 26025984,
+    "seconds": 5.673,
+    "log": "studio_contract_tests-a7839c227e5ce006.log"
+  },
+  {
+    "target": "temporal_queries_tests-aab4bba9831a692a.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 17985536,
+    "seconds": 2.479,
+    "log": "temporal_queries_tests-aab4bba9831a692a.log"
+  },
+  {
+    "target": "thai_fuzzy_tests-b98d06616349079f.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 13885440,
+    "seconds": 1.125,
+    "log": "thai_fuzzy_tests-b98d06616349079f.log"
+  },
+  {
+    "target": "tx_as_of_wp22_tests-eb2c136c8dd59958.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 16216064,
+    "seconds": 2.392,
+    "log": "tx_as_of_wp22_tests-eb2c136c8dd59958.log"
+  },
+  {
+    "target": "uee_g0_contract_tests-573c433da519c910.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 2830336,
+    "seconds": 0.572,
+    "log": "uee_g0_contract_tests-573c433da519c910.log"
+  },
+  {
+    "target": "unified_transaction_p5_tests-9419aeb71c721b97.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 21180416,
+    "seconds": 6.049,
+    "log": "unified_transaction_p5_tests-9419aeb71c721b97.log"
+  },
+  {
+    "target": "unified_transaction_u3_tests-db49e64bd1108ea5.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 15257600,
+    "seconds": 2.668,
+    "log": "unified_transaction_u3_tests-db49e64bd1108ea5.log"
+  },
+  {
+    "target": "vector_collections-25f7fed08b6e4bf4.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 30593024,
+    "seconds": 34.476,
+    "log": "vector_collections-25f7fed08b6e4bf4.log"
+  },
+  {
+    "target": "vector_memory_metrics_tests-332c3e9335acd364.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 18284544,
+    "seconds": 12.976,
+    "log": "vector_memory_metrics_tests-332c3e9335acd364.log"
+  },
+  {
+    "target": "wal_compaction_tests-ffe0c42405136a71.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 1,
+    "reason": "timeout_180s",
+    "peak_rss_bytes": 35610624,
+    "seconds": 180.283,
+    "log": "wal_compaction_tests-ffe0c42405136a71.log"
+  },
+  {
+    "target": "wal_tail_replay_tests-67201163eeea6c52.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 17182720,
+    "seconds": 23.769,
+    "log": "wal_tail_replay_tests-67201163eeea6c52.log"
+  },
+  {
+    "target": "wave_a_commit_tests-c790ed7a4583f74a.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 25726976,
+    "seconds": 4.786,
+    "log": "wave_a_commit_tests-c790ed7a4583f74a.log"
+  },
+  {
+    "target": "wave_b_collection_lifecycle_tests-6bae5f004a4b7995.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 18448384,
+    "seconds": 13.24,
+    "log": "wave_b_collection_lifecycle_tests-6bae5f004a4b7995.log"
+  },
+  {
+    "target": "wave_b_correctness_tests-a71f1e49be17ce4e.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 16769024,
+    "seconds": 3.208,
+    "log": "wave_b_correctness_tests-a71f1e49be17ce4e.log"
+  },
+  {
+    "target": "wave_b_failure_tests-a96d5f34787d3abf.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 14401536,
+    "seconds": 1.203,
+    "log": "wave_b_failure_tests-a96d5f34787d3abf.log"
+  },
+  {
+    "target": "wave_b_sync_tests-39552156cb2580f1.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 23687168,
+    "seconds": 2.645,
+    "log": "wave_b_sync_tests-39552156cb2580f1.log"
+  },
+  {
+    "target": "wave_c_query_correctness_tests-89e6d08643eb2372.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 60825600,
+    "seconds": 22.922,
+    "log": "wave_c_query_correctness_tests-89e6d08643eb2372.log"
+  },
+  {
+    "target": "wave_d_budget_tests-2ea5d7cfc55f4a05.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 16003072,
+    "seconds": 3.49,
+    "log": "wave_d_budget_tests-2ea5d7cfc55f4a05.log"
+  },
+  {
+    "target": "wave_d_quality_artifact_tests-87b489b9b40a79ec.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 2584576,
+    "seconds": 0.353,
+    "log": "wave_d_quality_artifact_tests-87b489b9b40a79ec.log"
+  },
+  {
+    "target": "wave_d_rest_tests-2e54ff9f7e2d2e9d.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 25010176,
+    "seconds": 2.164,
+    "log": "wave_d_rest_tests-2e54ff9f7e2d2e9d.log"
+  },
+  {
+    "target": "wave_e_context_tests-0baafc8f09993942.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 15368192,
+    "seconds": 2.457,
+    "log": "wave_e_context_tests-0baafc8f09993942.log"
+  },
+  {
+    "target": "wave_e_rest_tests-e73692a9995b508a.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 17928192,
+    "seconds": 1.712,
+    "log": "wave_e_rest_tests-e73692a9995b508a.log"
+  },
+  {
+    "target": "wp23_semantics_tests-54f24b1788532192.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 14553088,
+    "seconds": 1.942,
+    "log": "wp23_semantics_tests-54f24b1788532192.log"
+  },
+  {
+    "target": "zz_probe_discriminates-744992752e8d1ef4.exe",
+    "args": [
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "reason": null,
+    "peak_rss_bytes": 2580480,
+    "seconds": 1.222,
+    "log": "zz_probe_discriminates-744992752e8d1ef4.log"
+  }
+]

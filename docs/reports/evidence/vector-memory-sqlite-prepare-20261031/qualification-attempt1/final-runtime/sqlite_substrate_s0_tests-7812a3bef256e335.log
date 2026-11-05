@@ -1,0 +1,13 @@
+
+running 8 tests
+test sqlite_projection_bootstraps_schema_and_props ... ok
+test sqlite_projection_discards_unjournaled_mutation_on_reopen ... ok
+test sqlite_projection_heals_even_when_lamport_watermark_is_ahead ... ok
+test sqlite_projection_rebuilds_when_sidecar_missing ... ok
+test sqlite_projection_recovers_from_invalid_sidecar ... ok
+test sqlite_projection_tracks_batch_nodes_and_snapshots ... ok
+test sqlite_projection_uses_full_lww_clock_for_equal_lamport_times ... ok
+test sqlite_s1_resident_nodes_are_lean_but_views_are_hydrated ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.09s
+

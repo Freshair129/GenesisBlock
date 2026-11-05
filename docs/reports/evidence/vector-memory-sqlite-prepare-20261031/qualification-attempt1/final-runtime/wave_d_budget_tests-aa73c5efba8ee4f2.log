@@ -1,0 +1,10 @@
+
+running 5 tests
+test hql_match_uses_the_same_budget_and_stops_dense_frontiers ... ok
+test query_budget_rejects_zero_before_work ... ok
+test query_budget_reports_candidate_and_byte_exhaustion ... ok
+test query_budget_stops_graph_expansion_with_typed_reason ... ok
+test zero_neighbor_limit_is_rejected_before_traversal ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.42s
+

@@ -1,0 +1,8 @@
+{
+  "free_bytes_before": 194188533760,
+  "copy_completed": "2026-10-31T12:28:11.1719512+07:00",
+  "copy_seconds": 5.8283934,
+  "source": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\candidate\\synthetic-100000-1024-bq-r0\\gdb",
+  "destination": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb",
+  "copy_started": "2026-10-31T12:28:05.3418560+07:00"
+}

@@ -1,0 +1,23 @@
+{
+  "driver_pid": 17756,
+  "benchmark_pid": 50008,
+  "exit_code": 0,
+  "started_at_local": "2026-11-01T19:52:59.611428+07:00",
+  "finished_at_local": "2026-11-01T19:59:15.985291+07:00",
+  "elapsed_seconds": 376.374,
+  "binary_sha256": "4ad40b7e2cd7898c08eb35a3c72c19d356eee5d84d01953cfb8defb27506366c",
+  "input_hashes_before": {
+    "corpus": "20978d757c33a29dcd8e89e5708762738b10fc8da0f01358bcb325741f2f6057",
+    "queries": "6ccad031b956c6111519e6b0dfe97e7c63bd85801d9934efe4438f76d152ca68",
+    "truth": "2c133fd68ed2b60345715c24667a830ebf3ab303528e8eec0300385125e37c9c",
+    "meta": "f79c423a069d8c4faa9a2bf8fff920d0dc4102261b28c35692544974137a89de"
+  },
+  "input_hashes_after": {
+    "corpus": "20978d757c33a29dcd8e89e5708762738b10fc8da0f01358bcb325741f2f6057",
+    "queries": "6ccad031b956c6111519e6b0dfe97e7c63bd85801d9934efe4438f76d152ca68",
+    "truth": "2c133fd68ed2b60345715c24667a830ebf3ab303528e8eec0300385125e37c9c",
+    "meta": "f79c423a069d8c4faa9a2bf8fff920d0dc4102261b28c35692544974137a89de"
+  },
+  "input_unchanged": true,
+  "direct_file_handles": true
+}

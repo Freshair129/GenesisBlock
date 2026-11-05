@@ -1,0 +1,8 @@
+snapshot: attempting instant load from binary state...
+snapshot: loading 100001 nodes
+snapshot: loading 0 edges
+snapshot: instant load complete in 84.7169245s
+ setting number of points 50000 
+ setting number of points 100000 
+snapshot: state persisted successfully to C:\Users\suanr\genesis-sqlite-prepare-20261031\100k-fresh-cases\after\gdb
+shutdown: graceful shutdown, state saved.

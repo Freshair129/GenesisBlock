@@ -1,0 +1,547 @@
+{
+  "schema": "genesis-vector-memory-query-reopen-trace-v1",
+  "created_at_local": "2026-10-31T15:07:02.929110+07:00",
+  "run_root": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-bge-candidate-trace-20261031T145352",
+  "result": "complete",
+  "candidate": {
+    "binary": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\candidate-repeat-build-20261031T131156\\candidate-vbench-genesis-repeat.exe",
+    "binary_sha256": "959dfa8f6348082046bcbfad744a422e2bd7f5a43c702c2dba7d2d86d26aeaf1",
+    "candidate_lib_source": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\candidate-repeat-build-20261031T131156\\candidate-querytrace-lib.rs",
+    "candidate_lib_sha256": "ae2d416af3f083ea8afbb68c6a7173a6580185a9cb48018685729d378ba80553",
+    "candidate_bench_source": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\candidate-repeat-build-20261031T131156\\candidate-repeat-vector_memory.rs",
+    "candidate_bench_sha256": "5bfde2c3b897c316bed557fc3037ae9a44d9eead07053db4f835bf1bd7d27c62"
+  },
+  "run": {
+    "controller_status": "complete",
+    "controller_elapsed_seconds": 347.077,
+    "driver_elapsed_seconds": 345.461,
+    "driver_started_at_local": "2026-10-31T14:59:01.976970+07:00",
+    "driver_finished_at_local": "2026-10-31T15:04:47.438252+07:00",
+    "driver_pid": 34204,
+    "benchmark_pid": 22052,
+    "candidate_exit_code": 0,
+    "timed_out": false,
+    "rss_limit_hit": false,
+    "killed_pids": [],
+    "peak_process_tree_working_set_bytes": 324288512,
+    "peak_process_tree_private_bytes": 392454144,
+    "query_deadline_ms": 5000,
+    "runtime_cap_seconds": 1200,
+    "input_unchanged": true,
+    "input_hashes_before": {
+      "corpus": "20978d757c33a29dcd8e89e5708762738b10fc8da0f01358bcb325741f2f6057",
+      "queries": "6ccad031b956c6111519e6b0dfe97e7c63bd85801d9934efe4438f76d152ca68",
+      "truth": "2c133fd68ed2b60345715c24667a830ebf3ab303528e8eec0300385125e37c9c",
+      "meta": "f79c423a069d8c4faa9a2bf8fff920d0dc4102261b28c35692544974137a89de"
+    },
+    "input_hashes_after": {
+      "corpus": "20978d757c33a29dcd8e89e5708762738b10fc8da0f01358bcb325741f2f6057",
+      "queries": "6ccad031b956c6111519e6b0dfe97e7c63bd85801d9934efe4438f76d152ca68",
+      "truth": "2c133fd68ed2b60345715c24667a830ebf3ab303528e8eec0300385125e37c9c",
+      "meta": "f79c423a069d8c4faa9a2bf8fff920d0dc4102261b28c35692544974137a89de"
+    }
+  },
+  "admission": {
+    "sample_count": 11,
+    "observed_window_seconds": 10,
+    "average_total_cpu_percent": 10.272727272727273,
+    "minimum_free_gib": 17.544,
+    "cpu_gate_passed": true,
+    "memory_gate_passed": true,
+    "active_build_or_benchmark_processes": []
+  },
+  "input": {
+    "directory": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\inputs\\real-11266-1024",
+    "hashes": {
+      "corpus": "20978d757c33a29dcd8e89e5708762738b10fc8da0f01358bcb325741f2f6057",
+      "queries": "6ccad031b956c6111519e6b0dfe97e7c63bd85801d9934efe4438f76d152ca68",
+      "truth": "2c133fd68ed2b60345715c24667a830ebf3ab303528e8eec0300385125e37c9c",
+      "meta": "f79c423a069d8c4faa9a2bf8fff920d0dc4102261b28c35692544974137a89de"
+    },
+    "metadata": {
+      "dim": 1024,
+      "metric": "cosine",
+      "model": "bge-m3-repository-fixture",
+      "n": 11266,
+      "q": 24
+    }
+  },
+  "environment": {
+    "whitelist_count": 16,
+    "whitelist": {
+      "GB_VBENCH": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\inputs\\real-11266-1024",
+      "GB_QUANT": "none",
+      "GB_MEMORY_RETENTION": "full",
+      "GB_VEC_Q": "24",
+      "GB_MEMORY_AUDIT": "1",
+      "GB_MEMORY_OPEN_QUERY_SAMPLES": "0",
+      "RAYON_NUM_THREADS": "4",
+      "GB_VECTOR_QUERY_DIAGNOSTICS": "1",
+      "GB_MEMORY_OPEN_ONLY": null,
+      "GB_MEMORY_OPEN_READ_WRITE": null,
+      "GB_EF": "200",
+      "GB_MEMORY_OPEN_OUT": null,
+      "GB_MEMORY_RSS_LIMIT_BYTES": "2147483648",
+      "GB_MEMORY_INPUT": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\inputs\\real-11266-1024",
+      "GB_MEMORY_OPEN_REPEAT": "1",
+      "GB_RERANK": "0"
+    },
+    "extra_env": {
+      "GB_MEMORY_COMPACT": "1",
+      "GB_MEMORY_OUT": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-bge-candidate-trace-20261031T145352\\output"
+    },
+    "cleared_env_names": [
+      "GB_MEMORY_PREPARE",
+      "GB_MEMORY_CORPUS",
+      "GB_LIMIT",
+      "GB_EF_SWEEP",
+      "GB_MEMORY_OPEN_ONLY",
+      "GB_MEMORY_OPEN_READ_WRITE",
+      "GB_MEMORY_OPEN_OUT"
+    ],
+    "clear_env_names_absent": [
+      "GB_MEMORY_PREPARE",
+      "GB_MEMORY_CORPUS",
+      "GB_LIMIT",
+      "GB_EF_SWEEP",
+      "GB_MEMORY_OPEN_ONLY",
+      "GB_MEMORY_OPEN_READ_WRITE",
+      "GB_MEMORY_OPEN_OUT"
+    ],
+    "open_only_flags_absent_for_full_main": true,
+    "query_contract": {
+      "deadline_ms": 5000,
+      "initial_k": 10,
+      "initial_k100": 100,
+      "reopened_queries": 24,
+      "fresh_child_query_index": 0,
+      "ef": 200,
+      "alpha": 0.0
+    }
+  },
+  "phases": {
+    "ingest_seconds": 63.2097065,
+    "rebuild_seconds": 42.495991599999996,
+    "snapshot_seconds": 8.6016492,
+    "compaction_seconds": 42.497178,
+    "same_process_reopen_seconds": 97.3571848,
+    "fresh_child_open_seconds": 69.4428047,
+    "fresh_child_coverage_seconds": 0.0015142,
+    "fresh_child_q0_seconds": 0.0116406
+  },
+  "memory_json_metrics": {
+    "initial_search10": {
+      "k": 10,
+      "p50_us": 11209.800000000001,
+      "p95_us": 11682.8,
+      "p99_us": 13867.0,
+      "recall": 0.9875
+    },
+    "initial_search100": {
+      "k": 100,
+      "p50_us": 40592.200000000004,
+      "p95_us": 42162.1,
+      "p99_us": 42190.4,
+      "recall": 0.9758333333333333
+    },
+    "reopened_search10": {
+      "k": 10,
+      "p50_us": 11306.3,
+      "p95_us": 12481.1,
+      "p99_us": 2551044.3,
+      "recall": 0.9916666666666667
+    },
+    "coverage": [
+      {
+        "built_frontier": 48,
+        "collection": "bench",
+        "extra_count": 0,
+        "indexed_count": 11266,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 11266,
+        "source_frontier": 48,
+        "state": "READY",
+        "validated": true
+      },
+      {
+        "built_frontier": 0,
+        "collection": "default",
+        "extra_count": 0,
+        "indexed_count": 0,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 0,
+        "source_frontier": 0,
+        "state": "READY",
+        "validated": true
+      }
+    ],
+    "fresh_child_open_mode": "read_only",
+    "fresh_child_query": {
+      "completed_queries": 1,
+      "first_hits": [
+        {
+          "id": "5932",
+          "score": 0.6553812026977539
+        },
+        {
+          "id": "8217",
+          "score": 0.22530394792556763
+        },
+        {
+          "id": "5920",
+          "score": 0.18013900518417358
+        },
+        {
+          "id": "3613",
+          "score": 0.15906399488449097
+        },
+        {
+          "id": "5916",
+          "score": 0.15643668174743652
+        },
+        {
+          "id": "3748",
+          "score": 0.15410155057907104
+        },
+        {
+          "id": "5914",
+          "score": 0.14726018905639648
+        },
+        {
+          "id": "3611",
+          "score": 0.14215636253356934
+        }
+      ],
+      "input": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\inputs\\real-11266-1024",
+      "input_dim": 1024,
+      "input_n": 11266,
+      "query_index": 0,
+      "requested_queries": 1,
+      "result_count": 10,
+      "state": "ok"
+    },
+    "fresh_child_metadata_summary": {
+      "collection": "bench",
+      "event": "metadata_summary",
+      "metadata_count": 11266,
+      "metadata_samples": [
+        {
+          "arena_id": 0,
+          "node_id": "0",
+          "node_u32": 0,
+          "retired_seq": 0,
+          "visible_current": true
+        },
+        {
+          "arena_id": 1,
+          "node_id": "1",
+          "node_u32": 1,
+          "retired_seq": 0,
+          "visible_current": true
+        },
+        {
+          "arena_id": 2,
+          "node_id": "2",
+          "node_u32": 2,
+          "retired_seq": 0,
+          "visible_current": true
+        },
+        {
+          "arena_id": 3,
+          "node_id": "3",
+          "node_u32": 3,
+          "retired_seq": 0,
+          "visible_current": true
+        },
+        {
+          "arena_id": 4,
+          "node_id": "4",
+          "node_u32": 4,
+          "retired_seq": 0,
+          "visible_current": true
+        },
+        {
+          "arena_id": 5,
+          "node_id": "5",
+          "node_u32": 5,
+          "retired_seq": 0,
+          "visible_current": true
+        },
+        {
+          "arena_id": 6,
+          "node_id": "6",
+          "node_u32": 6,
+          "retired_seq": 0,
+          "visible_current": true
+        },
+        {
+          "arena_id": 7,
+          "node_id": "7",
+          "node_u32": 7,
+          "retired_seq": 0,
+          "visible_current": true
+        }
+      ],
+      "missing_current_node_count": 0,
+      "missing_node_count": 0,
+      "missing_node_samples": [],
+      "node_count": 11266,
+      "retired_count": 0,
+      "visible_current_count": 11266
+    }
+  },
+  "trace": {
+    "event_counts": {
+      "query_plan": 73,
+      "hnsw_search": 73,
+      "eligibility": 146,
+      "hydration": 5780,
+      "hybrid_search_return": 73,
+      "serialization_return": 73,
+      "metadata_summary": 1
+    },
+    "query_plan_count": 73,
+    "groups": [
+      {
+        "name": "initial_search10",
+        "trace_ordinals": [
+          0,
+          23
+        ],
+        "count": 24,
+        "k": 10
+      },
+      {
+        "name": "initial_search100",
+        "trace_ordinals": [
+          24,
+          47
+        ],
+        "count": 24,
+        "k": 100
+      },
+      {
+        "name": "same_process_reopen_search10",
+        "trace_ordinals": [
+          48,
+          71
+        ],
+        "count": 24,
+        "k": 10
+      },
+      {
+        "name": "fresh_child_q0",
+        "trace_ordinals": [
+          72,
+          72
+        ],
+        "count": 1,
+        "k": 10
+      }
+    ],
+    "initial_search10_q0": {
+      "trace_ordinal": 0,
+      "k": 10,
+      "plan_elapsed_us": 10,
+      "hnsw_searches": [
+        4082
+      ],
+      "eligibility_elapsed_us": [
+        26,
+        15
+      ],
+      "refill_count": 0,
+      "hydration_count": 20,
+      "hydration_sum_us": 341,
+      "hydration_slowest": {
+        "elapsed_us": 70,
+        "event": "hydration",
+        "node_id": "5932",
+        "node_u32": 5932,
+        "props_were_null": true
+      },
+      "hybrid_search_return": {
+        "elapsed_us": 13579,
+        "event": "hybrid_search_return",
+        "outcome": {
+          "row_count": 10,
+          "status": "ok"
+        }
+      },
+      "serialization_return": 11
+    },
+    "same_process_reopen_slowest": {
+      "ordinal_within_reopened_group": 0,
+      "input_query_index": 0,
+      "trace": {
+        "trace_ordinal": 48,
+        "k": 10,
+        "plan_elapsed_us": 8,
+        "hnsw_searches": [
+          4103
+        ],
+        "eligibility_elapsed_us": [
+          21,
+          12
+        ],
+        "refill_count": 0,
+        "hydration_count": 20,
+        "hydration_sum_us": 2539783,
+        "hydration_slowest": {
+          "elapsed_us": 2539473,
+          "event": "hydration",
+          "node_id": "5932",
+          "node_u32": 5932,
+          "props_were_null": true
+        },
+        "hybrid_search_return": {
+          "elapsed_us": 2550755,
+          "event": "hybrid_search_return",
+          "outcome": {
+            "row_count": 10,
+            "status": "ok"
+          }
+        },
+        "serialization_return": 10
+      }
+    },
+    "fresh_child_q0": {
+      "trace_ordinal": 72,
+      "k": 10,
+      "plan_elapsed_us": 13,
+      "hnsw_searches": [
+        3992
+      ],
+      "eligibility_elapsed_us": [
+        25,
+        13
+      ],
+      "refill_count": 0,
+      "hydration_count": 20,
+      "hydration_sum_us": 393,
+      "hydration_slowest": {
+        "elapsed_us": 65,
+        "event": "hydration",
+        "node_id": "5932",
+        "node_u32": 5932,
+        "props_were_null": true
+      },
+      "hybrid_search_return": {
+        "elapsed_us": 11348,
+        "event": "hybrid_search_return",
+        "outcome": {
+          "row_count": 10,
+          "status": "ok"
+        }
+      },
+      "serialization_return": 12
+    }
+  },
+  "attribution": {
+    "supported_stage": "one node hydration during same-process reopened search10 q0, input query index 0",
+    "candidate_id": "5932",
+    "candidate_node_u32": 5932,
+    "props_were_null": true,
+    "hydration_elapsed_us": 2539473,
+    "other_19_hydrations_sum_us": 310,
+    "hybrid_search_elapsed_us": 2550755,
+    "hnsw_elapsed_us": 4103,
+    "eligibility_elapsed_us": [
+      21,
+      12
+    ],
+    "refill_count": 0,
+    "serialization_elapsed_us": 10,
+    "eligible_count": 20,
+    "retired_missing_or_invisible_count": 0,
+    "source_path": {
+      "timed_query_hydration": "candidate-querytrace-lib.rs:24231-24232",
+      "hydrated_node": "candidate-querytrace-lib.rs:15443-15449",
+      "hydrated_props": "candidate-querytrace-lib.rs:15433-15441",
+      "projection_props_unlocked": "candidate-querytrace-lib.rs:14397-14413",
+      "projection_sql": "SELECT payload FROM props WHERE node_u32 = ?1"
+    },
+    "limitation": "Hydration timer covers the full hydrated_node path, including projection_db mutex acquisition, SQLite query, and JSON parse; it does not distinguish which substep consumed the delay. No deeper subcause is claimed."
+  },
+  "comparison": {
+    "untraced_real_pair_candidate_reopen_search10_p99_us": 2657669.3,
+    "this_diagnostic_reopen_search10_p99_us": 2551044.3,
+    "difference_us": 106625.0,
+    "fresh_child_q0_core_elapsed_us": 11348,
+    "initial_q0_hydration_node_5932_us": 70,
+    "note": "Trace identifies query ordinal 0 in this diagnostic; percentile-only untraced results did not identify the query index. Instrumentation was enabled, and no query exceeded the unchanged 5-second deadline."
+  },
+  "prelaunch_attempt_1": {
+    "attempt": 1,
+    "state": "prelaunch_failure_no_candidate_spawn",
+    "driver_pid": 30020,
+    "candidate_pid": null,
+    "candidate_process_spawned": false,
+    "database_opened": false,
+    "query_started": false,
+    "reason": "Python hash compare was case-sensitive and PowerShell process-tree function assigned read-only automatic variable $PID; the driver rejected the binary hash before Popen, and the monitor then failed on reserved variable.",
+    "binary_sha256": "959DFA8F6348082046BCBFAD744A422E2BD7F5A43C702C2DBA7D2D86D26AEAF1",
+    "input_hashes_before": "recorded in process-start.json and controller manifest",
+    "evidence_folder": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-bge-candidate-trace-20261031T145352\\attempt-1-prelaunch-failure"
+  },
+  "artifacts": {
+    "run-config.json": {
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-bge-candidate-trace-20261031T145352\\run-config.json",
+      "sha256": "c9d32eaa572050afa498da05871f6639d3123a5845dcac0674caf76a62d5f517"
+    },
+    "spawn-benchmark.py": {
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-bge-candidate-trace-20261031T145352\\spawn-benchmark.py",
+      "sha256": "5ba5c3c6eeb3d14864d43c41b7fa56f1cfb2c0fa58db8952aaa36e9418c2fe83"
+    },
+    "run-controller.ps1": {
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-bge-candidate-trace-20261031T145352\\run-controller.ps1",
+      "sha256": "4587e5e088740bd6792a0a31d53fbdb626ec470ee764c89975a03c05f564c372"
+    },
+    "driver-context.json": {
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-bge-candidate-trace-20261031T145352\\driver-context.json",
+      "sha256": "5acf4fec2b191f4e546d8a73c5d81172842167be1fac6137ee88ad8bb2990ea7"
+    },
+    "benchmark-start.json": {
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-bge-candidate-trace-20261031T145352\\benchmark-start.json",
+      "sha256": "e7c1f7a711fe235291bbfe34835771361cd854e9b6955352f436377f2210f1b0"
+    },
+    "driver-status.json": {
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-bge-candidate-trace-20261031T145352\\driver-status.json",
+      "sha256": "0ce3c134cfa97e602ad003dd3f77184c53c4ee895b695cac6fd5048e97654829"
+    },
+    "controller-status.json": {
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-bge-candidate-trace-20261031T145352\\controller-status.json",
+      "sha256": "de9be698120587fa92fa39d2b0f7830177b1ffbda5e392f06e3a3acb88c98269"
+    },
+    "host-admission.json": {
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-bge-candidate-trace-20261031T145352\\host-admission.json",
+      "sha256": "b99c387e70f92b9aa275396dc604f7ff235de5560d66598b2937b95f21c57d97"
+    },
+    "process-tree-timeline.jsonl": {
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-bge-candidate-trace-20261031T145352\\process-tree-timeline.jsonl",
+      "sha256": "3ba20d54285158f1907240b67d328d52fa749c7400c944e727eeed25c7423911"
+    },
+    "stdout.log": {
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-bge-candidate-trace-20261031T145352\\stdout.log",
+      "sha256": "b57e62c84d359913c6854f4c1874cd8f7f7f8e43d5d2159b99ca30440adb1564"
+    },
+    "stderr.log": {
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-bge-candidate-trace-20261031T145352\\stderr.log",
+      "sha256": "7b9aed2e5d631081b249b42b71eb16e908b81784786905614394ebfc595cfb7a"
+    },
+    "output/before_snapshot.json": {
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-bge-candidate-trace-20261031T145352\\output\\before_snapshot.json",
+      "sha256": "f20c73f55408dc25fbac2cbc9dedac7bb51a9893dcb0abde02b27ead9c6ff7f7"
+    },
+    "output/memory.json": {
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-bge-candidate-trace-20261031T145352\\output\\memory.json",
+      "sha256": "83d974e6924809524fa4829ee53661acd271c18c5a687da5b2fe3b26e5c0f85c"
+    },
+    "output/fresh_reopen.json": {
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-bge-candidate-trace-20261031T145352\\output\\fresh_reopen.json",
+      "sha256": "b1ab87afe0475800c51181dc59fd23bfa106fee63b0f1ad0ed1f091960fe4738"
+    }
+  }
+}

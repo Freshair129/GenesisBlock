@@ -1,0 +1,8 @@
+
+running 3 tests
+test storage_hql_join_kinds_match_typed_ir_and_independent_p7 ... ok
+test storage_join_diagnostics_preserve_p7_bags_counters_authority_and_state ... ok
+test storage_join_result_metadata_has_independent_fixture_expectations ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.92s
+

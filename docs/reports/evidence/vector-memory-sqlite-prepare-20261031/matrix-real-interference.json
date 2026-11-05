@@ -1,0 +1,9 @@
+{
+  "at": "2026-10-31T22:28:11.8097478+07:00",
+  "workload": "matrix-real",
+  "classification": "causal mechanism observed; timing not qualified as isolated performance",
+  "cause": "Unrelated gs-creator cargo/test/clippy/check started during the matrix, after original admission",
+  "external_compiler_start": "2026-10-31T22:26:04+07:00",
+  "preservation": "No unrelated process stopped",
+  "next": "Rerun in fresh output with continuously monitored competition and unchanged caps"
+}

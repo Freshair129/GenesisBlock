@@ -1,0 +1,35 @@
+
+running 30 tests
+test alpha_overflow_errors ... ok
+test budget_overflow_errors ... ok
+test colon_id_does_not_affect_pattern_grammar ... ok
+test colon_id_search_by_node_target ... ok
+test colon_id_traverse_seed_resolves_literal_node ... ok
+test depth_overflow_errors ... ok
+test ef_oversample_end_to_end_returns_results ... ok
+test ef_oversample_omitted_is_none ... ok
+test ef_oversample_parse_into_ast_hybrid ... ok
+test ef_oversample_parse_into_ast_search ... ok
+test filter_value_overflow_errors ... ok
+test hybrid_by_node_no_vector_returns_nearest_by_embedding ... ok
+test hybrid_k_composes_with_other_clauses ... ok
+test hybrid_k_widens_pool_past_default_10 ... ok
+test hybrid_without_k_unchanged ... ok
+test k_overflow_errors_not_silent_default ... ok
+test limit_overflow_still_saturates_ok ... ok
+test match_literal_vector_unchanged_shape ... ok
+test search_by_node_in_conflicting_collection_errors ... ok
+test search_by_node_matches_direct_hybrid_search_with_same_embedding ... ok
+test search_by_node_no_embedding_errors ... ok
+test search_by_node_no_vector_returns_nearest_by_embedding ... ok
+test search_by_node_unresolvable_target_errors ... ok
+test search_literal_vector_unchanged_shape ... ok
+test traverse_direction_both_returns_union ... ok
+test traverse_direction_in_returns_reverse_neighbor ... ok
+test traverse_direction_omitted_defaults_to_out ... ok
+test traverse_rel_alternation_returns_union ... ok
+test traverse_rel_any_restores_wildcard ... ok
+test vector_component_overflow_errors ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.10s
+

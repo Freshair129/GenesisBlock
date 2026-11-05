@@ -1,0 +1,50 @@
+{
+    "exit":  0,
+    "reason":  null,
+    "seconds":  356.6041553,
+    "peak_rss":  328364032,
+    "peak_private":  391593984,
+    "identities":  [
+                       {
+                           "ProcessId":  4024,
+                           "ParentProcessId":  4676,
+                           "CreationDate":  "\/Date(1793493239052)\/",
+                           "Name":  "python.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\AppData\\Local\\Programs\\Python\\Python314\\python.exe"
+                       },
+                       {
+                           "ProcessId":  4148,
+                           "ParentProcessId":  30060,
+                           "CreationDate":  "\/Date(1793493523736)\/",
+                           "Name":  "candidate-untraced-release.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\candidate-untraced-release.exe"
+                       },
+                       {
+                           "ProcessId":  30060,
+                           "ParentProcessId":  4024,
+                           "CreationDate":  "\/Date(1793493239823)\/",
+                           "Name":  "candidate-untraced-release.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\candidate-untraced-release.exe"
+                       },
+                       {
+                           "ProcessId":  47852,
+                           "ParentProcessId":  4024,
+                           "CreationDate":  "\/Date(1793493239060)\/",
+                           "Name":  "conhost.exe",
+                           "ExecutablePath":  "C:\\WINDOWS\\system32\\conhost.exe"
+                       }
+                   ],
+    "excluded_build_helpers":  [
+
+                               ],
+    "helper_finished_parent_condition":  true,
+    "helper_scope":  "Helpers are not terminated; successful Cargo completion and stopped tracked compiler clients are required before private-source edits. No shared source/target mutation.",
+    "admission_cpu":  16.636363636363637,
+    "admission_free":  15653134336,
+    "remaining":  [
+
+                  ],
+    "cleanup_complete":  true,
+    "monitor_error":  null,
+    "rss_scope":  "tracked owned process tree"
+}

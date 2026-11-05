@@ -1,0 +1,42 @@
+--- original
++++ diagnostic
+@@ -4878,6 +4878,7 @@
+                 }
+             }
+         }
++
+         *self.hnsw.write() = Some(index);
+         *self.coverage.write() = None;
+     }
+@@ -9777,6 +9778,31 @@
+     /// membership scan is O(n) and must not be hidden inside every flush or
+     /// query. `READY` proves structural membership only; it is not an exactness
+     /// or ANN-recall guarantee.
++    /// Diagnostic-only graph capture; invoked only after the measured queries.
++    pub fn diagnostic_capture_topology(&self, label: &str) {
++        let Some(collection) = self.collections.get("bench") else { return };
++        let guard = collection.hnsw.read();
++        if let (Ok(dir), Some(VecIndex::F32(h))) = (std::env::var("GB_MEMORY_TOPOLOGY_DIR"), guard.as_ref()) {
++            use std::io::Write as _;
++            let path = std::path::Path::new(&dir).join(format!("topology-{}-{}.txt", std::process::id(), label));
++            let mut out = std::io::BufWriter::new(std::fs::File::create(path).expect("topology create"));
++            let mut points: Vec<_> = h.get_point_indexation().into_iter().collect();
++            points.sort_unstable_by_key(|p| p.get_origin_id());
++            for point in points {
++                let id = point.get_point_id();
++                write!(out, "{} {} {}", point.get_origin_id(), id.0, id.1).expect("topology write");
++                for (layer, neighbors) in point.get_neighborhood_id().iter().enumerate() {
++                    write!(out, " |{}", layer).expect("topology write");
++                    for n in neighbors {
++                        write!(out, " {}:{}:{}:{:08x}", n.d_id, n.p_id.0, n.p_id.1, n.distance.to_bits()).expect("topology write");
++                    }
++                }
++                writeln!(out).expect("topology write");
++            }
++            out.flush().expect("topology flush");
++        }
++    }
++
+     pub fn validate_index_coverage(&self) -> Result<Vec<IndexCoverageReport>> {
+         self.ensure_readable()?;
+         let _read_guard = self.commit_lock.lock();

@@ -1,0 +1,4 @@
+source=959DFA8F6348082046BCBFAD744A422E2BD7F5A43C702C2DBA7D2D86D26AEAF1
+copy=959DFA8F6348082046BCBFAD744A422E2BD7F5A43C702C2DBA7D2D86D26AEAF1
+source_path=D:\GenesisBlock_Dev\GenesisBlock\target\release\vbench-genesis.exe
+copy_path=C:\Users\suanr\genesis-vector-memory-followup-20261031\candidate-repeat-build-20261031T131156\candidate-vbench-genesis-repeat.exe

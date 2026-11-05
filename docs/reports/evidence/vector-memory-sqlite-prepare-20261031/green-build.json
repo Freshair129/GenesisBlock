@@ -1,0 +1,25 @@
+{
+  "kind": "build_preparation",
+  "cwd": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\verify-src",
+  "args": [
+    "test",
+    "--locked",
+    "--offline",
+    "--target",
+    "x86_64-pc-windows-msvc",
+    "--no-default-features",
+    "--lib",
+    "--no-run",
+    "-j1",
+    "--message-format=json-render-diagnostics"
+  ],
+  "output": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\green-build",
+  "env": {
+    "CARGO_TARGET_DIR": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target",
+    "CARGO_BUILD_JOBS": "1",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_NET_OFFLINE": "true"
+  },
+  "exe": "C:\\Users\\suanr\\.cargo\\bin\\cargo.exe"
+}

@@ -212,15 +212,16 @@ export interface CollectionInfo {
   /** Whether this (quantized) collection keeps an f32 sidecar for exact rerank. */
   rerank: boolean
   /**
-   * Ops/credibility (P2c): resident (RAM) bytes held by the exact-f32 rerank
-   * sidecar. **≈0 post-P0**: the sidecar is on-disk (`fvec_<name>.bin`) behind a
-   * positioned-read `SidecarReader`, not a resident `Vec<f32>`, so its vector
-   * data consumes no heap. This field exists to PROVE the P0 RAM win (see
-   * docs/RCA--VECTOR-QUANTIZATION.md); a non-zero value here would mean the
-   * resident-sidecar regression came back. (`i64` not `u64`: byte counts fit a
-   * JS-safe integer and NAPI maps `i64`→JS number; `u64` would force BigInt.)
+   * Legacy full-file sidecar residency (0 for the positioned-read backing).
+   * Excludes the bounded decoded-row cache: see `sidecar_cache_bytes`.
+   * This is not process RSS or filesystem page-cache residency.
    */
   sidecarResidentBytes: number
+  /**
+   * Allocated f32 row payload in the bounded sidecar cache (capacity * 4).
+   * Excludes HashMap/VecDeque bookkeeping and transient caller-owned clones.
+   */
+  sidecarCacheBytes: number
   /**
    * Ops/credibility (P2c): on-disk bytes of the rerank sidecar
    * (`len_rows * dim * 4`), i.e. where the exact-f32 vectors actually live now.
@@ -229,11 +230,21 @@ export interface CollectionInfo {
    */
   sidecarDiskBytes: number
   /**
-   * Ops/credibility (P2c): resident (RAM) bytes of this collection's vector
-   * arena (`arena.byte_size()` — f32=4B/elem, SQ8=1B/elem, BQ=1bit/elem).
-   * Context for the residency story: this is the RAM the quantized arena costs.
+   * Legacy logical arena payload (length * element width), not physical RSS.
+   * Excludes spare capacity; overlaps `arena_allocated_bytes`, so do not add them.
    */
   arenaResidentBytes: number
+  /**
+   * Arena Vec allocation (capacity * element width), excluding allocator overhead.
+   * Allocated capacity is not a measurement of physically resident pages.
+   */
+  arenaAllocatedBytes: number
+  /**
+   * HNSW vector payload only: indexed points * per-row element bytes. F16 uses
+   * f32 here; BQ rounds dim up to u64 words. Excludes graph links, point/table
+   * allocations and allocator overhead: this is a lower bound, not total HNSW RAM.
+   */
+  hnswVectorBytes: number
   /**
    * Ops/credibility (P2c): engine-global async-indexing backlog
    * (`Storage::index_lag()`) — vectors staged into the arena but not yet

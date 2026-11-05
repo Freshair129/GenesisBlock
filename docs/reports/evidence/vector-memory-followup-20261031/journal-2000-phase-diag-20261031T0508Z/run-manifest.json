@@ -1,0 +1,11 @@
+{
+  "diagnostic": "journal_compresses_authenticated_compaction_proofs 2000 individual adds",
+  "addon": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\baseline.node",
+  "addon_sha256": "975C148C8733623D1ECEC2D5AF46B99F89355AA19EF35770C1B4C45FEECCC65C",
+  "node_exe": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe",
+  "node_script": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\journal-2000-phase-diag-20261031T0508Z\\journal-2000-baseline.cjs",
+  "db_path": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\journal-2000-phase-diag-20261031T0508Z\\database",
+  "limit_seconds": 300,
+  "rss_limit_bytes": 4294967296,
+  "start_utc": "2026-10-31T05:09:01.0845039Z"
+}

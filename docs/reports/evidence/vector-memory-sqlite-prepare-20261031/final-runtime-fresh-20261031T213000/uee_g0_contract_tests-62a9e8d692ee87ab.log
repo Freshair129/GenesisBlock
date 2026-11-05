@@ -1,0 +1,10 @@
+
+running 5 tests
+test g0_query_ir_rejects_unknown_inputs_and_cycles ... ok
+test g0_query_request_requires_one_v2_source ... ok
+test g0_receipt_validates_frontiers_without_claiming_commit_support ... ok
+test g0_transaction_rejects_invalid_frontier_interval_and_vector ... ok
+test g0_transaction_rejects_unknown_fields_and_accepts_valid_mutation ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

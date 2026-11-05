@@ -1,5 +1,7 @@
 """Verify the read-only audit gate preserves cargo-audit failures."""
 
+import json
+import re
 import unittest
 from unittest.mock import patch
 
@@ -40,13 +42,32 @@ class SecurityAuditTests(unittest.TestCase):
         ]
         expected_exceptions = [
             "--ignore", "RUSTSEC-2025-0141",
-            "--ignore", "RUSTSEC-2026-0204",
         ]
+        policy_file = run_security_audit.ROOT / ".github" / "security-advisory-exceptions.json"
+        registry = json.loads(policy_file.read_text(encoding="utf-8"))
+        self.assertEqual(set(registry), {"RUSTSEC-2025-0141"})
         commands = [entry.args[0] for entry in call.call_args_list]
         self.assertEqual(len(commands), len(expected_lockfiles))
         for command, lockfile in zip(commands, expected_lockfiles):
             self.assertEqual(command[:4], ["cargo", "audit", "--file", lockfile])
             self.assertEqual(command[4:], expected_exceptions)
+
+    def test_crossbeam_vulnerability_is_not_registered_as_an_ignore(self):
+        policy_file = run_security_audit.ROOT / ".github" / "security-advisory-exceptions.json"
+        registry = json.loads(policy_file.read_text(encoding="utf-8"))
+        self.assertNotIn("RUSTSEC-2026-0204", registry)
+
+    def test_every_audited_lockfile_uses_patched_crossbeam_epoch(self):
+        pattern = re.compile(
+            r'^\[\[package\]\]\r?\nname = "crossbeam-epoch"\r?\nversion = "([^"]+)"',
+            re.MULTILINE,
+        )
+        for lockfile in run_security_audit.LOCKFILES:
+            text = (run_security_audit.ROOT / lockfile).read_text(encoding="utf-8")
+            matches = pattern.findall(text)
+            self.assertEqual(len(matches), 1, lockfile)
+            version = tuple(int(part) for part in matches[0].split("."))
+            self.assertGreaterEqual(version, (0, 9, 20), lockfile)
 
 
 if __name__ == "__main__":

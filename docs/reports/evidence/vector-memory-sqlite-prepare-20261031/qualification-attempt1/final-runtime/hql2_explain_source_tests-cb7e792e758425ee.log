@@ -1,0 +1,10 @@
+
+running 5 tests
+test analyze_does_not_attribute_pre_execution_source_scan_time_to_operator ... ok
+test explain_edge_row_and_annotation_sources_preserve_frontier_and_fixture_files ... ok
+test explain_history_and_change_sources_do_not_publish_or_write ... ok
+test explain_lexical_and_context_do_not_publish_or_write ... ok
+test explain_source_plan_does_not_open_data_or_publish_a_snapshot ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.46s
+

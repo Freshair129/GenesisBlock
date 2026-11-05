@@ -1,0 +1,5 @@
+Exception: C:\Users\suanr\genesis-sqlite-prepare-20261031\build-release-variants.ps1:273
+Line |
+ 273 |  … ot.Count) { throw "D source file set changed at ${Where}: $($Snapshot …
+     |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | D source file set changed at initial frozen snapshot: 71 to 1

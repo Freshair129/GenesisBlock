@@ -1,0 +1,7 @@
+Exception: C:\Users\suanr\genesis-sqlite-prepare-20261031\guard.ps1:10
+Line |
+  10 |  … -or $free -lt 6GB){throw "Host admission failed CPU=$avg free=$free"}
+     |                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | Host admission failed CPU=96.0909090909091 free=6791344128
+
+

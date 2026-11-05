@@ -1,0 +1,8 @@
+
+running 3 tests
+test test_bi_directional_edge_cleanup ... ok
+test test_concurrent_node_writes_are_safe ... ok
+test test_configurable_vector_dim ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.91s
+

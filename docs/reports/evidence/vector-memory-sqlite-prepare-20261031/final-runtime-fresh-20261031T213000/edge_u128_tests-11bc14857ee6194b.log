@@ -1,0 +1,7 @@
+
+running 2 tests
+test legacy_u64_keyed_snapshot_loads ... ok
+test u128_edges_traverse_and_survive_reload ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s
+

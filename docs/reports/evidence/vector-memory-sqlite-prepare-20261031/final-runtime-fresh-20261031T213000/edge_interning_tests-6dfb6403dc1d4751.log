@@ -1,0 +1,15 @@
+
+running 10 tests
+test delete_removes_numeric_edge_and_adjacency ... ok
+test edge_key_is_deterministic ... ok
+test edge_reapply_is_idempotent ... ok
+test edges_absent_from_id_maps ... ok
+test edges_do_not_pollute_trigram ... ok
+test edges_still_traversable ... ok
+test fuzzy_id_never_resolves_to_edge ... ok
+test fuzzy_id_survives_snapshot_reload ... ok
+test numeric_keys_survive_snapshot_roundtrip ... ok
+test reload_stable_and_trigram_unpolluted ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.10s
+

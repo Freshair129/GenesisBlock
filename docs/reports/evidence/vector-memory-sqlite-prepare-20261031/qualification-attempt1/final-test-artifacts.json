@@ -1,0 +1,1951 @@
+{
+  "source": {
+    "src/lib.rs": "5b8bb9bed5dde5fa6e7d4d255da3acce6c1bfe892092456133adb65a78998fdd",
+    "src/vector_memory_tests.rs": "ffa1a7ab290dd9735414205ddb6169d28b409077a67b8a31b3a61c8938ddbd17",
+    "src/projection_rebuild_tests.rs": "40c4a131c4137304764b38a61d5d4a1482893796fd5e032d8292653a966cd342",
+    "Cargo.toml": "00550fbac8edb5c1316b5eb21983b078039604ed3c1460689515ba5539f30e25",
+    "Cargo.lock": "eda5bfa67c1077c96f2b84e44f740273e695c87a1a51b352cf18f2a031a4f8d2"
+  },
+  "artifacts": [
+    {
+      "target": "hql_fuzz_tests",
+      "binary": "hql_fuzz_tests-93cd2b0c44e996de.exe",
+      "sha256": "5ad5a29dbdbcad85dc99242875a1ff65a53d80747099c7a40a83529586b9a02b",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "consensus_commit_tests",
+      "binary": "consensus_commit_tests-8563d2848b34fa17.exe",
+      "sha256": "bb4f96bd1bdda8027f0d690cb122ebdc1663febe8b7d793102df0da4ffc73874",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_annotation_lookup_tests",
+      "binary": "hql2_annotation_lookup_tests-1f68d835ea56a3ce.exe",
+      "sha256": "e9d4f2b728f589dff5f32b5a92aa9062d48110cdf0bdb7dc0e3b7858f55c8d96",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_expand_sequence_tests",
+      "binary": "hql2_expand_sequence_tests-0f09cfa319801142.exe",
+      "sha256": "bee4d063196e065c066bd295ef9f7260a1f464022523451a1f8207f9723b21b5",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "rest_api_tests",
+      "binary": "rest_api_tests-0fbbc8d6b4089f11.exe",
+      "sha256": "4e30996cd64c39b2f9823761f48df0fe870e1e7c8dd0f74720aa22d350d2420b",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "retract_edge_tests",
+      "binary": "retract_edge_tests-76fc8c956c7224bc.exe",
+      "sha256": "8c7782d6ec7d7a2729a249c910b10f7bcc6e688da34dd5f2345a1d761206b205",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "rebuild_from_truth_tests",
+      "binary": "rebuild_from_truth_tests-466f03d07e0264b0.exe",
+      "sha256": "f54072fdfa4c507c4374aa0ea2011846da28d22ef6739362d84c5ae7a4a32b32",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "p6_generation_tests",
+      "binary": "p6_generation_tests-98f40aa3ecc09bba.exe",
+      "sha256": "62fa02bfeab105fac52a8fcef0adfb727aa9b05c69a5eea18587dcbe7d088dc1",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "ef_search_tests",
+      "binary": "ef_search_tests-15d89590a3186e5e.exe",
+      "sha256": "7b2def871b9e13a1b583769690852dd09e6d5635adc20f093571dcaec7f850eb",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "backup_restore_u9_tests",
+      "binary": "backup_restore_u9_tests-29b6508c7847664d.exe",
+      "sha256": "6126e888e2ad3c25fedcdb19719ed2f629939ca47c8a75f18b634c3458225400",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "epoch_e1_tests",
+      "binary": "epoch_e1_tests-fe897f4b8521678f.exe",
+      "sha256": "952ecfec67b28871c6b85cdeba14cbba43c2a1ab3637d58a434269036af1857a",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_storage_set_oracle_differential_tests",
+      "binary": "hql2_storage_set_oracle_differential_tests-8a6face7dbbd3164.exe",
+      "sha256": "8a776ece5f06e48fe48cff30be7d157ab8bbb1944b0bcb5b3eef2adfac9b7e95",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_restore_generation_tests",
+      "binary": "hql2_restore_generation_tests-3b42f96300485316.exe",
+      "sha256": "3187ae2f383e62946f0a2ebfdb72799d4aa2f772707cdb137eb30af0c1cec535",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "epoch_e2_tests",
+      "binary": "epoch_e2_tests-f741ba282955cd19.exe",
+      "sha256": "1af884372dfe41aa9834f2e862c08d60780668e1016467fa6da60af32de68572",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_request_tests",
+      "binary": "hql2_request_tests-ffac6b2e00aafcea.exe",
+      "sha256": "e14df08fef0f31a8e85510e9d5572f03c35505057eb3b16f7bb05f2015f1dde9",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_root_match_oracle_differential_tests",
+      "binary": "hql2_root_match_oracle_differential_tests-c39e4caeb44e0089.exe",
+      "sha256": "5e73fd8114173b86efd6e5429e327f4e5e974248c8618b04383a316ec4618cc0",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "crash_simulation_tests",
+      "binary": "crash_simulation_tests-ab879916f2108591.exe",
+      "sha256": "8b8bb1ca087b8f5c125189f1b680d04308d5d5132cf20d6899f886a9d048be73",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "state_transition_tests",
+      "binary": "state_transition_tests-8d1fcc24f7802e7c.exe",
+      "sha256": "7d11b1f537c967882df1f8eae97ddefcba6be60769a3aa3c28d9204e35d86fe0",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "zz_probe_discriminates",
+      "binary": "zz_probe_discriminates-50ac8da7c65479ae.exe",
+      "sha256": "2b3923a8bc09c6094e00e798d0a3450badbfce89e4eb1260bb6d8dfb71668428",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_pipeline_oracle_tests",
+      "binary": "hql2_pipeline_oracle_tests-abe35efe380bdb15.exe",
+      "sha256": "e05dda8fdfc8ff5a74791179b3dbdf19fc38070a77b8c6a99677c02cf2e7322f",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_g4_plan_identity_tests",
+      "binary": "hql2_g4_plan_identity_tests-8d71e83cf99bfce0.exe",
+      "sha256": "6aa4cc120a59ef9a6ccfd5c6673aa29426067bf8945e183bf9c330f43893a2f0",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "retention_wp13_tests",
+      "binary": "retention_wp13_tests-88a8a33f8eb2426d.exe",
+      "sha256": "c30682415a5b8462d6fc03d44128b453230e275294ad358236c7e5db791b56d3",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "async_indexing_tests",
+      "binary": "async_indexing_tests-dbfd445bf190dbaa.exe",
+      "sha256": "4d700a12145e7b0ca5587354c8350c9df60931ffdef19b45525625280a879f3f",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "soak_tests",
+      "binary": "soak_tests-de68236741eb57b0.exe",
+      "sha256": "2e461a946bd6c773bdcaba28ac554c09638d816e236a850df4f4ed905e81f3b5",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "wal_tail_replay_tests",
+      "binary": "wal_tail_replay_tests-cf928416784f4477.exe",
+      "sha256": "31e9d321e5b47e0a0f8bf013637fd10ba5974d7e85fcfeda2e037cebdeaa5e4b",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "wave_d_quality_artifact_tests",
+      "binary": "wave_d_quality_artifact_tests-6c63abf116531a3e.exe",
+      "sha256": "cb02cb1231dd3e666dc1ec33a59cc386780b688dcf6eaa05d79f0fd7a6a96b62",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "wave_e_context_tests",
+      "binary": "wave_e_context_tests-d7ff274e52d7364b.exe",
+      "sha256": "634a2d752595b495f7fa470b683c268ae7d3143e353d41c317971458e621a600",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "robustness",
+      "binary": "robustness-86ae51b948887d47.exe",
+      "sha256": "a740b9cbe3faf0731c3c7a14d0e6587d040732914f2028e500752fb150155b3e",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "batch_atomicity_tests",
+      "binary": "batch_atomicity_tests-ff37052138fbe871.exe",
+      "sha256": "e6777d4ee00433996cdff59e7dba1d768a58292b590f36b4f26350feefebdb76",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_durable_revision_tests",
+      "binary": "hql2_durable_revision_tests-a1b603e8db91ab54.exe",
+      "sha256": "8af602f5ce653f8a1dd039231444588f44d8a074db93b0b1a5570bcbdb8592d7",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_graph_oracle_tests",
+      "binary": "hql2_graph_oracle_tests-1ec0f24635fea331.exe",
+      "sha256": "04f215541fd78a74cf5fd194bf1d779925fc7f9a0ec6dea5d08811894fe1f146",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_wire_tests",
+      "binary": "hql2_wire_tests-ac58ff776c5ab89d.exe",
+      "sha256": "4edd27cf8171bb962bb449649b1d0c50b934f4988d64562161ae48cd87c76a80",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "journal_format_tests",
+      "binary": "journal_format_tests-db402d7edf72c286.exe",
+      "sha256": "048bf9f298d13d5302b009c720a65c93d9fea9153abbb1fd4b57359d70a72e9d",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "projection_reopen_tests",
+      "binary": "projection_reopen_tests-ac739bb418ea9fe7.exe",
+      "sha256": "cc4f096f422a9142180ff941307f1aaae16417b763621fa5c4e067b6f79cf57c",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "collection_ef_default_tests",
+      "binary": "collection_ef_default_tests-b62ca7fd63f7143d.exe",
+      "sha256": "f3f6c4de36051844f318ac2fb78f2d1d579c94361faa97b5255d0e2b780cfc01",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "thai_fuzzy_tests",
+      "binary": "thai_fuzzy_tests-27bfc9389b62f2c3.exe",
+      "sha256": "9415cf0bd46b9656d3d9275c468f0a400e36535d1cdddac3159ccb64d84fe063",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "vector_memory_metrics_tests",
+      "binary": "vector_memory_metrics_tests-c37e27d54e417704.exe",
+      "sha256": "cd25bda51c75878d9f30eb639e096a3e759927aa65b1e547915ff1f6226ffc94",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "wave_b_collection_lifecycle_tests",
+      "binary": "wave_b_collection_lifecycle_tests-2a8fc7037bf8a363.exe",
+      "sha256": "2c68356df2a30ca85392baaa994cc043e03032df91e3ec0145e8251b398797d6",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "core_engine_tests",
+      "binary": "core_engine_tests-50734af74b45b194.exe",
+      "sha256": "f8d1a064b0980f36ca5bcc900b58dbc8e248e31fde5ffc5ca6e4a3e1712c542a",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql_cypher_tests",
+      "binary": "hql_cypher_tests-0a96672a3c154a17.exe",
+      "sha256": "500e766b215b0c1c9e923e60828bc86bc2a7620f28e5c9043cd8b985b427b2dc",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "wave_c_query_correctness_tests",
+      "binary": "wave_c_query_correctness_tests-a9e4205f86f591a4.exe",
+      "sha256": "d509a32ae36ff090f4857b711a1af9057029fc51f7ea12cbf53affc88543ce74",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_annotation_source_tests",
+      "binary": "hql2_annotation_source_tests-44f439fa654fdd0a.exe",
+      "sha256": "0f4e42e5904f4f33883130e1726d7da29bb300c7f32b1367fe610b7e7a22ce3d",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_g4_source_counter_tests",
+      "binary": "hql2_g4_source_counter_tests-80ca6d9f12a75776.exe",
+      "sha256": "8789404b3fe55c82c524e3aeb39ca341cd1275bdf6b79eae8790656ce96d13ef",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "schema6_migration_tests",
+      "binary": "schema6_migration_tests-56bd8844be788711.exe",
+      "sha256": "6f02cd8d8aa6cae8ad161d917ca26235670fa7a7207e63ea7aa39c352a8ee9d6",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "tx_as_of_wp22_tests",
+      "binary": "tx_as_of_wp22_tests-0d224205fdeb70c5.exe",
+      "sha256": "e3bfe06682bfda44dc868ed5567c6f18d8d3b78251c03d4080a3e0e23799b188",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "edge_projection_tests",
+      "binary": "edge_projection_tests-aacec555b57736a3.exe",
+      "sha256": "08b5032d5e26899cbdee850cb9e83a073465d4648e8956ee70855d682986dfa0",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "p6_lease_tests",
+      "binary": "p6_lease_tests-63e17f092fcb7190.exe",
+      "sha256": "fe6b477f2ce3995c32abac8d2b510abd192325fca594742a8a6d3fd075d17003",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "relational_schema_resource_limit_tests",
+      "binary": "relational_schema_resource_limit_tests-10fdbfa9ad7c5b4a.exe",
+      "sha256": "74fcbc021ae621b74e1b2b1ac29dd39d484842a430e8f67321dd8dc43e6f9cc8",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "temporal_queries_tests",
+      "binary": "temporal_queries_tests-e49580002abc2f2e.exe",
+      "sha256": "5386a53ad98d266cbd695b37847a49489d2ca64c42655495ba8677e97d015618",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "wave_a_commit_tests",
+      "binary": "wave_a_commit_tests-b9477cbdbbc39a47.exe",
+      "sha256": "99e01a43bd722598883fc7c28b5bbd30c1da005216467964aa09090c958f63be",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_storage_join_oracle_differential_tests",
+      "binary": "hql2_storage_join_oracle_differential_tests-0664aa484e00231e.exe",
+      "sha256": "6dcc027d5f5afc9c7c227e442b18c60bd37539d88221e3ec90111e720999cac1",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "journal_recovery_p4_tests",
+      "binary": "journal_recovery_p4_tests-3e5df172a2202a83.exe",
+      "sha256": "8ca9a57347b49a643cf0a0136afeef97fe05e9db6f574dbe68596a9b5c014c15",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "studio_contract_tests",
+      "binary": "studio_contract_tests-32cb8354552c9ef1.exe",
+      "sha256": "5cd515a782889fa6c4306ef53971386c62c605aa100520a37d9210a948d0b9cd",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "multi_collection_tests",
+      "binary": "multi_collection_tests-cc6596310b4b581b.exe",
+      "sha256": "3e3d6b3e7610ca1b6d91f5517063478213dce08948c4198da93658b66fcf9d73",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "index_coverage_tests",
+      "binary": "index_coverage_tests-c7233e275c0fb740.exe",
+      "sha256": "70d9cb3410cc36b146b3a5ab06f1459a771cc2dee7df415d82be61996eb18743",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "persistence_tests",
+      "binary": "persistence_tests-cee74ede0423a7d5.exe",
+      "sha256": "721321ffcf871fb090eb572666eec959d5391d13338d5c2df0aadd5a72f57059",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "p6_snapshot_authority_tests",
+      "binary": "p6_snapshot_authority_tests-b6b357101a6c1ceb.exe",
+      "sha256": "87366c16e12834a327a2340636c941b94933e91144df55c47059b863cadb0c29",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "sidecar_reader_tests",
+      "binary": "sidecar_reader_tests-60cd9b4f9f1bc2f1.exe",
+      "sha256": "c291b337c526534befa1a07f8d92c66f5ba46508511cf5890ea81c8b8f426391",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "storage_lock_tests",
+      "binary": "storage_lock_tests-ef7b570f27f7aa70.exe",
+      "sha256": "97a7914b28c1aeae45ac4eb3770f9a7fb8d7623bf0995ab4553f39d65fa55311",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "edge_u128_tests",
+      "binary": "edge_u128_tests-11bc14857ee6194b.exe",
+      "sha256": "582e2429207f0972a0a44125aab8ac4d618e32aa9946971dd81793d7bb517710",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "graph_traversal",
+      "binary": "graph_traversal-b6455b0be819a39d.exe",
+      "sha256": "05f08e382b1e4922a8d3193557d39eb10146ebec2ae0080f43ef45ad488ec275",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "vector_collections",
+      "binary": "vector_collections-7aa061be751098bc.exe",
+      "sha256": "8eedb481033a1b04113771c3cacaaf957920bdaf7e575012cbe0cede1de52584",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "bitemporal",
+      "binary": "bitemporal-d9dd0cbfefd62064.exe",
+      "sha256": "d88aa2c3a32809c618340c735c6fb04e810dc804c5fde22d8246f7d7958e6cca",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_g4_contract_tests",
+      "binary": "hql2_g4_contract_tests-bf70f38e4c101dbd.exe",
+      "sha256": "d5cc0805bcb0ae45946fdf0234d0c1e0959ad7a1e7f6d190902bc767cda14c34",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql_filter_tests",
+      "binary": "hql_filter_tests-22c00e0c8adfde3f.exe",
+      "sha256": "c9573a21024146d86a125ac81375ce6239ae2d619c1897ed1a19a7e1cda15154",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "schema_version_tests",
+      "binary": "schema_version_tests-3ef34b6f6b631585.exe",
+      "sha256": "e797903ebcedc2effc5544a3aa2d5feb10aef12ff3128e81f3235f451f54380d",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "storage_reliability",
+      "binary": "storage_reliability-a558d0b4678f3dca.exe",
+      "sha256": "6da9a926eff98942c997c04c21b3bdc0940c7af3ec9e1c3716bff160a7f3c346",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "consensus_checkpoint_race_tests",
+      "binary": "consensus_checkpoint_race_tests-4028d1334adb472a.exe",
+      "sha256": "cbc537f19e81446d161254964c842912b7e3d88634e5f7f7f37720a6c4319cdd",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "collection_name_validation_tests",
+      "binary": "collection_name_validation_tests-b8d420fafd3b7b0c.exe",
+      "sha256": "c5b11631e7d323372ec43366f4041b4695794855e6da1541b63c63fcf2d6c1e0",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "durability_slice0_tests",
+      "binary": "durability_slice0_tests-fa6003e660adc82d.exe",
+      "sha256": "4af451b1434d824de77ce43da2009d8576f3d0ae2bca8bba9655078520ee631c",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "f16_quant_tests",
+      "binary": "f16_quant_tests-37b66b8619a6e4e9.exe",
+      "sha256": "dcf9568422e976caa90704826275e93f4f9da67c4ef40f32f07f54fd0ee886a8",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "grl_retrieval_tests",
+      "binary": "grl_retrieval_tests-d032ceb994ec2e0b.exe",
+      "sha256": "66ef145e4d35383f3a947df4c14e1af571cce3e369c54ddf74aea74e3e385cd4",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "compaction_tests",
+      "binary": "compaction_tests-61d71aa8e9d69070.exe",
+      "sha256": "7e48ce537b73ab2fe69f178d36adbcbf2b2fcc2134fc8f3e8b34d312f824b31e",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hnsw_recall_floor_tests",
+      "binary": "hnsw_recall_floor_tests-93700df8ff0bcdef.exe",
+      "sha256": "14939fd5ed1f895e36485451d78e4a5a7c6b4b2a378b183b89190fa563f7b880",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_g4_scalar_counter_tests",
+      "binary": "hql2_g4_scalar_counter_tests-b142ccc4d02f122d.exe",
+      "sha256": "8fd7da4e5d57bd9586895029ab398dc9111cdf31fa70676c57d061342c85e905",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_storage_aggregate_oracle_differential_tests",
+      "binary": "hql2_storage_aggregate_oracle_differential_tests-aeeee6d5da1cc5da.exe",
+      "sha256": "ee81864cc606925b8d3d14da8615994dbfb81bbf660d3b7a106efc1618be5581",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_g4_provenance_completeness_tests",
+      "binary": "hql2_g4_provenance_completeness_tests-731ddaa8598bdb95.exe",
+      "sha256": "ba96c50b736149bcb46bd223457388c2535a007347988e2abec78645994a9df4",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_p8_completion_tests",
+      "binary": "hql2_p8_completion_tests-213a6c3dc0971d87.exe",
+      "sha256": "8ead5f3e5b83f077cba6a931aa36d10a17b4e9db4d957721ab65fd066e54975b",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_vector_revision_tests",
+      "binary": "hql2_vector_revision_tests-84621e0daeeea5bb.exe",
+      "sha256": "164ebce3450fae69f9b05997a13d05db9e7c882d2562b258cd951b8767498f99",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_key_codec_tests",
+      "binary": "hql2_key_codec_tests-1a2af2f9418bb86a.exe",
+      "sha256": "cee45a659e1b4c62ed247ba2783e6ac79d879305cd263850e94d343c6b390a06",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql_p0_tests",
+      "binary": "hql_p0_tests-0d151047ee04d38a.exe",
+      "sha256": "33a9e2e3a8459de6a8ddf921cc91f0c2f16f821ae6533fd53b60290b68fb0f62",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_value_tests",
+      "binary": "hql2_value_tests-e2be756bc5b60c8d.exe",
+      "sha256": "fcedf815c1ae7325a4829e78a6ae5a3be89d6d23cf18b751d44fc5f857e391ac",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "unified_transaction_p5_tests",
+      "binary": "unified_transaction_p5_tests-77c26707f8058f90.exe",
+      "sha256": "bdc7a4222f015e84cece29a5899ff941a624be739c4d6808a2260649d731916f",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "node_versions_wp21_tests",
+      "binary": "node_versions_wp21_tests-6a3ae89956c8165b.exe",
+      "sha256": "69402df36e06e2da80fa0365d5631e3270d27353ba83fe76e232967f0df51406",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hnsw_capacity_tests",
+      "binary": "hnsw_capacity_tests-881f99eb880b5564.exe",
+      "sha256": "e0a9495270bc97503d6e89b651cf78a8a1f71d438b471e9fada15eb973427d93",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_vector_operator_tests",
+      "binary": "hql2_vector_operator_tests-2bcfc1d54d832d10.exe",
+      "sha256": "eb22030a216d6d8892b57b3d0fe480b4f12b878a91a3bb139b97ce0db28501cb",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "binary_quant_tests",
+      "binary": "binary_quant_tests-eaf1f79647d8c4cf.exe",
+      "sha256": "ffe72a9e2b777fc4d1cebc37b6111c426d765868759426eb27fda9b5e3763798",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_parser_tests",
+      "binary": "hql2_parser_tests-da60f3a41b6b3c36.exe",
+      "sha256": "76c9e529ded0d38eb9e756fc04d3dd94aece2fceabac1ecb7ab950f327a4817f",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "uee_g0_contract_tests",
+      "binary": "uee_g0_contract_tests-62a9e8d692ee87ab.exe",
+      "sha256": "387eaae025d1cfd8357816e27d050f229819696a2cdc326770dce6daafef7e45",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "query_ir_tests",
+      "binary": "query_ir_tests-bbb1d5187b614c62.exe",
+      "sha256": "f0ff0d55858ac7f62262a0292071bd6651b2ac856a198fc28bfbc092e39aa6a5",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "node_meta_a2_tests",
+      "binary": "node_meta_a2_tests-781e9af889fdd759.exe",
+      "sha256": "8310a5da491e03ff1e0bf2dc739a146e3beceea3f7efc176f839081b707ad91f",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "wave_b_failure_tests",
+      "binary": "wave_b_failure_tests-a7ee18e7cc52912f.exe",
+      "sha256": "07f1e33bb79daf866a3c912d38fab82f997dcf6d0c81615e75bd8e9870cac5a5",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "edge_interning_tests",
+      "binary": "edge_interning_tests-6dfb6403dc1d4751.exe",
+      "sha256": "b1aaa93d09fc41ddbcf557a6f4ffad69350e6403c7e83417cce55aea48112e3e",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_oracle_tests",
+      "binary": "hql2_oracle_tests-204f7410177f6eba.exe",
+      "sha256": "40e15acfa9f7eeffcc84fe51528155b0950ae477b22926a9ea6f1f6db74677bc",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "p6_peer_authority_tests",
+      "binary": "p6_peer_authority_tests-d58f9818c0d07d09.exe",
+      "sha256": "20666c3b502aeaaa83856a1719f80b8abb09d54de65332e1b80d53e8900f3211",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "relational_u2_tests",
+      "binary": "relational_u2_tests-126ecf5f9caa14ae.exe",
+      "sha256": "4f0c7f73715abb2ce71306d730aede6fdce906bd20de057410749733eba18b84",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "wave_e_rest_tests",
+      "binary": "wave_e_rest_tests-41612c101738fb04.exe",
+      "sha256": "10649d45c34f1379d0bb86a5dd8cd33bcddd09179e3c1c1d81e2940762f9cc53",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "anti_entropy_tests",
+      "binary": "anti_entropy_tests-f54284da71bfabca.exe",
+      "sha256": "28045ab9f98ab8799f5b918b923907402aa764a325d62521e02499b0b949d238",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "governance_tests",
+      "binary": "governance_tests-e86dd8e3eba80f94.exe",
+      "sha256": "6feac33f48196374c3b12dd2f12e0d0485adbcdee723c1dc99779c5dce3a2dde",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "gossip_membership_security_tests",
+      "binary": "gossip_membership_security_tests-481c70dde84c2a40.exe",
+      "sha256": "621910e55b0244e3e5fff2f2e97e2db399f5fc794df05d3be20ad5a1d8ecf68a",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "consensus_vote_sig_tests",
+      "binary": "consensus_vote_sig_tests-cd1384f3f0e24cad.exe",
+      "sha256": "aa7cfceb7ad1686c056b792ccdd186f47ccb6cc6d7ea587d2cf6a48dd2bfb728",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "wp23_semantics_tests",
+      "binary": "wp23_semantics_tests-182d886335580a8a.exe",
+      "sha256": "950b1671612f78905ca7fe9df065aef9a13eea9c855ec25390285f0235f99421",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_pattern_constraint_oracle_tests",
+      "binary": "hql2_pattern_constraint_oracle_tests-c11d10975b6d2d83.exe",
+      "sha256": "8ded5cf82f7e41449c988fa2eca4b42760c0ca516e2105f988b5704eb2cdc657",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "meta_format_migration_tests",
+      "binary": "meta_format_migration_tests-c7262ed1e5191972.exe",
+      "sha256": "1beaf94ca868ba94d8ea9428a84f4cb25510af8019ee03907a7494a239ad68ae",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "wave_d_rest_tests",
+      "binary": "wave_d_rest_tests-2b8427804089a560.exe",
+      "sha256": "9b45677ff514bd4fffd8ff74b0988904068439ccb20cfebaae3545a8174c5309",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_scalar_execution_tests",
+      "binary": "hql2_scalar_execution_tests-6428e2529bbc196a.exe",
+      "sha256": "0660b63befd848d8596ea1bc89417ef3dc6b2aafcf6272f94c34bf7f30fdba85",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_history_change_tests",
+      "binary": "hql2_history_change_tests-a66b59bb8c5b63fd.exe",
+      "sha256": "29bfa7f25b2a9e350c81b62b802ab2e4f8906388392e30cafe23075ac0cefb62",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "rerank_tests",
+      "binary": "rerank_tests-b1dbd703dfb52b63.exe",
+      "sha256": "a2f4c7fd08d4960e123c60c315ff5c134332047f8c0f15e6a189f8150efdac2b",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_annotation_acl_tests",
+      "binary": "hql2_annotation_acl_tests-aa20167501a4e2da.exe",
+      "sha256": "f16b4b085827231774d8d55fad1492614727272c4b44525770ebbb8bc0c2350c",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "node_interning_tests",
+      "binary": "node_interning_tests-36d8b4c55de0c086.exe",
+      "sha256": "c3c54c98a5d50eb36dd0c33a254bba2496ad7d52657d79fff3539bd0e09f18ee",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_lower_tests",
+      "binary": "hql2_lower_tests-5461ea3f2aa11e32.exe",
+      "sha256": "e2a6638917ddf31a012896b47d86537183894d089bd22d551a990e67b488cd30",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "rest_index_coverage_tests",
+      "binary": "rest_index_coverage_tests-d3e8e03862998dcc.exe",
+      "sha256": "f72406976acc838a276970d6704a6f7fdbbf1b2cb6459dcca10eccc98e4d886d",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "concurrent_writers_tests",
+      "binary": "concurrent_writers_tests-39d9c22fd6edfa26.exe",
+      "sha256": "f322f1820f9768981a266bb63eed28e7db1f76520e5efb84d0e772cd74082d93",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "sidecar_ondisk_tests",
+      "binary": "sidecar_ondisk_tests-18b67c33c02c5a17.exe",
+      "sha256": "90621c27ccb50c190f5d46bdb5d76d420ba32904da7bbcf38b4c1f4074873fa9",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "wal_compaction_tests",
+      "binary": "wal_compaction_tests-a811d805cfcd8a3f.exe",
+      "sha256": "c2f6d141a007a83c0c84a389cf0c68c12b580414c76e5dd63ce596d69f70618f",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_execution_tests",
+      "binary": "hql2_execution_tests-56b1fd1c498bfe28.exe",
+      "sha256": "3382006428c8d2f3cfe61ff98c1da2b5017ee2f619640395fca43967e587203e",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_storage_source_tests",
+      "binary": "hql2_storage_source_tests-18dab0f3906f9ae3.exe",
+      "sha256": "568a0f86d054fee9cfa48b9a10abdf7f02814d303ce6fae03e25323cf3977ff2",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "ephemeral_nodes_tests",
+      "binary": "ephemeral_nodes_tests-b6cf0427af8a835b.exe",
+      "sha256": "f86a36f821c224c9a34b83bec788f8543a33d5ae81a428c223c4a2c45006d27a",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_revision_backup_restore_tests",
+      "binary": "hql2_revision_backup_restore_tests-a88403cf07243487.exe",
+      "sha256": "52f2e6fbf48ed8c5073f5398b95174a2be8e859251a68e135644308f5cd23e78",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_row_history_tests",
+      "binary": "hql2_row_history_tests-29f7c0e70d4ef3f8.exe",
+      "sha256": "a7861f4253d2ea9f74e42ffbd0a6540335cfa38e12cdb0a1b004f759af2daee0",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "neighbors_direction_rels_tests",
+      "binary": "neighbors_direction_rels_tests-5dcbf4588cca0639.exe",
+      "sha256": "89380d96e29fd66b752246df338324fbf0260f13af7c44bdbb23bb6c8f5786f6",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "rest_api",
+      "binary": "rest_api-a8098d1906886c03.exe",
+      "sha256": "e58950ffb9504774c4356f5e203b9ef19573149a08cb6f675118dd36819930cc",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_explain_source_tests",
+      "binary": "hql2_explain_source_tests-cb7e792e758425ee.exe",
+      "sha256": "e491642f6988f7d2bde2dd81d20a82a8bdce72dc12bfe5dd4cb709a12e5705cc",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "sidecar_migration_tests",
+      "binary": "sidecar_migration_tests-bc8d963139017f1e.exe",
+      "sha256": "c9b6f4919935440ee30f8edc26c052994fcd1f9f7d75634085cd282b94a3f379",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "bq_centering_tests",
+      "binary": "bq_centering_tests-599cb23cabce4cc2.exe",
+      "sha256": "30f23babf2ce8ac15ef81e761ef30b3d76793295ee658e41eea42f22ad9b161b",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "concurrency",
+      "binary": "concurrency-d39b1179de3f2047.exe",
+      "sha256": "c40e8632c862b1fce74e03be6245170a2f97276ad970c7e5a3e728bbdfc335ce",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "add_vector_tests",
+      "binary": "add_vector_tests-ade58ae384b4e3ad.exe",
+      "sha256": "2579d03a5cb6d44fcf6d04c5ead7afa5a13029927b5f91d949f30177c5e975ef",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql_collection_tests",
+      "binary": "hql_collection_tests-0c0d286471416dd2.exe",
+      "sha256": "8c9a60f9628c8255a972aae82e1fac041c86803bff9e8ece363a316d43a49c79",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "relational_u2_contract_tests",
+      "binary": "relational_u2_contract_tests-819446c63a2a8ab2.exe",
+      "sha256": "ed15b99460affd63b7f32e8694654051dd1406dfd8cd8f5b01e5f0b92040d5cc",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_expand_tests",
+      "binary": "hql2_expand_tests-17a3211a1d06b0e9.exe",
+      "sha256": "a86a84accfc8e453e2d1f135ced04982805f1ed2c5ce3bc1ea375f25f7a20d2f",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_storage_hql_join_oracle_differential_tests",
+      "binary": "hql2_storage_hql_join_oracle_differential_tests-05ebb0e357f9c71b.exe",
+      "sha256": "82bf10abf7c5c242092aefcaf9caaf8e2af5acb18a6f58e5e66d892c1f23d582",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "projection_replay_recovery_tests",
+      "binary": "projection_replay_recovery_tests-287664d40b87a9e9.exe",
+      "sha256": "b48d8edbd57c9b9367fe78b8f3f742a8a8e7ebc1c487e66fdcc3e8f4853b5436",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "napi_rest_parity_tests",
+      "binary": "napi_rest_parity_tests-e51698fe873d122f.exe",
+      "sha256": "1029a22ce7ac2b8dcf2f4a8697ba69edbb8a22fc0a1b2703b6fe046b552278a5",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "sq8_calibration_tests",
+      "binary": "sq8_calibration_tests-c927e3452596284d.exe",
+      "sha256": "1c085d04a4d00e5e5484879fdd7d1b4a0720062b53f171c36d7cd393285f7d3a",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql",
+      "binary": "hql-c5b700ef34feec8e.exe",
+      "sha256": "98ed7002a26ec1f607096ec9170e2a972e5b0fb6fd00b7802d5485785943c908",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_hql1_property_projection_tests",
+      "binary": "hql2_hql1_property_projection_tests-5ce6d5b2842a3528.exe",
+      "sha256": "b47a1c2ca1095b81f93d1db1f3bd6eb9591b3786d1dbb3825ea623c8b04607a4",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "merkle_convergence_tests",
+      "binary": "merkle_convergence_tests-f96abaa163ba5291.exe",
+      "sha256": "3a398a95915db3878a6d89934e0402a88e1e097c990c6c3083dc1e8dbbaf6a66",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "quantization_tests",
+      "binary": "quantization_tests-9688a10f7ad308aa.exe",
+      "sha256": "56d33830fc93857ca782b242be54bcb1545e32abec857b828a1a7074cef7e008",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "sqlite_substrate_s0_tests",
+      "binary": "sqlite_substrate_s0_tests-7812a3bef256e335.exe",
+      "sha256": "c97594bcab609bb704c42889c255b9b293230fbabc4411c418b9d84f6693df82",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "wave_b_sync_tests",
+      "binary": "wave_b_sync_tests-040ec4c7c784603c.exe",
+      "sha256": "864730f57857a176e47a1337b1479a46a24540d28c9ddae9e48412354c2e1649",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "crdt_sync_tests",
+      "binary": "crdt_sync_tests-1cd4c3a887442065.exe",
+      "sha256": "6499cbcce6a1dce38bf45079be0b1c4cfe658dfeec612794e2ee098783156398",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "g3_oracle_differential_tests",
+      "binary": "g3_oracle_differential_tests-15f7c4911618447f.exe",
+      "sha256": "ee3e5114257931e51328c4789126b83ad2d9f041574373e45f05a390e26cd526",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_hql1_labeled_filter_tests",
+      "binary": "hql2_hql1_labeled_filter_tests-f73914f45ef5cec3.exe",
+      "sha256": "db715940adf9406f207b0db02b6ba6d5e46d5d4b1a05488f710c38f746c8d35a",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_vector_oracle_differential_tests",
+      "binary": "hql2_vector_oracle_differential_tests-b7c36d6c55eeadec.exe",
+      "sha256": "5484ad3dd6cdc21468c4a4eac3edc3779537c0646bcab19caea0d1d653eb84bb",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "bitemporal_matrix_wp31_tests",
+      "binary": "bitemporal_matrix_wp31_tests-7c7471c7f1013f21.exe",
+      "sha256": "7f4eb7cbd68eea6a045f0e87e5642f25596a314862e1d41f6720f8123b49ac8b",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "jit_chunk_schema",
+      "binary": "jit_chunk_schema-92c445ad0bfaed24.exe",
+      "sha256": "1c3b2a29a965d92f8814dbd27d6fed495512da341740d0bcfbc1f07d77c9d0c2",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "p6_visibility_tests",
+      "binary": "p6_visibility_tests-dacf766225d5aeb1.exe",
+      "sha256": "f3d1a52f8cf6d65356764174b5e0045c6ba5f1887715a657fea6fe0c84713ed0",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hardening_tests",
+      "binary": "hardening_tests-5bcf245ad86146db.exe",
+      "sha256": "2b2f43ed6a847591f026cd6fc82cc3b63aa6f4dfbc8130b0a98e8ee31701276a",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "wave_b_correctness_tests",
+      "binary": "wave_b_correctness_tests-8351ff06bae7cd40.exe",
+      "sha256": "6b4eacc244487742fb45998a3555b7b969e1564e5bb92c37c7d94c639109fa09",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_hql_reference_differential_tests",
+      "binary": "hql2_hql_reference_differential_tests-eff56977100f4aad.exe",
+      "sha256": "b50ced02b3aefe82d1ba6b29575a1596dd813cff810d7139634dc66c81e0a2d9",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "unified_transaction_u3_tests",
+      "binary": "unified_transaction_u3_tests-2ac3dfe471c12268.exe",
+      "sha256": "3aa01e5300c5e72f10cb76390ed650a21b3ffb3771706b2a4928f5e387d1b172",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_hql1_ordering_tests",
+      "binary": "hql2_hql1_ordering_tests-ddb7ddc7ff3b0758.exe",
+      "sha256": "9e858a07116557eb59b5f8e24fe9ad54ede20c01ad31d4a7118ddddbf95095f2",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "journal_migration_tests",
+      "binary": "journal_migration_tests-ecb4e3e7ac1bd338.exe",
+      "sha256": "103a64229b139a325a451b8d9480147df9e3bf32c8b2823835feebdf3d3e8622",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "readonly_sql_surface_tests",
+      "binary": "readonly_sql_surface_tests-1a94bd7b1c2dd607.exe",
+      "sha256": "f73131886c9cd7cdb8bbdd06ee2f9e96b4f0fd7a794f19f147ff2d500c53dcfc",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_rank_oracle_tests",
+      "binary": "hql2_rank_oracle_tests-89c7eff03d734768.exe",
+      "sha256": "be0463b4d0d24ad1145706af3c26b8bc14ae1809202bf76f79432c42b4d5956f",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_hql1_adapter_tests",
+      "binary": "hql2_hql1_adapter_tests-c4c7a42c8b2227d4.exe",
+      "sha256": "f7db22824a73a3cd8ad188a07c46d3e7aa3ecb3fd02c9230b3148b088c902fc7",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "durability_slice1_tests",
+      "binary": "durability_slice1_tests-f3fe7cbf0b50d35b.exe",
+      "sha256": "76c8733353aee6c6c8d0bc2e2338b94bf6adb6099439a1ee12a4fa2c7072b438",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "wave_d_budget_tests",
+      "binary": "wave_d_budget_tests-aa73c5efba8ee4f2.exe",
+      "sha256": "dd0ad49bdf4541247c92db7145bab283fafe07c888bde90d56ef8011fc3956f7",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "genesis_block_native",
+      "binary": "genesis_block_native-cd8246c766c42fca.exe",
+      "sha256": "39473e4ac7b4d424defbe31a416a8db7fa8b9372189941f26dd2d8eb1a8aa066",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    }
+  ],
+  "dependency_profiles": [
+    {
+      "name": "curve25519_dalek",
+      "profile": {
+        "opt_level": "3",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      }
+    },
+    {
+      "name": "sha2",
+      "profile": {
+        "opt_level": "3",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      }
+    },
+    {
+      "name": "lz4_flex",
+      "profile": {
+        "opt_level": "3",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      }
+    }
+  ]
+}

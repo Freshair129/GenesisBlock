@@ -1,0 +1,19 @@
+{
+  "pid": 33688,
+  "exit_code": 101,
+  "killed_by_guard": false,
+  "kill_reason": null,
+  "elapsed_seconds": 6.165,
+  "peak_working_set_seen_bytes": 3198976,
+  "peak_private_seen_bytes": 503808,
+  "binary_sha256": "959DFA8F6348082046BCBFAD744A422E2BD7F5A43C702C2DBA7D2D86D26AEAF1",
+  "query_budget_default_elapsed_ms": 5000,
+  "rss_limit_bytes": 2147483648,
+  "global_cpu_samples": [
+    {
+      "timestamp": "2026-10-31T14:13:08.0720000+07:00",
+      "cpu_percent": 19.39
+    }
+  ],
+  "global_cpu_average_percent": 19.39
+}

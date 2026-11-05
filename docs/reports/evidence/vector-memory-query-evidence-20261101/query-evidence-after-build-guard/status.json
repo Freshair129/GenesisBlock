@@ -1,0 +1,71 @@
+{
+    "exit":  0,
+    "reason":  null,
+    "seconds":  253.26430589999998,
+    "peak_rss":  1403904000,
+    "peak_private":  1607639040,
+    "identities":  [
+                       {
+                           "ProcessId":  44112,
+                           "ParentProcessId":  42188,
+                           "CreationDate":  "\/Date(1793536467532)\/",
+                           "Name":  "conhost.exe",
+                           "ExecutablePath":  "C:\\WINDOWS\\system32\\conhost.exe"
+                       },
+                       {
+                           "ProcessId":  20584,
+                           "ParentProcessId":  42188,
+                           "CreationDate":  "\/Date(1793536467577)\/",
+                           "Name":  "cargo.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\cargo.exe"
+                       },
+                       {
+                           "ProcessId":  19800,
+                           "ParentProcessId":  23376,
+                           "CreationDate":  "\/Date(1793536719064)\/",
+                           "Name":  "link.exe",
+                           "ExecutablePath":  "C:\\GenesisBlockW1Tools\\vs2022\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe"
+                       },
+                       {
+                           "ProcessId":  42188,
+                           "ParentProcessId":  46832,
+                           "CreationDate":  "\/Date(1793536467522)\/",
+                           "Name":  "cargo.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\.cargo\\bin\\cargo.exe"
+                       },
+                       {
+                           "ProcessId":  49032,
+                           "ParentProcessId":  37760,
+                           "CreationDate":  "\/Date(1793536707366)\/",
+                           "Name":  "link.exe",
+                           "ExecutablePath":  "C:\\GenesisBlockW1Tools\\vs2022\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe"
+                       },
+                       {
+                           "ProcessId":  37760,
+                           "ParentProcessId":  20584,
+                           "CreationDate":  "\/Date(1793536475163)\/",
+                           "Name":  "rustc.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+                       },
+                       {
+                           "ProcessId":  23376,
+                           "ParentProcessId":  20584,
+                           "CreationDate":  "\/Date(1793536708418)\/",
+                           "Name":  "rustc.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+                       }
+                   ],
+    "excluded_build_helpers":  [
+
+                               ],
+    "helper_finished_parent_condition":  true,
+    "helper_scope":  "Helpers are not terminated; successful Cargo completion and stopped tracked compiler clients are required before private-source edits. No shared source/target mutation.",
+    "admission_cpu":  26.636363636363637,
+    "admission_free":  13475958784,
+    "remaining":  [
+
+                  ],
+    "cleanup_complete":  true,
+    "monitor_error":  null,
+    "rss_scope":  "tracked processes; compiler telemetry/daemon helpers excluded"
+}

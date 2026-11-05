@@ -1,0 +1,19 @@
+{
+  "recorded_at": "2026-10-31T20:28:46.9300290+07:00",
+  "reason": "External host CPU84-98percent and7-13unrelated compilerprocesses; no budgetrelaxation",
+  "owner_pid": 36628,
+  "owner_start": "2026-10-31T20:07:32.5729987+07:00",
+  "owner_exit": "2026-10-31T20:28:46.2258230+07:00",
+  "interrupted_owned_tests": [
+    {
+      "pid": 4076,
+      "created": "2026-10-31T20:25:09.7926547+07:00",
+      "path": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\final-test-bin\\hql_cypher_tests-0a96672a3c154a17.exe",
+      "elapsed_before_hold_seconds": 216.7889561
+    }
+  ],
+  "remaining_owned_tests": [],
+  "qualified_final_suite": false,
+  "resumption": "Fresh complete159target suite on immutable5B8/E69candidate afteroriginalresourceadmission; interruptedpartialdoesnotcountascomplete",
+  "unrelated_processes_stopped": []
+}

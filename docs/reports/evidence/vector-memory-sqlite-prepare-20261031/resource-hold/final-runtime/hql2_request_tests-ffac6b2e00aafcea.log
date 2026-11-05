@@ -1,0 +1,11 @@
+
+running 6 tests
+test deeply_nested_rust_request_is_refused_and_disposed_without_recursive_drop ... ok
+test plain_hql_allows_envelope_explain_but_explicit_text_must_agree ... ok
+test request_size_is_checked_before_typed_decoding ... ok
+test structural_id_copies_and_expression_types_are_reserved_before_validation ... ok
+test temporal_namespace_conflicts_and_write_forms_reject ... ok
+test version_frontier_and_policy_matrix_fail_closed ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+

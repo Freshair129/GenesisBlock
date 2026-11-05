@@ -1,0 +1,12 @@
+
+running 7 tests
+test compaction_preserves_secondary_vectors ... ok
+test events_since_filters_by_clock ... ok
+test events_since_seq_filters_by_frame_cursor ... ok
+test history_horizon_tracks_folds ... ok
+test pull_delta_converges_graph_state ... ok
+test pull_delta_syncs_secondary_vectors ... ok
+test reapplying_delta_is_safe ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.24s
+

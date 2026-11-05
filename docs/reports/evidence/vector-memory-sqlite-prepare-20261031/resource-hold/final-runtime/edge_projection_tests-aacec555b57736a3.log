@@ -1,0 +1,15 @@
+
+running 10 tests
+test a_rejected_snapshot_requires_writable_projection_recovery ... ok
+test a_rejected_snapshot_without_journal_fails_closed ... ok
+test a_relationship_join_is_now_expressible_in_one_statement ... ok
+test an_existing_database_is_backfilled_on_open ... ok
+test an_unloadable_snapshot_without_journal_fails_closed ... ok
+test another_rejected_snapshot_component_does_not_hide_projection_recovery ... ok
+test edges_current_agrees_with_the_graph_api ... ok
+test legacy_snapshot_without_projection_digest_fails_closed_read_only_and_rebuilds ... ok
+test retracting_a_node_removes_its_edges_from_the_projection ... ok
+test the_projected_row_carries_the_whole_edge ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.85s
+

@@ -1,0 +1,24 @@
+{
+  "harness_dispatch": "GB_MEMORY_AUDIT=1",
+  "GB_VBENCH": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\inputs\\synthetic-100000-1024",
+  "exe": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-20261031T120732\\diagnostic-vbench-genesis.exe",
+  "exe_sha256": "A3AE43B60BE1C8F2E77A39D6D0A18589BB00F53B67C1123C7656A1D48B23035E",
+  "database": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\candidate\\synthetic-100000-1024-bq-r0\\gdb",
+  "database_read_only": true,
+  "input": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\inputs\\synthetic-100000-1024",
+  "input_meta": {
+    "dim": 1024,
+    "metric": "cosine",
+    "model": "synthetic-unit-seed42",
+    "n": 100000,
+    "q": 24
+  },
+  "query_index": 0,
+  "k": 10,
+  "ef_search": 200,
+  "alpha": 0.0,
+  "query_budget_default_elapsed_ms": 5000,
+  "rss_limit_bytes": 2147483648,
+  "diagnostics_enabled": true,
+  "no_tests_or_other_benchmarks": true
+}

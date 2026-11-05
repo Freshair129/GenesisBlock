@@ -1,0 +1,12 @@
+{
+  "stage": "before any measured child or database open",
+  "first_attempt": "PowerShell ParserError line 160: interpolated $RootProcessId: requires braced variable syntax",
+  "fix": "Changed to ${RootProcessId}:; PowerShell AST parse subsequently returned no errors",
+  "other_prelaunch_corrections": [
+    "Record C: as the actual scratch-data disk rather than repository disk D:",
+    "Use Remove-Item Env: for conflicting benchmark variables; clear open-only/trace overrides"
+  ],
+  "engine_source_changed": false,
+  "guards_changed": false,
+  "classification": "controller startup defect, not an engine or query result"
+}

@@ -1,0 +1,49 @@
+{
+  "recorded_at": "2026-10-31T15:40:42.302067+07:00",
+  "cwd": "D:\\GenesisBlock_Dev\\GenesisBlock",
+  "checks": [
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "output": ""
+    },
+    {
+      "name": "docs",
+      "command": [
+        "node",
+        "scripts/docs-validate.mjs"
+      ],
+      "exit_code": 0,
+      "output": "0 violations in 247 files\n"
+    },
+    {
+      "name": "diff",
+      "command": [
+        "git",
+        "-c",
+        "safe.directory=D:/GenesisBlock_Dev/GenesisBlock",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "output": "warning: in the working copy of 'Cargo.toml', LF will be replaced by CRLF the next time Git touches it\nwarning: in the working copy of 'index.d.ts', LF will be replaced by CRLF the next time Git touches it\nwarning: in the working copy of 'src/lib.rs', LF will be replaced by CRLF the next time Git touches it\nwarning: in the working copy of 'src/router.rs', LF will be replaced by CRLF the next time Git touches it\nwarning: in the working copy of 'tests/rest_api_tests.rs', LF will be replaced by CRLF the next time Git touches it\n"
+    },
+    {
+      "name": "source",
+      "command": [
+        "C:\\Users\\suanr\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
+        "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\verify-followup.py"
+      ],
+      "exit_code": 0,
+      "output": "{\"recorded_at\": \"2026-10-31T15:40:42.293382+07:00\", \"source_files\": 253, \"preserved_staged_files\": 7, \"source_mismatches\": [], \"protected_mismatches\": [], \"noncompiled_document_paths\": 8, \"noncompiled_document_differences\": [\".brain/rca/2026-10-31-vector-memory-allocations.md\", \"docs/reports/GENESISDB-VECTOR-MEMORY-AUDIT.md\"], \"scope_note\": \"Updated report/RCA are not compiled source; all seven original staged paths are checked independently. Attempt 1 incorrectly included evolving documents in code comparison.\", \"passed\": true, \"head\": \"ad94aa2e46025b7729d117ff376ab281ac15c49d\", \"branch\": \"codex/g4-p8-h2a-nullable-multikey\", \"staged_paths\": [\"docs/C4--GENESISDB-ARCHITECTURE.md\", \"docs/DOC-REGISTRY.md\", \"docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md\", \"docs/MASTER-SPEC--GENESIS-DB.md\", \"docs/REPORT--HQL2-P8-CORE-2026-09-28.md\", \"docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md\", \"tests/hql2_g4_scalar_counter_tests.rs\"]}\n"
+    }
+  ],
+  "passed": true
+}

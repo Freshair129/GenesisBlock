@@ -1,0 +1,6 @@
+Exception: C:\Users\suanr\genesis-sqlite-prepare-20261031\build-release-variants.ps1:542
+Line |
+ 542 |      if ($failure) { throw $failure }
+     |                      ~~~~~~~~~~~~~~
+     | System.Management.Automation.RuntimeException: Guard cleanup_complete is not true at diagnostic-before
+     | post-build stop proof for diagnostic-before

@@ -1,0 +1,12 @@
+
+running 7 tests
+test annotation_history_scan_matches_p7_for_wal_revision_and_reference_acl ... ok
+test annotation_scan_checks_edge_endpoint_access_for_target_and_evidence ... ok
+test annotation_scan_hides_parent_when_nested_annotation_references_are_incomplete ... ok
+test annotation_scan_paginates_without_skipping_or_repeating_revisions ... ok
+test annotation_scan_returns_the_revision_visible_in_its_p6_snapshot ... ok
+test annotation_scan_uses_namespace_read_for_target_and_evidence_references ... ok
+test hql_and_ir_annotation_scans_match_independent_p7_results ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.62s
+

@@ -1,0 +1,292 @@
+{
+  "pairs": [
+    {
+      "pair": 1,
+      "before": {
+        "rss": 329207808,
+        "search10_recall": 0.9875,
+        "search100_recall": 0.9808333333333333,
+        "reopen_query0_ms": 3167.3111,
+        "reopen_error": null,
+        "search10_p_ms": [
+          4.6866,
+          5.6845,
+          5.7519
+        ],
+        "search100_p_ms": [
+          6.065799999999999,
+          6.710100000000001,
+          6.8011
+        ]
+      },
+      "after": {
+        "rss": 375484416,
+        "search10_recall": 0.975,
+        "search100_recall": 0.9758333333333333,
+        "reopen_query0_ms": 4.641400000000001,
+        "reopen_error": null,
+        "search10_p_ms": [
+          4.247599999999999,
+          4.969900000000001,
+          5.3331
+        ],
+        "search100_p_ms": [
+          5.8995999999999995,
+          8.3537,
+          9.0224
+        ]
+      }
+    },
+    {
+      "pair": 2,
+      "before": {
+        "rss": 324272128,
+        "search10_recall": 0.9791666666666666,
+        "search100_recall": 0.9745833333333334,
+        "reopen_query0_ms": 3519.2851,
+        "reopen_error": null,
+        "search10_p_ms": [
+          4.7881,
+          6.5166,
+          6.534
+        ],
+        "search100_p_ms": [
+          6.8163,
+          9.2703,
+          9.983600000000001
+        ]
+      },
+      "after": {
+        "rss": 388202496,
+        "search10_recall": 0.9833333333333333,
+        "search100_recall": 0.9808333333333333,
+        "reopen_query0_ms": 5.7772,
+        "reopen_error": null,
+        "search10_p_ms": [
+          4.249899999999999,
+          4.893,
+          5.1568
+        ],
+        "search100_p_ms": [
+          6.001600000000001,
+          6.5134,
+          6.546200000000001
+        ]
+      }
+    },
+    {
+      "pair": 3,
+      "before": {
+        "rss": 323969024,
+        "search10_recall": 0.9833333333333333,
+        "search100_recall": 0.9745833333333334,
+        "reopen_query0_ms": 6057.612899999999,
+        "reopen_error": "QUERY_BUDGET_EXCEEDED: reason=deadline",
+        "search10_p_ms": [
+          4.439,
+          5.074,
+          5.3031999999999995
+        ],
+        "search100_p_ms": [
+          6.013400000000001,
+          6.587599999999999,
+          6.8906
+        ]
+      },
+      "after": {
+        "rss": 338489344,
+        "search10_recall": 0.9833333333333333,
+        "search100_recall": 0.9808333333333333,
+        "reopen_query0_ms": 4.681900000000001,
+        "reopen_error": null,
+        "search10_p_ms": [
+          4.1995,
+          4.804799999999999,
+          5.1285
+        ],
+        "search100_p_ms": [
+          6.052899999999999,
+          6.4501,
+          6.4583
+        ]
+      }
+    }
+  ],
+  "same_vector_sha256": "f83b5bc3b3d1057f01114196cd37ac95ecbeefe2f04ad0168d723e0860af3133",
+  "same_inputs": true,
+  "within_variant_query_hit_variation": {
+    "before": [
+      {
+        "query": 1,
+        "hits": [
+          10,
+          9,
+          10
+        ]
+      },
+      {
+        "query": 2,
+        "hits": [
+          10,
+          9,
+          10
+        ]
+      },
+      {
+        "query": 3,
+        "hits": [
+          10,
+          9,
+          10
+        ]
+      },
+      {
+        "query": 5,
+        "hits": [
+          10,
+          10,
+          9
+        ]
+      },
+      {
+        "query": 6,
+        "hits": [
+          10,
+          10,
+          9
+        ]
+      },
+      {
+        "query": 10,
+        "hits": [
+          9,
+          10,
+          9
+        ]
+      },
+      {
+        "query": 12,
+        "hits": [
+          10,
+          10,
+          9
+        ]
+      },
+      {
+        "query": 18,
+        "hits": [
+          9,
+          10,
+          10
+        ]
+      },
+      {
+        "query": 20,
+        "hits": [
+          9,
+          10,
+          10
+        ]
+      },
+      {
+        "query": 21,
+        "hits": [
+          10,
+          9,
+          10
+        ]
+      },
+      {
+        "query": 22,
+        "hits": [
+          10,
+          9,
+          10
+        ]
+      }
+    ],
+    "after": [
+      {
+        "query": 2,
+        "hits": [
+          10,
+          9,
+          9
+        ]
+      },
+      {
+        "query": 7,
+        "hits": [
+          9,
+          10,
+          9
+        ]
+      },
+      {
+        "query": 9,
+        "hits": [
+          9,
+          10,
+          10
+        ]
+      },
+      {
+        "query": 10,
+        "hits": [
+          10,
+          10,
+          9
+        ]
+      },
+      {
+        "query": 12,
+        "hits": [
+          10,
+          10,
+          9
+        ]
+      },
+      {
+        "query": 15,
+        "hits": [
+          9,
+          9,
+          10
+        ]
+      },
+      {
+        "query": 16,
+        "hits": [
+          9,
+          10,
+          10
+        ]
+      },
+      {
+        "query": 18,
+        "hits": [
+          10,
+          9,
+          10
+        ]
+      },
+      {
+        "query": 20,
+        "hits": [
+          10,
+          9,
+          10
+        ]
+      },
+      {
+        "query": 22,
+        "hits": [
+          8,
+          10,
+          10
+        ]
+      }
+    ]
+  },
+  "scope": "Three serial guarded pairs, independent random HNSW graphs; 24 queries per sweep; no deterministic causality or nonregression claim."
+}

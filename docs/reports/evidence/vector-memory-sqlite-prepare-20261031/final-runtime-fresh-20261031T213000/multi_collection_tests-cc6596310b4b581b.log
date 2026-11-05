@@ -1,0 +1,11 @@
+
+running 6 tests
+test collections_survive_snapshot_reload ... ok
+test default_routing_and_listing ... ok
+test dim_mismatch_is_rejected ... ok
+test two_collections_are_isolated ... ok
+test unknown_collection_errors ... ok
+test wal_replay_recovers_custom_collection ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.64s
+

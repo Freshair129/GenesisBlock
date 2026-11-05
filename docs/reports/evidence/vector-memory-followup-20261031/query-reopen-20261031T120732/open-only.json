@@ -1,0 +1,234 @@
+{
+  "collections": [
+    {
+      "arena_allocated_bytes": 0,
+      "arena_resident_bytes": 0,
+      "count": 0,
+      "coverage": {
+        "built_frontier": 0,
+        "collection": "default",
+        "extra_count": 0,
+        "indexed_count": 0,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 0,
+        "source_frontier": 0,
+        "state": "READY",
+        "validated": true
+      },
+      "dim": 1024,
+      "ef_search": null,
+      "hnsw_vector_bytes": 0,
+      "index_lag": 0,
+      "indexed": 0,
+      "metric": "L2",
+      "model": "default",
+      "name": "default",
+      "quant": "none",
+      "rerank": false,
+      "sidecar_cache_bytes": 0,
+      "sidecar_disk_bytes": 0,
+      "sidecar_resident_bytes": 0
+    },
+    {
+      "arena_allocated_bytes": 12800000,
+      "arena_resident_bytes": 12800000,
+      "count": 100000,
+      "coverage": {
+        "built_frontier": 394,
+        "collection": "bench",
+        "extra_count": 0,
+        "indexed_count": 100000,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 100000,
+        "source_frontier": 394,
+        "state": "READY",
+        "validated": true
+      },
+      "dim": 1024,
+      "ef_search": null,
+      "hnsw_vector_bytes": 12800000,
+      "index_lag": 0,
+      "indexed": 100000,
+      "metric": "Cosine",
+      "model": "synthetic-unit-seed42",
+      "name": "bench",
+      "quant": "bq",
+      "rerank": false,
+      "sidecar_cache_bytes": 0,
+      "sidecar_disk_bytes": 0,
+      "sidecar_resident_bytes": 0
+    }
+  ],
+  "coverage": {
+    "collections": [
+      {
+        "built_frontier": 0,
+        "collection": "default",
+        "extra_count": 0,
+        "indexed_count": 0,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 0,
+        "source_frontier": 0,
+        "state": "READY",
+        "validated": true
+      },
+      {
+        "built_frontier": 394,
+        "collection": "bench",
+        "extra_count": 0,
+        "indexed_count": 100000,
+        "missing_count": 0,
+        "pending_count": 0,
+        "source_count": 100000,
+        "source_frontier": 394,
+        "state": "READY",
+        "validated": true
+      }
+    ],
+    "state": "ok"
+  },
+  "coverage_memory": {
+    "before_rss_bytes": 539021312,
+    "peak_rss_bytes": 542191616,
+    "process_rss_bytes": 538779648,
+    "seconds": 0.0225907
+  },
+  "error": null,
+  "memory": {
+    "before_rss_bytes": 8126464,
+    "peak_rss_bytes": 539037696,
+    "process_rss_bytes": 539037696,
+    "seconds": 498.1689568
+  },
+  "metadata_summary": {
+    "collection": "bench",
+    "event": "metadata_summary",
+    "metadata_count": 100000,
+    "metadata_samples": [
+      {
+        "arena_id": 0,
+        "node_id": "0",
+        "node_u32": 0,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 1,
+        "node_id": "1",
+        "node_u32": 1,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 2,
+        "node_id": "2",
+        "node_u32": 2,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 3,
+        "node_id": "3",
+        "node_u32": 3,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 4,
+        "node_id": "4",
+        "node_u32": 4,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 5,
+        "node_id": "5",
+        "node_u32": 5,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 6,
+        "node_id": "6",
+        "node_u32": 6,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 7,
+        "node_id": "7",
+        "node_u32": 7,
+        "retired_seq": 0,
+        "visible_current": true
+      }
+    ],
+    "missing_current_node_count": 0,
+    "missing_node_count": 0,
+    "missing_node_samples": [],
+    "node_count": 100000,
+    "retired_count": 0,
+    "visible_current_count": 100000
+  },
+  "metadata_summary_memory": {
+    "before_rss_bytes": 538791936,
+    "peak_rss_bytes": 538820608,
+    "process_rss_bytes": 538820608,
+    "seconds": 0.04672
+  },
+  "open_path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\candidate\\synthetic-100000-1024-bq-r0\\gdb",
+  "query": {
+    "completed_queries": 1,
+    "first_hits": [
+      {
+        "id": "63605",
+        "score": 0.8916015625
+      },
+      {
+        "id": "42747",
+        "score": 0.5654296875
+      },
+      {
+        "id": "31633",
+        "score": 0.5634765625
+      },
+      {
+        "id": "33312",
+        "score": 0.5615234375
+      },
+      {
+        "id": "36968",
+        "score": 0.560546875
+      },
+      {
+        "id": "77442",
+        "score": 0.55859375
+      },
+      {
+        "id": "23396",
+        "score": 0.5556640625
+      },
+      {
+        "id": "12644",
+        "score": 0.5556640625
+      }
+    ],
+    "input": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\inputs\\synthetic-100000-1024",
+    "input_dim": 1024,
+    "input_n": 100000,
+    "query_index": 0,
+    "requested_queries": 1,
+    "result_count": 10,
+    "state": "ok"
+  },
+  "query_memory": {
+    "before_rss_bytes": 538771456,
+    "peak_rss_bytes": 538804224,
+    "process_rss_bytes": 538800128,
+    "seconds": 0.0118755
+  },
+  "read_only": true,
+  "rss_limit_bytes": "2147483648"
+}

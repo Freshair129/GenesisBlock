@@ -1,0 +1,9 @@
+
+running 4 tests
+test bulk_then_flush_indexes_all ... ok
+test flush_clears_index_lag ... ok
+test reopen_rebuilds_full_index ... ok
+test searchable_after_flush ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.94s
+

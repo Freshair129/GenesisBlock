@@ -1,0 +1,19 @@
+
+running 14 tests
+test add_vector_to_nonexistent_node_errors ... ok
+test add_vector_wrong_dim_errors ... ok
+test basic_vector_search ... ok
+test collection_already_exists_error ... ok
+test collection_listing ... ok
+test cosine_metric_collection ... ok
+test ef_search_parameter_works ... ok
+test empty_embedding_node_exists_as_graph_node ... ok
+test multi_collection_isolation ... ok
+test read_your_write_after_flush ... ok
+test recall_sanity_1000_vectors ... ok
+test snapshot_rehydrate_vector_search ... ok
+test vector_dim_mismatch_on_insert ... ok
+test vector_dim_mismatch_on_search ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.57s
+

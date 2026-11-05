@@ -1,0 +1,8 @@
+
+running 3 tests
+test restore_accepts_a_bundle_whose_last_frame_is_the_generation_receipt ... ok
+test restore_publishes_a_generation_before_exposing_the_target ... ok
+test restore_rejects_a_manifest_frontier_not_present_in_recovered_wal ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.58s
+

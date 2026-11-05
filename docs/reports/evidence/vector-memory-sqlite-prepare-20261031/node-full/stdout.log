@@ -1,0 +1,125 @@
+✔ canonical policy requires active metadata and all R1-R10 headings (1.6205ms)
+✔ canonical policy rejects a missing rule heading (0.5279ms)
+✔ canonical policy rejects inactive or superseded metadata (0.1879ms)
+✔ generated policy refresh preserves tool-specific content outside markers (0.3032ms)
+✔ generated policy rejects malformed marker pairs (0.1923ms)
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-api-error-query-19356
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-api-error-query-19356
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-api-error-query-legacy-code-19356
+✔ NAPI typed query contract returns versioned validation envelopes and success data (67.8705ms)
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-api-error-transaction-19356
+✔ NAPI query contract preserves the structured legacy code beside the stable code (41.5536ms)
+✔ NAPI transaction contract returns stable conflict while legacy commit remains rejected (41.2387ms)
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-napi-test-ryw-24948
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-napi-test-oversample-24948
+✔ NAPI: read-your-write — addNode + flushIndex + hybridSearch (47.2789ms)
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-napi-test-lag-24948
+✔ NAPI: hybridSearch accepts oversample on a quantized+rerank collection (46.8843ms)
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-napi-test-dim-mismatch-24948
+✔ NAPI: indexLag is zero after flushIndex (82.1661ms)
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-napi-test-coll-iso-24948
+✔ NAPI: wrong-dim embedding rejects cleanly (41.7849ms)
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-napi-test-edge-persist-24948
+Journal folded to base segment @seq 5 (8 live events).
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-napi-test-edge-persist-24948
+snapshot: attempting instant load from binary state...
+snapshot: loading 2 nodes
+snapshot: loading 1 edges
+snapshot: instant load complete in 4.5868ms
+✔ NAPI: collection isolation — node in alpha invisible from beta search (48.774ms)
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-napi-test-quant-ops-24948
+✔ NAPI: edge survives saveState + reopen (189.5133ms)
+✔ NAPI: listCollections exposes quant ops (sidecar resident bytes ~0, index_lag) (42.2999ms)
+GRL: Initializing GenesisBlockDB at C:\Users\suanr\genesis-vector-memory-20261031\verify-src\.brain\mcp_test_db
+GenesisBlock MCP Server running on Stdio
+▶ MCP Server: Life-cycle and Tools
+  ✔ list tools returns all five tools (3.4408ms)
+  ✔ gks_knowledge_promote is idempotent and returns structured canonical evidence (10.8234ms)
+  ✔ add_knowledge with explicit ID (2.9384ms)
+  ✔ add_knowledge generates ID when omitted (2.9832ms)
+  ✔ query_hql traverses known node (1.8345ms)
+  ✔ query_ir context returns a structured envelope (1.8185ms)
+  ✔ query_ir unsupported temporal context returns structured error (1.1811ms)
+  ✔ retrieve_tiered_context H0 returns target node (1.1677ms)
+  ✔ retrieve_tiered_context H1 returns context package shape (1.1507ms)
+  ✔ query_hql error path: malformed HQL returns structured error (1.0223ms)
+  ✔ add_knowledge missing labels returns error (0.583ms)
+  ✔ query_hql tool — malformed HQL returns structured error, not crash (0.7771ms)
+✔ MCP Server: Life-cycle and Tools (9722.769ms)
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-query-ir-parity-18680
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-query-ir-validation-18680
+✔ NAPI: executeQueryIr supports search and traverse envelopes (52.7009ms)
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-query-ir-unsupported-18680
+✔ NAPI: executeQueryIr rejects unknown envelope fields (38.0906ms)
+✔ NAPI: unsupported Query IR capabilities fail closed (38.3507ms)
+✔ engineNameSync returns the stable identifier (0.8395ms)
+✔ versionSync matches package.json version (single source of truth) (0.5273ms)
+✔ schemaVersionSync matches modules.json engine.schemaVersion (5.7864ms)
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-wave-a-R2T1oj
+✔ NAPI rejected unified constraints preserve frontier and allow corrected retry (49.8642ms)
+snapshot: attempting instant load from binary state...
+snapshot: loading 0 nodes
+snapshot: loading 0 edges
+snapshot: instant load complete in 2.6658ms
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\genesis-wave-b-edge-VdskCM
+✔ NAPI collection definition survives child exit without checkpoint (139.2154ms)
+✔ NAPI edge rebind preserves transaction-time endpoints (51.4591ms)
+✔ normalizes relative scopes and rejects traversal, aliases, and parent-child conflicts (3.1949ms)
+✔ validates exact task and graph sets, cycle freedom, model policy, and poison IDs (2.5204ms)
+✔ rejects unauthorized dispatch and worker-authored session registration without changing state (4.1553ms)
+✔ requires parsed command evidence and rejects zero tests or changed scope before handoff (5.7799ms)
+✔ keeps a packet from passing after its lease expires even before watchdog runs (1.9934ms)
+✔ watchdog blocks stopped tasks at their cumulative deadline and retains quarantined writers (3.1577ms)
+✔ watchdog preserves owner-aborted status and quarantine until stop proof (1.3673ms)
+✔ rejects an expired submitted packet without changing failure attribution (1.4862ms)
+✔ does not accept an ACKed packet after its lease expires before the separate verdict (1.6289ms)
+✔ uses attempt fences, cumulative command budgets, and stop proof before reallocating a failed scope (2.7939ms)
+✔ makes event replay idempotent and rejects changed IDs or stale versions (0.7272ms)
+✔ requires independent candidate gates and reaches done only on a fresh full pass (5.6522ms)
+✔ requires an explicit positive AC closure for every expected-red characterization (0.2706ms)
+✔ dispatch enforces unresolved decisions and predecessor verification even against a forged ready status (1.1516ms)
+✔ required skips cannot pass, while optional absence and explicit skip stay non-blocking (4.8121ms)
+✔ required unsupported and schema-invalid outcomes are distinct valid AC evidence (3.6746ms)
+✔ expected-red requires a parsed RED marker and a normal nonzero process exit (3.3487ms)
+✔ accepted C0 RED evidence must feed its linked C1 GREEN task and an atomic integration group (9.3282ms)
+✔ one-shot gate reports preserve the report hash first and reject reused sessions, stale order, and stale candidates (7.7559ms)
+✔ task authors cannot self-review and integration sessions cannot fill a Review role (2.7849ms)
+✔ a failed gate retains partial AC results and a blocker, then blocks all further reports (3.0978ms)
+✔ final gate cannot be reserved before Audit, and candidate invalidation rejects stale completion (3.963ms)
+✔ bounds three code attempts and one infrastructure retry, requiring stop receipts each time (4.5416ms)
+✔ repeated same-source failures ignore cosmetic artifacts, and trusted time cannot roll back (4.0712ms)
+✔ rejected candidates count source progress and keep handoff finding identity stable across reasons (4.315ms)
+✔ same-source rejection followed by failed verdict reaches the two-candidate stop (3.031ms)
+✔ durable CLI completes the synthetic handoff and replays accepted state after restart (8379.9344ms)
+✔ concurrent dispatch writers serialize to one attempt (3113.4706ms)
+✔ generic event input cannot reserve or forge gate reports and help lists bounded operations (2321.0909ms)
+✔ parallel tasks dispatch into distinct pinned worktrees and shared-root writers serialize fail-closed (8890.5268ms)
+✔ sequential tasks reuse the default shared workspace through integration and all four gates (27918.7433ms)
+✔ expired retry rejection durably records watchdog closure after stop proof (4867.8179ms)
+✔ watchdog and stop-proof replay preserve owner-aborted run identity (5277.8237ms)
+✔ integration rejects an out-of-scope commit after the accepted task commit without recording integration (10756.1523ms)
+✔ integration scope diff rejects a rename from an out-of-scope baseline path into an allowed directory (10735.4715ms)
+✔ handoff scope validation sees both sides of a rename and rejects the packet without accepting it (7026.376ms)
+✔ event file crashes before and after atomic rename replay the correct authority (3501.0789ms)
+✔ ledger digest corruption is rejected without truncating or rewriting history (2254.2906ms)
+✔ ledger cannot be initialized inside the source tree and cwd symlinks cannot escape it (2875.8094ms)
+✔ candidate capture rejects hidden index flags, catches metadata-preserving byte changes, and accepts CRLF normalization (11481.7007ms)
+✔ tracked path validation rejects C-quoted stdin hash ambiguity (0.3193ms)
+✔ handoff rejects wrong artifact hashes and changed candidates before event commit (7586.1027ms)
+✔ timed-out commands finish within a bound and quarantine the task writer (4843.835ms)
+✔ tracked and untracked subprocess mutations fail closed (9126.8758ms)
+✔ gate-report executes fresh integrated Verify and stores a hash-bound four-stage happy path (17690.1777ms)
+✔ malformed integrated Verify is committed as a blocking FAIL and exits nonzero (13105.9294ms)
+✔ crashed Verify reservation replays as consumed and cannot spawn again (13677.0906ms)
+✔ W1 overlay preserves history, requires materialization, and keeps dispatch disabled (11.4116ms)
+✔ duplicate known node cannot hide a missing graph node (0.5772ms)
+✔ source identity is stable across Git LF and CRLF checkouts (1.755ms)
+✔ source mismatch and dispatch mutation fail closed (0.8486ms)
+ℹ tests 88
+ℹ suites 0
+ℹ pass 88
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 202187.1329

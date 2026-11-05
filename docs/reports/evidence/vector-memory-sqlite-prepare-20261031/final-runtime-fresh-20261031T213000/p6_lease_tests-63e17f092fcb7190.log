@@ -1,0 +1,15 @@
+
+running 10 tests
+test committed_write_makes_the_prior_generation_stale ... ok
+test lease_from_a_previous_storage_owner_fails_after_reopen ... ok
+test lease_validates_at_the_generation_it_pins ... ok
+test monotonic_ttl_expiry_returns_lease_expired ... ok
+test read_view_rejects_tx_as_of_above_its_generation_frontier ... ok
+test revocation_advances_the_storage_fence_for_all_outstanding_leases ... ok
+test tx_as_of_at_generation_history_horizon_and_wal_frontier_is_accepted ... ok
+test tx_as_of_at_publication_receipt_is_rejected_by_direct_generation_pin ... ok
+test tx_as_of_below_generation_history_horizon_is_rejected ... ok
+test tx_as_of_u64_max_is_rejected_by_direct_generation_pin ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.83s
+

@@ -1,0 +1,4 @@
+# Evidence manifests hash the original bytes, including line endings.
+# Preserve raw logs, source snapshots and receipts across Windows/Linux checkout.
+# Whitespace in verbatim evidence is hashed data, not editable source formatting.
+* -text -whitespace

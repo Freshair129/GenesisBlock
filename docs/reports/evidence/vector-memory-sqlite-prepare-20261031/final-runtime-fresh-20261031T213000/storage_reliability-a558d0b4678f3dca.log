@@ -1,0 +1,18 @@
+
+running 13 tests
+test duplicate_node_id_behavior ... ok
+test empty_database_status ... ok
+test large_props_preserved ... ok
+test open_close_reopen_edge_persists ... ok
+test open_close_reopen_node_persists ... ok
+test read_only_blocks_writes ... ok
+test read_only_does_not_mutate ... ok
+test snapshot_reload_with_vectors ... ok
+test stable_string_identity_across_reopen ... ok
+test status_reflects_node_edge_counts ... ok
+test unknown_edge_endpoint_returns_error_not_panic ... ok
+test wal_durability_edges ... ok
+test wal_durability_without_snapshot ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.88s
+

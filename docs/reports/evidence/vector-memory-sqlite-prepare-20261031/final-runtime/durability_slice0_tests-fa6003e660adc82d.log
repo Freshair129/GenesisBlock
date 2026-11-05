@@ -1,0 +1,9 @@
+
+running 4 tests
+test cursor_less_snapshot_does_not_drop_acked_writes ... ok
+test retracted_node_and_edges_stay_deleted_across_crash_replay ... ok
+test retracted_node_stays_deleted_after_clean_reopen ... ok
+test stale_snapshot_older_than_fold_does_not_resurrect_deletes ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.61s
+

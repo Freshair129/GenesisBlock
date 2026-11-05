@@ -1,0 +1,9 @@
+
+running 4 tests
+test source_budget_failures_return_errors_in_both_execution_modes ... ok
+test source_diagnostics_respect_explicit_actor_authority ... ok
+test source_result_metadata_has_independent_fixture_expectations_in_hql_and_ir ... ok
+test source_rows_are_exact_in_hql_ir_and_all_diagnostic_modes_including_empty ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.73s
+

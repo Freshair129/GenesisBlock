@@ -1,0 +1,125 @@
+diff --git "a/C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-20261031T120732\\pre-instrumentation\\vector_memory.rs" b/benches/vector_memory.rs
+index 7c82c43..66d4eed 100644
+--- "a/C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-20261031T120732\\pre-instrumentation\\vector_memory.rs"
++++ b/benches/vector_memory.rs
+@@ -218,6 +218,9 @@ fn search(
+ pub fn run() {
+     // A new process separates reopen residency from retained ingest allocator pages.
+     if let Ok(path) = std::env::var("GB_MEMORY_OPEN_ONLY") {
++        let open_path = path.clone();
++        let diagnostics = std::env::var_os("GB_VECTOR_QUERY_DIAGNOSTICS").is_some();
++        let input = std::env::var("GB_MEMORY_INPUT").ok();
+         let (result, memory) = measure(|| {
+             Storage::open(OpenOptions {
+                 path,
+@@ -228,9 +231,107 @@ pub fn run() {
+             })
+         });
+         let value = match result {
+-            Ok(storage) => json!({"memory":memory,"collections":storage.list_collections(),
+-                "coverage":storage.validate_index_coverage().unwrap(),"error":null}),
+-            Err(error) => json!({"memory":memory,"error":error.to_string()}),
++            Ok(storage) => {
++                let (coverage_result, coverage_memory) =
++                    measure(|| storage.validate_index_coverage());
++                let coverage_ok = coverage_result.is_ok();
++                let coverage = match coverage_result {
++                    Ok(report) => json!({"state":"ok","collections":report}),
++                    Err(error) => json!({"state":"error","message":error.to_string()}),
++                };
++                let mut query = json!({"state":"skipped","reason":"diagnostics disabled"});
++                let mut query_memory = Value::Null;
++                let mut metadata_summary = Value::Null;
++                let mut metadata_summary_memory = Value::Null;
++                if diagnostics {
++                    if !coverage_ok {
++                        query = json!({"state":"skipped","reason":"index coverage failed"});
++                    } else if let Some(input_path) = input {
++                        let meta: Value = serde_json::from_slice(
++                            &fs::read(Path::new(&input_path).join("meta.json")).unwrap(),
++                        )
++                        .unwrap();
++                        let n = meta["n"].as_u64().unwrap_or(0);
++                        let dim = meta["dim"].as_u64().unwrap_or(0) as usize;
++                        let query_file = Path::new(&input_path).join("queries.f32");
++                        let mut reader = BufReader::new(File::open(&query_file).unwrap());
++                        let query_vector = row(&mut reader, dim)
++                            .into_iter()
++                            .map(f64::from)
++                            .collect();
++                        let (query_result, measured_query) = measure(|| {
++                            storage.hybrid_search(HybridSearchInput {
++                                query_vector,
++                                k: 10,
++                                alpha: Some(0.0),
++                                lang: None,
++                                as_of: None,
++                                collection: Some("bench".into()),
++                                ef_search: Some(200),
++                                oversample: None,
++                            })
++                        });
++                        query_memory = measured_query;
++                        query = match query_result {
++                            Ok(rows) => json!({
++                                "state":"ok",
++                                "input":input_path,
++                                "input_n":n,
++                                "input_dim":dim,
++                                "query_index":0,
++                                "requested_queries":1,
++                                "completed_queries":1,
++                                "result_count":rows.len(),
++                                "first_hits":rows.iter().take(8).map(|row| json!({
++                                    "id":row.node.id,
++                                    "score":row.score,
++                                })).collect::<Vec<_>>(),
++                            }),
++                            Err(error) => json!({
++                                "state":"error",
++                                "input":input_path,
++                                "input_n":n,
++                                "input_dim":dim,
++                                "query_index":0,
++                                "requested_queries":1,
++                                "completed_queries":0,
++                                "error":error.to_string(),
++                            }),
++                        };
++                        let (summary_result, measured_summary) = measure(|| {
++                            storage.diagnostic_vector_metadata_summary("bench", 8)
++                        });
++                        metadata_summary_memory = measured_summary;
++                        metadata_summary = match summary_result {
++                            Ok(summary) => summary,
++                            Err(error) => json!({"state":"error","message":error.to_string()}),
++                        };
++                    } else {
++                        query = json!({"state":"skipped","reason":"GB_MEMORY_INPUT not set"});
++                    }
++                }
++                json!({
++                    "memory":memory,
++                    "open_path":open_path,
++                    "read_only":true,
++                    "rss_limit_bytes":std::env::var("GB_MEMORY_RSS_LIMIT_BYTES").ok(),
++                    "collections":storage.list_collections(),
++                    "coverage":coverage,
++                    "coverage_memory":coverage_memory,
++                    "query":query,
++                    "query_memory":query_memory,
++                    "metadata_summary":metadata_summary,
++                    "metadata_summary_memory":metadata_summary_memory,
++                    "error":null,
++                })
++            }
++            Err(error) => json!({
++                "memory":memory,
++                "open_path":open_path,
++                "read_only":true,
++                "rss_limit_bytes":std::env::var("GB_MEMORY_RSS_LIMIT_BYTES").ok(),
++                "error":error.to_string(),
++            }),
+         };
+         fs::write(
+             std::env::var("GB_MEMORY_OPEN_OUT").unwrap(),

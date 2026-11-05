@@ -1,0 +1,34 @@
+{
+  "exit": 0,
+  "reason": null,
+  "seconds": 1.6836357,
+  "peak_rss": 95268864,
+  "peak_private": 64131072,
+  "identities": [
+    {
+      "ProcessId": 29336,
+      "ParentProcessId": 35068,
+      "CreationDate": "2026-10-31T19:28:33.958704+07:00",
+      "Name": "cargo.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.cargo\\bin\\cargo.exe"
+    },
+    {
+      "ProcessId": 2944,
+      "ParentProcessId": 29336,
+      "CreationDate": "2026-10-31T19:28:34.023835+07:00",
+      "Name": "cargo.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\cargo.exe"
+    },
+    {
+      "ProcessId": 4336,
+      "ParentProcessId": 29336,
+      "CreationDate": "2026-10-31T19:28:33.971495+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    }
+  ],
+  "excluded_build_helpers": [],
+  "admission_cpu": 33.18181818181818,
+  "admission_free": 13565837312.0,
+  "remaining": []
+}

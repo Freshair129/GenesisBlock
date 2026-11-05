@@ -1,0 +1,13 @@
+
+running 8 tests
+test export_and_restore_reject_live_or_existing_destinations ... ok
+test export_then_clean_restore_preserves_graph_vector_and_manifest_identity ... ok
+test restore_accepts_older_engine_version_with_same_schema ... ok
+test restore_authenticates_truncated_bundle_before_extracting_artifacts ... ok
+test restore_rejects_duplicate_traversal_and_trailing_entries ... ok
+test restore_rejects_incompatible_engine_and_schema_without_creating_target ... ok
+test restore_rejects_incompatible_manifest_without_creating_target ... ok
+test restore_rejects_tampered_bundle_without_creating_target ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.52s
+

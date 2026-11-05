@@ -1,0 +1,55 @@
+{
+  "attempt": 3,
+  "sample_start_local": "2026-10-31T14:12:57.5170000+07:00",
+  "counter": "\\Processor(_Total)\\% Processor Time",
+  "sample_count": 10,
+  "duration_seconds": 10,
+  "cpu_samples": [
+    {
+      "timestamp": "2026-10-31T14:12:57.5170000+07:00",
+      "cpu_percent": 14.837
+    },
+    {
+      "timestamp": "2026-10-31T14:12:58.5300000+07:00",
+      "cpu_percent": 16.33
+    },
+    {
+      "timestamp": "2026-10-31T14:12:59.5330000+07:00",
+      "cpu_percent": 10.065
+    },
+    {
+      "timestamp": "2026-10-31T14:13:00.5350000+07:00",
+      "cpu_percent": 10.088
+    },
+    {
+      "timestamp": "2026-10-31T14:13:01.5350000+07:00",
+      "cpu_percent": 28.393
+    },
+    {
+      "timestamp": "2026-10-31T14:13:02.5400000+07:00",
+      "cpu_percent": 12.03
+    },
+    {
+      "timestamp": "2026-10-31T14:13:03.5490000+07:00",
+      "cpu_percent": 9.892
+    },
+    {
+      "timestamp": "2026-10-31T14:13:04.5630000+07:00",
+      "cpu_percent": 8.681
+    },
+    {
+      "timestamp": "2026-10-31T14:13:05.5680000+07:00",
+      "cpu_percent": 7.621
+    },
+    {
+      "timestamp": "2026-10-31T14:13:06.5770000+07:00",
+      "cpu_percent": 13.509
+    }
+  ],
+  "global_cpu_avg_percent": 13.145,
+  "free_ram_bytes": 18943950848.0,
+  "free_ram_gib": 17.643,
+  "related_build_or_bench_processes": [],
+  "binary_sha256": "959DFA8F6348082046BCBFAD744A422E2BD7F5A43C702C2DBA7D2D86D26AEAF1",
+  "preflight_pass": true
+}

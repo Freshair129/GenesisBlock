@@ -1,0 +1,24 @@
+
+running 19 tests
+test boolean_literals_do_not_absorb_whitespace_or_qualified_names ... ok
+test broad_sources_are_refused_before_pest_by_shared_work_profile ... ok
+test concurrent_public_and_unrelated_pest_parsers_do_not_share_mutated_limits ... ok
+test depth_preflight_handles_delimiters_not_chains_and_comments ... ok
+test heap_reservation_covers_isolated_allocator_probes ... ok
+test keywords_have_boundaries_and_trailing_statements_reject ... ok
+test legal_depth_128_is_accepted_even_with_small_caller_stack ... ok
+test numeric_boundaries_and_malformed_literals ... ok
+test parser_heap_probe_child ... ignored, run by heap_reservation_covers_isolated_allocator_probes in a dedicated process
+test pinned_negative_manifest_is_rejected ... ok
+test pinned_positive_manifest_is_accepted ... ok
+test public_parser_and_resource_helpers_share_unicode_source_cap ... ok
+test remaining_grammar_families_are_parsed_without_claiming_execution ... ok
+test resource_bound_requires_pinned_grammar_and_layout_review ... ok
+test scalar_operators_have_structural_not_string_split_representation ... ok
+test scalar_values_ast_preserves_types_precedence_and_parameter_identity ... ok
+test spans_are_half_open_utf8_and_errors_use_scalar_columns ... ok
+test stack_reservation_matches_preflight_without_parsing ... ok
+test statement_classes_are_explicit ... ok
+
+test result: ok. 18 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.56s
+

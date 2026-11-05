@@ -1,0 +1,404 @@
+[
+  {
+    "collection": "bench",
+    "ef_override": 200,
+    "elapsed_us": 9,
+    "event": "query_plan",
+    "fetch": 20,
+    "k": 10,
+    "metric": "Cosine",
+    "quant": "Binary",
+    "query_dim": 1024,
+    "rerank": false,
+    "resolved_ef": 200,
+    "slots": 100000
+  },
+  {
+    "call": 1,
+    "ef": 200,
+    "elapsed_us": 2439,
+    "event": "hnsw_search",
+    "hits": 20,
+    "limit": 20
+  },
+  {
+    "call": 1,
+    "candidate_count": 20,
+    "duplicate_node_count": 0,
+    "elapsed_us": 48,
+    "eligible_count": 20,
+    "event": "eligibility",
+    "first_candidates": [
+      {
+        "distance": 0.1083984375,
+        "node_id": "63605",
+        "node_u32": 63605,
+        "retired_seq": 0,
+        "slot": 63605,
+        "status": "eligible"
+      },
+      {
+        "distance": 0.4345703125,
+        "node_id": "42747",
+        "node_u32": 42747,
+        "retired_seq": 0,
+        "slot": 42747,
+        "status": "eligible"
+      },
+      {
+        "distance": 0.4384765625,
+        "node_id": "33312",
+        "node_u32": 33312,
+        "retired_seq": 0,
+        "slot": 33312,
+        "status": "eligible"
+      },
+      {
+        "distance": 0.4443359375,
+        "node_id": "56723",
+        "node_u32": 56723,
+        "retired_seq": 0,
+        "slot": 56723,
+        "status": "eligible"
+      },
+      {
+        "distance": 0.4443359375,
+        "node_id": "23396",
+        "node_u32": 23396,
+        "retired_seq": 0,
+        "slot": 23396,
+        "status": "eligible"
+      },
+      {
+        "distance": 0.4453125,
+        "node_id": "61693",
+        "node_u32": 61693,
+        "retired_seq": 0,
+        "slot": 61693,
+        "status": "eligible"
+      },
+      {
+        "distance": 0.4462890625,
+        "node_id": "22732",
+        "node_u32": 22732,
+        "retired_seq": 0,
+        "slot": 22732,
+        "status": "eligible"
+      },
+      {
+        "distance": 0.4482421875,
+        "node_id": "21644",
+        "node_u32": 21644,
+        "retired_seq": 0,
+        "slot": 21644,
+        "status": "eligible"
+      }
+    ],
+    "invisible_count": 0,
+    "missing_metadata_slot_count": 0,
+    "missing_node_count": 0,
+    "retired_count": 0
+  },
+  {
+    "call": 2,
+    "candidate_count": 20,
+    "duplicate_node_count": 0,
+    "elapsed_us": 24,
+    "eligible_count": 20,
+    "event": "eligibility",
+    "first_candidates": [
+      {
+        "distance": 0.1083984375,
+        "node_id": "63605",
+        "node_u32": 63605,
+        "retired_seq": 0,
+        "slot": 63605,
+        "status": "eligible"
+      },
+      {
+        "distance": 0.4345703125,
+        "node_id": "42747",
+        "node_u32": 42747,
+        "retired_seq": 0,
+        "slot": 42747,
+        "status": "eligible"
+      },
+      {
+        "distance": 0.4384765625,
+        "node_id": "33312",
+        "node_u32": 33312,
+        "retired_seq": 0,
+        "slot": 33312,
+        "status": "eligible"
+      },
+      {
+        "distance": 0.4443359375,
+        "node_id": "56723",
+        "node_u32": 56723,
+        "retired_seq": 0,
+        "slot": 56723,
+        "status": "eligible"
+      },
+      {
+        "distance": 0.4443359375,
+        "node_id": "23396",
+        "node_u32": 23396,
+        "retired_seq": 0,
+        "slot": 23396,
+        "status": "eligible"
+      },
+      {
+        "distance": 0.4453125,
+        "node_id": "61693",
+        "node_u32": 61693,
+        "retired_seq": 0,
+        "slot": 61693,
+        "status": "eligible"
+      },
+      {
+        "distance": 0.4462890625,
+        "node_id": "22732",
+        "node_u32": 22732,
+        "retired_seq": 0,
+        "slot": 22732,
+        "status": "eligible"
+      },
+      {
+        "distance": 0.4482421875,
+        "node_id": "21644",
+        "node_u32": 21644,
+        "retired_seq": 0,
+        "slot": 21644,
+        "status": "eligible"
+      }
+    ],
+    "invisible_count": 0,
+    "missing_metadata_slot_count": 0,
+    "missing_node_count": 0,
+    "retired_count": 0
+  },
+  {
+    "elapsed_us": 363,
+    "event": "hydration",
+    "node_id": "63605",
+    "node_u32": 63605,
+    "props_were_null": true
+  },
+  {
+    "elapsed_us": 43,
+    "event": "hydration",
+    "node_id": "42747",
+    "node_u32": 42747,
+    "props_were_null": true
+  },
+  {
+    "elapsed_us": 34,
+    "event": "hydration",
+    "node_id": "33312",
+    "node_u32": 33312,
+    "props_were_null": true
+  },
+  {
+    "elapsed_us": 33,
+    "event": "hydration",
+    "node_id": "56723",
+    "node_u32": 56723,
+    "props_were_null": true
+  },
+  {
+    "elapsed_us": 30,
+    "event": "hydration",
+    "node_id": "23396",
+    "node_u32": 23396,
+    "props_were_null": true
+  },
+  {
+    "elapsed_us": 53,
+    "event": "hydration",
+    "node_id": "61693",
+    "node_u32": 61693,
+    "props_were_null": true
+  },
+  {
+    "elapsed_us": 40,
+    "event": "hydration",
+    "node_id": "22732",
+    "node_u32": 22732,
+    "props_were_null": true
+  },
+  {
+    "elapsed_us": 39,
+    "event": "hydration",
+    "node_id": "21644",
+    "node_u32": 21644,
+    "props_were_null": true
+  },
+  {
+    "elapsed_us": 39,
+    "event": "hydration",
+    "node_id": "24931",
+    "node_u32": 24931,
+    "props_were_null": true
+  },
+  {
+    "elapsed_us": 28,
+    "event": "hydration",
+    "node_id": "16357",
+    "node_u32": 16357,
+    "props_were_null": true
+  },
+  {
+    "elapsed_us": 27,
+    "event": "hydration",
+    "node_id": "26123",
+    "node_u32": 26123,
+    "props_were_null": true
+  },
+  {
+    "elapsed_us": 23,
+    "event": "hydration",
+    "node_id": "57911",
+    "node_u32": 57911,
+    "props_were_null": true
+  },
+  {
+    "elapsed_us": 161,
+    "event": "hydration",
+    "node_id": "14615",
+    "node_u32": 14615,
+    "props_were_null": true
+  },
+  {
+    "elapsed_us": 217,
+    "event": "hydration",
+    "node_id": "2783",
+    "node_u32": 2783,
+    "props_were_null": true
+  },
+  {
+    "elapsed_us": 152,
+    "event": "hydration",
+    "node_id": "9292",
+    "node_u32": 9292,
+    "props_were_null": true
+  },
+  {
+    "elapsed_us": 34,
+    "event": "hydration",
+    "node_id": "25440",
+    "node_u32": 25440,
+    "props_were_null": true
+  },
+  {
+    "elapsed_us": 59,
+    "event": "hydration",
+    "node_id": "40150",
+    "node_u32": 40150,
+    "props_were_null": true
+  },
+  {
+    "elapsed_us": 36,
+    "event": "hydration",
+    "node_id": "65692",
+    "node_u32": 65692,
+    "props_were_null": true
+  },
+  {
+    "elapsed_us": 19,
+    "event": "hydration",
+    "node_id": "33293",
+    "node_u32": 33293,
+    "props_were_null": true
+  },
+  {
+    "elapsed_us": 24,
+    "event": "hydration",
+    "node_id": "69075",
+    "node_u32": 69075,
+    "props_were_null": true
+  },
+  {
+    "elapsed_us": 8891,
+    "event": "hybrid_search_return",
+    "outcome": {
+      "row_count": 10,
+      "status": "ok"
+    }
+  },
+  {
+    "elapsed_us": 16,
+    "event": "serialization_return",
+    "outcome": {
+      "status": "ok"
+    }
+  },
+  {
+    "collection": "bench",
+    "event": "metadata_summary",
+    "metadata_count": 100000,
+    "metadata_samples": [
+      {
+        "arena_id": 0,
+        "node_id": "0",
+        "node_u32": 0,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 1,
+        "node_id": "1",
+        "node_u32": 1,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 2,
+        "node_id": "2",
+        "node_u32": 2,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 3,
+        "node_id": "3",
+        "node_u32": 3,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 4,
+        "node_id": "4",
+        "node_u32": 4,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 5,
+        "node_id": "5",
+        "node_u32": 5,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 6,
+        "node_id": "6",
+        "node_u32": 6,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 7,
+        "node_id": "7",
+        "node_u32": 7,
+        "retired_seq": 0,
+        "visible_current": true
+      }
+    ],
+    "missing_current_node_count": 0,
+    "missing_node_count": 0,
+    "missing_node_samples": [],
+    "node_count": 100000,
+    "retired_count": 0,
+    "visible_current_count": 100000
+  }
+]

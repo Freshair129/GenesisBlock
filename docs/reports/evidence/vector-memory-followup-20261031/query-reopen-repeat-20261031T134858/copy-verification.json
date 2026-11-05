@@ -1,0 +1,140 @@
+{
+  "source": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb",
+  "source_file_count": 109,
+  "source_total_bytes": 12689795140.0,
+  "source_prior_core_hashes": [
+    {
+      "name": "state.json",
+      "length": 2470,
+      "sha256": "4686824A3FE13C08BD7ABBAAE7097783DF6708DCF5447E6C02B7D875220AFEBA",
+      "last_write_time_utc": "2026-10-31T05:42:40.1050389Z"
+    },
+    {
+      "name": "nodes.bin",
+      "length": 25227518,
+      "sha256": "38EA81753BE20E020FF8C3B59B1EFAD162CD01D43DFD4B7DBCFC94C5711E8760",
+      "last_write_time_utc": "2026-10-31T05:41:21.6642281Z"
+    },
+    {
+      "name": "meta_bench.bin",
+      "length": 2616662,
+      "sha256": "69BE689D9FECEA2D25429CCB86194E2680C4D9C693AFF127CC9FC994E55EF3CF",
+      "last_write_time_utc": "2026-10-31T05:41:21.5239659Z"
+    },
+    {
+      "name": "vec_bench.bin",
+      "length": 12800000,
+      "sha256": "FF7ADDA00B4ED6C9511B14FA1553C5D1D8B641794132353C53FB73DC933E96E4",
+      "last_write_time_utc": "2026-10-31T05:41:21.5144549Z"
+    },
+    {
+      "name": "projection.sqlite",
+      "length": 9006981120,
+      "sha256": "31B0549F146E12392C4458F1FB64C446AD43FA3DC17E689CA5D41D97E4A4D87E",
+      "last_write_time_utc": "2026-10-31T03:17:20.7446077Z"
+    },
+    {
+      "name": "identity.bin",
+      "length": 32,
+      "sha256": "60C307AAA2277A5889FE04C93FE4900D684E7159DBB341EEE3A7387D120637C5",
+      "last_write_time_utc": "2026-10-31T02:45:27.8409746Z"
+    }
+  ],
+  "destinations": [
+    {
+      "name": "old",
+      "file_count": 109,
+      "total_bytes": 12689795140.0,
+      "missing_paths": [],
+      "extra_paths": [],
+      "size_mismatch_paths": [],
+      "core_hashes": [
+        {
+          "name": "state.json",
+          "length": 2470,
+          "sha256": "4686824A3FE13C08BD7ABBAAE7097783DF6708DCF5447E6C02B7D875220AFEBA",
+          "matches_prior_source_hash": true
+        },
+        {
+          "name": "nodes.bin",
+          "length": 25227518,
+          "sha256": "38EA81753BE20E020FF8C3B59B1EFAD162CD01D43DFD4B7DBCFC94C5711E8760",
+          "matches_prior_source_hash": true
+        },
+        {
+          "name": "meta_bench.bin",
+          "length": 2616662,
+          "sha256": "69BE689D9FECEA2D25429CCB86194E2680C4D9C693AFF127CC9FC994E55EF3CF",
+          "matches_prior_source_hash": true
+        },
+        {
+          "name": "vec_bench.bin",
+          "length": 12800000,
+          "sha256": "FF7ADDA00B4ED6C9511B14FA1553C5D1D8B641794132353C53FB73DC933E96E4",
+          "matches_prior_source_hash": true
+        },
+        {
+          "name": "projection.sqlite",
+          "length": 9006981120,
+          "sha256": "31B0549F146E12392C4458F1FB64C446AD43FA3DC17E689CA5D41D97E4A4D87E",
+          "matches_prior_source_hash": true
+        },
+        {
+          "name": "identity.bin",
+          "length": 32,
+          "sha256": "60C307AAA2277A5889FE04C93FE4900D684E7159DBB341EEE3A7387D120637C5",
+          "matches_prior_source_hash": true
+        }
+      ],
+      "manifest_matches": true
+    },
+    {
+      "name": "new",
+      "file_count": 109,
+      "total_bytes": 12689795140.0,
+      "missing_paths": [],
+      "extra_paths": [],
+      "size_mismatch_paths": [],
+      "core_hashes": [
+        {
+          "name": "state.json",
+          "length": 2470,
+          "sha256": "4686824A3FE13C08BD7ABBAAE7097783DF6708DCF5447E6C02B7D875220AFEBA",
+          "matches_prior_source_hash": true
+        },
+        {
+          "name": "nodes.bin",
+          "length": 25227518,
+          "sha256": "38EA81753BE20E020FF8C3B59B1EFAD162CD01D43DFD4B7DBCFC94C5711E8760",
+          "matches_prior_source_hash": true
+        },
+        {
+          "name": "meta_bench.bin",
+          "length": 2616662,
+          "sha256": "69BE689D9FECEA2D25429CCB86194E2680C4D9C693AFF127CC9FC994E55EF3CF",
+          "matches_prior_source_hash": true
+        },
+        {
+          "name": "vec_bench.bin",
+          "length": 12800000,
+          "sha256": "FF7ADDA00B4ED6C9511B14FA1553C5D1D8B641794132353C53FB73DC933E96E4",
+          "matches_prior_source_hash": true
+        },
+        {
+          "name": "projection.sqlite",
+          "length": 9006981120,
+          "sha256": "31B0549F146E12392C4458F1FB64C446AD43FA3DC17E689CA5D41D97E4A4D87E",
+          "matches_prior_source_hash": true
+        },
+        {
+          "name": "identity.bin",
+          "length": 32,
+          "sha256": "60C307AAA2277A5889FE04C93FE4900D684E7159DBB341EEE3A7387D120637C5",
+          "matches_prior_source_hash": true
+        }
+      ],
+      "manifest_matches": true
+    }
+  ],
+  "equivalent_copies": true
+}

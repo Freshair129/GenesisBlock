@@ -1,0 +1,17 @@
+{
+  "passed": true,
+  "at": "2026-10-31T22:32:15.7843768+07:00",
+  "guard_sha256": "7465745ECB6642272459DD278DBA992F7CF9CF421BBFB972E78555AE5AC46D3D",
+  "strict_mode": "Latest",
+  "normal_status": "guard-continuous-success/status.json",
+  "timeout_status": "guard-continuous-timeout/status.json",
+  "scope": "StrictMode normal/timeout fixtures plus actual arriving-compiler resource hold; workload timings separate",
+  "arrival_branch": {
+    "observed": true,
+    "status": "100k-copy-preparation-final/status.json",
+    "competition": "100k-copy-preparation-final/competition.json",
+    "owned_cleanup_complete": true,
+    "competing_identities_disjoint_from_owned": true,
+    "performance_qualification": false
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "purpose": "External diagnostic variants only; no repo/C-source/database/build/runtime mutation.",
+  "inputs": {
+    "diagnostic_base": {
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\projection-props-split-20261031T151315\\patched-querytrace-lib.rs",
+      "sha256": "D64EC0AC47F35CCC70F8A4251FC5DBAC763BC556F7085049104C8D760795CA7B",
+      "bytes": 1562749
+    },
+    "publication_proposal": {
+      "path": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\proposed-publication-lib.rs",
+      "sha256": "5B8BB9BED5DDE5FA6E7D4D255DA3ACCE6C1BFE892092456133ADB65A78998FDD",
+      "bytes": 1509769
+    },
+    "generation_script": {
+      "path": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\generate-traced-variants.py",
+      "sha256": "9391F918E3672FE26A3E715F7D9CF46F7EFD8BBE385C0D8A5A0DBD203441C65C",
+      "bytes": 19474
+    }
+  },
+  "outputs": {
+    "before-traced-lib.rs": {
+      "sha256": "CE0F4A77A33A8D1EA2DFB1A7F8F3A1EA4DF18042D5EB08E59DF969A0B7E71CCF",
+      "bytes": 1569047
+    },
+    "after-traced-lib.rs": {
+      "sha256": "74975827C95C17A783A1A26F3BA2A5439C6B198A8EA1608AF504F23577715859",
+      "bytes": 1570582
+    }
+  },
+  "patches": {
+    "before-traced.patch": {
+      "sha256": "7B9A75FAACAED5A241F2EF6A60310F124D06F36CF3C2E00FCA6F13EBFD59992C",
+      "bytes": 9119
+    },
+    "after-traced.patch": {
+      "sha256": "560F7F557F8A12C9E2558848E0AD5CCF16912E421CBFEFA861455409999E25FD",
+      "bytes": 12019
+    },
+    "after-vs-before.patch": {
+      "sha256": "443D90E78D15CEE9E4326EC40805245EEB41E26BA261AD54D7D45638BFBCCC3D",
+      "bytes": 4849
+    }
+  },
+  "unchanged_query_props_budget_region_sha256": {
+    "projection_props_unlocked": "05539A57C829FA00F2F86EB6830371563CF80DD52AAA2F894954ACD650FAF3BF",
+    "hybrid_search": "C9E30ECEDC81E283081EFF6A5760A86D82A5B1BC6927513553D9D1076DFDA9F3",
+    "hybrid_search_impl": "5C33B72549E585D4D627E4615968165BEA3AC3DC1D5D79593F77EB1AAAC2021F",
+    "hybrid_search_with_budget": "CF12F9137DA4F96DBC12E8C20627EAD85FEBF537BD5B03126B2FF12391B20368"
+  },
+  "diagnostics": {
+    "environment_gate": "GB_VECTOR_QUERY_DIAGNOSTICS",
+    "open_branches": [
+      "force_rebuild",
+      "marker_match",
+      "marker_miss",
+      "read_only_no_sync",
+      "read_only_force_rebuild_rejected"
+    ],
+    "candidate_stages": [
+      "projection_replay_wal",
+      "rebuild_edge_history",
+      "projection_backfill_edges"
+    ],
+    "publication_snapshot": "main/WAL/SHM sizes from filesystem metadata; read only the first 100 SHM bytes; mxFrame is LE u32 at offset 16 and nBackfill at offset 96.",
+    "before_publication": "At SQLITE_DONE, log filesystem-only snapshot then immediately return; no SQLite API calls or SQL between backup completion and first props query.",
+    "after_publication": "Backup scope ends before the unchanged PRAGMA wal_checkpoint(PASSIVE) SQL call; log its elapsed time and post-maintenance filesystem/SHM snapshot."
+  },
+  "verification": {
+    "input_hashes_verified": true,
+    "variants_differ_only_in_publication_function": true,
+    "query_props_and_budget_regions_byte_identical": true,
+    "line_endings": "CRLF matching diagnostic base",
+    "build_test_runtime": "not run by design"
+  }
+}

@@ -1,0 +1,20 @@
+
+running 15 tests
+test cycle_safety ... ok
+test direction_both ... ok
+test direction_incoming ... ok
+test direction_outgoing ... ok
+test edge_properties_preserved ... ok
+test edge_properties_survive_reopen ... ok
+test edge_retract_hides_from_current ... ok
+test edge_retract_visible_with_include_invalid ... ok
+test large_fanout_stress ... ok
+test limit_honored ... ok
+test multi_hop_path_tracking ... ok
+test relationship_filter ... ok
+test self_loop_does_not_infinite ... ok
+test traverse_depth_0_returns_empty ... ok
+test traverse_depth_chain ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.00s
+

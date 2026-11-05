@@ -1,0 +1,14 @@
+{
+  "env": {
+    "CARGO_TARGET_DIR": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\reproducer-target"
+  },
+  "exe": "C:\\Users\\suanr\\.cargo\\bin\\cargo.exe",
+  "args": [
+    "build",
+    "--release",
+    "--offline",
+    "-j1"
+  ],
+  "cwd": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\reproducer",
+  "output": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\reproducer-build-attempt9"
+}

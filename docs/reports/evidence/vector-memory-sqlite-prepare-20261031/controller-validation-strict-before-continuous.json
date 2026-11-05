@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "at": "2026-10-31T22:12:34.9902554+07:00",
+  "guard_sha256": "294C133BA94B31650D9A4D6EB8A7B9939336BF1EC127771F85181A4147A376A1",
+  "strict_mode": "Latest",
+  "normal_status": "guard-strict-success/status.json",
+  "timeout_status": "guard-strict-timeout/status.json",
+  "scope": "controller lifecycle only; not benchmark"
+}

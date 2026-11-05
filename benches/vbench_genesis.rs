@@ -12,6 +12,9 @@ use std::fs;
 use std::io::{BufReader, Read, Write};
 use std::time::Instant;
 
+#[path = "vector_memory.rs"]
+mod vector_memory;
+
 fn read_f32(path: &str) -> Vec<f32> {
     let bytes = fs::read(path).expect("read f32 file");
     bytes
@@ -29,6 +32,10 @@ fn percentile(sorted: &[f64], p: f64) -> f64 {
 }
 
 fn main() {
+    if std::env::var_os("GB_MEMORY_AUDIT").is_some() {
+        vector_memory::run();
+        return;
+    }
     let bench = std::env::var("GB_VBENCH").expect("set GB_VBENCH to the bench dir");
     let meta: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(format!("{bench}/meta.json")).unwrap()).unwrap();

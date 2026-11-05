@@ -1,0 +1,9 @@
+
+running 4 tests
+test budget_profile_folds_only_when_exceeded ... ok
+test frontier_only_default_folds_every_checkpoint ... ok
+test full_profile_never_folds_and_recovers_journal_only ... ok
+test unknown_retention_profile_fails_open_loudly ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.92s
+

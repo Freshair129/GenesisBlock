@@ -1,0 +1,7 @@
+
+running 2 tests
+test d7_labeled_zero_hop_exact_id_matches_legacy_and_canonical_hql2 ... ok
+test d7_labeled_zero_hop_filter_rejects_unproven_shapes ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+

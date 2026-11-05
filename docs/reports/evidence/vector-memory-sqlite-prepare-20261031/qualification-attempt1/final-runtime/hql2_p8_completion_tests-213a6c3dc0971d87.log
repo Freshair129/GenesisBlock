@@ -1,0 +1,19 @@
+
+running 14 tests
+test ambiguous_null_and_heterogeneous_lists_reject_while_empty_list_is_contextual ... ok
+test context_diagnostics_preserve_p7_packages_for_empty_duplicate_and_token_limits ... ok
+test context_pack_keeps_exact_text_evidence_and_unicode_scalar_offsets ... ok
+test context_unknown_tokenizer_fails_even_for_an_empty_source ... ok
+test contextual_null_lists_and_json_objects_keep_their_exact_types ... ok
+test lexical_and_context_memory_budget_failures_return_no_partial_rows ... ok
+test lexical_diagnostics_match_p7_for_empty_duplicate_nonmatch_and_top_zero ... ok
+test lexical_match_uses_registered_profile_bm25_and_exact_ties ... ok
+test lexical_unknown_profile_fails_even_for_an_empty_source ... ok
+test sequence_edge_property_filters_candidates_before_shortest_selection ... ok
+test sequence_node_and_edge_properties_use_exact_json_values ... ok
+test sequence_property_work_budget_exhaustion_returns_no_partial_rows ... ok
+test text_diagnostics_preserve_capability_errors_in_all_modes_and_frontends ... ok
+test text_output_budgets_fail_without_partial_packages_in_normal_and_analyze ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.21s
+

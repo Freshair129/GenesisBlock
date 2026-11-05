@@ -2,20 +2,11 @@
   "RUSTSEC-2025-0141": {
     "package": "bincode",
     "kind": "unmaintained",
-    "reason": "Read-only legacy metadata snapshot fallback during the postcard migration window.",
+    "reason": "Informational unmaintained advisory; bincode 1.3.3 is retained only as a read-only legacy metadata snapshot fallback while postcard handles all new writes.",
     "owner": "persistence",
-    "last_reviewed": "2026-08-01",
-    "review_by": "2026-10-31",
+    "last_reviewed": "2026-11-05",
+    "review_by": "2027-02-05",
     "remove_at_version": "0.4.0",
     "tracking": "ADR--GENESISDB-BINCODE-EXIT"
-  },
-  "RUSTSEC-2026-0204": {
-    "package": "crossbeam-epoch",
-    "kind": "unmaintained",
-    "reason": "Transitive dependency; migration depends on upstream dashmap/crossbeam consumers.",
-    "owner": "dependencies",
-    "last_reviewed": "2026-08-01",
-    "review_by": "2026-10-31",
-    "tracking": "TECH-DEBT--DEPENDENCY-EXCEPTIONS"
   }
 }

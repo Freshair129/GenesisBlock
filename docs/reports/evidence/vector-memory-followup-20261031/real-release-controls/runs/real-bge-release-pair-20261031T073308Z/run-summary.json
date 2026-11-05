@@ -1,0 +1,495 @@
+{
+  "status": "complete",
+  "run_id": "20261031T073308Z",
+  "started_at_utc": "2026-10-31T07:33:08.8559756Z",
+  "finished_at_utc": "2026-10-31T07:45:14.4922658Z",
+  "order": [
+    "01-baseline baseline",
+    "02-candidate candidate"
+  ],
+  "completed_jobs": 2,
+  "baseline": {
+    "completed_runs": 1,
+    "single_observation": {
+      "ingest_s": 64.1108434,
+      "rebuild_s": 42.4539875,
+      "compaction_s": 42.7543074,
+      "snapshot_s": 8.6304449,
+      "reopen_s": 97.9501003,
+      "fresh_read_only_reopen_s": 69.2539527,
+      "search10_recall": 0.975,
+      "search10_p50_us": 4165.5,
+      "search100_recall": 0.9783333333333334,
+      "search100_p50_us": 5876.700000000001
+    }
+  },
+  "candidate": {
+    "completed_runs": 1,
+    "single_observation": {
+      "ingest_s": 63.0799539,
+      "rebuild_s": 42.2376563,
+      "compaction_s": 42.4131372,
+      "snapshot_s": 8.5743065,
+      "reopen_s": 96.0168424,
+      "fresh_read_only_reopen_s": 68.5096995,
+      "search10_recall": 0.975,
+      "search10_p50_us": 4184.5,
+      "search100_recall": 0.9783333333333334,
+      "search100_p50_us": 6321.6
+    }
+  },
+  "jobs": [
+    {
+      "label": "01-baseline",
+      "stage": "baseline",
+      "binary": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\baseline-release.exe",
+      "status": "complete",
+      "input_hashes_before": {
+        "corpus": "20978d757c33a29dcd8e89e5708762738b10fc8da0f01358bcb325741f2f6057",
+        "queries": "6ccad031b956c6111519e6b0dfe97e7c63bd85801d9934efe4438f76d152ca68",
+        "truth": "2c133fd68ed2b60345715c24667a830ebf3ab303528e8eec0300385125e37c9c",
+        "meta": "f79c423a069d8c4faa9a2bf8fff920d0dc4102261b28c35692544974137a89de"
+      },
+      "input_hashes_after": {
+        "corpus": "20978d757c33a29dcd8e89e5708762738b10fc8da0f01358bcb325741f2f6057",
+        "queries": "6ccad031b956c6111519e6b0dfe97e7c63bd85801d9934efe4438f76d152ca68",
+        "truth": "2c133fd68ed2b60345715c24667a830ebf3ab303528e8eec0300385125e37c9c",
+        "meta": "f79c423a069d8c4faa9a2bf8fff920d0dc4102261b28c35692544974137a89de"
+      },
+      "admission": {
+        "sample_count": 11,
+        "observed_window_seconds": 10,
+        "average_total_cpu_percent": 11.090909090909092,
+        "minimum_free_physical_bytes": 18922319872,
+        "cpu_gate_passed": true,
+        "memory_gate_passed": true,
+        "samples": [
+          {
+            "at_utc": "2026-10-31T07:33:16.9336783Z",
+            "total_cpu_percent": 14.0,
+            "free_physical_bytes": 18937106432
+          },
+          {
+            "at_utc": "2026-10-31T07:33:18.3419021Z",
+            "total_cpu_percent": 10.0,
+            "free_physical_bytes": 18953248768
+          },
+          {
+            "at_utc": "2026-10-31T07:33:19.7463575Z",
+            "total_cpu_percent": 19.0,
+            "free_physical_bytes": 18922319872
+          },
+          {
+            "at_utc": "2026-10-31T07:33:21.1416058Z",
+            "total_cpu_percent": 7.0,
+            "free_physical_bytes": 18929917952
+          },
+          {
+            "at_utc": "2026-10-31T07:33:22.5368253Z",
+            "total_cpu_percent": 12.0,
+            "free_physical_bytes": 18938621952
+          },
+          {
+            "at_utc": "2026-10-31T07:33:23.9375724Z",
+            "total_cpu_percent": 11.0,
+            "free_physical_bytes": 18937962496
+          },
+          {
+            "at_utc": "2026-10-31T07:33:25.3296337Z",
+            "total_cpu_percent": 11.0,
+            "free_physical_bytes": 18942042112
+          },
+          {
+            "at_utc": "2026-10-31T07:33:26.7487997Z",
+            "total_cpu_percent": 8.0,
+            "free_physical_bytes": 18927345664
+          },
+          {
+            "at_utc": "2026-10-31T07:33:28.1515505Z",
+            "total_cpu_percent": 9.0,
+            "free_physical_bytes": 18934616064
+          },
+          {
+            "at_utc": "2026-10-31T07:33:29.5452571Z",
+            "total_cpu_percent": 14.0,
+            "free_physical_bytes": 18937552896
+          },
+          {
+            "at_utc": "2026-10-31T07:33:30.9431168Z",
+            "total_cpu_percent": 7.0,
+            "free_physical_bytes": 18929410048
+          }
+        ]
+      },
+      "exit_code": 0,
+      "timeout": false,
+      "rss_limit_hit": false,
+      "process_timeline": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\followuproot\\vector-real-release-controller\\runs\\real-bge-release-pair-20261031T073308Z\\01-baseline\\process-timeline.jsonl",
+      "stdout": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\followuproot\\vector-real-release-controller\\runs\\real-bge-release-pair-20261031T073308Z\\01-baseline\\stdout.log",
+      "stderr": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\followuproot\\vector-real-release-controller\\runs\\real-bge-release-pair-20261031T073308Z\\01-baseline\\stderr.log",
+      "metrics": {
+        "n": 11266,
+        "dim": 1024,
+        "q": 24,
+        "quant": "none",
+        "rerank": false,
+        "retention": "full",
+        "ingest_s": 64.1108434,
+        "ingest_peak_rss_bytes": 344154112,
+        "rebuild_s": 42.4539875,
+        "rebuild_peak_rss_bytes": 251387904,
+        "search10_recall": 0.975,
+        "search10_p50_us": 4165.5,
+        "search10_p95_us": 4540.299999999999,
+        "search10_p99_us": 4689.8,
+        "search100_recall": 0.9783333333333334,
+        "search100_p50_us": 5876.700000000001,
+        "search100_p95_us": 6435.7,
+        "search100_p99_us": 6631.9,
+        "compaction_s": 42.7543074,
+        "compaction_peak_rss_bytes": 256299008,
+        "snapshot_s": 8.6304449,
+        "snapshot_peak_rss_bytes": 202145792,
+        "snapshot_error": null,
+        "reopen_s": 97.9501003,
+        "reopen_peak_rss_bytes": 352120832,
+        "reopen_error": null,
+        "fresh_read_only_reopen_s": 69.2539527,
+        "fresh_read_only_reopen_peak_rss_bytes": 215584768,
+        "fresh_read_only_reopen_error": null,
+        "fresh_read_only_coverage": [
+          {
+            "built_frontier": 48,
+            "collection": "bench",
+            "extra_count": 0,
+            "indexed_count": 11266,
+            "missing_count": 0,
+            "pending_count": 0,
+            "source_count": 11266,
+            "source_frontier": 48,
+            "state": "READY",
+            "validated": true
+          },
+          {
+            "built_frontier": 0,
+            "collection": "default",
+            "extra_count": 0,
+            "indexed_count": 0,
+            "missing_count": 0,
+            "pending_count": 0,
+            "source_count": 0,
+            "source_frontier": 0,
+            "state": "READY",
+            "validated": true
+          }
+        ],
+        "reopen_search10_recall": 0.9791666666666666,
+        "reopen_search10_p50_us": 4355.900000000001,
+        "disk_bytes": 1501142299,
+        "coverage": [
+          {
+            "built_frontier": 0,
+            "collection": "default",
+            "extra_count": 0,
+            "indexed_count": 0,
+            "missing_count": 0,
+            "pending_count": 0,
+            "source_count": 0,
+            "source_frontier": 0,
+            "state": "READY",
+            "validated": true
+          },
+          {
+            "built_frontier": 48,
+            "collection": "bench",
+            "extra_count": 0,
+            "indexed_count": 11266,
+            "missing_count": 0,
+            "pending_count": 0,
+            "source_count": 11266,
+            "source_frontier": 48,
+            "state": "READY",
+            "validated": true
+          }
+        ],
+        "errors": null
+      },
+      "output_manifest": {
+        "state_sha256": "60af65b8762921da60b2f3eb759889136d575f49230419b6e6573392a0589cd0",
+        "p6_manifest_sha256": "61004a8e8245e4f3ba5c2a03465524f942d33daad828b240c5f8787093c1ce7e",
+        "components": [
+          {
+            "path": "edges.bin",
+            "bytes": 2,
+            "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          },
+          {
+            "path": "edges_retired.bin",
+            "bytes": 2,
+            "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          },
+          {
+            "path": "meta_bench.bin",
+            "bytes": 256675,
+            "sha256": "7d3dc01b711953f383819c6efa9afd08142ee082caaf36ae03971ce65a0482d1"
+          },
+          {
+            "path": "meta_default.bin",
+            "bytes": 5,
+            "sha256": "1438169120bcd7b270d38604a220b61af96f13bb265d428a3560e9fc96fb317b"
+          },
+          {
+            "path": "nodes.bin",
+            "bytes": 2814677,
+            "sha256": "8772087cde3559b1194ced7f3802f04234831f46e896a2f8c6172c41ab555481"
+          },
+          {
+            "path": "projection.sqlite",
+            "bytes": 1017339904,
+            "sha256": "543963a3e1c580555d23a18b72ebf28daa10373d9900443c61270bcf149ad8f9"
+          },
+          {
+            "path": "vec_bench.bin",
+            "bytes": 46145536,
+            "sha256": "f83b5bc3b3d1057f01114196cd37ac95ecbeefe2f04ad0168d723e0860af3133"
+          },
+          {
+            "path": "vec_default.bin",
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ]
+      },
+      "error": null,
+      "peak_process_tree_working_set_bytes": 307359744,
+      "peak_process_tree_private_bytes": 378429440,
+      "elapsed_seconds": 345.914
+    },
+    {
+      "label": "02-candidate",
+      "stage": "candidate",
+      "binary": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\candidate-release.exe",
+      "status": "complete",
+      "input_hashes_before": {
+        "corpus": "20978d757c33a29dcd8e89e5708762738b10fc8da0f01358bcb325741f2f6057",
+        "queries": "6ccad031b956c6111519e6b0dfe97e7c63bd85801d9934efe4438f76d152ca68",
+        "truth": "2c133fd68ed2b60345715c24667a830ebf3ab303528e8eec0300385125e37c9c",
+        "meta": "f79c423a069d8c4faa9a2bf8fff920d0dc4102261b28c35692544974137a89de"
+      },
+      "input_hashes_after": {
+        "corpus": "20978d757c33a29dcd8e89e5708762738b10fc8da0f01358bcb325741f2f6057",
+        "queries": "6ccad031b956c6111519e6b0dfe97e7c63bd85801d9934efe4438f76d152ca68",
+        "truth": "2c133fd68ed2b60345715c24667a830ebf3ab303528e8eec0300385125e37c9c",
+        "meta": "f79c423a069d8c4faa9a2bf8fff920d0dc4102261b28c35692544974137a89de"
+      },
+      "admission": {
+        "sample_count": 11,
+        "observed_window_seconds": 10,
+        "average_total_cpu_percent": 8.454545454545455,
+        "minimum_free_physical_bytes": 18860421120,
+        "cpu_gate_passed": true,
+        "memory_gate_passed": true,
+        "samples": [
+          {
+            "at_utc": "2026-10-31T07:39:17.8671549Z",
+            "total_cpu_percent": 15.0,
+            "free_physical_bytes": 18860421120
+          },
+          {
+            "at_utc": "2026-10-31T07:39:19.2638347Z",
+            "total_cpu_percent": 4.0,
+            "free_physical_bytes": 18879315968
+          },
+          {
+            "at_utc": "2026-10-31T07:39:20.6675140Z",
+            "total_cpu_percent": 7.0,
+            "free_physical_bytes": 18888519680
+          },
+          {
+            "at_utc": "2026-10-31T07:39:22.0558657Z",
+            "total_cpu_percent": 4.0,
+            "free_physical_bytes": 18883887104
+          },
+          {
+            "at_utc": "2026-10-31T07:39:23.4837231Z",
+            "total_cpu_percent": 5.0,
+            "free_physical_bytes": 18888339456
+          },
+          {
+            "at_utc": "2026-10-31T07:39:24.8896909Z",
+            "total_cpu_percent": 9.0,
+            "free_physical_bytes": 18889379840
+          },
+          {
+            "at_utc": "2026-10-31T07:39:26.2781984Z",
+            "total_cpu_percent": 15.0,
+            "free_physical_bytes": 18890588160
+          },
+          {
+            "at_utc": "2026-10-31T07:39:27.6679076Z",
+            "total_cpu_percent": 9.0,
+            "free_physical_bytes": 18903207936
+          },
+          {
+            "at_utc": "2026-10-31T07:39:29.0705659Z",
+            "total_cpu_percent": 10.0,
+            "free_physical_bytes": 18878451712
+          },
+          {
+            "at_utc": "2026-10-31T07:39:30.4628933Z",
+            "total_cpu_percent": 6.0,
+            "free_physical_bytes": 18882736128
+          },
+          {
+            "at_utc": "2026-10-31T07:39:31.8592249Z",
+            "total_cpu_percent": 9.0,
+            "free_physical_bytes": 18880270336
+          }
+        ]
+      },
+      "exit_code": 0,
+      "timeout": false,
+      "rss_limit_hit": false,
+      "process_timeline": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\followuproot\\vector-real-release-controller\\runs\\real-bge-release-pair-20261031T073308Z\\02-candidate\\process-timeline.jsonl",
+      "stdout": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\followuproot\\vector-real-release-controller\\runs\\real-bge-release-pair-20261031T073308Z\\02-candidate\\stdout.log",
+      "stderr": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\followuproot\\vector-real-release-controller\\runs\\real-bge-release-pair-20261031T073308Z\\02-candidate\\stderr.log",
+      "metrics": {
+        "n": 11266,
+        "dim": 1024,
+        "q": 24,
+        "quant": "none",
+        "rerank": false,
+        "retention": "full",
+        "ingest_s": 63.0799539,
+        "ingest_peak_rss_bytes": 346988544,
+        "rebuild_s": 42.2376563,
+        "rebuild_peak_rss_bytes": 254230528,
+        "search10_recall": 0.975,
+        "search10_p50_us": 4184.5,
+        "search10_p95_us": 4655.900000000001,
+        "search10_p99_us": 4676.8,
+        "search100_recall": 0.9783333333333334,
+        "search100_p50_us": 6321.6,
+        "search100_p95_us": 6916.5,
+        "search100_p99_us": 6971.7,
+        "compaction_s": 42.4131372,
+        "compaction_peak_rss_bytes": 265457664,
+        "snapshot_s": 8.5743065,
+        "snapshot_peak_rss_bytes": 204357632,
+        "snapshot_error": null,
+        "reopen_s": 96.0168424,
+        "reopen_peak_rss_bytes": 358457344,
+        "reopen_error": null,
+        "fresh_read_only_reopen_s": 68.5096995,
+        "fresh_read_only_reopen_peak_rss_bytes": 210980864,
+        "fresh_read_only_reopen_error": null,
+        "fresh_read_only_coverage": [
+          {
+            "built_frontier": 0,
+            "collection": "default",
+            "extra_count": 0,
+            "indexed_count": 0,
+            "missing_count": 0,
+            "pending_count": 0,
+            "source_count": 0,
+            "source_frontier": 0,
+            "state": "READY",
+            "validated": true
+          },
+          {
+            "built_frontier": 48,
+            "collection": "bench",
+            "extra_count": 0,
+            "indexed_count": 11266,
+            "missing_count": 0,
+            "pending_count": 0,
+            "source_count": 11266,
+            "source_frontier": 48,
+            "state": "READY",
+            "validated": true
+          }
+        ],
+        "reopen_search10_recall": 0.9833333333333333,
+        "reopen_search10_p50_us": 4316.5,
+        "disk_bytes": 1501160987,
+        "coverage": [
+          {
+            "built_frontier": 48,
+            "collection": "bench",
+            "extra_count": 0,
+            "indexed_count": 11266,
+            "missing_count": 0,
+            "pending_count": 0,
+            "source_count": 11266,
+            "source_frontier": 48,
+            "state": "READY",
+            "validated": true
+          },
+          {
+            "built_frontier": 0,
+            "collection": "default",
+            "extra_count": 0,
+            "indexed_count": 0,
+            "missing_count": 0,
+            "pending_count": 0,
+            "source_count": 0,
+            "source_frontier": 0,
+            "state": "READY",
+            "validated": true
+          }
+        ],
+        "errors": null
+      },
+      "output_manifest": {
+        "state_sha256": "b12fc2a058aff188b20db5ccd705fab37c4c36e192da3a94b83508a34c73b84c",
+        "p6_manifest_sha256": "7fa1ce303c13f0edae62e1833e75779bf1468e1028b85fabe6eaa7b27207e158",
+        "components": [
+          {
+            "path": "edges.bin",
+            "bytes": 2,
+            "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          },
+          {
+            "path": "edges_retired.bin",
+            "bytes": 2,
+            "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          },
+          {
+            "path": "meta_bench.bin",
+            "bytes": 256675,
+            "sha256": "154ee3c7f76244b6d3e00b46261104fbb0e6d6126a64c5bb38e1c5d6615a2ed1"
+          },
+          {
+            "path": "meta_default.bin",
+            "bytes": 5,
+            "sha256": "1438169120bcd7b270d38604a220b61af96f13bb265d428a3560e9fc96fb317b"
+          },
+          {
+            "path": "nodes.bin",
+            "bytes": 2814677,
+            "sha256": "0220cdab43dbe6dad805f48d6cca8675e1978a796d997e2a694e6832cd9335fd"
+          },
+          {
+            "path": "projection.sqlite",
+            "bytes": 1017331712,
+            "sha256": "cb0dafbd10e950621fd06fa99d44ac3df810d6e947bd479891babc2aa754d97f"
+          },
+          {
+            "path": "vec_bench.bin",
+            "bytes": 46145536,
+            "sha256": "f83b5bc3b3d1057f01114196cd37ac95ecbeefe2f04ad0168d723e0860af3133"
+          },
+          {
+            "path": "vec_default.bin",
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ]
+      },
+      "error": null,
+      "peak_process_tree_working_set_bytes": 313716736,
+      "peak_process_tree_private_bytes": 379195392,
+      "elapsed_seconds": 342.135
+    }
+  ]
+}

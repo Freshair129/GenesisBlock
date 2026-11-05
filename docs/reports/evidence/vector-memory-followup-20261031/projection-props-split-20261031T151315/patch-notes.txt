@@ -1,0 +1,9 @@
+source_overlay=candidate-querytrace-lib.rs; modified exactly projection_props_unlocked
+bench_overlay=candidate-repeat-vector_memory.rs
+conditional gate=GB_VECTOR_QUERY_DIAGNOSTICS
+SQL text=SELECT payload FROM props WHERE node_u32 = ?1
+normal path retains original Connection.query_row + OptionalExtension + Error::from_reason + serde_json parse behavior
+instrumented path measures lock acquisition, prepare, query_row (SQLite step/row.get/OptionalExtension), explicit Statement drop/finalize, JSON parse
+logs SELECT status, rusqlite error debug code, extended code, message, payload byte length, and JSON parse status/error; never payload content
+Connection guard remains held through parse as before and is dropped before diagnostic eprintln to avoid logging while holding projection_db mutex
+error behavior remains Result -> Error::from_reason and hydrated_props still applies its existing ok/flatten/fallback behavior

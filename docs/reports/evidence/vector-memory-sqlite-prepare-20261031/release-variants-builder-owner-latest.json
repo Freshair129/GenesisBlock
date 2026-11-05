@@ -1,0 +1,7 @@
+{
+  "pid": 21268,
+  "started": "2026-10-31T22:00:02.7966752+07:00",
+  "path": "C:\\Users\\suanr\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\native\\powershell\\pwsh.exe",
+  "stdout": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\release-variants-builder-20261031T220002.log",
+  "stderr": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\release-variants-builder-20261031T220002.err"
+}

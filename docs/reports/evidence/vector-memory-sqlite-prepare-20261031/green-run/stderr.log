@@ -1,0 +1,5 @@
+publication_hook_calls=1 publication_frames=2352 publication_log_frames=2352 publication_checkpointed_frames=2352 first_read_hook_calls=0
+
+thread 'vector_memory_tests::signature_math_cache_is_exact_bounded_and_operation_local' (16188) panicked at src\vector_memory_tests.rs:577:9:
+scope unwind
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

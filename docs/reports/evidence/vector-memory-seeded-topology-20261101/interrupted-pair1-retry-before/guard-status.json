@@ -1,0 +1,43 @@
+{
+    "exit":  -1,
+    "reason":  "resource_competition",
+    "seconds":  1.0891944,
+    "peak_rss":  88158208,
+    "peak_private":  77881344,
+    "identities":  [
+                       {
+                           "ProcessId":  37216,
+                           "ParentProcessId":  20700,
+                           "CreationDate":  "\/Date(1793541542523)\/",
+                           "Name":  "conhost.exe",
+                           "ExecutablePath":  "C:\\WINDOWS\\system32\\conhost.exe"
+                       },
+                       {
+                           "ProcessId":  23340,
+                           "ParentProcessId":  20700,
+                           "CreationDate":  "\/Date(1793541542823)\/",
+                           "Name":  "seeded-before.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\seeded-topology-20261101\\seeded-before.exe"
+                       },
+                       {
+                           "ProcessId":  20700,
+                           "ParentProcessId":  46676,
+                           "CreationDate":  "\/Date(1793541542511)\/",
+                           "Name":  "python.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\AppData\\Local\\Programs\\Python\\Python314\\python.exe"
+                       }
+                   ],
+    "excluded_build_helpers":  [
+
+                               ],
+    "helper_finished_parent_condition":  false,
+    "helper_scope":  "Helpers are not terminated; successful Cargo completion and stopped tracked compiler clients are required before private-source edits. No shared source/target mutation.",
+    "admission_cpu":  6.6363636363636367,
+    "admission_free":  15618895872,
+    "remaining":  [
+
+                  ],
+    "cleanup_complete":  true,
+    "monitor_error":  null,
+    "rss_scope":  "tracked owned process tree"
+}

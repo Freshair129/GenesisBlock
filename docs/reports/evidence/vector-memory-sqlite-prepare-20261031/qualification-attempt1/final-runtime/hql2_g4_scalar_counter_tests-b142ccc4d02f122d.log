@@ -1,0 +1,27 @@
+
+running 22 tests
+test aggregate_counts_global_empty_and_nullable_groups ... ok
+test all_join_kinds_count_input_bags_even_when_one_side_is_empty ... ok
+test analyze_budget_failures_never_publish_partial_scalar_or_aggregate_results ... ok
+test checked_arithmetic_frontends_fail_closed_without_observed_state_change ... ok
+test checked_arithmetic_frontends_match_p7_and_diagnostics ... ok
+test composed_scalar_pipeline_matches_literals_p7_and_diagnostics ... ok
+test decimal_u64_structural_pagination_accepts_boundary_parameters ... ok
+test finite_float_boundary_and_checked_result_fail_closed ... ok
+test hql_frontend_reports_the_same_scalar_contract_for_null_bags_and_empty_input ... ok
+test nullable_multikey_hql_default_null_order_matches_literals ... ok
+test nullable_multikey_unique_complete_keys_match_literals_and_supported_p7 ... ok
+test projection_distinct_sort_offset_take_preserve_nulls_and_nonempty_results ... ok
+test scalar_frontends_preserve_p7_pipeline_counters_authority_and_state ... ok
+test scalar_nullable_ordering_matrix_covers_remaining_orderable_types ... ok
+test scalar_ordering_matrix_pairs_frontends_with_literal_rows_and_counters ... ok
+test scalar_pipeline_counts_duplicates_null_filtering_and_empty_inputs ... ok
+test scalar_result_metadata_has_independent_fixture_expectations ... ok
+test scalar_type_admissibility_matrix_accepts_row_shaping_kernels ... ok
+test scalar_type_admissibility_matrix_filters_and_compares ... ok
+test scalar_type_admissibility_matrix_functions_and_checked_arithmetic ... ok
+test scalar_type_admissibility_matrix_rejects_unsupported_cells ... ok
+test union_all_counts_both_inputs_including_repeated_input_edges ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.79s
+

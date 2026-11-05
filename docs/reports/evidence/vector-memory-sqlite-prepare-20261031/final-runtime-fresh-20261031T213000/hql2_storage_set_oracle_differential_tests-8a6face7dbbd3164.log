@@ -1,0 +1,8 @@
+
+running 3 tests
+test storage_hql_and_ir_union_all_match_p7_for_nullable_bag_pairs ... ok
+test storage_union_all_diagnostics_preserve_p7_bags_counters_authority_and_state ... ok
+test union_result_metadata_has_independent_fixture_expectations ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.64s
+

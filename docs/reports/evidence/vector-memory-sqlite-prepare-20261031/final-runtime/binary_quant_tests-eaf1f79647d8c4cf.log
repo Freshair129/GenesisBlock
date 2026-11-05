@@ -1,0 +1,8 @@
+
+running 3 tests
+test bq_disk_is_32x_smaller ... ok
+test bq_exact_match_is_top1 ... ok
+test bq_survives_reopen ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.65s
+

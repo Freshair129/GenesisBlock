@@ -1,0 +1,19 @@
+{
+  "sample_count": 120,
+  "repeat": 2,
+  "page_cache_mb": 64,
+  "ef_search": 200,
+  "binary_sha256": "959DFA8F6348082046BCBFAD744A422E2BD7F5A43C702C2DBA7D2D86D26AEAF1",
+  "rss_limit_bytes": 2147483648,
+  "alpha": 0,
+  "query_budget_default_elapsed_ms": 5000,
+  "pid": 5832,
+  "vector_dim": 1024,
+  "started_local": "2026-10-31T14:11:48.8072632+07:00",
+  "retention": "full",
+  "read_only": false,
+  "rayon_num_threads": 4,
+  "k": 10,
+  "input": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\inputs\\synthetic-100000-1024",
+  "db": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-repeat-20261031T134858\\new\\gdb"
+}

@@ -1,0 +1,15 @@
+{
+  "attempt": 1,
+  "state": "startup_failure_before_database_open",
+  "exit_code": 101,
+  "binary_sha256": "959DFA8F6348082046BCBFAD744A422E2BD7F5A43C702C2DBA7D2D86D26AEAF1",
+  "failure": "vbench_genesis requires GB_VBENCH before running, including open-only repeat branch",
+  "evidence_paths": [
+    "stderr.log",
+    "process-start.json",
+    "process-status.json",
+    "run-new-repeat.ps1"
+  ],
+  "gdb_opened": false,
+  "query_started": false
+}

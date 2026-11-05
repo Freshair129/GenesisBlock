@@ -1,0 +1,8 @@
+
+running 3 tests
+test compacted_wal_restores_frontier_and_transaction_identity ... ok
+test one_wal_transaction_advances_stable_frontier_for_row_and_graph ... ok
+test stale_expected_frontier_is_rejected_before_commit ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+

@@ -1,0 +1,39 @@
+{
+  "pid": 35064,
+  "start": "2026-10-31T22:17:07.1059219+07:00",
+  "config": {
+    "kind": "build_preparation",
+    "exe": "C:\\Users\\suanr\\.cargo\\bin\\cargo.exe",
+    "args": [
+      "build",
+      "--manifest-path",
+      "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\release-src\\20261031T150004Z-b5e55f51\\Cargo.toml",
+      "--locked",
+      "--offline",
+      "--release",
+      "--no-default-features",
+      "--features",
+      "bins",
+      "--bin",
+      "vbench-genesis",
+      "-j1"
+    ],
+    "cwd": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\release-src\\20261031T150004Z-b5e55f51",
+    "output": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\release-variants-resume-20261031T151238Z\\diagnostic-after\\guard-output",
+    "cap_seconds": 1200,
+    "env": {
+      "CARGO_TARGET_DIR": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\release-target\\20261031T150004Z-b5e55f51",
+      "RELEASE_LTO": "false",
+      "CODEGEN_UNITS": "16",
+      "BUILD_JOBS": "1",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_PROFILE_RELEASE_LTO": "false",
+      "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "16",
+      "CARGO_BUILD_JOBS": "1"
+    }
+  },
+  "query_deadline_ms": 5000,
+  "cap_seconds": 1200,
+  "rss_cap": 2147483648,
+  "identity": "PID+CreationDate+path+name; require live matching parent and child born after root"
+}

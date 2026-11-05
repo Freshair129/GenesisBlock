@@ -1,7 +1,7 @@
 # ADR — GENESISDB-BINCODE-EXIT
 
-- **Status:** Proposed (2026-07-19)
-- **Driver:** RUSTSEC-2025-0141 — bincode 1.3.3 unmaintained (team ceased development 2025-12). Currently ignored in `.github/workflows/security.yml`; this ADR replaces the ignore with an exit plan.
+- **Status:** Proposed (2026-07-19; security review refreshed 2026-11-05)
+- **Driver:** RUSTSEC-2025-0141 — informational unmaintained advisory for bincode 1.3.3. This ADR defines the bounded legacy fallback and exit plan; the separate exception registry records its time-limited review.
 - **Deciders:** Boss (merge gate), Claude Fable 5 (author)
 
 ## Context
@@ -9,6 +9,10 @@
 `bincode` is used in exactly one subsystem: per-collection metadata snapshots (`meta_<name>.bin`) — `bincode::serialize(&Vec<NodeMetadata>)` on save ([src/lib.rs:4492]) and a **try-chain deserialize** on load: `Vec<NodeMetadata>` (V1) → fallback `Vec<NodeMetadataV0>` (legacy) ([src/lib.rs:4743-4777]). The WAL and `state.json` do not use bincode. The blob is non-self-describing (noted at src/lib.rs:436), which is why the try-chain pattern exists.
 
 An unmaintained, non-self-describing binary deserializer sitting on the persistence path of a database is unacceptable long-term: no fixes will ship if a deserialization CVE or a Rust-version incompatibility lands.
+
+## Security review (2026-11-05)
+
+RustSec classifies RUSTSEC-2025-0141 as informational/unmaintained and records that the bincode team considers 1.3.3 complete and not in need of updates. GenesisBlock keeps the 1.3.3 dependency only to read legacy metadata snapshots; new snapshot writes use postcard. The time-limited exception is reviewed through 2027-02-05 and remains subject to the existing 0.4.0 removal gate. This review is specific to the unmaintained advisory and does not imply that an affected vulnerability is acceptable or suppressed.
 
 ## Decision
 
@@ -26,7 +30,7 @@ An unmaintained, non-self-describing binary deserializer sitting on the persiste
 - **bincode 2.x:** same maintainership situation that triggered the advisory; migrating to a differently-shaped API of the same abandoned org buys nothing.
 - **rmp-serde / MessagePack:** self-describing but larger blobs and slower; self-description is redundant once the magic prefix exists.
 - **serde_json:** human-debuggable but ~4-8× size on metadata vectors; metadata blobs are the hot save/load path at 1M nodes.
-- **Do nothing (keep the CI ignore):** silent risk accrual on the persistence path; ignores are for transitives you can't control, not direct deps you can.
+- **Keep an open-ended CI exception:** silent risk accrual on the persistence path. The retained exception is time-limited, tied to the read-only legacy fallback, and removed at the existing 0.4.0 gate.
 
 ## Consequences
 

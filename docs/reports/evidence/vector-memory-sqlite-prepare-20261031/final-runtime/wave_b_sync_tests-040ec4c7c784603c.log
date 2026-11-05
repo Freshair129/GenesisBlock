@@ -1,0 +1,9 @@
+
+running 4 tests
+test conflicting_definition_rejected_before_append ... ok
+test empty_collection_and_dependent_delta_sync_and_reopen ... ok
+test gossip_rejects_old_schema_before_sending_delta ... ok
+test signed_batch_rebind_is_applied_as_one_original_frame ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.75s
+

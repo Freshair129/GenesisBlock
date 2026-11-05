@@ -1,0 +1,10 @@
+{
+  "env": {},
+  "output": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\matrix-real-guard-final",
+  "exe": "C:\\Users\\suanr\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
+  "args": [
+    "-u",
+    "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\run-matrix.py"
+  ],
+  "cwd": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031"
+}

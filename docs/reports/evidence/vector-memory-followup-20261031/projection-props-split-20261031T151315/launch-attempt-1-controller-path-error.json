@@ -1,0 +1,12 @@
+{
+  "attempt": 1,
+  "at_local": "2026-10-31T15:22:31.4573888+07:00",
+  "state": "prelaunch_controller_path_error",
+  "error": "Copied controller retained previous runRoot and observed the prior run output; no candidate was spawned.",
+  "previous_run_root": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-bge-candidate-trace-20261031T145352",
+  "expected_run_root": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\projection-props-split-20261031T151315",
+  "candidate_process_spawned": false,
+  "database_opened": false,
+  "fresh_admission_started": false,
+  "new_output_path_exists": false
+}

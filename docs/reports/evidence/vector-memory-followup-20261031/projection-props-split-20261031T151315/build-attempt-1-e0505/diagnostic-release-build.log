@@ -1,0 +1,21 @@
+   Compiling genesis-block-native v0.2.10 (C:\Users\suanr\genesis-vector-memory-20261031\verify-src)
+error[E0505]: cannot move out of `conn` because it is borrowed
+     --> src\lib.rs:14434:22
+      |
+14424 |         let conn = self.projection_db.lock();
+      |             ---- binding `conn` declared here
+...
+14428 |         let mut statement = match conn.prepare(SQL) {
+      |                                   -----------------
+      |                                   |
+      |                                   borrow of `conn` occurs here
+      |                                   a temporary with access to the borrow is created here ...
+...
+14434 |                 drop(conn);
+      |                      ^^^^ move out of `conn` occurs here
+...
+14457 |         };
+      |          - ... and the borrow might be used here, when that temporary is dropped and runs the destructor for type `std::result::Result<Statement<'_>, rusqlite::Error>`
+
+For more information about this error, try `rustc --explain E0505`.
+error: could not compile `genesis-block-native` (lib) due to 1 previous error

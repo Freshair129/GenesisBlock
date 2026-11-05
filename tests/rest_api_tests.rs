@@ -1905,6 +1905,18 @@ async fn test_metrics_includes_per_collection_vectors() {
         "per-collection vector gauge must appear labeled with the collection name:\n{body}"
     );
     // Sidecar/arena residency gauges (reused from CollectionInfo) must also be present.
+    for metric in [
+        "sidecar_cache_bytes",
+        "arena_allocated_bytes",
+        "hnsw_vector_bytes",
+    ] {
+        assert!(
+            body.contains(&format!(
+                "genesisdb_collection_{metric}{{collection=\"metrics_col\"}}"
+            )),
+            "allocation metric must appear per collection: {metric}\n{body}"
+        );
+    }
     assert!(
         body.contains("genesisdb_collection_sidecar_resident_bytes{collection=\"metrics_col\"}"),
         "sidecar resident bytes gauge must appear per collection:\n{body}"

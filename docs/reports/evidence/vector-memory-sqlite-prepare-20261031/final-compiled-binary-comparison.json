@@ -1,0 +1,2393 @@
+{
+  "count": 159,
+  "changed_binaries": [
+    "hql2_request_tests-ffac6b2e00aafcea.exe",
+    "hql_p0_tests-0d151047ee04d38a.exe",
+    "add_vector_tests-ade58ae384b4e3ad.exe",
+    "projection_reopen_tests-ac739bb418ea9fe7.exe",
+    "wal_compaction_tests-a811d805cfcd8a3f.exe",
+    "hql2_parser_tests-da60f3a41b6b3c36.exe",
+    "relational_u2_contract_tests-819446c63a2a8ab2.exe",
+    "wave_b_collection_lifecycle_tests-2a8fc7037bf8a363.exe",
+    "graph_traversal-b6455b0be819a39d.exe",
+    "anti_entropy_tests-f54284da71bfabca.exe",
+    "rest_index_coverage_tests-d3e8e03862998dcc.exe",
+    "hql_collection_tests-0c0d286471416dd2.exe",
+    "rest_api-a8098d1906886c03.exe",
+    "sidecar_ondisk_tests-18b67c33c02c5a17.exe",
+    "hql-c5b700ef34feec8e.exe",
+    "hql2_g4_plan_identity_tests-8d71e83cf99bfce0.exe",
+    "hql2_key_codec_tests-1a2af2f9418bb86a.exe",
+    "hql2_lower_tests-5461ea3f2aa11e32.exe",
+    "hql2_storage_source_tests-18dab0f3906f9ae3.exe",
+    "unified_transaction_p5_tests-77c26707f8058f90.exe",
+    "wave_e_context_tests-d7ff274e52d7364b.exe",
+    "crdt_sync_tests-1cd4c3a887442065.exe",
+    "quantization_tests-9688a10f7ad308aa.exe",
+    "wave_e_rest_tests-41612c101738fb04.exe",
+    "durability_slice0_tests-fa6003e660adc82d.exe",
+    "hql2_hql1_labeled_filter_tests-f73914f45ef5cec3.exe",
+    "hql_fuzz_tests-93cd2b0c44e996de.exe",
+    "journal_migration_tests-ecb4e3e7ac1bd338.exe",
+    "relational_schema_resource_limit_tests-10fdbfa9ad7c5b4a.exe",
+    "retract_edge_tests-76fc8c956c7224bc.exe",
+    "soak_tests-de68236741eb57b0.exe",
+    "hql2_graph_oracle_tests-1ec0f24635fea331.exe",
+    "bitemporal_matrix_wp31_tests-7c7471c7f1013f21.exe",
+    "hql2_scalar_execution_tests-6428e2529bbc196a.exe",
+    "node_meta_a2_tests-781e9af889fdd759.exe",
+    "schema6_migration_tests-56bd8844be788711.exe",
+    "vector_memory_metrics_tests-c37e27d54e417704.exe",
+    "core_engine_tests-50734af74b45b194.exe",
+    "hql2_hql_reference_differential_tests-eff56977100f4aad.exe",
+    "projection_replay_recovery_tests-287664d40b87a9e9.exe",
+    "hql_cypher_tests-0a96672a3c154a17.exe",
+    "crash_simulation_tests-ab879916f2108591.exe",
+    "hql2_rank_oracle_tests-89c7eff03d734768.exe",
+    "hql2_expand_sequence_tests-0f09cfa319801142.exe",
+    "node_versions_wp21_tests-6a3ae89956c8165b.exe",
+    "edge_projection_tests-aacec555b57736a3.exe",
+    "multi_collection_tests-cc6596310b4b581b.exe",
+    "hnsw_capacity_tests-881f99eb880b5564.exe",
+    "binary_quant_tests-eaf1f79647d8c4cf.exe",
+    "hql2_annotation_acl_tests-aa20167501a4e2da.exe",
+    "p6_peer_authority_tests-d58f9818c0d07d09.exe",
+    "p6_snapshot_authority_tests-b6b357101a6c1ceb.exe",
+    "relational_u2_tests-126ecf5f9caa14ae.exe",
+    "robustness-86ae51b948887d47.exe",
+    "vector_collections-7aa061be751098bc.exe",
+    "zz_probe_discriminates-50ac8da7c65479ae.exe",
+    "hql2_durable_revision_tests-a1b603e8db91ab54.exe",
+    "rest_api_tests-0fbbc8d6b4089f11.exe",
+    "hql2_expand_tests-17a3211a1d06b0e9.exe",
+    "hql2_vector_operator_tests-2bcfc1d54d832d10.exe",
+    "sqlite_substrate_s0_tests-7812a3bef256e335.exe",
+    "temporal_queries_tests-e49580002abc2f2e.exe",
+    "concurrent_writers_tests-39d9c22fd6edfa26.exe",
+    "hql2_revision_backup_restore_tests-a88403cf07243487.exe",
+    "epoch_e2_tests-f741ba282955cd19.exe",
+    "durability_slice1_tests-f3fe7cbf0b50d35b.exe",
+    "p6_visibility_tests-dacf766225d5aeb1.exe",
+    "sidecar_reader_tests-60cd9b4f9f1bc2f1.exe",
+    "journal_recovery_p4_tests-3e5df172a2202a83.exe",
+    "persistence_tests-cee74ede0423a7d5.exe",
+    "f16_quant_tests-37b66b8619a6e4e9.exe",
+    "meta_format_migration_tests-c7262ed1e5191972.exe",
+    "retention_wp13_tests-88a8a33f8eb2426d.exe",
+    "backup_restore_u9_tests-29b6508c7847664d.exe",
+    "hql2_value_tests-e2be756bc5b60c8d.exe",
+    "edge_interning_tests-6dfb6403dc1d4751.exe",
+    "index_coverage_tests-c7233e275c0fb740.exe",
+    "merkle_convergence_tests-f96abaa163ba5291.exe",
+    "async_indexing_tests-dbfd445bf190dbaa.exe",
+    "hql2_root_match_oracle_differential_tests-c39e4caeb44e0089.exe",
+    "collection_name_validation_tests-b8d420fafd3b7b0c.exe",
+    "hql2_oracle_tests-204f7410177f6eba.exe",
+    "rebuild_from_truth_tests-466f03d07e0264b0.exe",
+    "tx_as_of_wp22_tests-0d224205fdeb70c5.exe",
+    "neighbors_direction_rels_tests-5dcbf4588cca0639.exe",
+    "uee_g0_contract_tests-62a9e8d692ee87ab.exe",
+    "hql2_g4_contract_tests-bf70f38e4c101dbd.exe",
+    "hql2_vector_oracle_differential_tests-b7c36d6c55eeadec.exe",
+    "unified_transaction_u3_tests-2ac3dfe471c12268.exe",
+    "grl_retrieval_tests-d032ceb994ec2e0b.exe",
+    "wp23_semantics_tests-182d886335580a8a.exe",
+    "sq8_calibration_tests-c927e3452596284d.exe",
+    "hql2_g4_provenance_completeness_tests-731ddaa8598bdb95.exe",
+    "hql2_hql1_property_projection_tests-5ce6d5b2842a3528.exe",
+    "wave_b_failure_tests-a7ee18e7cc52912f.exe",
+    "hql2_hql1_ordering_tests-ddb7ddc7ff3b0758.exe",
+    "hql2_hql1_adapter_tests-c4c7a42c8b2227d4.exe",
+    "governance_tests-e86dd8e3eba80f94.exe",
+    "jit_chunk_schema-92c445ad0bfaed24.exe",
+    "p6_lease_tests-63e17f092fcb7190.exe",
+    "wave_a_commit_tests-b9477cbdbbc39a47.exe",
+    "hql2_annotation_lookup_tests-1f68d835ea56a3ce.exe",
+    "thai_fuzzy_tests-27bfc9389b62f2c3.exe",
+    "concurrency-d39b1179de3f2047.exe",
+    "wave_d_rest_tests-2b8427804089a560.exe",
+    "schema_version_tests-3ef34b6f6b631585.exe",
+    "hql2_annotation_source_tests-44f439fa654fdd0a.exe",
+    "edge_u128_tests-11bc14857ee6194b.exe",
+    "hql2_storage_aggregate_oracle_differential_tests-aeeee6d5da1cc5da.exe",
+    "wave_d_quality_artifact_tests-6c63abf116531a3e.exe",
+    "consensus_checkpoint_race_tests-4028d1334adb472a.exe",
+    "sidecar_migration_tests-bc8d963139017f1e.exe",
+    "storage_lock_tests-ef7b570f27f7aa70.exe",
+    "ef_search_tests-15d89590a3186e5e.exe",
+    "batch_atomicity_tests-ff37052138fbe871.exe",
+    "hql2_g4_scalar_counter_tests-b142ccc4d02f122d.exe",
+    "ephemeral_nodes_tests-b6cf0427af8a835b.exe",
+    "hql2_storage_join_oracle_differential_tests-0664aa484e00231e.exe",
+    "consensus_commit_tests-8563d2848b34fa17.exe",
+    "g3_oracle_differential_tests-15f7c4911618447f.exe",
+    "hql2_row_history_tests-29f7c0e70d4ef3f8.exe",
+    "napi_rest_parity_tests-e51698fe873d122f.exe",
+    "p6_generation_tests-98f40aa3ecc09bba.exe",
+    "readonly_sql_surface_tests-1a94bd7b1c2dd607.exe",
+    "epoch_e1_tests-fe897f4b8521678f.exe",
+    "storage_reliability-a558d0b4678f3dca.exe",
+    "hardening_tests-5bcf245ad86146db.exe",
+    "hql2_restore_generation_tests-3b42f96300485316.exe",
+    "wave_c_query_correctness_tests-a9e4205f86f591a4.exe",
+    "collection_ef_default_tests-b62ca7fd63f7143d.exe",
+    "journal_format_tests-db402d7edf72c286.exe",
+    "hql2_history_change_tests-a66b59bb8c5b63fd.exe",
+    "hql2_explain_source_tests-cb7e792e758425ee.exe",
+    "hql2_execution_tests-56b1fd1c498bfe28.exe",
+    "hnsw_recall_floor_tests-93700df8ff0bcdef.exe",
+    "hql2_pipeline_oracle_tests-abe35efe380bdb15.exe",
+    "wave_b_correctness_tests-8351ff06bae7cd40.exe",
+    "node_interning_tests-36d8b4c55de0c086.exe",
+    "studio_contract_tests-32cb8354552c9ef1.exe",
+    "bq_centering_tests-599cb23cabce4cc2.exe",
+    "hql2_vector_revision_tests-84621e0daeeea5bb.exe",
+    "hql2_pattern_constraint_oracle_tests-c11d10975b6d2d83.exe",
+    "wave_d_budget_tests-aa73c5efba8ee4f2.exe",
+    "rerank_tests-b1dbd703dfb52b63.exe",
+    "consensus_vote_sig_tests-cd1384f3f0e24cad.exe",
+    "compaction_tests-61d71aa8e9d69070.exe",
+    "hql2_g4_source_counter_tests-80ca6d9f12a75776.exe",
+    "hql2_p8_completion_tests-213a6c3dc0971d87.exe",
+    "hql_filter_tests-22c00e0c8adfde3f.exe",
+    "wave_b_sync_tests-040ec4c7c784603c.exe",
+    "hql2_storage_set_oracle_differential_tests-8a6face7dbbd3164.exe",
+    "wal_tail_replay_tests-cf928416784f4477.exe",
+    "query_ir_tests-bbb1d5187b614c62.exe",
+    "state_transition_tests-8d1fcc24f7802e7c.exe",
+    "hql2_storage_hql_join_oracle_differential_tests-05ebb0e357f9c71b.exe",
+    "gossip_membership_security_tests-481c70dde84c2a40.exe",
+    "hql2_wire_tests-ac58ff776c5ab89d.exe",
+    "bitemporal-d9dd0cbfefd62064.exe",
+    "genesis_block_native-cd8246c766c42fca.exe"
+  ],
+  "unchanged_binaries": 0,
+  "artifacts": [
+    {
+      "target": "hql2_request_tests",
+      "binary": "hql2_request_tests-ffac6b2e00aafcea.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_request_tests-ffac6b2e00aafcea.exe",
+      "sha256": "252b53efe4827231805ced4c183fbac28e2120b4599acecb5486f7534931cfc4",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql_p0_tests",
+      "binary": "hql_p0_tests-0d151047ee04d38a.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql_p0_tests-0d151047ee04d38a.exe",
+      "sha256": "a64a79a0bed5bd4e5c70d13c2dc21f20151efe124ce675864ef81eb02214a14e",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "add_vector_tests",
+      "binary": "add_vector_tests-ade58ae384b4e3ad.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\add_vector_tests-ade58ae384b4e3ad.exe",
+      "sha256": "4bd5df446d0a4c5465df3833ec862950ca43411bd4a45313e3b1983922ec49f0",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "projection_reopen_tests",
+      "binary": "projection_reopen_tests-ac739bb418ea9fe7.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\projection_reopen_tests-ac739bb418ea9fe7.exe",
+      "sha256": "668438ad2451fdc8edd6c1790fb38b7735ee1ddc2bb986311aefac4eb32956b4",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "wal_compaction_tests",
+      "binary": "wal_compaction_tests-a811d805cfcd8a3f.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\wal_compaction_tests-a811d805cfcd8a3f.exe",
+      "sha256": "1f0c4bbfca5513e1f2cbbab94ada187a27fc728bdc62351ca91a149e679341c1",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_parser_tests",
+      "binary": "hql2_parser_tests-da60f3a41b6b3c36.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_parser_tests-da60f3a41b6b3c36.exe",
+      "sha256": "3b537bbd00dc30e13bd6d601af8502af5d987cf6e6b9f355f989a35bbef01b75",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "relational_u2_contract_tests",
+      "binary": "relational_u2_contract_tests-819446c63a2a8ab2.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\relational_u2_contract_tests-819446c63a2a8ab2.exe",
+      "sha256": "21fe12f07631bba125e777b4b93ef4ae0f26543fe44bd330592769bebaa0d062",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "wave_b_collection_lifecycle_tests",
+      "binary": "wave_b_collection_lifecycle_tests-2a8fc7037bf8a363.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\wave_b_collection_lifecycle_tests-2a8fc7037bf8a363.exe",
+      "sha256": "9172e941603a7b101358d1d5bcc69bce422d4806dee739577cb992df5a79f69a",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "graph_traversal",
+      "binary": "graph_traversal-b6455b0be819a39d.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\graph_traversal-b6455b0be819a39d.exe",
+      "sha256": "91df932c4b3e86a0f6cc277e167eabb91aa94426967c7694ab52fb83a5c97337",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "anti_entropy_tests",
+      "binary": "anti_entropy_tests-f54284da71bfabca.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\anti_entropy_tests-f54284da71bfabca.exe",
+      "sha256": "e7df8397b87e97b6c8a352375f4d702ef8732ac6128720492acc4a5f8bf177d1",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "rest_index_coverage_tests",
+      "binary": "rest_index_coverage_tests-d3e8e03862998dcc.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\rest_index_coverage_tests-d3e8e03862998dcc.exe",
+      "sha256": "aa71989a8318bef7f0c3a2bc73e96ea942eed96ec686b2960d0bfac9db7a2771",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql_collection_tests",
+      "binary": "hql_collection_tests-0c0d286471416dd2.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql_collection_tests-0c0d286471416dd2.exe",
+      "sha256": "c5b901309b686ae18eac309165d8982263a1f974cea837ea6e2122ddf6394671",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "rest_api",
+      "binary": "rest_api-a8098d1906886c03.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\rest_api-a8098d1906886c03.exe",
+      "sha256": "515b39483e9bd74eb2bff5e574f18f8b80dbe132586f3a00f996cb9ccf6ef321",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "sidecar_ondisk_tests",
+      "binary": "sidecar_ondisk_tests-18b67c33c02c5a17.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\sidecar_ondisk_tests-18b67c33c02c5a17.exe",
+      "sha256": "e7dcd6e36ea31406b1e9cf7adbd4f3c69ebe8a341104edbb9058652ff98c8335",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql",
+      "binary": "hql-c5b700ef34feec8e.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql-c5b700ef34feec8e.exe",
+      "sha256": "af9170bcf6942e0e514dcad8544a61a4136887fb025cd9cd1d38e6c99a1de681",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_g4_plan_identity_tests",
+      "binary": "hql2_g4_plan_identity_tests-8d71e83cf99bfce0.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_g4_plan_identity_tests-8d71e83cf99bfce0.exe",
+      "sha256": "0e434ce233cb9706183aa81bba9640aaabe3cfa620c3e716795d15639bf2c897",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_key_codec_tests",
+      "binary": "hql2_key_codec_tests-1a2af2f9418bb86a.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_key_codec_tests-1a2af2f9418bb86a.exe",
+      "sha256": "e03739081b5b0df5f804dc823b0375118865af7e66a160011e1f87545ef1868f",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_lower_tests",
+      "binary": "hql2_lower_tests-5461ea3f2aa11e32.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_lower_tests-5461ea3f2aa11e32.exe",
+      "sha256": "03aa160f44dd9aac5af524f41661a724600c9cd5d864df90fc5880ac7191470b",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_storage_source_tests",
+      "binary": "hql2_storage_source_tests-18dab0f3906f9ae3.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_storage_source_tests-18dab0f3906f9ae3.exe",
+      "sha256": "6ba4e8aa8a4b9a5f9347c0579c9894921bb60c8b95c1cd2a8bd377383f2f81eb",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "unified_transaction_p5_tests",
+      "binary": "unified_transaction_p5_tests-77c26707f8058f90.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\unified_transaction_p5_tests-77c26707f8058f90.exe",
+      "sha256": "b5d4a04f4cf18cca74b39b5a9abb61c9d5e5c2ef11ff8f341164da7cce002ab4",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "wave_e_context_tests",
+      "binary": "wave_e_context_tests-d7ff274e52d7364b.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\wave_e_context_tests-d7ff274e52d7364b.exe",
+      "sha256": "95035ca27ebc779224b9b01761bfcec0a4953f53d8069b996402b074ba754a74",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "crdt_sync_tests",
+      "binary": "crdt_sync_tests-1cd4c3a887442065.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\crdt_sync_tests-1cd4c3a887442065.exe",
+      "sha256": "b89385bc29203315255cb5e5d4321666e9bf00b3082f863db79f7c45713c3a5d",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "quantization_tests",
+      "binary": "quantization_tests-9688a10f7ad308aa.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\quantization_tests-9688a10f7ad308aa.exe",
+      "sha256": "9a752f2374130b3087db330299b0eb49be6133a5b263d79421f699c4487993b8",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "wave_e_rest_tests",
+      "binary": "wave_e_rest_tests-41612c101738fb04.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\wave_e_rest_tests-41612c101738fb04.exe",
+      "sha256": "3d2fc2813d345610da80303a20be99f5f645e428ff93014307e25946ea818197",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "durability_slice0_tests",
+      "binary": "durability_slice0_tests-fa6003e660adc82d.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\durability_slice0_tests-fa6003e660adc82d.exe",
+      "sha256": "83306f60810b7124967158b810df6a0a203714414c6c6c38eb4132fd7f749dbf",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_hql1_labeled_filter_tests",
+      "binary": "hql2_hql1_labeled_filter_tests-f73914f45ef5cec3.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_hql1_labeled_filter_tests-f73914f45ef5cec3.exe",
+      "sha256": "cdadb58237beb5d6b8e35ba5e60f7315dc72afec5a370985eb8d3e605503ad32",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql_fuzz_tests",
+      "binary": "hql_fuzz_tests-93cd2b0c44e996de.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql_fuzz_tests-93cd2b0c44e996de.exe",
+      "sha256": "e961668bb85abeb129b34568eef09c7e2bb2982a09d14346759bba9bc61893ab",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "journal_migration_tests",
+      "binary": "journal_migration_tests-ecb4e3e7ac1bd338.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\journal_migration_tests-ecb4e3e7ac1bd338.exe",
+      "sha256": "1a3fe5a0a1b677ec43a506baba05eed80a2d2ce0fac9d85d20f230c1efa5cbf6",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "relational_schema_resource_limit_tests",
+      "binary": "relational_schema_resource_limit_tests-10fdbfa9ad7c5b4a.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\relational_schema_resource_limit_tests-10fdbfa9ad7c5b4a.exe",
+      "sha256": "21b21690434c895f8f76c96a6cfc300ca6c4023aea7bc40e80e9db6586fc6b3b",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "retract_edge_tests",
+      "binary": "retract_edge_tests-76fc8c956c7224bc.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\retract_edge_tests-76fc8c956c7224bc.exe",
+      "sha256": "0d0c2a9c3175822ed0927c1d47e057b439dc9868fdd504fe306d9655ef682073",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "soak_tests",
+      "binary": "soak_tests-de68236741eb57b0.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\soak_tests-de68236741eb57b0.exe",
+      "sha256": "fbfddd4070f2152d5dd183647e96d664e86b3ea733b28a536e7f5b0d1082ad95",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_graph_oracle_tests",
+      "binary": "hql2_graph_oracle_tests-1ec0f24635fea331.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_graph_oracle_tests-1ec0f24635fea331.exe",
+      "sha256": "15c6b439bea2997c990340c589e092bb7188e0f22c484813ef903ec0acf3c545",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "bitemporal_matrix_wp31_tests",
+      "binary": "bitemporal_matrix_wp31_tests-7c7471c7f1013f21.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\bitemporal_matrix_wp31_tests-7c7471c7f1013f21.exe",
+      "sha256": "1bb28b6f3b0018818c6e2fb2d23e2c1744a678315f05ff0e2115ce618b1b7c93",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_scalar_execution_tests",
+      "binary": "hql2_scalar_execution_tests-6428e2529bbc196a.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_scalar_execution_tests-6428e2529bbc196a.exe",
+      "sha256": "907cfad9838760b511c7e7c2417732eee58e117c8344e3cb01c8c5e0ec1cf165",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "node_meta_a2_tests",
+      "binary": "node_meta_a2_tests-781e9af889fdd759.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\node_meta_a2_tests-781e9af889fdd759.exe",
+      "sha256": "8c292fbf85d5cc716be299aaf08d4e065041698dc7c538492541005718520c43",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "schema6_migration_tests",
+      "binary": "schema6_migration_tests-56bd8844be788711.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\schema6_migration_tests-56bd8844be788711.exe",
+      "sha256": "ec4c88095c3a62164a5ad2e363dc840095d891a7a3bc7c77c89e0bbb74108b0f",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "vector_memory_metrics_tests",
+      "binary": "vector_memory_metrics_tests-c37e27d54e417704.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\vector_memory_metrics_tests-c37e27d54e417704.exe",
+      "sha256": "6a8767474770a323acdcd4be1c865db27b893c751341fee548d9c09530e392db",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "core_engine_tests",
+      "binary": "core_engine_tests-50734af74b45b194.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\core_engine_tests-50734af74b45b194.exe",
+      "sha256": "268235d032442337021c176ef750eede8b2a7ac7e98b82c28d8cb84f5e340db7",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_hql_reference_differential_tests",
+      "binary": "hql2_hql_reference_differential_tests-eff56977100f4aad.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_hql_reference_differential_tests-eff56977100f4aad.exe",
+      "sha256": "e0f5a91e2fad880ec26c86e8d8c6f39f8d03651dd6e1cddb05b40d38a9f06a9f",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "projection_replay_recovery_tests",
+      "binary": "projection_replay_recovery_tests-287664d40b87a9e9.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\projection_replay_recovery_tests-287664d40b87a9e9.exe",
+      "sha256": "a972d1c626e1b919c5d68a447de98afdddaa352f673395ac9c2470f43f15fab1",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql_cypher_tests",
+      "binary": "hql_cypher_tests-0a96672a3c154a17.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql_cypher_tests-0a96672a3c154a17.exe",
+      "sha256": "8ee4d703ae4df12d58e6c8756b56917cb58d160cf3120af06d7bc78f69f5c062",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "crash_simulation_tests",
+      "binary": "crash_simulation_tests-ab879916f2108591.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\crash_simulation_tests-ab879916f2108591.exe",
+      "sha256": "88e019465e457dd2170fe043eb1446ad028c6de878be920233064ab1c997b69f",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_rank_oracle_tests",
+      "binary": "hql2_rank_oracle_tests-89c7eff03d734768.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_rank_oracle_tests-89c7eff03d734768.exe",
+      "sha256": "50893b29f36201056760f847403ac592744f260ce48b51e0852245ac56cd2641",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_expand_sequence_tests",
+      "binary": "hql2_expand_sequence_tests-0f09cfa319801142.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_expand_sequence_tests-0f09cfa319801142.exe",
+      "sha256": "738e444d73f131d856bd52073d4b65283f4dd8deb80417e980733e3d5c706d47",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "node_versions_wp21_tests",
+      "binary": "node_versions_wp21_tests-6a3ae89956c8165b.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\node_versions_wp21_tests-6a3ae89956c8165b.exe",
+      "sha256": "4325281d9ba4eff07ef3bada60b9b12aaf82c2a66d95b40422b92a19f33e225e",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "edge_projection_tests",
+      "binary": "edge_projection_tests-aacec555b57736a3.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\edge_projection_tests-aacec555b57736a3.exe",
+      "sha256": "36ddf4ff40e88fc91123f3632fcc2b82622eedad5169920af879f2d94a00b8da",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "multi_collection_tests",
+      "binary": "multi_collection_tests-cc6596310b4b581b.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\multi_collection_tests-cc6596310b4b581b.exe",
+      "sha256": "6f404c60fec36318eeda8d7b5d6b8c3732211e1912471e2d35bb9806988529ee",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hnsw_capacity_tests",
+      "binary": "hnsw_capacity_tests-881f99eb880b5564.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hnsw_capacity_tests-881f99eb880b5564.exe",
+      "sha256": "4152707c806f1d71e4634c028d493afdff694b18fbb2a5f517c00e34bfabe277",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "binary_quant_tests",
+      "binary": "binary_quant_tests-eaf1f79647d8c4cf.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\binary_quant_tests-eaf1f79647d8c4cf.exe",
+      "sha256": "a8b8b08659857d35a3af398ec032b6d4d200366bea7902bc59a21f8e856cc75a",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_annotation_acl_tests",
+      "binary": "hql2_annotation_acl_tests-aa20167501a4e2da.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_annotation_acl_tests-aa20167501a4e2da.exe",
+      "sha256": "7e8f5149a9e1801c7aed1e213622f0ec1e1534bce35f8008b66fe43198ccdab3",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "p6_peer_authority_tests",
+      "binary": "p6_peer_authority_tests-d58f9818c0d07d09.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\p6_peer_authority_tests-d58f9818c0d07d09.exe",
+      "sha256": "a76722e9bb32252a44679c29cbe599ee0cd7f46ad731280a1857fb71dc139df8",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "p6_snapshot_authority_tests",
+      "binary": "p6_snapshot_authority_tests-b6b357101a6c1ceb.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\p6_snapshot_authority_tests-b6b357101a6c1ceb.exe",
+      "sha256": "c3b9fb362abd3ffba24a49df18cd5d3a89efbf614e60b3737947030ef0cfcf76",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "relational_u2_tests",
+      "binary": "relational_u2_tests-126ecf5f9caa14ae.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\relational_u2_tests-126ecf5f9caa14ae.exe",
+      "sha256": "70c26fdb64298f00cd82f00b0f0153488d2306bb54d5f0063c9981bfe0fe4e5b",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "robustness",
+      "binary": "robustness-86ae51b948887d47.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\robustness-86ae51b948887d47.exe",
+      "sha256": "03436776590ce3c52c16ca89e215de30aa076858a6837b48c1c554ccf5f4f897",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "vector_collections",
+      "binary": "vector_collections-7aa061be751098bc.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\vector_collections-7aa061be751098bc.exe",
+      "sha256": "76bc919259ac09adaf314ca3a62e29299465199ec19a089c981779046e9eaf5f",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "zz_probe_discriminates",
+      "binary": "zz_probe_discriminates-50ac8da7c65479ae.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\zz_probe_discriminates-50ac8da7c65479ae.exe",
+      "sha256": "b2bc7950dc9bc1071bda635c117d690cbdd88ee82618d54654fc4c31f4e0316a",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_durable_revision_tests",
+      "binary": "hql2_durable_revision_tests-a1b603e8db91ab54.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_durable_revision_tests-a1b603e8db91ab54.exe",
+      "sha256": "d002f794ef2c0d8a9316236105318497f7a738a87e9c4fe5691956b649c903ed",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "rest_api_tests",
+      "binary": "rest_api_tests-0fbbc8d6b4089f11.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\rest_api_tests-0fbbc8d6b4089f11.exe",
+      "sha256": "1149b41967df1a0aeae04fa2628644537217e20a0b493eea0fe843a748bbcf7a",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_expand_tests",
+      "binary": "hql2_expand_tests-17a3211a1d06b0e9.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_expand_tests-17a3211a1d06b0e9.exe",
+      "sha256": "3d2e5c1619986cfecfb216e972c967067c582a6de9920949927a75b8f3073d28",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_vector_operator_tests",
+      "binary": "hql2_vector_operator_tests-2bcfc1d54d832d10.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_vector_operator_tests-2bcfc1d54d832d10.exe",
+      "sha256": "d9624dcd62f7fac018cb6199d8af7c64cf86bca39bdcfae80e0cc2a992130da1",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "sqlite_substrate_s0_tests",
+      "binary": "sqlite_substrate_s0_tests-7812a3bef256e335.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\sqlite_substrate_s0_tests-7812a3bef256e335.exe",
+      "sha256": "a69c4d35e08627402bbc24753727b7d733935c101e8ca6e7cbb5e115f29ac437",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "temporal_queries_tests",
+      "binary": "temporal_queries_tests-e49580002abc2f2e.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\temporal_queries_tests-e49580002abc2f2e.exe",
+      "sha256": "f31c35ad67a32cb9bdabbde3dfd289843d869ce74da58e34dad6991fc5f86226",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "concurrent_writers_tests",
+      "binary": "concurrent_writers_tests-39d9c22fd6edfa26.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\concurrent_writers_tests-39d9c22fd6edfa26.exe",
+      "sha256": "b8e8a7cac29a4c51b7e4b8ea7d9cdf4f9c474a7c68030dc09eedb37affde5f2c",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_revision_backup_restore_tests",
+      "binary": "hql2_revision_backup_restore_tests-a88403cf07243487.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_revision_backup_restore_tests-a88403cf07243487.exe",
+      "sha256": "4d799f6bfc95835bebffdd6c47aa24be25170d45d8c67d073051cf9462edc94d",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "epoch_e2_tests",
+      "binary": "epoch_e2_tests-f741ba282955cd19.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\epoch_e2_tests-f741ba282955cd19.exe",
+      "sha256": "ba0e90f5acfae0e4d3a5d5289cb4b83c294ed59825cf8706e60fc998b5498614",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "durability_slice1_tests",
+      "binary": "durability_slice1_tests-f3fe7cbf0b50d35b.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\durability_slice1_tests-f3fe7cbf0b50d35b.exe",
+      "sha256": "7cd9ea9abdc4d1a028eefd0901a9a881f8cd479f1e89c48f8f453f1e3bdbe8eb",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "p6_visibility_tests",
+      "binary": "p6_visibility_tests-dacf766225d5aeb1.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\p6_visibility_tests-dacf766225d5aeb1.exe",
+      "sha256": "7d51f16c6c6557cafe69b645abfe0f316069bacea000dd4aa63bb5a132a1dba9",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "sidecar_reader_tests",
+      "binary": "sidecar_reader_tests-60cd9b4f9f1bc2f1.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\sidecar_reader_tests-60cd9b4f9f1bc2f1.exe",
+      "sha256": "5a9ecf48c6180560d443c0fa63bc48a2b9d5e20027235de2536057256e2941df",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "journal_recovery_p4_tests",
+      "binary": "journal_recovery_p4_tests-3e5df172a2202a83.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\journal_recovery_p4_tests-3e5df172a2202a83.exe",
+      "sha256": "de182940b43e9fd2475acae65067800dc63d6c7551a8e78392016ecc6712a1ec",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "persistence_tests",
+      "binary": "persistence_tests-cee74ede0423a7d5.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\persistence_tests-cee74ede0423a7d5.exe",
+      "sha256": "c7417f23cb3153cc112442c7bb0ba7e76356ce10c4a102508c430f995c0b1f7e",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "f16_quant_tests",
+      "binary": "f16_quant_tests-37b66b8619a6e4e9.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\f16_quant_tests-37b66b8619a6e4e9.exe",
+      "sha256": "7c23e6e01be73acee60f94584d3f3d819c6e9c59511b1d364d668770b6d2e4b7",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "meta_format_migration_tests",
+      "binary": "meta_format_migration_tests-c7262ed1e5191972.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\meta_format_migration_tests-c7262ed1e5191972.exe",
+      "sha256": "3e72087843cad2c63f83f10ab1b24315ade0440b42c76f9b48d5c3ea2c1ba7d4",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "retention_wp13_tests",
+      "binary": "retention_wp13_tests-88a8a33f8eb2426d.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\retention_wp13_tests-88a8a33f8eb2426d.exe",
+      "sha256": "fb9ffc49b3c4970a84450bac4be0fc32360b69a50dced84b3eb729d0aff1a065",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "backup_restore_u9_tests",
+      "binary": "backup_restore_u9_tests-29b6508c7847664d.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\backup_restore_u9_tests-29b6508c7847664d.exe",
+      "sha256": "d13c50fa969d17f6ff2ef2b7ad97935908f8031cbd2d32d108c054279097011b",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_value_tests",
+      "binary": "hql2_value_tests-e2be756bc5b60c8d.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_value_tests-e2be756bc5b60c8d.exe",
+      "sha256": "6b300436f67e7730ba7988788460d6764a0ef49c609f46eb63fccc2625f832e5",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "edge_interning_tests",
+      "binary": "edge_interning_tests-6dfb6403dc1d4751.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\edge_interning_tests-6dfb6403dc1d4751.exe",
+      "sha256": "8c601270cd2cdc17f01ca8c7cdffab6ca7c57d092715de7708c1f6ae67272750",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "index_coverage_tests",
+      "binary": "index_coverage_tests-c7233e275c0fb740.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\index_coverage_tests-c7233e275c0fb740.exe",
+      "sha256": "5dff790a51d669ac3a5bf716cb8d25c67699bc3fb7f0a9f613b29ffe25419bd1",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "merkle_convergence_tests",
+      "binary": "merkle_convergence_tests-f96abaa163ba5291.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\merkle_convergence_tests-f96abaa163ba5291.exe",
+      "sha256": "066657f9dfd290b48dd2049c2cf88f447e113b84e49cf9e084fa58a134752b72",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "async_indexing_tests",
+      "binary": "async_indexing_tests-dbfd445bf190dbaa.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\async_indexing_tests-dbfd445bf190dbaa.exe",
+      "sha256": "25fa494347b09840700957a5fbdfaf624417744567568376dead8524aea4d04a",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_root_match_oracle_differential_tests",
+      "binary": "hql2_root_match_oracle_differential_tests-c39e4caeb44e0089.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_root_match_oracle_differential_tests-c39e4caeb44e0089.exe",
+      "sha256": "86469ee57c40f37be6d2c9f86e00e7bfc7d3d9f2907e8e890c9104cc560ac69a",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "collection_name_validation_tests",
+      "binary": "collection_name_validation_tests-b8d420fafd3b7b0c.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\collection_name_validation_tests-b8d420fafd3b7b0c.exe",
+      "sha256": "793ad839411499cb227357cb3bae4b9a612f7bb6c1ca49e540983f14264f0692",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_oracle_tests",
+      "binary": "hql2_oracle_tests-204f7410177f6eba.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_oracle_tests-204f7410177f6eba.exe",
+      "sha256": "629625fb053af90114b9725fe9ed63577449593b3878d01679c2c68aa58f636d",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "rebuild_from_truth_tests",
+      "binary": "rebuild_from_truth_tests-466f03d07e0264b0.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\rebuild_from_truth_tests-466f03d07e0264b0.exe",
+      "sha256": "54e581a593eec4a82f06ac9dc82ded0345b6917e98597dfe57a22ec980253cd0",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "tx_as_of_wp22_tests",
+      "binary": "tx_as_of_wp22_tests-0d224205fdeb70c5.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\tx_as_of_wp22_tests-0d224205fdeb70c5.exe",
+      "sha256": "851a6059f403b0cbd407df5cb881755850446cdce2d38e7d7a023b411544f7c7",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "neighbors_direction_rels_tests",
+      "binary": "neighbors_direction_rels_tests-5dcbf4588cca0639.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\neighbors_direction_rels_tests-5dcbf4588cca0639.exe",
+      "sha256": "985dd450699d66a2bbfc375fc096b0d7a5430f82da14306164550abfd3c789bc",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "uee_g0_contract_tests",
+      "binary": "uee_g0_contract_tests-62a9e8d692ee87ab.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\uee_g0_contract_tests-62a9e8d692ee87ab.exe",
+      "sha256": "8d9ce0c52cc226c5ad2061e38b8958a6407522933c40fbd17cb512a5384d4023",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_g4_contract_tests",
+      "binary": "hql2_g4_contract_tests-bf70f38e4c101dbd.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_g4_contract_tests-bf70f38e4c101dbd.exe",
+      "sha256": "b4bb3d1195082e33e56a2ed0979f6eadaa2264d8cb217d7d8935b3ca053a2744",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_vector_oracle_differential_tests",
+      "binary": "hql2_vector_oracle_differential_tests-b7c36d6c55eeadec.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_vector_oracle_differential_tests-b7c36d6c55eeadec.exe",
+      "sha256": "722a138d4e54757017ab351757449b8574622d7d12bcb304e7bea8b26bfd12c8",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "unified_transaction_u3_tests",
+      "binary": "unified_transaction_u3_tests-2ac3dfe471c12268.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\unified_transaction_u3_tests-2ac3dfe471c12268.exe",
+      "sha256": "58941f2dca5e1465c68c39250bf05eb363f2abdcfb5e29e909fae1fcce558169",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "grl_retrieval_tests",
+      "binary": "grl_retrieval_tests-d032ceb994ec2e0b.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\grl_retrieval_tests-d032ceb994ec2e0b.exe",
+      "sha256": "caba844828fb94fba86ea9579321b0a9f3c7841b928eaf5cfd9631178ba1064b",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "wp23_semantics_tests",
+      "binary": "wp23_semantics_tests-182d886335580a8a.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\wp23_semantics_tests-182d886335580a8a.exe",
+      "sha256": "d8805c36a77d4fda1205d09596af21a4e11c40d51029d018786751a33bde6cc7",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "sq8_calibration_tests",
+      "binary": "sq8_calibration_tests-c927e3452596284d.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\sq8_calibration_tests-c927e3452596284d.exe",
+      "sha256": "51e8e7c3a81f7daa08d27cb6d7a898773eb7706d36b05f5b977fa1c442ced428",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_g4_provenance_completeness_tests",
+      "binary": "hql2_g4_provenance_completeness_tests-731ddaa8598bdb95.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_g4_provenance_completeness_tests-731ddaa8598bdb95.exe",
+      "sha256": "16b1511562ac93728077e6ae4055215f00dc7b55972139d0f86cd75c9228aac8",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_hql1_property_projection_tests",
+      "binary": "hql2_hql1_property_projection_tests-5ce6d5b2842a3528.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_hql1_property_projection_tests-5ce6d5b2842a3528.exe",
+      "sha256": "4439516371dd1075231348a2e2e4d64750d4122edc07e1f5417cf50677dc2831",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "wave_b_failure_tests",
+      "binary": "wave_b_failure_tests-a7ee18e7cc52912f.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\wave_b_failure_tests-a7ee18e7cc52912f.exe",
+      "sha256": "305474aaf1975a0bb8b0d0d090ef0087a2a79b63d65d06b93fda9c173100910c",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_hql1_ordering_tests",
+      "binary": "hql2_hql1_ordering_tests-ddb7ddc7ff3b0758.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_hql1_ordering_tests-ddb7ddc7ff3b0758.exe",
+      "sha256": "8a0aadfeb281b9f512364080a0d6143b347db81f99d79d7e75162c8aa078ea4b",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_hql1_adapter_tests",
+      "binary": "hql2_hql1_adapter_tests-c4c7a42c8b2227d4.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_hql1_adapter_tests-c4c7a42c8b2227d4.exe",
+      "sha256": "94b6e2a23e55924e201517024e20b7e51b20aa734e4c45a1696fc191a5b2bc26",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "governance_tests",
+      "binary": "governance_tests-e86dd8e3eba80f94.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\governance_tests-e86dd8e3eba80f94.exe",
+      "sha256": "accad807eef2186279d07d38856509325a3fcc5e405a1837fc7258c60a0ca50f",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "jit_chunk_schema",
+      "binary": "jit_chunk_schema-92c445ad0bfaed24.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\jit_chunk_schema-92c445ad0bfaed24.exe",
+      "sha256": "92e882c4650057d40ac3c106b14c4b43463c95000064163a0f6165d7ef212ce3",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "p6_lease_tests",
+      "binary": "p6_lease_tests-63e17f092fcb7190.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\p6_lease_tests-63e17f092fcb7190.exe",
+      "sha256": "c0c8d601694870811f5d1124ee419197c892d9b16209813eacda55c4bfc00319",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "wave_a_commit_tests",
+      "binary": "wave_a_commit_tests-b9477cbdbbc39a47.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\wave_a_commit_tests-b9477cbdbbc39a47.exe",
+      "sha256": "0d607609cedd4e49eb0fffc6ab29dc0eee9400f19a74ee41fb6c1c72c40fb102",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_annotation_lookup_tests",
+      "binary": "hql2_annotation_lookup_tests-1f68d835ea56a3ce.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_annotation_lookup_tests-1f68d835ea56a3ce.exe",
+      "sha256": "7dfb4a2b1a7bb93b16d4c553f1ae8fa0f3b66117183124ff0696e9a3c0c9b2c9",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "thai_fuzzy_tests",
+      "binary": "thai_fuzzy_tests-27bfc9389b62f2c3.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\thai_fuzzy_tests-27bfc9389b62f2c3.exe",
+      "sha256": "2062c98cd45abc26cb5ff9d5a9d0cdef78a1a29a22f0aa2b6f05c071a8b26310",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "concurrency",
+      "binary": "concurrency-d39b1179de3f2047.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\concurrency-d39b1179de3f2047.exe",
+      "sha256": "d552fcaef3caeffb4613cc46a886803947f2f1342ab3fef0e38c82f418006e1a",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "wave_d_rest_tests",
+      "binary": "wave_d_rest_tests-2b8427804089a560.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\wave_d_rest_tests-2b8427804089a560.exe",
+      "sha256": "7f808083c60edba2c3b69acdf648231b348c3e044b50baf6641021a9140ba5b3",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "schema_version_tests",
+      "binary": "schema_version_tests-3ef34b6f6b631585.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\schema_version_tests-3ef34b6f6b631585.exe",
+      "sha256": "ff078d12c7f0eb8dc143ba96757a77140ffad84fc8e8ac94745281273ce08a7f",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_annotation_source_tests",
+      "binary": "hql2_annotation_source_tests-44f439fa654fdd0a.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_annotation_source_tests-44f439fa654fdd0a.exe",
+      "sha256": "20fade1ea1f02c7de3dd29eeb9e2212ee0e3c36eed46f5ba6233c98a44e7bf69",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "edge_u128_tests",
+      "binary": "edge_u128_tests-11bc14857ee6194b.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\edge_u128_tests-11bc14857ee6194b.exe",
+      "sha256": "dea0632c20a1a088a0752b5ed665085cc5031e88f02f2f8f19e456b79cc5980f",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_storage_aggregate_oracle_differential_tests",
+      "binary": "hql2_storage_aggregate_oracle_differential_tests-aeeee6d5da1cc5da.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_storage_aggregate_oracle_differential_tests-aeeee6d5da1cc5da.exe",
+      "sha256": "781ff7300ba417fa9fecc466643928c0a06148df9f0e064894e690052f11c2c6",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "wave_d_quality_artifact_tests",
+      "binary": "wave_d_quality_artifact_tests-6c63abf116531a3e.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\wave_d_quality_artifact_tests-6c63abf116531a3e.exe",
+      "sha256": "a0d9587645281339d31c77dec54ba37bc2c3d498dc6650a77d600402e3ebcf7b",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "consensus_checkpoint_race_tests",
+      "binary": "consensus_checkpoint_race_tests-4028d1334adb472a.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\consensus_checkpoint_race_tests-4028d1334adb472a.exe",
+      "sha256": "821b667471c9a358306116ee87bf01872dafaf14a2a4f47f73f25f6c92fa3292",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "sidecar_migration_tests",
+      "binary": "sidecar_migration_tests-bc8d963139017f1e.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\sidecar_migration_tests-bc8d963139017f1e.exe",
+      "sha256": "670d994a59303a93d1af64b136286f853e35f1fa2b6be343c3499a7c1cf8d31f",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "storage_lock_tests",
+      "binary": "storage_lock_tests-ef7b570f27f7aa70.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\storage_lock_tests-ef7b570f27f7aa70.exe",
+      "sha256": "de1f972c78f28e5eb276457fd4464d32b0a5ea81d5822ff6ca6b6f28301e445a",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "ef_search_tests",
+      "binary": "ef_search_tests-15d89590a3186e5e.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\ef_search_tests-15d89590a3186e5e.exe",
+      "sha256": "985cb7ede1a24f82bd395c7a829214d8f08f62946b65ed73ede79e87f808db9d",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "batch_atomicity_tests",
+      "binary": "batch_atomicity_tests-ff37052138fbe871.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\batch_atomicity_tests-ff37052138fbe871.exe",
+      "sha256": "730ba31ac98c45edb7336d58699f30ba398f603a166df18403f64ab381f53f41",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_g4_scalar_counter_tests",
+      "binary": "hql2_g4_scalar_counter_tests-b142ccc4d02f122d.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_g4_scalar_counter_tests-b142ccc4d02f122d.exe",
+      "sha256": "2a122b0ed49b1fcaddcfb365d97cd7402807ab972199412c638c1a2dfbe01578",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "ephemeral_nodes_tests",
+      "binary": "ephemeral_nodes_tests-b6cf0427af8a835b.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\ephemeral_nodes_tests-b6cf0427af8a835b.exe",
+      "sha256": "dfd8756022495a38452247583ce65878c4bddf7c74700c4ca96738cce1aae5f8",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_storage_join_oracle_differential_tests",
+      "binary": "hql2_storage_join_oracle_differential_tests-0664aa484e00231e.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_storage_join_oracle_differential_tests-0664aa484e00231e.exe",
+      "sha256": "b9a52f5a17cb988e4151997e4d922b16ed146cc6db20b6d501702906bffb7b16",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "consensus_commit_tests",
+      "binary": "consensus_commit_tests-8563d2848b34fa17.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\consensus_commit_tests-8563d2848b34fa17.exe",
+      "sha256": "a7e4ad96265037c85d1680cfeae143c5886c6de6bb717e762e76b1cc572634ff",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "g3_oracle_differential_tests",
+      "binary": "g3_oracle_differential_tests-15f7c4911618447f.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\g3_oracle_differential_tests-15f7c4911618447f.exe",
+      "sha256": "7c5867b53cdc1ab602c5da25f7f135cee51ba90ce4009edc5108117537f35f1a",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_row_history_tests",
+      "binary": "hql2_row_history_tests-29f7c0e70d4ef3f8.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_row_history_tests-29f7c0e70d4ef3f8.exe",
+      "sha256": "2e48f61105fd83b4177b995977fe8bd6323c5203f3bb4252d06670ba431d4ac0",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "napi_rest_parity_tests",
+      "binary": "napi_rest_parity_tests-e51698fe873d122f.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\napi_rest_parity_tests-e51698fe873d122f.exe",
+      "sha256": "b4b77ae70b57bd02de04881da4e1f00ababf443a9c4575d4378473b1bddc2398",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "p6_generation_tests",
+      "binary": "p6_generation_tests-98f40aa3ecc09bba.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\p6_generation_tests-98f40aa3ecc09bba.exe",
+      "sha256": "4a83c5a580f067504a32e0978ea61af820fda88539b699fd47b4fda640d42c32",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "readonly_sql_surface_tests",
+      "binary": "readonly_sql_surface_tests-1a94bd7b1c2dd607.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\readonly_sql_surface_tests-1a94bd7b1c2dd607.exe",
+      "sha256": "ab87d20675537dbe2ab8c6fde94509f13d62629aeac8deea70e0a8d06f2fe13d",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "epoch_e1_tests",
+      "binary": "epoch_e1_tests-fe897f4b8521678f.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\epoch_e1_tests-fe897f4b8521678f.exe",
+      "sha256": "2ca1c78074bab8b1c50a46e3dd1947810214755fcb3a508a7e8727f9aa3957c2",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "storage_reliability",
+      "binary": "storage_reliability-a558d0b4678f3dca.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\storage_reliability-a558d0b4678f3dca.exe",
+      "sha256": "2342e4bc5f06ef3871a108bcf189df8b695797384cdb703b426faf30dca02637",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hardening_tests",
+      "binary": "hardening_tests-5bcf245ad86146db.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hardening_tests-5bcf245ad86146db.exe",
+      "sha256": "949f015da4cec9aaac8e5c90af935bd1a68190381354a2c1797e313b0d454305",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_restore_generation_tests",
+      "binary": "hql2_restore_generation_tests-3b42f96300485316.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_restore_generation_tests-3b42f96300485316.exe",
+      "sha256": "d6bfe1d0785b81a93be8edd5a87c549a40aab082332187000e20a123f581ceb3",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "wave_c_query_correctness_tests",
+      "binary": "wave_c_query_correctness_tests-a9e4205f86f591a4.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\wave_c_query_correctness_tests-a9e4205f86f591a4.exe",
+      "sha256": "178a9c130cc307b572e90297db4416ec173296c4923dea1998a2f94c91023667",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "collection_ef_default_tests",
+      "binary": "collection_ef_default_tests-b62ca7fd63f7143d.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\collection_ef_default_tests-b62ca7fd63f7143d.exe",
+      "sha256": "b048d4ef4844928c5f76a0ecd7224b1f6228d18272d05d740e7b8faed695ef52",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "journal_format_tests",
+      "binary": "journal_format_tests-db402d7edf72c286.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\journal_format_tests-db402d7edf72c286.exe",
+      "sha256": "e8f9ed96db14474b362e265d3bb460eb428811f46414a591905d4abe6dfa5afe",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_history_change_tests",
+      "binary": "hql2_history_change_tests-a66b59bb8c5b63fd.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_history_change_tests-a66b59bb8c5b63fd.exe",
+      "sha256": "409766d15a490bd1471ed5148c2d875026ec56e1157fad3d4de37566510de389",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_explain_source_tests",
+      "binary": "hql2_explain_source_tests-cb7e792e758425ee.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_explain_source_tests-cb7e792e758425ee.exe",
+      "sha256": "a3313c0afb8def65b0902da55fd9b566d4c2bfb6806989c5be83a67aeac0aae2",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_execution_tests",
+      "binary": "hql2_execution_tests-56b1fd1c498bfe28.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_execution_tests-56b1fd1c498bfe28.exe",
+      "sha256": "502cc5fc2052ff7f7144bb410bdd266399e4b75bdeb7918ddfd0b0333987f0b1",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hnsw_recall_floor_tests",
+      "binary": "hnsw_recall_floor_tests-93700df8ff0bcdef.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hnsw_recall_floor_tests-93700df8ff0bcdef.exe",
+      "sha256": "ebc6de684a4cd2c91b4759ff403d08ec463bd722006c253fe4954818a5fdcc29",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_pipeline_oracle_tests",
+      "binary": "hql2_pipeline_oracle_tests-abe35efe380bdb15.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_pipeline_oracle_tests-abe35efe380bdb15.exe",
+      "sha256": "972c8438c92c8d6027f5ee665befd23f0fa48d7c67dbc3321a0686cd84cc8ca7",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "wave_b_correctness_tests",
+      "binary": "wave_b_correctness_tests-8351ff06bae7cd40.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\wave_b_correctness_tests-8351ff06bae7cd40.exe",
+      "sha256": "bdceb0f4eb3c443cc9901843b6b13cc57a67e72510f0249a2abccf6f84d1626d",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "node_interning_tests",
+      "binary": "node_interning_tests-36d8b4c55de0c086.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\node_interning_tests-36d8b4c55de0c086.exe",
+      "sha256": "0924549eadb0996c79364973c2aa7854b91079cb877983a22a17b61338921a97",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "studio_contract_tests",
+      "binary": "studio_contract_tests-32cb8354552c9ef1.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\studio_contract_tests-32cb8354552c9ef1.exe",
+      "sha256": "a910b4e8e3f756d8b51f7d45b55f4fce436e77763ce5bcb246d7cb0b1a11c06a",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "bq_centering_tests",
+      "binary": "bq_centering_tests-599cb23cabce4cc2.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\bq_centering_tests-599cb23cabce4cc2.exe",
+      "sha256": "1ec4ebd862f3405fa14840a9fac1fbda231af325d14d6e390de08cc259299220",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_vector_revision_tests",
+      "binary": "hql2_vector_revision_tests-84621e0daeeea5bb.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_vector_revision_tests-84621e0daeeea5bb.exe",
+      "sha256": "098390021df39e942d16675a2515e58189070110e5bdc04d95d724f34afa4a21",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_pattern_constraint_oracle_tests",
+      "binary": "hql2_pattern_constraint_oracle_tests-c11d10975b6d2d83.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_pattern_constraint_oracle_tests-c11d10975b6d2d83.exe",
+      "sha256": "9ab00429ecfc550fe1a8a38c7e4ac3961992101c8b87e1bda97e86977e671f3f",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "wave_d_budget_tests",
+      "binary": "wave_d_budget_tests-aa73c5efba8ee4f2.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\wave_d_budget_tests-aa73c5efba8ee4f2.exe",
+      "sha256": "d79abf69a4c9ff23abfc10fc56efb31ed5486d2bf6b32586ea4fe9b8f99c4229",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "rerank_tests",
+      "binary": "rerank_tests-b1dbd703dfb52b63.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\rerank_tests-b1dbd703dfb52b63.exe",
+      "sha256": "483b407c3c24d3683203773d44952b198dc2f8e0d44d68c3eb742eb1420f0c33",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "consensus_vote_sig_tests",
+      "binary": "consensus_vote_sig_tests-cd1384f3f0e24cad.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\consensus_vote_sig_tests-cd1384f3f0e24cad.exe",
+      "sha256": "edab7dfebb79a3a57473024ef209c5cf795f2a2a887169691a706f1e26ba2779",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "compaction_tests",
+      "binary": "compaction_tests-61d71aa8e9d69070.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\compaction_tests-61d71aa8e9d69070.exe",
+      "sha256": "7eb5ea15b03b705796493ef26bd495123696c145868c5e9e9ed156ca01e52f4c",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_g4_source_counter_tests",
+      "binary": "hql2_g4_source_counter_tests-80ca6d9f12a75776.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_g4_source_counter_tests-80ca6d9f12a75776.exe",
+      "sha256": "896681ff14f80a2fb5784bd9d0af9c87a932d9dd0e236a86d2e6a4e29ab3f570",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_p8_completion_tests",
+      "binary": "hql2_p8_completion_tests-213a6c3dc0971d87.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_p8_completion_tests-213a6c3dc0971d87.exe",
+      "sha256": "24d364404a4ad4ff273654c521a052286c1974729ab305cc41fb5239d3084602",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql_filter_tests",
+      "binary": "hql_filter_tests-22c00e0c8adfde3f.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql_filter_tests-22c00e0c8adfde3f.exe",
+      "sha256": "10a4522bbee29f3a79aab2cf8dfecb004ba6abf8840826e94aa5189301d10212",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "wave_b_sync_tests",
+      "binary": "wave_b_sync_tests-040ec4c7c784603c.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\wave_b_sync_tests-040ec4c7c784603c.exe",
+      "sha256": "bf7a12f5275ede6c7bf73b096bde5716b256f270194a3cd94e7d920a5930b24c",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_storage_set_oracle_differential_tests",
+      "binary": "hql2_storage_set_oracle_differential_tests-8a6face7dbbd3164.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_storage_set_oracle_differential_tests-8a6face7dbbd3164.exe",
+      "sha256": "54f3b490685bb742e156bbd3240c96e50f5464686755b73b2772d027c4d074ca",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "wal_tail_replay_tests",
+      "binary": "wal_tail_replay_tests-cf928416784f4477.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\wal_tail_replay_tests-cf928416784f4477.exe",
+      "sha256": "dda588ea3d36299c4c434f69aef42805fc8bdb78f3faf8d477b3778782ea204d",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "query_ir_tests",
+      "binary": "query_ir_tests-bbb1d5187b614c62.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\query_ir_tests-bbb1d5187b614c62.exe",
+      "sha256": "213d0d482a96141763a376d81991466e057793530eeba0ee8695e0f1910040ef",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "state_transition_tests",
+      "binary": "state_transition_tests-8d1fcc24f7802e7c.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\state_transition_tests-8d1fcc24f7802e7c.exe",
+      "sha256": "356009cb4565d65e76d9335a740db8b57cefa33391755c7a26a54b7b1dd1c2cb",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_storage_hql_join_oracle_differential_tests",
+      "binary": "hql2_storage_hql_join_oracle_differential_tests-05ebb0e357f9c71b.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_storage_hql_join_oracle_differential_tests-05ebb0e357f9c71b.exe",
+      "sha256": "a804b27902dbb7cc15103cbf536c9b6343584712237660e0272a45fa9ebb1e2c",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "gossip_membership_security_tests",
+      "binary": "gossip_membership_security_tests-481c70dde84c2a40.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\gossip_membership_security_tests-481c70dde84c2a40.exe",
+      "sha256": "2171f9e438513d43649c5f00f33df5c7ea21d12e1e64d4ad3dbed6cc66ba3a29",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "hql2_wire_tests",
+      "binary": "hql2_wire_tests-ac58ff776c5ab89d.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\hql2_wire_tests-ac58ff776c5ab89d.exe",
+      "sha256": "f0493da58e7ba171c50c1ffdeec6294e5b2c8e2996d334fcf9a0f515f0a0257a",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "bitemporal",
+      "binary": "bitemporal-d9dd0cbfefd62064.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\bitemporal-d9dd0cbfefd62064.exe",
+      "sha256": "412d9b3ebbb7737edc7f399b0742e1367566f208c5c3409b1a9a2b332054a4aa",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": "genesis_block_native",
+      "binary": "genesis_block_native-cd8246c766c42fca.exe",
+      "path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\napi-target\\x86_64-pc-windows-msvc\\debug\\deps\\genesis_block_native-cd8246c766c42fca.exe",
+      "sha256": "ae06598d315990651cc67e1dae52581a8fc00e78b15b4b3b04194435fd70d9a7",
+      "fresh": false,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    }
+  ]
+}

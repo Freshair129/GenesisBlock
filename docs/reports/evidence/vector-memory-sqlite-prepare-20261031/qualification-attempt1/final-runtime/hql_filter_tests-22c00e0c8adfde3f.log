@@ -1,0 +1,35 @@
+
+running 30 tests
+test context_rejects_trailing_clauses ... ok
+test digit_rules_parse_exact_values ... ok
+test hybrid_and_search_parse_new_exposed_knobs ... ok
+test hybrid_match_carries_clauses ... ok
+test limit_overflow_saturates_not_drops ... ok
+test no_clause_is_backward_compatible ... ok
+test order_by_asc_default ... ok
+test order_by_asc_nulls_last ... ok
+test order_by_label_does_not_panic ... ok
+test order_by_prop_desc_nulls_last_then_limit ... ok
+test prop_accessor_is_case_insensitive ... ok
+test return_key_collision_last_wins ... ok
+test return_star_equals_no_return ... ok
+test return_star_keeps_full_shape ... ok
+test score_is_null_on_traverse ... ok
+test search_no_return_keeps_neighboroutput_shape ... ok
+test search_order_by_score_desc_projects_numeric_score ... ok
+test strict_numeric_parse_errors_surface_in_ast ... ok
+test traverse_parse_direction_and_rel_union ... ok
+test where_and_conjunction ... ok
+test where_contains ... ok
+test where_label_membership ... ok
+test where_label_ne_membership ... ok
+test where_ne_excludes_missing_sql_semantics ... ok
+test where_numeric_boundary_inclusive_vs_exclusive ... ok
+test where_numeric_excludes_missing_and_smaller ... ok
+test where_prop_eq_and_projects_null_for_missing_field ... ok
+test where_startswith ... ok
+test where_three_way_and_with_missing_conjunct ... ok
+test where_type_mismatch_excludes ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.15s
+

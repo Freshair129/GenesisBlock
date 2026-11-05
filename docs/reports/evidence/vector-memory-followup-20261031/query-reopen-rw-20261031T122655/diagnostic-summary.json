@@ -1,0 +1,350 @@
+{
+  "run": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655",
+  "diagnostic_binary_sha256": "73C6B6F392F9A0CB98E84C500D89B56F24F51CD4917834214D95B521E9CB4B19",
+  "source_head": "ad94aa2e46025b7729d117ff376ab281ac15c49d",
+  "process": {
+    "started": "2026-10-31T12:33:50.1558787+07:00",
+    "exit_code": 0,
+    "elapsed_seconds": 531.448976,
+    "completed": "2026-10-31T12:42:41.6044895+07:00"
+  },
+  "exit_code": 0,
+  "open_seconds": 450.9238067,
+  "open_peak_rss_bytes": 528236544,
+  "drop_seconds": 80.0825478,
+  "drop_peak_rss_external_monitor": 570404864,
+  "coverage_state": "ok",
+  "query_budget_default_ms": 5000,
+  "query_parameters": {
+    "query_index": 0,
+    "k": 10,
+    "ef_search": 200,
+    "alpha": 0.0,
+    "collection": "bench",
+    "input_n": 100000,
+    "input_dim": 1024
+  },
+  "query_state": "ok",
+  "result_count": 10,
+  "query_measure_seconds": 0.009156,
+  "hybrid_search_elapsed_us": 8891,
+  "serialization_elapsed_us": 16,
+  "query_plan": {
+    "collection": "bench",
+    "ef_override": 200,
+    "elapsed_us": 9,
+    "event": "query_plan",
+    "fetch": 20,
+    "k": 10,
+    "metric": "Cosine",
+    "quant": "Binary",
+    "query_dim": 1024,
+    "rerank": false,
+    "resolved_ef": 200,
+    "slots": 100000
+  },
+  "hnsw_search_events": [
+    {
+      "call": 1,
+      "ef": 200,
+      "elapsed_us": 2439,
+      "event": "hnsw_search",
+      "hits": 20,
+      "limit": 20
+    }
+  ],
+  "eligibility_events": [
+    {
+      "call": 1,
+      "candidate_count": 20,
+      "duplicate_node_count": 0,
+      "elapsed_us": 48,
+      "eligible_count": 20,
+      "event": "eligibility",
+      "first_candidates": [
+        {
+          "distance": 0.1083984375,
+          "node_id": "63605",
+          "node_u32": 63605,
+          "retired_seq": 0,
+          "slot": 63605,
+          "status": "eligible"
+        },
+        {
+          "distance": 0.4345703125,
+          "node_id": "42747",
+          "node_u32": 42747,
+          "retired_seq": 0,
+          "slot": 42747,
+          "status": "eligible"
+        },
+        {
+          "distance": 0.4384765625,
+          "node_id": "33312",
+          "node_u32": 33312,
+          "retired_seq": 0,
+          "slot": 33312,
+          "status": "eligible"
+        },
+        {
+          "distance": 0.4443359375,
+          "node_id": "56723",
+          "node_u32": 56723,
+          "retired_seq": 0,
+          "slot": 56723,
+          "status": "eligible"
+        },
+        {
+          "distance": 0.4443359375,
+          "node_id": "23396",
+          "node_u32": 23396,
+          "retired_seq": 0,
+          "slot": 23396,
+          "status": "eligible"
+        },
+        {
+          "distance": 0.4453125,
+          "node_id": "61693",
+          "node_u32": 61693,
+          "retired_seq": 0,
+          "slot": 61693,
+          "status": "eligible"
+        },
+        {
+          "distance": 0.4462890625,
+          "node_id": "22732",
+          "node_u32": 22732,
+          "retired_seq": 0,
+          "slot": 22732,
+          "status": "eligible"
+        },
+        {
+          "distance": 0.4482421875,
+          "node_id": "21644",
+          "node_u32": 21644,
+          "retired_seq": 0,
+          "slot": 21644,
+          "status": "eligible"
+        }
+      ],
+      "invisible_count": 0,
+      "missing_metadata_slot_count": 0,
+      "missing_node_count": 0,
+      "retired_count": 0
+    },
+    {
+      "call": 2,
+      "candidate_count": 20,
+      "duplicate_node_count": 0,
+      "elapsed_us": 24,
+      "eligible_count": 20,
+      "event": "eligibility",
+      "first_candidates": [
+        {
+          "distance": 0.1083984375,
+          "node_id": "63605",
+          "node_u32": 63605,
+          "retired_seq": 0,
+          "slot": 63605,
+          "status": "eligible"
+        },
+        {
+          "distance": 0.4345703125,
+          "node_id": "42747",
+          "node_u32": 42747,
+          "retired_seq": 0,
+          "slot": 42747,
+          "status": "eligible"
+        },
+        {
+          "distance": 0.4384765625,
+          "node_id": "33312",
+          "node_u32": 33312,
+          "retired_seq": 0,
+          "slot": 33312,
+          "status": "eligible"
+        },
+        {
+          "distance": 0.4443359375,
+          "node_id": "56723",
+          "node_u32": 56723,
+          "retired_seq": 0,
+          "slot": 56723,
+          "status": "eligible"
+        },
+        {
+          "distance": 0.4443359375,
+          "node_id": "23396",
+          "node_u32": 23396,
+          "retired_seq": 0,
+          "slot": 23396,
+          "status": "eligible"
+        },
+        {
+          "distance": 0.4453125,
+          "node_id": "61693",
+          "node_u32": 61693,
+          "retired_seq": 0,
+          "slot": 61693,
+          "status": "eligible"
+        },
+        {
+          "distance": 0.4462890625,
+          "node_id": "22732",
+          "node_u32": 22732,
+          "retired_seq": 0,
+          "slot": 22732,
+          "status": "eligible"
+        },
+        {
+          "distance": 0.4482421875,
+          "node_id": "21644",
+          "node_u32": 21644,
+          "retired_seq": 0,
+          "slot": 21644,
+          "status": "eligible"
+        }
+      ],
+      "invisible_count": 0,
+      "missing_metadata_slot_count": 0,
+      "missing_node_count": 0,
+      "retired_count": 0
+    }
+  ],
+  "hydration_hit_count": 20,
+  "hydration_total_us": 1454.0,
+  "hydration_max_us": 363.0,
+  "metadata_summary": {
+    "collection": "bench",
+    "event": "metadata_summary",
+    "metadata_count": 100000,
+    "metadata_samples": [
+      {
+        "arena_id": 0,
+        "node_id": "0",
+        "node_u32": 0,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 1,
+        "node_id": "1",
+        "node_u32": 1,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 2,
+        "node_id": "2",
+        "node_u32": 2,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 3,
+        "node_id": "3",
+        "node_u32": 3,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 4,
+        "node_id": "4",
+        "node_u32": 4,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 5,
+        "node_id": "5",
+        "node_u32": 5,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 6,
+        "node_id": "6",
+        "node_u32": 6,
+        "retired_seq": 0,
+        "visible_current": true
+      },
+      {
+        "arena_id": 7,
+        "node_id": "7",
+        "node_u32": 7,
+        "retired_seq": 0,
+        "visible_current": true
+      }
+    ],
+    "missing_current_node_count": 0,
+    "missing_node_count": 0,
+    "missing_node_samples": [],
+    "node_count": 100000,
+    "retired_count": 0,
+    "visible_current_count": 100000
+  },
+  "query_first_hits": [
+    {
+      "id": "63605",
+      "score": 0.8916015625
+    },
+    {
+      "id": "42747",
+      "score": 0.5654296875
+    },
+    {
+      "id": "33312",
+      "score": 0.5615234375
+    },
+    {
+      "id": "56723",
+      "score": 0.5556640625
+    },
+    {
+      "id": "23396",
+      "score": 0.5556640625
+    },
+    {
+      "id": "61693",
+      "score": 0.5546875
+    },
+    {
+      "id": "22732",
+      "score": 0.5537109375
+    },
+    {
+      "id": "21644",
+      "score": 0.5517578125
+    }
+  ],
+  "timeout_reproduced": false,
+  "read_write_drop_behavior": {
+    "drop_calls_save_state": "src/lib.rs:33321-33345",
+    "projection_snapshot_copy": "src/lib.rs:13412-13428, called at 26443",
+    "drop_elapsed_seconds": 80.0825478
+  },
+  "matrix_rayon_num_threads": "$env:RAYON_NUM_THREADS = '4'",
+  "rayon_explicit_in_this_run": false,
+  "input_hashes": [
+    {
+      "name": "meta.json",
+      "length": 101,
+      "sha256": "1A2BEC07B13A6BA0DF46756509FA152EEEA16C96FEC988AFC7239D89D195A95A"
+    },
+    {
+      "name": "corpus.f32",
+      "length": 409600000,
+      "sha256": "A4D885AB3C6D6A0559E07F35E5A3BCEAA285AB5E42C309E1691B9B648347AA30"
+    },
+    {
+      "name": "queries.f32",
+      "length": 98304,
+      "sha256": "630A95758E4BC7861E3868435B7178B96FB2A790577A0C95D28616A14B2C3421"
+    },
+    {
+      "name": "truth.json",
+      "length": 14198,
+      "sha256": "7608A283E2251AAA82424A6268C63B045FA17ED47D583E308A3FC4967FFC580E"
+    }
+  ]
+}

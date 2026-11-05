@@ -1,0 +1,27 @@
+   Compiling genesis-block-native v0.2.10 (C:\Users\suanr\genesis-vector-memory-20261031\verify-src)
+    Finished `test` profile [unoptimized] target(s) in 36.61s
+     Running unittests src\lib.rs (C:\Users\suanr\genesis-vector-memory-20261031\napi-target\x86_64-pc-windows-msvc\debug\deps\genesis_block_native-b7af0321854b0aac.exe)
+
+running 1 test
+test vector_memory_tests::checkpoint_proof_maps_share_one_source_and_keep_signed_bytes ... FAILED
+
+failures:
+
+---- vector_memory_tests::checkpoint_proof_maps_share_one_source_and_keep_signed_bytes stdout ----
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmpLLL5oA
+
+thread 'vector_memory_tests::checkpoint_proof_maps_share_one_source_and_keep_signed_bytes' (25636) panicked at src\vector_memory_tests.rs:273:5:
+assertion `left == right` failed: all leaf lookups must share their immutable source transaction
+  left: 12
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmpLLL5oA
+shutdown: graceful shutdown, state saved.
+
+
+failures:
+    vector_memory_tests::checkpoint_proof_maps_share_one_source_and_keep_signed_bytes
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.33s
+
+error: test failed, to rerun pass `--lib`

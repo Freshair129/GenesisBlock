@@ -1,0 +1,27 @@
+{
+  "reason": "process_exit",
+  "exit_code": 0,
+  "pid": 2108,
+  "started_utc": "2026-10-31T05:09:01.1376983Z",
+  "ended_utc": "2026-10-31T05:11:19.7053868Z",
+  "elapsed_s": 138.57,
+  "peak_rss_bytes": 119193600,
+  "final_cpu_seconds": 124.703125,
+  "storage_shutdown_marker_seen": false,
+  "storage_shutdown_marker_elapsed_s": null,
+  "last_progress": {
+    "phase": "drop_done",
+    "elapsed_ms": 138180.557,
+    "unix_time_ms": 1793423479424,
+    "drop_wait_ms": 3.7312000000092667,
+    "explicit_save_elapsed_ms": 132206.52790000002,
+    "save_done_elapsed_ms": 138174.72689999998,
+    "total_elapsed_ms": 138180.5466,
+    "storage_drop_marker_expected": "shutdown: graceful shutdown, state saved.",
+    "status": "complete"
+  },
+  "progress_path": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\journal-2000-phase-diag-20261031T0508Z\\progress.jsonl",
+  "stdout_path": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\journal-2000-phase-diag-20261031T0508Z\\node.stdout.log",
+  "stderr_path": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\journal-2000-phase-diag-20261031T0508Z\\node.stderr.log",
+  "timeline_path": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\journal-2000-phase-diag-20261031T0508Z\\timeline.jsonl"
+}

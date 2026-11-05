@@ -1,0 +1,52 @@
+{
+  "status": "prepared_not_built_or_run",
+  "requires_root_confirmation_that_owned_tests_and_builds_are_done": true,
+  "source_checkout": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\verify-src",
+  "source_head": "ad94aa2e46025b7729d117ff376ab281ac15c49d",
+  "database": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\scratch-copy\\gdb",
+  "database_is_closed_disposable_copy": true,
+  "mode": "same-process two opens, read-write",
+  "per_pass_open_options": {
+    "page_cache_mb": 64,
+    "read_only": false,
+    "vector_dim": 1024,
+    "retention": "full"
+  },
+  "sequence": [
+    "pass 1: open read-write, query index 0, drop with 2 GiB guard",
+    "pass 2: reopen read-write, validate coverage, query index 0, metadata scan, drop with 2 GiB guard"
+  ],
+  "query": {
+    "k": 10,
+    "ef_search": 200,
+    "alpha": 0.0,
+    "deadline_ms": 5000,
+    "budget_changes": 0
+  },
+  "runtime_environment": {
+    "GB_MEMORY_AUDIT": "1",
+    "GB_MEMORY_OPEN_REPEAT": "2",
+    "GB_MEMORY_OPEN_READ_WRITE": "1",
+    "GB_MEMORY_INPUT": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\inputs\\synthetic-100000-1024",
+    "GB_MEMORY_RSS_LIMIT_BYTES": "2147483648",
+    "GB_VECTOR_QUERY_DIAGNOSTICS": "1",
+    "RAYON_NUM_THREADS": "4",
+    "GB_EF": "200"
+  },
+  "first_pass_coverage": "skipped to keep query then Drop adjacent",
+  "final_pass_coverage": "run before query to match original same-process reopen flow",
+  "host_context": "available/total RAM, working set, process page faults/CPU times, raw host CPU counters at query start; deltas captured after query",
+  "expected_duration_upper_bound_seconds": 1200,
+  "existing_single_pass_exe_is_not_for_repeat": true,
+  "modified_source_files": [
+    "src/lib.rs",
+    "benches/vector_memory.rs"
+  ],
+  "query_sample_count_default": 24,
+  "query_sample_count_options": [
+    0,
+    24,
+    120
+  ],
+  "query_sweep_semantics": "Only after final reopen query0 succeeds; same q24 input/truth cyclically repeated for 120; diagnostics tracing disabled during warm sweep only; default 24 extra calls and exact 5s per-call budget"
+}

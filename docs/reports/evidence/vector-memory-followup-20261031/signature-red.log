@@ -1,0 +1,27 @@
+   Compiling genesis-block-native v0.2.10 (D:\GenesisBlock_Dev\GenesisBlock)
+    Finished `test` profile [unoptimized] target(s) in 18.10s
+     Running unittests src\lib.rs (C:\Users\suanr\genesis-vector-memory-20261031\napi-target\x86_64-pc-windows-msvc\debug\deps\genesis_block_native-b7af0321854b0aac.exe)
+
+running 1 test
+test vector_memory_tests::checkpoint_reuses_identical_signature_math_within_one_operation ... FAILED
+
+failures:
+
+---- vector_memory_tests::checkpoint_reuses_identical_signature_math_within_one_operation stdout ----
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmplV3BQQ
+
+thread 'vector_memory_tests::checkpoint_reuses_identical_signature_math_within_one_operation' (22488) panicked at src\vector_memory_tests.rs:434:5:
+assertion `left == right` failed: identical immutable key/message/signature math is repeated inside one checkpoint
+  left: 7
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+snapshot: state persisted successfully to C:\Users\suanr\AppData\Local\Temp\.tmplV3BQQ
+shutdown: graceful shutdown, state saved.
+
+
+failures:
+    vector_memory_tests::checkpoint_reuses_identical_signature_math_within_one_operation
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 49 filtered out; finished in 0.37s
+
+error: test failed, to rerun pass `--lib`

@@ -1,0 +1,50 @@
+{
+    "exit":  0,
+    "reason":  null,
+    "seconds":  380.0393332,
+    "peak_rss":  327335936,
+    "peak_private":  392146944,
+    "identities":  [
+                       {
+                           "ProcessId":  26368,
+                           "ParentProcessId":  17580,
+                           "CreationDate":  "\/Date(1793542070537)\/",
+                           "Name":  "conhost.exe",
+                           "ExecutablePath":  "C:\\WINDOWS\\system32\\conhost.exe"
+                       },
+                       {
+                           "ProcessId":  17580,
+                           "ParentProcessId":  41756,
+                           "CreationDate":  "\/Date(1793542070528)\/",
+                           "Name":  "python.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\AppData\\Local\\Programs\\Python\\Python314\\python.exe"
+                       },
+                       {
+                           "ProcessId":  49456,
+                           "ParentProcessId":  17580,
+                           "CreationDate":  "\/Date(1793542070844)\/",
+                           "Name":  "seeded-before.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\seeded-topology-20261101\\seeded-before.exe"
+                       },
+                       {
+                           "ProcessId":  38612,
+                           "ParentProcessId":  49456,
+                           "CreationDate":  "\/Date(1793542376785)\/",
+                           "Name":  "seeded-before.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\seeded-topology-20261101\\seeded-before.exe"
+                       }
+                   ],
+    "excluded_build_helpers":  [
+
+                               ],
+    "helper_finished_parent_condition":  true,
+    "helper_scope":  "Helpers are not terminated; successful Cargo completion and stopped tracked compiler clients are required before private-source edits. No shared source/target mutation.",
+    "admission_cpu":  15.181818181818182,
+    "admission_free":  15603675136,
+    "remaining":  [
+
+                  ],
+    "cleanup_complete":  true,
+    "monitor_error":  null,
+    "rss_scope":  "tracked owned process tree"
+}

@@ -1,0 +1,26 @@
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -150,6 +150,23 @@
+ codegen-units = 1
+ strip = "symbols"
+ 
++# Keep debug/test crypto and proof compression representative of shipped code.
++# Engine code remains opt-level=0; assertions and overflow checks stay enabled.
++[profile.dev.package.sha2]
++opt-level = 3
++debug-assertions = true
++overflow-checks = true
++
++[profile.dev.package.curve25519-dalek]
++opt-level = 3
++debug-assertions = true
++overflow-checks = true
++
++[profile.dev.package.lz4_flex]
++opt-level = 3
++debug-assertions = true
++overflow-checks = true
++
+ [dev-dependencies]
+ # Already a normal dependency; declared here too so integration tests (their own
+ # crates) can open projection.sqlite directly to simulate a pre-v4 database.

@@ -1,0 +1,23 @@
+
+running 18 tests
+test analyze_reports_exact_vector_distance_evaluations_and_budget_errors ... ok
+test approximate_knn_is_rejected_until_candidate_coverage_is_implemented ... ok
+test exact_cosine_knn_uses_the_original_collection_metric ... ok
+test exact_knn_fails_closed_below_the_selected_vector_history_floor ... ok
+test exact_knn_reads_original_vectors_and_drops_missing_candidates ... ok
+test exact_rank_diagnostics_count_duplicate_bags_empty_inputs_and_missing_knn_vectors ... ok
+test hql_and_ir_exact_knn_have_identical_results ... ok
+test hql_knn_and_rerank_accept_decimal_u64_k_parameters ... ok
+test knn_exposes_a_typed_score_value_when_the_score_is_projected_whole ... ok
+test original_rerank_fails_closed_when_any_candidate_lacks_original_vector ... ok
+test original_rerank_missing_original_fails_in_normal_and_analyze_modes ... ok
+test original_rerank_returns_top_candidates_with_original_score_semantics ... ok
+test rank_candidate_and_distance_budget_boundaries_count_repeated_candidates ... ok
+test vector_candidate_budget_fails_before_returning_partial_rows ... ok
+test vector_parameter_dimension_must_match_its_ir_type_declaration ... ok
+test vector_parameter_space_must_match_its_ir_type_declaration ... ok
+test vector_type_must_match_the_resolved_collection_space ... ok
+test zero_cosine_query_is_rejected_even_when_the_input_is_empty ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.56s
+

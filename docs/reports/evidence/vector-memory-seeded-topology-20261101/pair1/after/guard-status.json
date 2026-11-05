@@ -1,0 +1,50 @@
+{
+    "exit":  0,
+    "reason":  null,
+    "seconds":  407.69368249999997,
+    "peak_rss":  347570176,
+    "peak_private":  467181568,
+    "identities":  [
+                       {
+                           "ProcessId":  4884,
+                           "ParentProcessId":  33252,
+                           "CreationDate":  "\/Date(1793542802059)\/",
+                           "Name":  "seeded-after.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\seeded-topology-20261101\\seeded-after.exe"
+                       },
+                       {
+                           "ProcessId":  33252,
+                           "ParentProcessId":  48184,
+                           "CreationDate":  "\/Date(1793542477604)\/",
+                           "Name":  "seeded-after.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\seeded-topology-20261101\\seeded-after.exe"
+                       },
+                       {
+                           "ProcessId":  48184,
+                           "ParentProcessId":  23848,
+                           "CreationDate":  "\/Date(1793542476990)\/",
+                           "Name":  "python.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\AppData\\Local\\Programs\\Python\\Python314\\python.exe"
+                       },
+                       {
+                           "ProcessId":  2368,
+                           "ParentProcessId":  48184,
+                           "CreationDate":  "\/Date(1793542477001)\/",
+                           "Name":  "conhost.exe",
+                           "ExecutablePath":  "C:\\WINDOWS\\system32\\conhost.exe"
+                       }
+                   ],
+    "excluded_build_helpers":  [
+
+                               ],
+    "helper_finished_parent_condition":  true,
+    "helper_scope":  "Helpers are not terminated; successful Cargo completion and stopped tracked compiler clients are required before private-source edits. No shared source/target mutation.",
+    "admission_cpu":  12,
+    "admission_free":  14405033984,
+    "remaining":  [
+
+                  ],
+    "cleanup_complete":  true,
+    "monitor_error":  null,
+    "rss_scope":  "tracked owned process tree"
+}

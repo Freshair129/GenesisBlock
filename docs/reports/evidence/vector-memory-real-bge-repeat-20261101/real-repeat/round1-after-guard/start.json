@@ -1,0 +1,23 @@
+{
+    "pid":  38592,
+    "start":  "2026-11-01T12:55:57.7918113+07:00",
+    "config":  {
+                   "exe":  "C:\\Users\\suanr\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
+                   "args":  [
+                                "-u",
+                                "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\run-real-case.py",
+                                "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\real-repeat\\round1-after\\run-config.json"
+                            ],
+                   "cwd":  "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\real-repeat\\round1-after",
+                   "output":  "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\real-repeat\\round1-after-guard",
+                   "env":  {
+
+                           },
+                   "kind":  "benchmark",
+                   "cap_seconds":  1200
+               },
+    "query_deadline_ms":  5000,
+    "cap_seconds":  1200,
+    "rss_cap":  2147483648,
+    "identity":  "PID+CreationDate+path+name; require live matching parent and child born after root"
+}

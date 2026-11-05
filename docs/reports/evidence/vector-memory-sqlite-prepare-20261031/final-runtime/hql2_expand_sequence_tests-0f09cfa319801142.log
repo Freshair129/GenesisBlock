@@ -1,0 +1,16 @@
+
+running 11 tests
+test analyze_reports_sequence_graph_work ... ok
+test hql_sequence_uses_the_same_kernel_and_path_ordering_as_typed_ir ... ok
+test ir_root_sequence_match_binds_each_segment_and_shortest_selects_one_path ... ok
+test ir_sequence_returns_each_named_segment_and_one_typed_path ... ok
+test optional_sequence_null_extends_every_new_alias_and_matches_hql ... ok
+test root_sequence_match_counts_work_before_shortest_deduplication ... ok
+test sequence_budget_boundaries_include_source_materialization_and_fail_closed ... ok
+test sequence_budget_exhaustion_returns_no_partial_result ... ok
+test sequence_diagnostics_count_parallel_duplicate_optional_and_empty_work ... ok
+test sequence_node_label_constraints_filter_candidates ... ok
+test sequence_uniqueness_mode_applies_across_all_steps ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.95s
+

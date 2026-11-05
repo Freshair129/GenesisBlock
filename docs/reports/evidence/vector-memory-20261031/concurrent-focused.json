@@ -1,0 +1,30 @@
+[
+  {
+    "seconds": 18.7872432,
+    "reason": null,
+    "peak_rss_bytes": 23379968,
+    "test": "concurrent_read_while_write",
+    "exit_code": 0
+  },
+  {
+    "seconds": 1.1061993,
+    "reason": null,
+    "peak_rss_bytes": 15499264,
+    "test": "concurrent_search_while_write",
+    "exit_code": 0
+  },
+  {
+    "seconds": 96.5272249,
+    "reason": null,
+    "peak_rss_bytes": 54595584,
+    "test": "concurrent_node_writes",
+    "exit_code": 0
+  },
+  {
+    "seconds": 40.7145008,
+    "reason": null,
+    "peak_rss_bytes": 30760960,
+    "test": "concurrent_edge_writes",
+    "exit_code": 0
+  }
+]

@@ -1,0 +1,16 @@
+[
+  {
+    "seconds": 146.0640423,
+    "peak_rss_bytes": 18964480,
+    "reason": null,
+    "test": "small_collection_returns_full_k_on_every_fresh_graph",
+    "exit_code": 0
+  },
+  {
+    "seconds": 22.5560332,
+    "peak_rss_bytes": 24276992,
+    "reason": null,
+    "test": "small_lossless_l2_and_cosine_top_k_matches_exhaustive_oracle",
+    "exit_code": 0
+  }
+]

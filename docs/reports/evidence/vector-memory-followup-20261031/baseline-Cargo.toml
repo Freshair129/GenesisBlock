@@ -1,0 +1,263 @@
+[package]
+name = "genesis-block-native"
+version = "0.2.10"
+edition = "2021"
+rust-version = "1.88"
+description = "Genesis Block — high-performance hybrid semantic-graph engine"
+license = "MIT"
+publish = false
+# The files in benches/ are [[bin]] audit harnesses (required-features = ["bins"]),
+# not Criterion benches — the only real bench is the explicit [[bench]] ldbc_lite.
+# Disable bench auto-discovery so cargo does not also synthesize phantom bench
+# targets from benches/*.rs: those would ignore required-features and fail to link
+# `sysinfo` (now optional, bins-only) under `--no-default-features --all-targets`.
+autobenches = false
+
+[lib]
+#   cdylib  — Node addon (napi) + Android `.so` loaded via System.loadLibrary
+#   staticlib — `.a` slices combined into the iOS GenesisBlockDB.xcframework
+#   rlib    — REST server / integration tests / benches link the core directly
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[features]
+# napi-bindings (default ON) compiles the NAPI cdylib surface (the GenesisDatabase
+# wrapper + #[napi] exports = the Node addon). Turn it OFF to build the storage
+# core + REST server / integration tests as plain native binaries with NO napi_*
+# symbol dependency — which is what lets them link on Linux CI. The core's
+# Error/Result fall back to a tiny shim when this is off (see src/lib.rs).
+default = ["napi-bindings"]
+napi-bindings = ["dep:napi", "dep:napi-derive"]
+# `bins` gates the standalone server + benchmark executables. Build them WITHOUT
+# napi for a standalone link: `cargo build --no-default-features --features bins`.
+# `sysinfo` is only used by the bench harnesses (RSS/mem probes), so it is pulled
+# in here rather than as a hard dependency — that keeps it out of mobile builds.
+bins = ["dep:sysinfo"]
+# `libsql-baseline` adds the libSQL/DiskANN competitor row to the moat bench
+# (WP-3.3 follow-up 1). Kept OUT of `bins` on purpose: libSQL bundles a SQLite
+# fork and costs ~2 min of compile, which every server/bench build would
+# otherwise pay. moat-bench compiles without it (the row is simply absent and
+# the metrics JSON says so); the follow-up run enables it explicitly:
+#   cargo run --release --no-default-features --features "bins,libsql-baseline" --bin moat-bench
+libsql-baseline = ["dep:libsql"]
+# `mobile` builds the storage core for iOS/Android targets: no napi, no bins,
+# no sysinfo (the RSS probe relies on OS APIs that fail in mobile sandboxes).
+# Build: cargo build --no-default-features --features mobile --target aarch64-apple-ios
+mobile = []
+# `ffi` exposes the C ABI layer (src/ffi.rs) consumed by the iOS xcframework
+# (and any C/Swift caller). Composes with `mobile`: --features "mobile ffi".
+ffi = []
+# `android-jni` exposes the JNI bridge (src/jni.rs): the
+# `Java_dev_genesisblock_GenesisDB_native*` symbols the Android `.aar`'s Kotlin
+# wrapper binds via System.loadLibrary. Pulls in the `jni` crate. Compose with
+# `mobile`: --features "mobile ffi android-jni". The `jni` crate is pure Rust and
+# also builds on the host triple, so this type-checks off-device.
+android-jni = ["dep:jni"]
+
+[dependencies]
+napi = { version = "2.16", default-features = false, features = ["napi8", "async", "serde-json"], optional = true }
+napi-derive = { version = "2.16", optional = true }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.0", features = ["v4", "serde"] }
+tokio = { version = "1", features = ["full"] }
+# H1-T: inspect/configure the bound Tokio socket through a safe borrowed handle.
+# Already locked transitively; keep this promotion free of version churn.
+socket2 = "=0.6.4"
+md5 = "0.7"
+regex = "1"
+dashmap = "6.0"
+once_cell = "1.19"
+parking_lot = "0.12"
+rusqlite = { version = "0.32", features = ["bundled", "hooks", "limits", "backup"] }
+# WP-3.3 follow-up 1: the libSQL/DiskANN baseline row in the moat bench. Local
+# (embedded) core only — no replication/remote/tls — so the comparison stays
+# embedded-vs-embedded like the rest of the bench. Optional; see the
+# `libsql-baseline` feature.
+libsql = { version = "0.9", default-features = false, features = ["core"], optional = true }
+fs2 = "0.4.3"
+sysinfo = { version = "0.30", optional = true }
+# Android JNI bridge (src/jni.rs); only enabled by the `android-jni` feature.
+# No `invocation` feature → does not link a JVM, so it builds on the host triple.
+jni = { version = "0.21", optional = true }
+# ADR--GENESISDB-BINCODE-EXIT: bincode 1.3 is unmaintained (RUSTSEC-2025-0141,
+# ignored in security.yml). Kept as a read-only legacy fallback for metadata
+# snapshots (meta_<name>.bin) for a deprecation window; the write path now
+# uses `postcard` (below) exclusively. Do not add new bincode call sites.
+bincode = "1.3"
+# Metadata snapshot serializer (ADR--GENESISDB-BINCODE-EXIT): maintained,
+# serde-based, no_std/alloc-compatible (aligns with the `mobile` feature's
+# no_std direction). `default-features = false` + `alloc` keeps it lean for
+# the mobile build (no std-only extras pulled in).
+postcard = { version = "1.1", default-features = false, features = ["alloc"] }
+hnsw_rs = "0.3.4"
+# f16↔f32 for the F16 quantization arena (Quant::F16). Already compiled as a
+# transitive dep of anndists (hnsw_rs' distance crate); promoted to a direct dep.
+# anndists has no Distance<f16>, so F16 dequantizes to f32 for the HNSW.
+half = "2"
+axum = "0.7"
+tower-http = { version = "0.5", features = ["cors", "trace", "limit"] }
+async-trait = "0.1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+csv = "1.4.0"
+rayon = "1.12.0"
+twox-hash = "2.1.2"
+rand = { version = "0.8", features = ["std"] }
+crossbeam-channel = "0.5.15"
+pest = "2.7"
+pest_derive = "2.7"
+strsim = "0.11"
+sha2 = "0.10"
+hex = "0.4"
+unicode-general-category = "1.1.0"
+ed25519-dalek = { version = "2.2.0", features = ["serde"] }
+roaring = "0.10"
+# WP-1.2 framed journal (ADR--GENESISDB-JOURNAL-HISTORY / SPEC--GENESISDB-JOURNAL-FORMAT-V1).
+# `zstd`/`zstd-sys` was the originally planned primary codec but was DROPPED
+# (SPEC §8): its vendored C sources fail to link for aarch64-apple-ios
+# ("Undefined symbols... ___chkstk_darwin" — a Darwin stack-probe symbol
+# zstd's C emits that iOS cross-linking can't resolve; confirmed via
+# mobile-build.yml run 31982222256, Android was unaffected). `lz4_flex` — the
+# pure-Rust fallback the ADR/SPEC already named for exactly this contingency —
+# is now the SOLE codec, `frame` feature enabled for the streaming API the
+# legacy-WAL migration needs (bounded memory; see `migrate_legacy_wal`). A
+# segment header still carries a codec byte, so reintroducing zstd later
+# (desktop-only, behind a feature) would not be a format break.
+lz4_flex = { version = "0.11", features = ["frame"] }
+# CRC32C (Castagnoli) per frame — hardware-accelerated where available.
+crc32c = "0.6"
+
+[build-dependencies]
+napi-build = "2.1"
+
+[[bin]]
+name = "genesis-db-server"
+path = "src/main.rs"
+required-features = ["bins"]
+
+[[bin]]
+name = "wave-d-quality-gate"
+path = "benches/wave_d_quality_gate.rs"
+required-features = ["bins"]
+
+[[bench]]
+name = "ldbc_lite"
+harness = false
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = "symbols"
+
+[dev-dependencies]
+# Already a normal dependency; declared here too so integration tests (their own
+# crates) can open projection.sqlite directly to simulate a pre-v4 database.
+rusqlite = { version = "0.32", features = ["bundled"] }
+anyhow = "1.0.103"  # RUSTSEC-2026-0190 fix (Error::downcast_mut unsoundness)
+criterion = "0.8.2"
+rand = "0.8"
+tempfile = "3.27.0"
+tower = { version = "0.4", features = ["util"] }
+http-body-util = "0.1"
+# Only for tests/meta_format_migration_tests.rs, to hand-construct a legacy
+# bincode-encoded `meta_<name>.bin` fixture (ADR--GENESISDB-BINCODE-EXIT).
+bincode = "1.3"
+postcard = { version = "1.1", default-features = false, features = ["use-std"] }
+# tests/consensus_checkpoint_race_tests.rs deliberately bypasses Storage::open
+# and reads the on-disk journal directly (so a loader bug can't mask a write-
+# path durability bug) — needs the same lz4 frame decoder the crate uses to
+# decompress sealed segments (journal/*.gseg).
+lz4_flex = { version = "0.11", features = ["frame"] }
+
+[[bin]]
+name = "snb-ingestion"
+path = "benches/snb_ingestion.rs"
+required-features = ["bins"]
+
+
+[[bin]]
+name = "snb-bulk-ingestion"
+path = "benches/snb_bulk_ingestion.rs"
+required-features = ["bins"]
+
+
+[[bin]]
+name = "shadow-sync-stress"
+path = "benches/shadow_sync_stress.rs"
+required-features = ["bins"]
+
+
+[[bin]]
+name = "hql-query-stress"
+path = "benches/hql_query_stress.rs"
+required-features = ["bins"]
+
+
+[[bin]]
+name = "industrial-audit"
+path = "benches/industrial_audit.rs"
+required-features = ["bins"]
+
+
+[[bin]]
+name = "scientific-audit"
+path = "benches/scientific_audit.rs"
+required-features = ["bins"]
+
+
+[[bin]]
+name = "vbench-genesis"
+path = "benches/vbench_genesis.rs"
+required-features = ["bins"]
+
+
+[[bin]]
+name = "graph-bench"
+path = "benches/graph_bench.rs"
+required-features = ["bins"]
+
+
+[[bin]]
+name = "vector-bench"
+path = "benches/vector_bench.rs"
+required-features = ["bins"]
+
+
+[[bin]]
+name = "moat-bench"
+path = "benches/moat_bench.rs"
+required-features = ["bins"]
+
+# WP-3.3 follow-up 1. A SEPARATE binary on purpose: libsql-ffi and rusqlite both
+# export the bundled `sqlite3_*` symbols, so linking both is either a hard
+# LNK2005 or a silent single-implementation resolution that would corrupt both
+# sides of the comparison. This target links libSQL and never the engine; see
+# the header of benches/moat_libsql.rs.
+[[bin]]
+name = "moat-libsql"
+path = "benches/moat_libsql.rs"
+required-features = ["bins", "libsql-baseline"]
+
+
+[[bin]]
+name = "gov-kimpact-bench"
+path = "benches/gov_kimpact_bench.rs"
+required-features = ["bins"]
+
+
+[[bin]]
+name = "edge-interning-audit"
+path = "benches/edge_interning_audit.rs"
+required-features = ["bins"]
+
+[[bin]]
+name = "sqlite-props-audit"
+path = "benches/sqlite_props_audit.rs"
+required-features = ["bins"]
+
+[[bin]]
+name = "wave-b-replay"
+path = "benches/wave_b_replay.rs"
+required-features = ["bins"]
+

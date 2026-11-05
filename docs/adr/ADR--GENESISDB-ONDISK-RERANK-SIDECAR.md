@@ -126,19 +126,27 @@ a format change:
 
 ### 4. Bounded LRU page cache
 
-A fixed-capacity LRU (e.g. `SIDECAR_CACHE_ROWS` rows, hand-rolled — no new
-crate dependency) sits inside `SidecarReader`, keyed by `d_id`, storing
-decoded `Vec<f32>` rows:
+A fixed-capacity LRU (hand-rolled — no new crate dependency) sits inside
+`SidecarReader`, keyed by `d_id`, storing decoded `Vec<f32>` rows. Admission is
+bounded by both `SIDECAR_CACHE_ROWS = 4096` and
+`SIDECAR_CACHE_BYTES = 16 MiB` of retained decoded-row capacity per reader; the
+first limit reached triggers least-recently-used eviction. A row whose own
+capacity exceeds the byte budget is returned from the positioned disk read but
+is not retained in the cache.
 
 - **Rationale:** rerank re-fetches the same over-fetched candidate rows
   within a query (oversample × top-k) and across nearby queries against a hot
   working set; a small cache absorbs that locality without re-introducing
-  full residency. Capacity is a small constant independent of collection
-  size, so worst-case resident bytes are `O(cache_rows * dim * 4)`, not
-  `O(collection_size)` — the property this ADR exists to restore.
+  full residency. The byte limit bounds retained decoded-row payload for one
+  reader to 16 MiB, while the row limit continues to cap entry count. These
+  bounds exclude LRU metadata, caller-owned or transient row copies, other
+  readers/collections, allocator overhead, and total process RSS; they are not
+  a process-wide memory guarantee.
 - **Bounded, not advisory:** eviction must actually occur at capacity (LRU
-  discard), never grow past it. An unbounded or soft-bounded cache would
-  recreate the exact resident-RAM problem this design fixes.
+  discard), never grow past either limit. If the byte budget cannot admit a
+  row, the read result remains available and only cache admission is skipped.
+  An unbounded or soft-bounded cache would recreate the exact resident-RAM
+  problem this design fixes.
 - **Placement:** per-`SidecarReader` instance (one cache per collection, not
   global), consistent with `VectorCollection` already being the unit of
   isolation for arena/HNSW/metric/dim.
@@ -222,3 +230,4 @@ candidate set the caller asks it to rescore:
 | Version | Date | Summary |
 |---|---|---|
 | 0.1.0 | 2026-07-02 | Proposed & accepted: on-disk rerank sidecar via positioned reads (no mmap), lock order `meta → arena → sidecar` preserved, unchanged file layout, bounded LRU cache. |
+| 0.2.0 | 2026-11-05 | Clarified the accepted per-reader cache bound as 4,096 rows and 16 MiB of retained decoded-row capacity, whichever is reached first; no disk-layout or query-result change. |

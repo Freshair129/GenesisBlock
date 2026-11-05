@@ -1,0 +1,29 @@
+{
+  "db": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-bge-candidate-trace-20261031T145352\\output\\gdb\\projection.sqlite",
+  "sqlite_version": "3.50.4",
+  "open_s": 0.09547240000028978,
+  "first_select_s": 0.007854899999074405,
+  "row_length_prefix": [
+    2,
+    "{}"
+  ],
+  "query_plan": [
+    [
+      2,
+      0,
+      33,
+      "SEARCH props USING INTEGER PRIMARY KEY (rowid=?)"
+    ]
+  ],
+  "journal_mode": [
+    "wal"
+  ],
+  "page_count": [
+    248369
+  ],
+  "side_files": {
+    "projection.sqlite": 1017319424,
+    "projection.sqlite-shm": 32768,
+    "projection.sqlite-wal": 0
+  }
+}

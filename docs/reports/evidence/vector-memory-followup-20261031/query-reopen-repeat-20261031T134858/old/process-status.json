@@ -1,0 +1,496 @@
+{
+  "pid": 32860,
+  "exit_code": 0,
+  "killed_by_guard": false,
+  "kill_reason": null,
+  "started_local": "2026-10-31T13:51:25.5631935+07:00",
+  "finished_local": "2026-10-31T14:07:43.8985038+07:00",
+  "elapsed_seconds": 978.332,
+  "peak_working_set_seen_bytes": 583327744,
+  "peak_private_seen_bytes": 912003072,
+  "query_json_exists": true,
+  "query_json": {
+    "open_mode": "read_write",
+    "open_path": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-repeat-20261031T134858\\old\\gdb",
+    "passes": [
+      {
+        "coverage": {
+          "reason": "reserved for final reopen to match original query path",
+          "state": "skipped"
+        },
+        "coverage_memory": null,
+        "metadata_summary": {
+          "reason": "deferred until final repeat pass",
+          "state": "skipped"
+        },
+        "metadata_summary_memory": null,
+        "open_memory": {
+          "before_rss_bytes": 9052160,
+          "peak_rss_bytes": 536375296,
+          "process_rss_bytes": 536358912,
+          "seconds": 411.6447703
+        },
+        "pass": 1,
+        "query": {
+          "completed_queries": 1,
+          "first_hits": [
+            {
+              "id": "63605",
+              "score": 0.8916015625
+            },
+            {
+              "id": "42747",
+              "score": 0.5654296875
+            },
+            {
+              "id": "93875",
+              "score": 0.564453125
+            },
+            {
+              "id": "31633",
+              "score": 0.5634765625
+            },
+            {
+              "id": "12702",
+              "score": 0.5615234375
+            },
+            {
+              "id": "36968",
+              "score": 0.560546875
+            },
+            {
+              "id": "84656",
+              "score": 0.55859375
+            },
+            {
+              "id": "77442",
+              "score": 0.55859375
+            },
+            {
+              "id": "24095",
+              "score": 0.5576171875
+            },
+            {
+              "id": "23396",
+              "score": 0.5556640625
+            }
+          ],
+          "input": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\inputs\\synthetic-100000-1024",
+          "input_dim": 1024,
+          "input_n": 100000,
+          "query_index": 0,
+          "requested_queries": 1,
+          "result_count": 10,
+          "state": "ok"
+        },
+        "query_memory": {
+          "before_rss_bytes": 536346624,
+          "peak_rss_bytes": 536367104,
+          "process_rss_bytes": 536367104,
+          "seconds": 0.1795072
+        },
+        "query_resources": {
+          "after_query": {
+            "available_memory_bytes": 18553999360,
+            "host_idle_time_100ns": 1408333125000,
+            "host_kernel_time_100ns": 1712315312500,
+            "host_user_time_100ns": 1225043125000,
+            "process_kernel_time_100ns": 270156250,
+            "process_page_fault_count": 26345300,
+            "process_user_time_100ns": 3850312500,
+            "process_working_set_bytes": 536350720,
+            "timestamp_unix_ms": 1793429897528,
+            "total_memory_bytes": 34317889536
+          },
+          "at_query_start": {
+            "available_memory_bytes": 18551459840,
+            "host_idle_time_100ns": 1408312968750,
+            "host_kernel_time_100ns": 1712293437500,
+            "host_user_time_100ns": 1225040781250,
+            "process_kernel_time_100ns": 269843750,
+            "process_page_fault_count": 26345294,
+            "process_user_time_100ns": 3849218750,
+            "process_working_set_bytes": 536346624,
+            "timestamp_unix_ms": 1793429897320,
+            "total_memory_bytes": 34317889536
+          },
+          "host_cpu_busy_percent_during_query": 16.7741935483871,
+          "process_page_fault_delta": 6
+        },
+        "query_samples": {
+          "reason": "deferred until the final reopen so pass1 query remains adjacent to Drop",
+          "state": "skipped"
+        },
+        "state": "ok",
+        "storage_drop_memory": {
+          "before_rss_bytes": 536350720,
+          "peak_rss_bytes": 600412160,
+          "process_rss_bytes": 22818816,
+          "seconds": 74.1978736
+        }
+      },
+      {
+        "coverage": {
+          "collections": [
+            {
+              "built_frontier": 0,
+              "collection": "default",
+              "extra_count": 0,
+              "indexed_count": 0,
+              "missing_count": 0,
+              "pending_count": 0,
+              "source_count": 0,
+              "source_frontier": 0,
+              "state": "READY",
+              "validated": true
+            },
+            {
+              "built_frontier": 394,
+              "collection": "bench",
+              "extra_count": 0,
+              "indexed_count": 100000,
+              "missing_count": 0,
+              "pending_count": 0,
+              "source_count": 100000,
+              "source_frontier": 394,
+              "state": "READY",
+              "validated": true
+            }
+          ],
+          "state": "ok"
+        },
+        "coverage_memory": {
+          "before_rss_bytes": 537505792,
+          "peak_rss_bytes": 538030080,
+          "process_rss_bytes": 537104384,
+          "seconds": 0.0174201
+        },
+        "metadata_summary": {
+          "collection": "bench",
+          "event": "metadata_summary",
+          "metadata_count": 100000,
+          "metadata_samples": [
+            {
+              "arena_id": 0,
+              "node_id": "0",
+              "node_u32": 0,
+              "retired_seq": 0,
+              "visible_current": true
+            },
+            {
+              "arena_id": 1,
+              "node_id": "1",
+              "node_u32": 1,
+              "retired_seq": 0,
+              "visible_current": true
+            },
+            {
+              "arena_id": 2,
+              "node_id": "2",
+              "node_u32": 2,
+              "retired_seq": 0,
+              "visible_current": true
+            },
+            {
+              "arena_id": 3,
+              "node_id": "3",
+              "node_u32": 3,
+              "retired_seq": 0,
+              "visible_current": true
+            },
+            {
+              "arena_id": 4,
+              "node_id": "4",
+              "node_u32": 4,
+              "retired_seq": 0,
+              "visible_current": true
+            },
+            {
+              "arena_id": 5,
+              "node_id": "5",
+              "node_u32": 5,
+              "retired_seq": 0,
+              "visible_current": true
+            },
+            {
+              "arena_id": 6,
+              "node_id": "6",
+              "node_u32": 6,
+              "retired_seq": 0,
+              "visible_current": true
+            },
+            {
+              "arena_id": 7,
+              "node_id": "7",
+              "node_u32": 7,
+              "retired_seq": 0,
+              "visible_current": true
+            }
+          ],
+          "missing_current_node_count": 0,
+          "missing_node_count": 0,
+          "missing_node_samples": [],
+          "node_count": 100000,
+          "retired_count": 0,
+          "visible_current_count": 100000
+        },
+        "metadata_summary_memory": {
+          "before_rss_bytes": 539795456,
+          "peak_rss_bytes": 539811840,
+          "process_rss_bytes": 539811840,
+          "seconds": 0.0673712
+        },
+        "open_memory": {
+          "before_rss_bytes": 22814720,
+          "peak_rss_bytes": 537522176,
+          "process_rss_bytes": 537522176,
+          "seconds": 414.5568283
+        },
+        "pass": 2,
+        "query": {
+          "completed_queries": 1,
+          "first_hits": [
+            {
+              "id": "63605",
+              "score": 0.8916015625
+            },
+            {
+              "id": "42747",
+              "score": 0.5654296875
+            },
+            {
+              "id": "23396",
+              "score": 0.5556640625
+            },
+            {
+              "id": "56723",
+              "score": 0.5556640625
+            },
+            {
+              "id": "57569",
+              "score": 0.5537109375
+            },
+            {
+              "id": "22732",
+              "score": 0.5537109375
+            },
+            {
+              "id": "66593",
+              "score": 0.552734375
+            },
+            {
+              "id": "1538",
+              "score": 0.5517578125
+            },
+            {
+              "id": "24931",
+              "score": 0.5517578125
+            },
+            {
+              "id": "43170",
+              "score": 0.5517578125
+            }
+          ],
+          "input": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\inputs\\synthetic-100000-1024",
+          "input_dim": 1024,
+          "input_n": 100000,
+          "query_index": 0,
+          "requested_queries": 1,
+          "result_count": 10,
+          "state": "ok"
+        },
+        "query_memory": {
+          "before_rss_bytes": 537096192,
+          "peak_rss_bytes": 537280512,
+          "process_rss_bytes": 537280512,
+          "seconds": 0.1763034
+        },
+        "query_resources": {
+          "after_query": {
+            "available_memory_bytes": 18309959680,
+            "host_idle_time_100ns": 1454972812500,
+            "host_kernel_time_100ns": 1762659375000,
+            "host_user_time_100ns": 1233388750000,
+            "process_kernel_time_100ns": 574687500,
+            "process_page_fault_count": 50952433,
+            "process_user_time_100ns": 8432187500,
+            "process_working_set_bytes": 537264128,
+            "timestamp_unix_ms": 1793430386604,
+            "total_memory_bytes": 34317889536
+          },
+          "at_query_start": {
+            "available_memory_bytes": 18316992512,
+            "host_idle_time_100ns": 1454952031250,
+            "host_kernel_time_100ns": 1762636718750,
+            "host_user_time_100ns": 1233386718750,
+            "process_kernel_time_100ns": 574375000,
+            "process_page_fault_count": 50952387,
+            "process_user_time_100ns": 8430937500,
+            "process_working_set_bytes": 537096192,
+            "timestamp_unix_ms": 1793430386406,
+            "total_memory_bytes": 34317889536
+          },
+          "host_cpu_busy_percent_during_query": 15.822784810126583,
+          "process_page_fault_delta": 46
+        },
+        "query_samples": {
+          "diagnostic_trace_disabled": true,
+          "memory": {
+            "before_rss_bytes": 537632768,
+            "peak_rss_bytes": 539811840,
+            "process_rss_bytes": 539811840,
+            "seconds": 0.2784382
+          },
+          "metrics": {
+            "k": 10,
+            "p50_us": 2281.0,
+            "p95_us": 2708.0,
+            "p99_us": 2979.0,
+            "recall": 0.14166666666666666
+          },
+          "query_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23
+          ],
+          "sample_count": 120,
+          "sample_kind": "additional warm cyclic query sweep after query0",
+          "state": "ok"
+        },
+        "state": "ok",
+        "storage_drop_memory": {
+          "before_rss_bytes": 539795456,
+          "peak_rss_bytes": 608391168,
+          "process_rss_bytes": 24285184,
+          "seconds": 74.3654661
+        }
+      }
+    ],
+    "query_budget_default_elapsed_ms": 5000,
+    "query_sample_count": 120,
+    "rayon_num_threads": "4",
+    "read_only": false,
+    "repeat_count": 2,
+    "rss_limit_bytes": "2147483648",
+    "same_process": true,
+    "vector_dim": 1024
+  },
+  "binary_sha256": "D3956B12359B73458BB3483F78D951D0F0C767C39F441E64BEF1C7BCE1392172"
+}

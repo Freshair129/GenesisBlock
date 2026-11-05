@@ -1,0 +1,23 @@
+{
+  "bench": {
+    "path": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\fresh-reopen-vector_memory.rs",
+    "sha256": "a0486cb80af74d8bf614b4fce7c8a806fb2245f95588855aa8a7ee9ae26b3c8e"
+  },
+  "sources": {
+    "before": {
+      "path": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\fresh-before-traced-lib.rs",
+      "sha256": "92d43798219447980dbc4b22df1bf41eb54c4dbee31fb90009211e8eec9266bc"
+    },
+    "after": {
+      "path": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\fresh-after-traced-lib.rs",
+      "sha256": "e63127ac96b2afa4f48a8a2b1b3c19992f17e45c7508d16a279db4f4e69b44b2"
+    }
+  },
+  "scope": "External diagnostic/harness only; production D/C engine unchanged. Identical new observer gate in both variants. No query/data/budget correctness gate removed.",
+  "old_workload": "Original same-process two-open1200s timeout retained, not qualified by these new workloads.",
+  "new_workloads": [
+    "fixture preparation: one open + add_node + normal Drop, zero queries",
+    "fresh-process RW reopen includes ALL snapshot/replay/backup/maintenance work, q0first,24k10/k100,coverage/count/marker checks,normal Drop"
+  ],
+  "caps": "Each workload1200s/2GiB; engine query5000ms; no warmup; no parent timer reset or full-two-open pass claim"
+}

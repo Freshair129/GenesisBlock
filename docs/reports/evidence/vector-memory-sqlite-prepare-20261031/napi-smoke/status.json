@@ -1,0 +1,32 @@
+{
+  "exit": 0,
+  "reason": null,
+  "seconds": 1.759361,
+  "peak_rss": 77398016,
+  "peak_private": 22192128,
+  "identities": [
+    {
+      "ProcessId": 25856,
+      "ParentProcessId": 11988,
+      "CreationDate": "2026-10-31T21:47:52.997484+07:00",
+      "Name": "node.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe"
+    },
+    {
+      "ProcessId": 37800,
+      "ParentProcessId": 25856,
+      "CreationDate": "2026-10-31T21:47:53.003853+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    }
+  ],
+  "excluded_build_helpers": [],
+  "helper_finished_parent_condition": true,
+  "helper_scope": "Helpers are not terminated; successful Cargo completion and stopped tracked compiler clients are required before private-source edits. No shared source/target mutation.",
+  "admission_cpu": 5.363636363636363,
+  "admission_free": 18464784384.0,
+  "remaining": [],
+  "cleanup_complete": true,
+  "monitor_error": null,
+  "rss_scope": "tracked owned process tree"
+}

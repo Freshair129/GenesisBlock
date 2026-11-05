@@ -1,0 +1,36 @@
+{
+  "recorded_at": "2026-10-31T10:33:46.677279+07:00",
+  "cwd": "D:\\GenesisBlock_Dev\\GenesisBlock",
+  "checks": [
+    {
+      "name": "fmt",
+      "command": "cargo fmt --all -- --check",
+      "exit_code": 0,
+      "output": ""
+    },
+    {
+      "name": "docs",
+      "command": "node scripts/docs-validate.mjs",
+      "exit_code": 0,
+      "output": "0 violations in 246 files\n"
+    },
+    {
+      "name": "dts",
+      "command": "node scripts/check-dts-freshness.mjs . target/vector-memory-napi",
+      "exit_code": 0,
+      "output": "index.d.ts and index.js are in sync with src/lib.rs (26 hand-written API declarations and 4 hand-refined signatures accounted for).\n"
+    },
+    {
+      "name": "diff",
+      "command": "git -c safe.directory=D:/GenesisBlock_Dev/GenesisBlock diff --check",
+      "exit_code": 0,
+      "output": "warning: in the working copy of 'index.d.ts', LF will be replaced by CRLF the next time Git touches it\nwarning: in the working copy of 'src/router.rs', LF will be replaced by CRLF the next time Git touches it\nwarning: in the working copy of 'tests/rest_api_tests.rs', LF will be replaced by CRLF the next time Git touches it\n"
+    },
+    {
+      "name": "source",
+      "command": "python verify-hashes.py (253 code/config/declaration files and seven preserved original files)",
+      "exit_code": 0,
+      "output": "{'checked_source_files': 253, 'preserved_staged_files': 7, 'mismatches': []}\n"
+    }
+  ]
+}

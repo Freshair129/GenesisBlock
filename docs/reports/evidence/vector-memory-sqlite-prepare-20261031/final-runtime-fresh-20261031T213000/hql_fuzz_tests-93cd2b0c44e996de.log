@@ -1,0 +1,45 @@
+
+running 40 tests
+test all_valid_tiers ... ok
+test context_with_budget ... ok
+test doubled_keywords ... ok
+test empty_string ... ok
+test empty_vector ... ok
+test extra_whitespace_and_newlines ... ok
+test extreme_alpha_values ... ok
+test extreme_budget_values ... ok
+test extreme_depth_values ... ok
+test extreme_k_values ... ok
+test extreme_vector_values ... ok
+test fuzzy_prefix_variants ... ok
+test invalid_tiers ... ok
+test keyword_case_mutations ... ok
+test large_vector_dimension ... ok
+test long_identifiers ... ok
+test long_string_literals ... ok
+test missing_required_clauses ... ok
+test p0_optional_vector_and_tuning_values ... ok
+test p0_traverse_direction_rel_alternation_and_colon_ids ... ok
+test progressive_truncation ... ok
+test random_ascii_strings ... ok
+test random_bytes_never_panic ... ok
+test random_mutations_of_valid_queries ... ok
+test search_with_all_optional_clauses ... ok
+test search_with_partial_optional_clauses ... ok
+test single_characters ... ok
+test single_element_vector ... ok
+test sql_injection_attempts ... ok
+test traverse_with_as_of ... ok
+test traverse_with_infer_rel ... ok
+test traverse_with_p0_direction_rel_alternation ... ok
+test unicode_stress ... ok
+test valid_context_parses ... ok
+test valid_hybrid_by_node_p0_parses ... ok
+test valid_hybrid_parses ... ok
+test valid_search_by_node_p0_parses ... ok
+test valid_search_parses ... ok
+test valid_traverse_p0_parses ... ok
+test valid_traverse_parses ... ok
+
+test result: ok. 40 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+

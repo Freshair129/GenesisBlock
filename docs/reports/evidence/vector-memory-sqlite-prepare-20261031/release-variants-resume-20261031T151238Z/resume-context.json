@@ -1,0 +1,34 @@
+{
+  "prior_run": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\release-variants-20261031T150004Z-b5e55f51",
+  "source_clone": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\release-src\\20261031T150004Z-b5e55f51",
+  "target": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\release-target\\20261031T150004Z-b5e55f51",
+  "qualification": {
+    "run_id": "genesis-sqlite-prepare-20261031",
+    "receipt_sha256": "93E09606C78FD56A8D79CE9463B37F60BF45F0081DAA313C8007ED06B4751DA6",
+    "completed_targets": 159,
+    "passed": true,
+    "gate_hashes": {
+      "final-runtime.status": "EEBBF6457E46A7F63ACDF9B97390F790BA443D60CFA44B607DA7E5C40AA1CC1D",
+      "final-runtime.json": "B43FCA8070A93B821373E21312E6AC09A882500BF9F1CDF778DB18A06EB6DC71",
+      "final-test-artifacts.json": "C0144A407B2B5B72C706B276D3BBA0F6B43C655AB49FFBBACA0FC546366813F4",
+      "post-checks.status": "833113AF457FA828527BDF3F54D6D3EC94D0E210DB1ED6521ABA91820567F9A3"
+    },
+    "full_source_manifest_sha256": "AE9A146DF069FA0C4ED3EBF0A78C19D36486C0A9CF7EE9F6F2EFD412CC438222",
+    "clone_source_manifest_sha256": "E333B4DAEDE72CACF6309D546FC9A37F35744C141FC1C34C2F2E6D42B1FFC24A",
+    "full_source_manifest_paths": 287,
+    "clone_source_files": 71
+  },
+  "builder_sha256": "1A24A2DBD26A89B730BBF0A84693B7FA2135B3DC4421BD25BA3CF1299CDB08BA",
+  "guard_sha256": "294C133BA94B31650D9A4D6EB8A7B9939336BF1EC127771F85181A4147A376A1",
+  "stop_proof": {
+    "at": "2026-10-31T22:11:24.0585904+07:00",
+    "status_exit": 0,
+    "original_monitor_error": "The property 'Sum' cannot be found on this object. Verify that the property exists.",
+    "identities_checked": 118,
+    "remaining_owned": 0,
+    "global_compiler_benchmark_count": 0,
+    "policy": "Original failed monitor receipt preserved; fresh PID+birth absence proof permits only private-clone continuation."
+  },
+  "old_monitor_result": "preserved failed; cached Cargo completion rerun required",
+  "repository_mutation": "none"
+}

@@ -1,0 +1,26 @@
+{
+  "small_baseline_max_phase_peak_MiB": 433.7,
+  "baseline_default": {
+    "process_cap_bytes": 4294967296,
+    "min_free_GiB": 6
+  },
+  "remaining_small_candidate": {
+    "process_cap_bytes": 1073741824,
+    "min_free_GiB": 3,
+    "cases": [
+      "10000-768-bq-r0",
+      "10000-768-bq-r1",
+      "10000-768-f16-r0",
+      "11266-1024-none-r0",
+      "11266-1024-sq8-r1",
+      "11266-1024-bq-r1",
+      "10000-1536-none-r0"
+    ]
+  },
+  "scale_100k_bq": {
+    "process_cap_bytes": 2147483648,
+    "min_free_GiB": 4,
+    "sequential": true
+  },
+  "reason": "Tighter child RSS caps based on observed small baseline; unrelated host workloads preserved."
+}

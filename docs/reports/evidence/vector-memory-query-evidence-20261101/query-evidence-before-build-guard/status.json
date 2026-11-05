@@ -1,0 +1,85 @@
+{
+    "exit":  0,
+    "reason":  null,
+    "seconds":  332.45724279999996,
+    "peak_rss":  1408471040,
+    "peak_private":  1601667072,
+    "identities":  [
+                       {
+                           "ProcessId":  43740,
+                           "ParentProcessId":  45080,
+                           "CreationDate":  "\/Date(1793536107563)\/",
+                           "Name":  "cargo.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\.cargo\\bin\\cargo.exe"
+                       },
+                       {
+                           "ProcessId":  31836,
+                           "ParentProcessId":  36312,
+                           "CreationDate":  "\/Date(1793536437002)\/",
+                           "Name":  "link.exe",
+                           "ExecutablePath":  "C:\\GenesisBlockW1Tools\\vs2022\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe"
+                       },
+                       {
+                           "ProcessId":  11688,
+                           "ParentProcessId":  43740,
+                           "CreationDate":  "\/Date(1793536107575)\/",
+                           "Name":  "conhost.exe",
+                           "ExecutablePath":  "C:\\WINDOWS\\system32\\conhost.exe"
+                       },
+                       {
+                           "ProcessId":  15596,
+                           "ParentProcessId":  49456,
+                           "CreationDate":  "\/Date(1793536424472)\/",
+                           "Name":  "link.exe",
+                           "ExecutablePath":  null
+                       },
+                       {
+                           "ProcessId":  34108,
+                           "ParentProcessId":  45688,
+                           "CreationDate":  "\/Date(1793536115045)\/",
+                           "Name":  "rustc.exe",
+                           "ExecutablePath":  null
+                       },
+                       {
+                           "ProcessId":  10052,
+                           "ParentProcessId":  45688,
+                           "CreationDate":  "\/Date(1793536108002)\/",
+                           "Name":  "rustc.exe",
+                           "ExecutablePath":  null
+                       },
+                       {
+                           "ProcessId":  49456,
+                           "ParentProcessId":  45688,
+                           "CreationDate":  "\/Date(1793536122005)\/",
+                           "Name":  "rustc.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+                       },
+                       {
+                           "ProcessId":  45688,
+                           "ParentProcessId":  43740,
+                           "CreationDate":  "\/Date(1793536107636)\/",
+                           "Name":  "cargo.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\cargo.exe"
+                       },
+                       {
+                           "ProcessId":  36312,
+                           "ParentProcessId":  45688,
+                           "CreationDate":  "\/Date(1793536425777)\/",
+                           "Name":  "rustc.exe",
+                           "ExecutablePath":  "C:\\Users\\suanr\\.rustup\\toolchains\\1.96.0-x86_64-pc-windows-msvc\\bin\\rustc.exe"
+                       }
+                   ],
+    "excluded_build_helpers":  [
+
+                               ],
+    "helper_finished_parent_condition":  true,
+    "helper_scope":  "Helpers are not terminated; successful Cargo completion and stopped tracked compiler clients are required before private-source edits. No shared source/target mutation.",
+    "admission_cpu":  66.272727272727266,
+    "admission_free":  11949662208,
+    "remaining":  [
+
+                  ],
+    "cleanup_complete":  true,
+    "monitor_error":  null,
+    "rss_scope":  "tracked processes; compiler telemetry/daemon helpers excluded"
+}

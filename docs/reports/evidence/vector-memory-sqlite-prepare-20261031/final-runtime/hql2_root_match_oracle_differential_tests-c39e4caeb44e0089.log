@@ -1,0 +1,6 @@
+
+running 1 test
+test root_match_hql_matches_independent_p7_bag_with_parallel_edges ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.64s
+

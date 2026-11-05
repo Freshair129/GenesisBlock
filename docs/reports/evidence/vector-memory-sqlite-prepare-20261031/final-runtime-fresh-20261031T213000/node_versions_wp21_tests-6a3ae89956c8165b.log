@@ -1,0 +1,10 @@
+
+running 5 tests
+test beyond_horizon_fails_explicitly_after_fold ... ok
+test chain_rebuilds_from_journal ... ok
+test resolve_at_commit_returns_historical_version ... ok
+test retraction_appears_in_chain_and_resolves_as_retracted ... ok
+test supersede_builds_a_version_chain ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s
+

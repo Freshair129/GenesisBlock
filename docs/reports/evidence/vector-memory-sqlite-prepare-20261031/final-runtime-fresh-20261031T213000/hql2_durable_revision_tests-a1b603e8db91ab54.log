@@ -1,0 +1,20 @@
+
+running 15 tests
+test database_id_is_stable_for_a_persisted_key_and_distinct_for_new_lineages ... ok
+test record_reference_requires_database_id_and_canonical_uuid_v4_revision ... ok
+test revision_transaction_validates_lineage_cas_and_nonempty_validity ... ok
+test schema5_relational_writes_keep_legacy_key_size_behavior ... ok
+test schema5_transaction_event_serialization_omits_revision_extension ... ok
+test schema6_direct_graph_writes_persist_revision_envelopes_in_the_wal ... ok
+test schema6_direct_relational_events_cannot_bypass_key_codec_preflight ... ok
+test schema6_graph_batch_uses_one_revision_bearing_wal_transaction ... ok
+test schema6_node_revisions_use_compare_and_swap_and_survive_fold_rebuild ... ok
+test schema6_node_transaction_persists_its_revision_identity_in_wal_and_projection ... ok
+test schema6_nullable_primary_key_duplicates_keep_distinct_row_ids ... ok
+test schema6_relational_mutations_enforce_the_runtime_key_codec_limit_before_append ... ok
+test schema6_relational_revision_binding_rejects_unversioned_and_mismatched_events ... ok
+test schema6_relational_row_ids_revisions_and_key_codec_survive_reinsert_and_rebuild ... ok
+test schema6_relational_rows_in_unified_transaction_share_the_revision_envelope ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.31s
+

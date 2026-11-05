@@ -1,0 +1,7 @@
+{
+  "mode": "prepare",
+  "case_path": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\100k-fixture-preparation",
+  "binary_path": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\fresh-after.exe",
+  "binary_sha256": "5273a92b0f2bb4a685baee7189795e1cf73fe2efa079018cc21c604e3d2cda54",
+  "input_path": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\inputs\\synthetic-100000-1024"
+}

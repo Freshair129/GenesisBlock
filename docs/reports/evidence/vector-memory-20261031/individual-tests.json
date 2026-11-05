@@ -1,0 +1,300 @@
+{
+  "executed": [
+    {
+      "target": "consensus_checkpoint_race_tests-23a17829175f7dbc.exe",
+      "test": "consensus_commits_survive_concurrent_save_state",
+      "exit_code": 1,
+      "reason": "timeout_180s",
+      "peak_rss_bytes": 16187392,
+      "seconds": 180.303,
+      "log": "consensus_checkpoint_race_tests-23a17829175f7dbc--consensus_commits_survive_concurrent_save_state.log"
+    },
+    {
+      "target": "hql_cypher_tests-cf7711df2414f595.exe",
+      "test": "cypher_id_anchor_label_mismatch_is_empty",
+      "exit_code": 1,
+      "reason": "rss_limit_512_MiB",
+      "peak_rss_bytes": 639754240,
+      "seconds": 2.411,
+      "log": "hql_cypher_tests-cf7711df2414f595--cypher_id_anchor_label_mismatch_is_empty.log"
+    },
+    {
+      "target": "hql_cypher_tests-cf7711df2414f595.exe",
+      "test": "cypher_id_anchor_nonexistent_id_is_empty",
+      "exit_code": 1,
+      "reason": "rss_limit_512_MiB",
+      "peak_rss_bytes": 545742848,
+      "seconds": 2.209,
+      "log": "hql_cypher_tests-cf7711df2414f595--cypher_id_anchor_nonexistent_id_is_empty.log"
+    },
+    {
+      "target": "hql_cypher_tests-cf7711df2414f595.exe",
+      "test": "cypher_id_anchor_numeric_falls_back_to_scan",
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 14610432,
+      "seconds": 0.607,
+      "log": "hql_cypher_tests-cf7711df2414f595--cypher_id_anchor_numeric_falls_back_to_scan.log"
+    },
+    {
+      "target": "hql_cypher_tests-cf7711df2414f595.exe",
+      "test": "cypher_id_anchor_retracted_edge_visibility",
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 14716928,
+      "seconds": 0.608,
+      "log": "hql_cypher_tests-cf7711df2414f595--cypher_id_anchor_retracted_edge_visibility.log"
+    },
+    {
+      "target": "hql_cypher_tests-cf7711df2414f595.exe",
+      "test": "cypher_incoming_direction",
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 14581760,
+      "seconds": 0.608,
+      "log": "hql_cypher_tests-cf7711df2414f595--cypher_incoming_direction.log"
+    },
+    {
+      "target": "hql_cypher_tests-cf7711df2414f595.exe",
+      "test": "cypher_inline_prop_constraint",
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 14581760,
+      "seconds": 0.607,
+      "log": "hql_cypher_tests-cf7711df2414f595--cypher_inline_prop_constraint.log"
+    },
+    {
+      "target": "hql_cypher_tests-cf7711df2414f595.exe",
+      "test": "cypher_label_constraints",
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 14553088,
+      "seconds": 0.608,
+      "log": "hql_cypher_tests-cf7711df2414f595--cypher_label_constraints.log"
+    },
+    {
+      "target": "hql_cypher_tests-cf7711df2414f595.exe",
+      "test": "cypher_order_by_limit",
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 14680064,
+      "seconds": 0.808,
+      "log": "hql_cypher_tests-cf7711df2414f595--cypher_order_by_limit.log"
+    },
+    {
+      "target": "hql_cypher_tests-cf7711df2414f595.exe",
+      "test": "cypher_single_hop",
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 14442496,
+      "seconds": 0.608,
+      "log": "hql_cypher_tests-cf7711df2414f595--cypher_single_hop.log"
+    },
+    {
+      "target": "hql_cypher_tests-cf7711df2414f595.exe",
+      "test": "cypher_two_hop_chain",
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 14598144,
+      "seconds": 0.809,
+      "log": "hql_cypher_tests-cf7711df2414f595--cypher_two_hop_chain.log"
+    },
+    {
+      "target": "hql_cypher_tests-cf7711df2414f595.exe",
+      "test": "cypher_where_prop_and_label",
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 14626816,
+      "seconds": 0.809,
+      "log": "hql_cypher_tests-cf7711df2414f595--cypher_where_prop_and_label.log"
+    },
+    {
+      "target": "journal_format_tests-fe6b4cd9fa0e01d3.exe",
+      "test": "journal_only_recovery_without_snapshot",
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 14385152,
+      "seconds": 1.209,
+      "log": "journal_format_tests-fe6b4cd9fa0e01d3--journal_only_recovery_without_snapshot.log"
+    },
+    {
+      "target": "journal_format_tests-fe6b4cd9fa0e01d3.exe",
+      "test": "orphan_tmp_segment_is_cleaned_on_open",
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 14315520,
+      "seconds": 1.008,
+      "log": "journal_format_tests-fe6b4cd9fa0e01d3--orphan_tmp_segment_is_cleaned_on_open.log"
+    },
+    {
+      "target": "journal_format_tests-fe6b4cd9fa0e01d3.exe",
+      "test": "tail_replay_recovers_post_snapshot_writes",
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 14610432,
+      "seconds": 2.011,
+      "log": "journal_format_tests-fe6b4cd9fa0e01d3--tail_replay_recovers_post_snapshot_writes.log"
+    },
+    {
+      "target": "journal_format_tests-fe6b4cd9fa0e01d3.exe",
+      "test": "torn_active_tail_is_truncated_not_fatal",
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 14475264,
+      "seconds": 1.812,
+      "log": "journal_format_tests-fe6b4cd9fa0e01d3--torn_active_tail_is_truncated_not_fatal.log"
+    },
+    {
+      "target": "rebuild_from_truth_tests-afd2a683c957236a.exe",
+      "test": "logical_clock_persists",
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 16191488,
+      "seconds": 3.818,
+      "log": "rebuild_from_truth_tests-afd2a683c957236a--logical_clock_persists.log"
+    },
+    {
+      "target": "rebuild_from_truth_tests-afd2a683c957236a.exe",
+      "test": "node_properties_survive_roundtrip",
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 15773696,
+      "seconds": 1.209,
+      "log": "rebuild_from_truth_tests-afd2a683c957236a--node_properties_survive_roundtrip.log"
+    },
+    {
+      "target": "rebuild_from_truth_tests-afd2a683c957236a.exe",
+      "test": "snapshot_roundtrip_nodes_edges_vectors",
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 18001920,
+      "seconds": 20.044,
+      "log": "rebuild_from_truth_tests-afd2a683c957236a--snapshot_roundtrip_nodes_edges_vectors.log"
+    },
+    {
+      "target": "rebuild_from_truth_tests-afd2a683c957236a.exe",
+      "test": "superseded_node_chain_survives",
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 15912960,
+      "seconds": 1.812,
+      "log": "rebuild_from_truth_tests-afd2a683c957236a--superseded_node_chain_survives.log"
+    },
+    {
+      "target": "rebuild_from_truth_tests-afd2a683c957236a.exe",
+      "test": "wal_only_roundtrip",
+      "exit_code": 0,
+      "reason": null,
+      "peak_rss_bytes": 16343040,
+      "seconds": 3.815,
+      "log": "rebuild_from_truth_tests-afd2a683c957236a--wal_only_roundtrip.log"
+    }
+  ],
+  "skipped": [
+    {
+      "target": "consensus_checkpoint_race_tests-23a17829175f7dbc.exe",
+      "test": "consensus_commits_survive_concurrent_compact",
+      "reason": "previous_resource_bound_case"
+    },
+    {
+      "target": "hql_cypher_tests-cf7711df2414f595.exe",
+      "test": "cypher_anchor_only",
+      "reason": "already_passed"
+    },
+    {
+      "target": "hql_cypher_tests-cf7711df2414f595.exe",
+      "test": "cypher_as_of_temporal",
+      "reason": "already_passed"
+    },
+    {
+      "target": "hql_cypher_tests-cf7711df2414f595.exe",
+      "test": "cypher_both_direction",
+      "reason": "already_passed"
+    },
+    {
+      "target": "hql_cypher_tests-cf7711df2414f595.exe",
+      "test": "cypher_default_return_shape",
+      "reason": "already_passed"
+    },
+    {
+      "target": "hql_cypher_tests-cf7711df2414f595.exe",
+      "test": "cypher_does_not_break_hybrid_match",
+      "reason": "already_passed"
+    },
+    {
+      "target": "hql_cypher_tests-cf7711df2414f595.exe",
+      "test": "cypher_edge_variable",
+      "reason": "already_passed"
+    },
+    {
+      "target": "hql_cypher_tests-cf7711df2414f595.exe",
+      "test": "cypher_id_anchor_fast_path_full_rows",
+      "reason": "previous_resource_bound_case"
+    },
+    {
+      "target": "journal_format_tests-fe6b4cd9fa0e01d3.exe",
+      "test": "active_journal_uses_framed_format",
+      "reason": "already_passed"
+    },
+    {
+      "target": "journal_format_tests-fe6b4cd9fa0e01d3.exe",
+      "test": "checkpoint_produces_sealed_segment_files",
+      "reason": "already_passed"
+    },
+    {
+      "target": "journal_format_tests-fe6b4cd9fa0e01d3.exe",
+      "test": "checkpointed_journal_alone_recovers_live_state",
+      "reason": "already_passed"
+    },
+    {
+      "target": "journal_format_tests-fe6b4cd9fa0e01d3.exe",
+      "test": "corrupt_frame_crc_stops_replay_at_the_tear",
+      "reason": "already_passed"
+    },
+    {
+      "target": "journal_format_tests-fe6b4cd9fa0e01d3.exe",
+      "test": "frame_and_txn_frontier_split",
+      "reason": "already_passed"
+    },
+    {
+      "target": "journal_format_tests-fe6b4cd9fa0e01d3.exe",
+      "test": "journal_compresses_authenticated_compaction_proofs",
+      "reason": "previous_resource_bound_case"
+    },
+    {
+      "target": "rebuild_from_truth_tests-afd2a683c957236a.exe",
+      "test": "edge_properties_survive_roundtrip",
+      "reason": "already_passed"
+    },
+    {
+      "target": "rebuild_from_truth_tests-afd2a683c957236a.exe",
+      "test": "graph_indices_survive_roundtrip",
+      "reason": "already_passed"
+    },
+    {
+      "target": "rebuild_from_truth_tests-afd2a683c957236a.exe",
+      "test": "idempotent_double_reload",
+      "reason": "already_passed"
+    },
+    {
+      "target": "rebuild_from_truth_tests-afd2a683c957236a.exe",
+      "test": "labels_survive_roundtrip",
+      "reason": "already_passed"
+    },
+    {
+      "target": "rebuild_from_truth_tests-afd2a683c957236a.exe",
+      "test": "large_batch_roundtrip",
+      "reason": "previous_resource_bound_case"
+    },
+    {
+      "target": "wal_compaction_tests-ffe0c42405136a71.exe",
+      "test": "checkpointed_wal_replays_to_identical_live_state",
+      "reason": "already_passed"
+    },
+    {
+      "target": "wal_compaction_tests-ffe0c42405136a71.exe",
+      "test": "save_state_shrinks_wal_through_open_handle",
+      "reason": "previous_resource_bound_case"
+    }
+  ]
+}

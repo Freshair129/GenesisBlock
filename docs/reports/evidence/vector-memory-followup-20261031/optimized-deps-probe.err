@@ -1,0 +1,16 @@
+   Compiling curve25519-dalek v4.1.3
+   Compiling sha2 v0.10.9
+   Compiling lz4_flex v0.11.6
+   Compiling ed25519-dalek v2.2.0
+   Compiling genesis-block-native v0.2.10 (D:\GenesisBlock_Dev\GenesisBlock)
+    Finished `test` profile [unoptimized] target(s) in 43.32s
+     Running unittests src\lib.rs (C:\Users\suanr\genesis-vector-memory-20261031\napi-target\x86_64-pc-windows-msvc\debug\deps\genesis_block_native-cd8246c766c42fca.exe)
+{"phase":"ingest","seconds":0.4636521}
+{"phase":"proof_collection","seconds":0.1501222}
+{"iterations":4,"phase":"raw_signature","seconds":0.1897542}
+{"iterations":4,"phase":"graph_binding","seconds":0.0539537}
+{"iterations":4,"phase":"leaf_matching","seconds":0.0528831}
+{"iterations":4,"phase":"signing","seconds":0.6465931}
+{"iterations":4,"phase":"signing_cached","seconds":0.2438599}
+{"iterations":4,"phase":"signing_math","seconds":0.0136148}
+{"iterations":4,"phase":"sha512_hash","seconds":0.0068551}

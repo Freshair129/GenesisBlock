@@ -1,0 +1,115 @@
+# Vector-memory timeout follow-up RCA and execution plan
+
+Spec: user follow-up dated 2026-10-31; existing vector-memory audit report.
+Authorization: user explicitly requested investigation, fixes, isolated remeasurement
+and report update without changing budgets/correctness. Continue implementation;
+no repeated R5 approval gate. Original seven staged paths remain protected.
+Risk: C-2 algorithm/diagnostic work, HIGH assurance because binding validators feed
+persistence/authentication. No wire format, authority, proof cap or query budget change.
+
+[ROOT CAUSE] Confirmed source inefficiency: revision_transaction_binds_graph and
+validate_graph_revision_binding linearly search all mutations per graph leaf;
+vector matching and owner lookup repeat scans. Signing each compacted leaf invokes
+whole-source binding validation repeatedly, yielding cubic work for large batches.
+Isolated pre-fix bulk-edge diagnostic used 54.44 CPU seconds in 60.20 elapsed seconds
+with 39.85 MB final working set: CPU-bound work, not evidence of a memory limit.
+Existing unchanged 300-second runs provide RED integration evidence for six groups.
+Single-write journal/WAL/consensus groups also incur synchronous durable ACKs and
+repeated authenticated folds; their dominant phase is not yet established.
+The 100k post-reopen query deadline is reproduced in prior baseline/candidate; source
+review excluded ef/metric/as_of/sidecar changes. Metadata inspection confirms 100k
+non-retired rows with node IDs 0..99999 in both snapshots. Need stage diagnostics.
+
+Why detection failed: prior named-test logs lacked phase/candidate-work counters;
+coverage checks validate HNSW arena IDs, not query progress. Mixed benchmark/test
+workloads made single-run performance differences unattributable.
+
+Plan (executed inline with systematic-debugging/TDD):
+- [x] Freeze current source/binaries and preserve failed scratch fixtures.
+- [x] Obtain phase traces for reopen/refill/hydration and the non-batch timeouts.
+- [x] Pin algorithmic work and exact acceptance/rejection parity in regressions.
+- [x] Index revision lookups without changing first-match/duplicate semantics,
+      payload/namespace/operation/owner checks or signature verification.
+- [x] Apply further bounded fixes only after independent evidence, retaining
+      5 s query, 300 s test, 4 GiB test guard, auth/proof/size contracts and WAL fsync.
+- [x] Run all six full groups, full core/native tests and independent review.
+- [x] Alternate baseline/candidate isolated release workloads, one process at a
+      time, no overlapping owned tests/builds; record host CPU and free RAM.
+- [x] Update audit with raw receipts, source hashes, corrected gates and limits.
+
+Prevention: deterministic probe-count and adversarial binding parity tests;
+phase-attributed benchmark outputs; fresh-open queries as well as index coverage.
+
+
+Update: indexed lookup RED failed at 8,385 probes / 129 mutations; GREEN 49/49.
+Signature math RED measured seven identical verifications per checkpoint. New
+bounded thread-local RAII scope caches only pure Ed25519 key/message/signature
+results during build_compacted_wal, not membership/authority/binding decisions.
+The key includes current verifying-key bytes, full signature, message SHA256;
+full message bytes are compared on hits, so digest collisions cannot reuse results.
+Bounded at 16,384 entries and 8 MiB message payload; full cache falls back to real
+verification. No cross-operation/thread reuse. All caller key lookups still run.
+GREEN 51/51 included tamper/key/signature changes, collision, unwind, thread and
+byte/entry bounds. Assurance remains HIGH; fresh review and security suites required.
+Single-write native control: 2,000 writes 5.873s; explicit save 132.207s, CPU-bound.
+Native wrapper finalization is not Storage::Drop (autonomic Arc owner); no native
+Drop timing claim. Rust process tests include real Drop and unchanged assertions.
+Ruling: do not add an open-wide signature cache. Two small snapshot/reopen controls
+(full and compacted journal) already perform each identical raw verification once.
+The 100k query-stage diagnostic is still running; no query fix inferred yet.
+
+
+Further attribution: after indexed validation + math cache, consensus passed
+181.817s, journal 148.984s, WAL 95.028s; bulk/HQL/rebuild still hit 300s.
+1000-edge microprofile (four calls): raw canonicalization .399s, binding .062s,
+leaf match .059s, signing 1.395s. Source canonical_event_bytes clones the full
+transaction to strip local_frame_seq; repeated source encoding RED 70 times.
+Bounded borrowed serialization cache removes repeated source cloning/encoding;
+all graph binding/crypto/key/authority predicates still run. Exact Node/Edge/Vector
+owned-vs-cached envelopes/signatures, Unicode/escapes and budget fallback pass.
+Review caught repeated rejected admissions; RED proved it; boolean closes new
+admissions after first byte rejection while retained hits remain usable. GREEN.
+No unsafe references, wire format, proof cap, WAL sync or query contract changed.
+
+Second-stage concurrency full group passed 276.266s under the original300s cap.
+Measured remaining debug signing cost: four 1000-edge payload signatures .4557s;
+four SHA512 hashes .2275s. Existing signed protocol requires hashing full per-leaf
+proof payloads; a normalized proof-pool wire format is outside this request.
+CLI experiment optimized ONLY sha2/curve25519-dalek/lz4_flex: cached signing four
+calls .9550 -> .2439s, signing math .4557 -> .0136s, SHA512 .2275 -> .00686s.
+Cargo JSON confirms all three dependencies opt-level3 with debug_assertions=true
+and overflow_checks=true; engine remains opt-level0, both checks true. Ship those
+explicit dev package overrides, preserving test budgets/assertions and all release
+profile settings. Compare release performance with matched release flags; do not
+attribute a debug profile speedup solely to engine source optimization. Retain the
+unoptimized-source stage timings and failures as historical evidence.
+
+Final qualification: all 159 core executables completed under unchanged 300s/4GiB:
+1325 passed, zero failed, seven ignored (six existing plus explicitly invoked
+manual profiler). All six formerly timed-out full groups passed. Node 88/88;
+strict core/default Clippy, Windows-host mobile compile, NAPI and dts passed.
+Matched checked-dev native ABBAAB (six fresh writers + six RO verifiers) reduced
+median explicit save 6173.717 -> 5484.191ms (-11.17%) but raised OS peak RSS
+120.361 -> 131.625MB (+11.264MB/+9.36%); whole wall essentially unchanged.
+Isolated real BGE release pair completed both full streamed/compaction/recovery
+workloads: whole wall345.914 ->342.135s, vector-file SHA identical, recall10 .975
+and recall100 .97833 both unchanged. Search100 p95 +7.47% observed; one pair does
+not qualify latency non-regression. No source query algorithm changed.
+100k old/new two-open RW diagnostics completed978.332/978.529s under1200s/2GiB.
+All four cold q0 calls passed5s, with20/20 eligible candidates and no visibility
+or metadata mismatch. Warm120 is24 unique queries repeated5 times. This does not
+reproduce original full-ingest lifecycle. Exact main NOT_RUN under original cap:
+historical phase sums2394/2439s before Drop exceed1200s; contention caveat retained.
+No phase splitting or cap expansion. Original deadline cause remains unconfirmed.
+
+Further bounded real-F32 full-main traces: first run347.077s, all73 query groups,
+reopenedq0 core2.550755s with2.539473s inside one hydration(node5932). Split-stage
+run353.038s pinpoints2.631425s in successful SQLite Connection::prepare; mutex0us,
+rowread37us, finalize0us, JSON0us at resolution; payload2bytes '{}', no SQL/parse
+error. Pinned rusqlite0.32.1/libsqlite3-sys0.30.1 SQLite3.46.0. Readonly standalone
+Python3.50.4 firstlookup7.85ms is different connection/build/state, not a subcause
+proof. RW projection sync may replay/publish via backup; readonly skips it. Pinned
+SQLite backup commits before DONE; no proof of deferred Rust-side backup commit.
+No production query change or eager warming shipped; underlying prepare wait and
+its relation to the original100k deadline remain unresolved. Original full100k
+sequence not split or granted a larger cap. No more runtime work pending.

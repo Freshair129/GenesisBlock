@@ -1,0 +1,11 @@
+
+running 6 tests
+test acl_policy_cannot_change_without_revision_successor_at_u64_max ... ok
+test contiguous_signed_acl_transitions_survive_snapshot_reopen ... ok
+test folded_nonzero_acl_baseline_allows_next_contiguous_signed_transition ... ok
+test matching_snapshot_rejects_locally_valid_signed_acl_cas_gap ... ok
+test signed_same_revision_acl_event_at_u64_max_fails_closed ... ok
+test wal_only_replay_of_signed_acl_cas_gap_fails_closed ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.62s
+

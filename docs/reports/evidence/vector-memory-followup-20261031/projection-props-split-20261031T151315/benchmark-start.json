@@ -1,0 +1,9 @@
+{
+  "driver_pid": 11040,
+  "benchmark_pid": 26044,
+  "started_at_local": "2026-10-31T15:23:01.771080+07:00",
+  "binary_sha256": "43b25c6c8daa639595af0329f7b9a1e3a6572fa08ff7bd7fadbbaf61b52495a7",
+  "output_dir": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\projection-props-split-20261031T151315\\output",
+  "direct_file_handles": true,
+  "process_tree_root_pid": 11040
+}

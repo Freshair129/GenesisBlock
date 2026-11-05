@@ -1,0 +1,10 @@
+{
+  "version": "0.3.4",
+  "lock_package_checksum": "43a5258f079b97bf2e8311ff9579e903c899dcbac0d9a138d62e9a066778bd07",
+  "archive_sha256": "43a5258f079b97bf2e8311ff9579e903c899dcbac0d9a138d62e9a066778bd07",
+  "package_matches_lock": true,
+  "source_file": "src/hnsw.rs",
+  "actual_source_sha256": "dd55bccd4ffcde255c268b19941b97313824cd56a373a09b71eb25802ca44f21",
+  "archived_source_sha256": "dd55bccd4ffcde255c268b19941b97313824cd56a373a09b71eb25802ca44f21",
+  "source_matches_archive": true
+}

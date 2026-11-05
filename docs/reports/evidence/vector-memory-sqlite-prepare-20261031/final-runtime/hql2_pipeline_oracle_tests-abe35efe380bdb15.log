@@ -1,0 +1,30 @@
+
+running 25 tests
+test context_package_remains_a_single_typed_binding_for_return_and_count ... ok
+test count_and_collect_validate_argument_expression_types_on_empty_input ... ok
+test cross_domain_filter_topk_stage_order_is_observable ... ok
+test dropping_a_context_row_removes_the_entire_payload ... ok
+test empty_domain_columns_do_not_acquire_undeclared_sort_or_numeric_operators ... ok
+test empty_graph_input_still_rejects_output_scalar_alias_collision ... ok
+test empty_input_rejects_non_boolean_predicates_and_operands ... ok
+test empty_relations_do_not_hide_unknown_fields_in_filter_project_sort_aggregate ... ok
+test expanded_seed_score_keeps_its_owner_and_does_not_score_the_neighbor ... ok
+test graph_acl_blocks_hidden_seed_before_vector_ranking ... ok
+test graph_work_budget_is_shared_across_the_entire_composed_plan ... ok
+test knn_expand_annotation_project_aggregate_preserves_parallel_edge_bag ... ok
+test knn_skips_node_without_any_ranking_document_but_rerank_requires_original ... ok
+test lexical_absent_text_document_is_nonmatching_not_an_owner_error ... ok
+test lexical_corpus_statistics_do_not_use_graph_hidden_documents ... ok
+test lexical_rerank_context_is_composed_and_token_budget_includes_citations ... ok
+test logical_depth_boundary_is_checked_without_recursive_dispatch_frames ... ok
+test match_shortest_binds_endpoint_pairs_and_chooses_one_parallel_path ... ok
+test project_preserves_score_origin_without_reassigning_it_to_reused_alias ... ok
+test projected_entity_literal_is_typed_for_following_knn ... ok
+test semi_and_anti_do_not_export_right_score_bindings ... ok
+test source_families_and_relational_composition_have_checked_answers ... ok
+test source_match_rejects_optional_mode_absent_from_its_wire_contract ... ok
+test union_does_not_label_an_ordinary_number_as_a_ranked_score ... ok
+test union_rejects_incompatible_scalar_column_types ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+

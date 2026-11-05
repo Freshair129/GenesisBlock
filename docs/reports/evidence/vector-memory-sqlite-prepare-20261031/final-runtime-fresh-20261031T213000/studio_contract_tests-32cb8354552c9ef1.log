@@ -1,0 +1,12 @@
+
+running 7 tests
+test bounded_scene_is_deterministic_and_paginated ... ok
+test local_and_remote_studio_reads_match_on_the_same_persisted_fixture ... ok
+test scene_and_entity_contracts_never_expose_embeddings ... ok
+test seed_packaged_studio_parity_fixture ... ignored, invoked only by the packaged Studio parity workflow
+test seeded_scene_respects_the_requested_temporal_view ... ok
+test studio_read_hql_rejects_invalid_commands_without_a_write_fallback ... ok
+test studio_rest_routes_are_bounded_and_api_key_guarded ... ok
+
+test result: ok. 6 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.59s
+

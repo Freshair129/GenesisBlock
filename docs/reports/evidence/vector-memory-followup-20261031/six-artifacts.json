@@ -1,0 +1,36 @@
+{
+  "source_sha256": "d28fbfc1ecd1c53af46b73616febee8e2d5dc0b4a1ee9b67243c488abb64da50",
+  "tests_sha256": "e768dad110cb49154b97a6c49e881baba1ed54ae41df673bc5d4b3de966e4730",
+  "artifacts": [
+    {
+      "target": "wal_compaction_tests",
+      "binary": "wal_compaction_tests-ffe0c42405136a71.exe",
+      "sha256": "eaf038bda136fe4c901079a0ac04240bc5fb32bae97b0c375e7c19e049de513e"
+    },
+    {
+      "target": "hql_cypher_tests",
+      "binary": "hql_cypher_tests-cf7711df2414f595.exe",
+      "sha256": "c82ecdb4e7efc881b4b5f3495d43aa2e9b4802b4057af96be3e102240de0412d"
+    },
+    {
+      "target": "concurrency",
+      "binary": "concurrency-948a29ec82ad9112.exe",
+      "sha256": "a4e901a5afb1521bb4dd13bc2bf8dd00410d3bb428ca54a0d55b9a6cdba82391"
+    },
+    {
+      "target": "rebuild_from_truth_tests",
+      "binary": "rebuild_from_truth_tests-afd2a683c957236a.exe",
+      "sha256": "f8f7b48d84482b2bcfba67b04b12c3069372b5136aa0d7c74b3825dcb7c75328"
+    },
+    {
+      "target": "consensus_checkpoint_race_tests",
+      "binary": "consensus_checkpoint_race_tests-23a17829175f7dbc.exe",
+      "sha256": "fe1553e953ff485a506c5a8dfc8f2dd1982b404e5519f749a150c5c8f94bc1f0"
+    },
+    {
+      "target": "journal_format_tests",
+      "binary": "journal_format_tests-fe6b4cd9fa0e01d3.exe",
+      "sha256": "004bb1033cf74c2a618f062c9b5cd501b034e09a9e843a732039bf8d07c68083"
+    }
+  ]
+}

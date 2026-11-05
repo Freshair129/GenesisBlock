@@ -1,0 +1,9 @@
+{
+  "driver_pid": 34204,
+  "benchmark_pid": 22052,
+  "started_at_local": "2026-10-31T14:59:01.976970+07:00",
+  "binary_sha256": "959DFA8F6348082046BCBFAD744A422E2BD7F5A43C702C2DBA7D2D86D26AEAF1",
+  "output_dir": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-bge-candidate-trace-20261031T145352\\output",
+  "direct_file_handles": true,
+  "process_tree_root_pid": 34204
+}

@@ -1,0 +1,9 @@
+{
+  "exit_code": 0,
+  "node_version": "v24.20.0",
+  "addon_path": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\baseline-addon-profile-20261031T130406\\node-smoke-scratch\\baseline-profiled.node",
+  "addon_sha256": "8BDE8388D401F82CB03D4A7C039EF45963AC77B8B39F7741DAECC260D08FF4C2",
+  "database_opened": false,
+  "stdout": "{\"loaded\":true,\"databaseOpened\":false,\"exportCount\":5,\"exports\":[\"GenesisDatabase\",\"ScalingTier\",\"engineNameSync\",\"schemaVersionSync\",\"versionSync\"],\"GenesisDatabase\":\"function\"}\r\n",
+  "note": "Attempt 1 used a smoke script that redeclared the CommonJS exports parameter; harness corrected for attempt 2."
+}

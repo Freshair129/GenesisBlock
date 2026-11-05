@@ -1,0 +1,31 @@
+{
+  "restored_local": "2026-10-31T15:20:40.4026724+07:00",
+  "c_repo": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\verify-src",
+  "delivery_d": "D:\\GenesisBlock_Dev\\GenesisBlock",
+  "restored_files": [
+    {
+      "path": "src\\lib.rs",
+      "c_sha256": "812afdbe74e96aee4f0c08b93488dda4ac5a6c0e4784b72bb9f615d30c7877a9",
+      "d_sha256": "812afdbe74e96aee4f0c08b93488dda4ac5a6c0e4784b72bb9f615d30c7877a9",
+      "matches": true
+    },
+    {
+      "path": "benches\\vector_memory.rs",
+      "c_sha256": "46694637e7e028f8a12c5c5f5eb83c8bac3ca33e7e276b1236e097f970f53c3f",
+      "d_sha256": "46694637e7e028f8a12c5c5f5eb83c8bac3ca33e7e276b1236e097f970f53c3f",
+      "matches": true
+    },
+    {
+      "path": "src\\vector_memory_tests.rs",
+      "c_sha256": "ffa1a7ab290dd9735414205ddb6169d28b409077a67b8a31b3a61c8938ddbd17",
+      "d_sha256": "ffa1a7ab290dd9735414205ddb6169d28b409077a67b8a31b3a61c8938ddbd17",
+      "matches": true
+    }
+  ],
+  "all_match": true,
+  "diagnostic_exe_sha256": "43b25c6c8daa639595af0329f7b9a1e3a6572fa08ff7bd7fadbbaf61b52495a7",
+  "target_exe_original_backup_sha256": "959dfa8f6348082046bcbfad744a422e2bd7f5a43c702c2dba7d2d86d26aeaf1",
+  "target_exe_restored_sha256": "959dfa8f6348082046bcbfad744a422e2bd7f5a43c702c2dba7d2d86d26aeaf1",
+  "target_exe_restored": true,
+  "active_compilers": []
+}

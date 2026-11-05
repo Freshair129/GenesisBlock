@@ -1,0 +1,454 @@
+diff --git "a/C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\pre-repeat-vector_memory.rs" b/benches/vector_memory.rs
+index aac9c98..435d760 100644
+--- "a/C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\query-reopen-rw-20261031T122655\\pre-repeat-vector_memory.rs"
++++ b/benches/vector_memory.rs
+@@ -9,7 +9,7 @@ use std::sync::{
+     atomic::{AtomicBool, Ordering},
+     Arc,
+ };
+-use std::time::{Duration, Instant};
++use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+ 
+ fn number(key: &str, default: usize) -> usize {
+     std::env::var(key)
+@@ -215,6 +215,365 @@ fn search(
+         "p50_us":percentile(0.5),"p95_us":percentile(0.95),"p99_us":percentile(0.99)})
+ }
+ 
++#[cfg(windows)]
++#[repr(C)]
++#[derive(Default, Clone, Copy)]
++struct WinFileTime {
++    low: u32,
++    high: u32,
++}
++
++#[cfg(windows)]
++impl WinFileTime {
++    fn as_u64(self) -> u64 {
++        ((self.high as u64) << 32) | self.low as u64
++    }
++}
++
++#[cfg(windows)]
++#[repr(C)]
++#[derive(Default)]
++struct WinProcessMemoryCounters {
++    cb: u32,
++    page_fault_count: u32,
++    peak_working_set_size: usize,
++    working_set_size: usize,
++    quota_peak_paged_pool_usage: usize,
++    quota_paged_pool_usage: usize,
++    quota_peak_non_paged_pool_usage: usize,
++    quota_non_paged_pool_usage: usize,
++    pagefile_usage: usize,
++    peak_pagefile_usage: usize,
++}
++
++#[cfg(windows)]
++#[link(name = "kernel32")]
++extern "system" {
++    fn GetCurrentProcess() -> *mut std::ffi::c_void;
++    fn GetSystemTimes(
++        idle_time: *mut WinFileTime,
++        kernel_time: *mut WinFileTime,
++        user_time: *mut WinFileTime,
++    ) -> i32;
++    fn GetProcessTimes(
++        process: *mut std::ffi::c_void,
++        creation_time: *mut WinFileTime,
++        exit_time: *mut WinFileTime,
++        kernel_time: *mut WinFileTime,
++        user_time: *mut WinFileTime,
++    ) -> i32;
++}
++
++#[cfg(windows)]
++#[link(name = "Psapi")]
++extern "system" {
++    fn GetProcessMemoryInfo(
++        process: *mut std::ffi::c_void,
++        counters: *mut WinProcessMemoryCounters,
++        size: u32,
++    ) -> i32;
++}
++
++#[cfg(windows)]
++fn query_resource_sample() -> Value {
++    let mut system = sysinfo::System::new();
++    system.refresh_memory();
++    let mut idle = WinFileTime::default();
++    let mut kernel = WinFileTime::default();
++    let mut user = WinFileTime::default();
++    let mut process_kernel = WinFileTime::default();
++    let mut process_user = WinFileTime::default();
++    let mut creation = WinFileTime::default();
++    let mut exit = WinFileTime::default();
++    let process = unsafe { GetCurrentProcess() };
++    let system_times_ok = unsafe { GetSystemTimes(&mut idle, &mut kernel, &mut user) } != 0;
++    let process_times_ok = unsafe {
++        GetProcessTimes(
++            process,
++            &mut creation,
++            &mut exit,
++            &mut process_kernel,
++            &mut process_user,
++        )
++    } != 0;
++    let mut counters = WinProcessMemoryCounters {
++        cb: std::mem::size_of::<WinProcessMemoryCounters>() as u32,
++        ..WinProcessMemoryCounters::default()
++    };
++    let process_memory_ok = unsafe {
++        GetProcessMemoryInfo(process, &mut counters, counters.cb)
++    } != 0;
++    let timestamp_unix_ms = SystemTime::now()
++        .duration_since(UNIX_EPOCH)
++        .unwrap_or_default()
++        .as_millis();
++    json!({
++        "timestamp_unix_ms":timestamp_unix_ms,
++        "total_memory_bytes":system.total_memory(),
++        "available_memory_bytes":system.available_memory(),
++        "process_working_set_bytes":process_memory_ok.then_some(counters.working_set_size),
++        "process_page_fault_count":process_memory_ok.then_some(counters.page_fault_count),
++        "process_user_time_100ns":process_times_ok.then_some(process_user.as_u64()),
++        "process_kernel_time_100ns":process_times_ok.then_some(process_kernel.as_u64()),
++        "host_idle_time_100ns":system_times_ok.then_some(idle.as_u64()),
++        "host_kernel_time_100ns":system_times_ok.then_some(kernel.as_u64()),
++        "host_user_time_100ns":system_times_ok.then_some(user.as_u64()),
++    })
++}
++
++#[cfg(not(windows))]
++fn query_resource_sample() -> Value {
++    let mut system = sysinfo::System::new();
++    system.refresh_memory();
++    json!({
++        "timestamp_unix_ms":SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis(),
++        "total_memory_bytes":system.total_memory(),
++        "available_memory_bytes":system.available_memory(),
++        "process_working_set_bytes":rss(),
++        "process_page_fault_count":Value::Null,
++        "host_cpu_times":Value::Null,
++    })
++}
++
++fn host_cpu_busy_percent(start: &Value, end: &Value) -> Option<f64> {
++    let start_kernel = start.get("host_kernel_time_100ns")?.as_u64()?;
++    let start_user = start.get("host_user_time_100ns")?.as_u64()?;
++    let start_idle = start.get("host_idle_time_100ns")?.as_u64()?;
++    let end_kernel = end.get("host_kernel_time_100ns")?.as_u64()?;
++    let end_user = end.get("host_user_time_100ns")?.as_u64()?;
++    let end_idle = end.get("host_idle_time_100ns")?.as_u64()?;
++    let total_delta = (end_kernel + end_user).checked_sub(start_kernel + start_user)?;
++    let idle_delta = end_idle.checked_sub(start_idle)?;
++    if total_delta == 0 {
++        return None;
++    }
++    Some(
++        (total_delta.saturating_sub(idle_delta) as f64 / total_delta as f64) * 100.0,
++    )
++}
++
++fn run_open_repeat_pass(
++    path: &str,
++    input_path: &str,
++    pass: usize,
++    repeat: usize,
++    sample_count: usize,
++) -> Value {
++    let stage = |name: &str, extra: Value| {
++        eprintln!(
++            "GB_MEMORY_OPEN_REPEAT {}",
++            json!({"pass":pass,"repeat":repeat,"stage":name,"extra":extra})
++        );
++    };
++    stage("open_start", json!({"path":path}));
++    let (open_result, open_memory) = measure(|| {
++        Storage::open(OpenOptions {
++            path: path.to_string(),
++            page_cache_mb: Some(64),
++            read_only: Some(false),
++            vector_dim: Some(1024),
++            retention: Some("full".into()),
++        })
++    });
++    let storage = match open_result {
++        Ok(storage) => storage,
++        Err(error) => {
++            stage("open_error", json!({"error":error.to_string()}));
++            return json!({
++                "pass":pass,
++                "state":"open_error",
++                "open_memory":open_memory,
++                "error":error.to_string(),
++            });
++        }
++    };
++    stage("open_complete", json!({"open_memory":open_memory}));
++    // The original same-process reopen path validates coverage immediately
++    // before its reopened search. Keep the first pass query-before-drop, then
++    // run coverage only on the final reopen so it does not add work between
++    // that first query and the measured Drop/reopen transition.
++    let (coverage_ok, coverage, coverage_memory) = if pass == repeat {
++        let (coverage_result, memory) = measure(|| storage.validate_index_coverage());
++        let ok = coverage_result.is_ok();
++        let value = match coverage_result {
++            Ok(report) => json!({"state":"ok","collections":report}),
++            Err(error) => json!({"state":"error","message":error.to_string()}),
++        };
++        (ok, value, memory)
++    } else {
++        (
++            true,
++            json!({"state":"skipped","reason":"reserved for final reopen to match original query path"}),
++            Value::Null,
++        )
++    };
++    stage("coverage_complete", json!({"coverage":coverage,"coverage_memory":coverage_memory}));
++
++    let input_meta: Value = serde_json::from_slice(
++        &fs::read(Path::new(input_path).join("meta.json")).unwrap(),
++    )
++    .unwrap();
++    let input_n = input_meta["n"].as_u64().unwrap_or(0);
++    let dim = input_meta["dim"].as_u64().unwrap_or(0) as usize;
++    let query_count = input_meta["q"].as_u64().unwrap_or(0) as usize;
++    let mut query = json!({"state":"skipped","reason":"index coverage failed"});
++    let mut query_memory = Value::Null;
++    let mut query_resources = Value::Null;
++    let mut query_samples = json!({"state":"skipped","reason":"first query did not complete"});
++    if coverage_ok {
++        let query_file = Path::new(input_path).join("queries.f32");
++        let mut reader = BufReader::new(File::open(&query_file).unwrap());
++        let query_vector = row(&mut reader, dim)
++            .into_iter()
++            .map(f64::from)
++            .collect();
++        let resources_start = query_resource_sample();
++        stage(
++            "query_start",
++            json!({"query_index":0,"k":10,"ef_search":200,"alpha":0.0,"resources":resources_start}),
++        );
++        let (query_result, measured_query) = measure(|| {
++            storage.hybrid_search(HybridSearchInput {
++                query_vector,
++                k: 10,
++                alpha: Some(0.0),
++                lang: None,
++                as_of: None,
++                collection: Some("bench".into()),
++                ef_search: Some(200),
++                oversample: None,
++            })
++        });
++        let resources_end = query_resource_sample();
++        query_resources = json!({
++            "at_query_start":resources_start,
++            "after_query":resources_end,
++            "host_cpu_busy_percent_during_query":host_cpu_busy_percent(&resources_start,&resources_end),
++            "process_page_fault_delta":resources_start["process_page_fault_count"].as_u64()
++                .zip(resources_end["process_page_fault_count"].as_u64())
++                .map(|(before,after)|after.saturating_sub(before)),
++        });
++        query_memory = measured_query;
++        query = match query_result {
++            Ok(rows) => json!({
++                "state":"ok",
++                "input":input_path,
++                "input_n":input_n,
++                "input_dim":dim,
++                "query_index":0,
++                "requested_queries":1,
++                "completed_queries":1,
++                "result_count":rows.len(),
++                "first_hits":rows.iter().take(10).map(|row| json!({
++                    "id":row.node.id,
++                    "score":row.score,
++                })).collect::<Vec<_>>(),
++            }),
++            Err(error) => json!({
++                "state":"error",
++                "input":input_path,
++                "input_n":input_n,
++                "input_dim":dim,
++                "query_index":0,
++                "requested_queries":1,
++                "completed_queries":0,
++                "error":error.to_string(),
++            }),
++        };
++        stage(
++            "query_complete",
++            json!({"query":query,"query_memory":query_memory,"query_resources":query_resources}),
++        );
++        let pass_sample_count = if pass == repeat { sample_count } else { 0 };
++        if query["state"].as_str() == Some("ok") && pass_sample_count > 0 {
++            assert!(query_count > 0, "input metadata must contain queries");
++            let mut query_reader = BufReader::new(
++                File::open(Path::new(input_path).join("queries.f32")).unwrap(),
++            );
++            let all_queries: Vec<Vec<f32>> =
++                (0..query_count).map(|_| row(&mut query_reader, dim)).collect();
++            let all_truth: Vec<Vec<usize>> = serde_json::from_slice(
++                &fs::read(Path::new(input_path).join("truth.json")).unwrap(),
++            )
++            .unwrap();
++            assert_eq!(all_truth.len(), query_count);
++            let sample_queries: Vec<Vec<f32>> = (0..pass_sample_count)
++                .map(|index| all_queries[index % query_count].clone())
++                .collect();
++            let sample_truth: Vec<Vec<usize>> = (0..pass_sample_count)
++                .map(|index| all_truth[index % query_count].clone())
++                .collect();
++            let query_indices: Vec<usize> =
++                (0..pass_sample_count).map(|index| index % query_count).collect();
++            let saved_diagnostics = std::env::var_os("GB_VECTOR_QUERY_DIAGNOSTICS");
++            if saved_diagnostics.is_some() {
++                std::env::remove_var("GB_VECTOR_QUERY_DIAGNOSTICS");
++            }
++            stage(
++                "query_sample_sweep_start",
++                json!({
++                    "sample_count":pass_sample_count,
++                    "query_indices":query_indices,
++                    "diagnostic_trace_disabled":saved_diagnostics.is_some(),
++                }),
++            );
++            let (sample_result, sample_memory) = measure(|| {
++                search(&storage, &sample_queries, &sample_truth, 10, 200)
++            });
++            if let Some(value) = saved_diagnostics {
++                std::env::set_var("GB_VECTOR_QUERY_DIAGNOSTICS", value);
++            }
++            query_samples = json!({
++                "state":if sample_result.get("error").is_some() {"error"} else {"ok"},
++                "sample_kind":"additional warm cyclic query sweep after query0",
++                "sample_count":pass_sample_count,
++                "query_indices":query_indices,
++                "diagnostic_trace_disabled":true,
++                "metrics":sample_result,
++                "memory":sample_memory,
++            });
++            stage("query_sample_sweep_complete", query_samples.clone());
++        }
++        if pass != repeat && query["state"].as_str() == Some("ok") && sample_count > 0 {
++            query_samples = json!({
++                "state":"skipped",
++                "reason":"deferred until the final reopen so pass1 query remains adjacent to Drop",
++            });
++        }
++    }
++
++    let (metadata_summary, metadata_summary_memory) = if pass == repeat && coverage_ok {
++        let (result, memory) = measure(|| storage.diagnostic_vector_metadata_summary("bench", 8));
++        let value = match result {
++            Ok(summary) => summary,
++            Err(error) => json!({"state":"error","message":error.to_string()}),
++        };
++        (value, memory)
++    } else {
++        (
++            json!({"state":"skipped","reason":"deferred until final repeat pass"}),
++            Value::Null,
++        )
++    };
++    stage("drop_start", json!({"pass":pass}));
++    let ((), storage_drop_memory) = measure(|| drop(storage));
++    stage("drop_complete", json!({"storage_drop_memory":storage_drop_memory}));
++    json!({
++        "pass":pass,
++        "state":"ok",
++        "open_memory":open_memory,
++        "coverage":coverage,
++        "coverage_memory":coverage_memory,
++        "query":query,
++        "query_memory":query_memory,
++        "query_resources":query_resources,
++        "query_samples":query_samples,
++        "metadata_summary":metadata_summary,
++        "metadata_summary_memory":metadata_summary_memory,
++        "storage_drop_memory":storage_drop_memory,
++    })
++}
++
+ pub fn run() {
+     // A new process separates reopen residency from retained ingest allocator pages.
+     if let Ok(path) = std::env::var("GB_MEMORY_OPEN_ONLY") {
+@@ -222,6 +581,54 @@ pub fn run() {
+         let diagnostics = std::env::var_os("GB_VECTOR_QUERY_DIAGNOSTICS").is_some();
+         let read_write = std::env::var_os("GB_MEMORY_OPEN_READ_WRITE").is_some();
+         let input = std::env::var("GB_MEMORY_INPUT").ok();
++        let repeat = number("GB_MEMORY_OPEN_REPEAT", 1);
++        assert!((1..=2).contains(&repeat), "GB_MEMORY_OPEN_REPEAT must be 1 or 2");
++        if repeat == 2 {
++            assert!(read_write, "GB_MEMORY_OPEN_REPEAT=2 requires GB_MEMORY_OPEN_READ_WRITE=1");
++            assert!(diagnostics, "GB_MEMORY_OPEN_REPEAT=2 requires GB_VECTOR_QUERY_DIAGNOSTICS=1");
++            assert_eq!(
++                std::env::var("RAYON_NUM_THREADS").ok().as_deref(),
++                Some("4"),
++                "GB_MEMORY_OPEN_REPEAT=2 requires the original matrix setting RAYON_NUM_THREADS=4"
++            );
++            let input_path = input
++                .as_deref()
++                .expect("GB_MEMORY_OPEN_REPEAT=2 requires GB_MEMORY_INPUT");
++            let sample_count = number("GB_MEMORY_OPEN_QUERY_SAMPLES", 24);
++            assert!(
++                [0, 24, 120].contains(&sample_count),
++                "GB_MEMORY_OPEN_QUERY_SAMPLES must be 0, 24, or 120"
++            );
++            let mut passes = Vec::with_capacity(repeat);
++            for pass in 1..=repeat {
++                let result =
++                    run_open_repeat_pass(&path, input_path, pass, repeat, sample_count);
++                let pass_failed = result["state"].as_str() != Some("ok");
++                passes.push(result);
++                if pass_failed {
++                    break;
++                }
++            }
++            let value = json!({
++                "open_path":path,
++                "open_mode":"read_write",
++                "read_only":false,
++                "vector_dim":1024,
++                "repeat_count":repeat,
++                "query_sample_count":sample_count,
++                "same_process":true,
++                "passes":passes,
++                "rayon_num_threads":std::env::var("RAYON_NUM_THREADS").ok(),
++                "query_budget_default_elapsed_ms":5000,
++                "rss_limit_bytes":std::env::var("GB_MEMORY_RSS_LIMIT_BYTES").ok(),
++            });
++            fs::write(
++                std::env::var("GB_MEMORY_OPEN_OUT").unwrap(),
++                serde_json::to_vec_pretty(&value).unwrap(),
++            )
++            .unwrap();
++            return;
++        }
+         let (result, memory) = measure(|| {
+             Storage::open(OpenOptions {
+                 path,
+@@ -315,9 +722,8 @@ pub fn run() {
+                 // Measure the API's normal close/checkpoint path separately from
+                 // open and the first query. This diagnostic runs on a disposable
+                 // full copy when read_write is enabled.
+-                let drop_started = Instant::now();
+-                drop(storage);
+-                let storage_drop_seconds = drop_started.elapsed().as_secs_f64();
++                let ((), storage_drop_memory) = measure(|| drop(storage));
++                let storage_drop_seconds = storage_drop_memory["seconds"].as_f64();
+                 json!({
+                     "memory":memory,
+                     "open_path":open_path,
+@@ -333,6 +739,7 @@ pub fn run() {
+                     "metadata_summary":metadata_summary,
+                     "metadata_summary_memory":metadata_summary_memory,
+                     "storage_drop_seconds":storage_drop_seconds,
++                    "storage_drop_memory":storage_drop_memory,
+                     "error":null,
+                 })
+             }

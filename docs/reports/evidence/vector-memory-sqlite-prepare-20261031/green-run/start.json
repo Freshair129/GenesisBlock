@@ -1,0 +1,19 @@
+{
+  "pid": 31404,
+  "start": "2026-10-31T19:10:50.1444131+07:00",
+  "config": {
+    "exe": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\green-library-tests.exe",
+    "cwd": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\verify-src",
+    "cap_seconds": 300,
+    "output": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\green-run",
+    "env": {},
+    "args": [
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "kind": "functional_test"
+  },
+  "query_deadline_ms": 5000,
+  "cap_seconds": 300,
+  "rss_cap": 2147483648
+}

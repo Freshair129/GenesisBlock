@@ -1,0 +1,37 @@
+{
+  "build_mode": "dev",
+  "command": "cargo build --locked --offline --lib -j1",
+  "default_features": [
+    "napi-bindings"
+  ],
+  "no_default_features": false,
+  "cargo_target_dir": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\baseline-native-target",
+  "environment": {
+    "CARGO_PROFILE_DEV_DEBUG": "0"
+  },
+  "release_profile": "unchanged from source manifest",
+  "lto": "default dev profile (disabled)",
+  "engine_code_opt_level": 0,
+  "manifest_dependency_overrides": [
+    {
+      "opt_level": 3,
+      "debug_assertions": true,
+      "package": "sha2",
+      "overflow_checks": true
+    },
+    {
+      "opt_level": 3,
+      "debug_assertions": true,
+      "package": "curve25519-dalek",
+      "overflow_checks": true
+    },
+    {
+      "opt_level": 3,
+      "debug_assertions": true,
+      "package": "lz4_flex",
+      "overflow_checks": true
+    }
+  ],
+  "manifest_sha256": "00550FBAC8EDB5C1316B5EB21983B078039604ED3C1460689515BA5539F30E25",
+  "cargo_lock_sha256": "EDA5BFA67C1077C96F2B84E44F740273E695C87A1A51B352CF18F2A031A4F8D2"
+}

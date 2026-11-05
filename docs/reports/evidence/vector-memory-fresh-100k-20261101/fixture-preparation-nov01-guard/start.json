@@ -1,0 +1,23 @@
+{
+    "pid":  18204,
+    "start":  "2026-11-01T06:40:52.8850772+07:00",
+    "config":  {
+                   "args":  [
+                                "-u",
+                                "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\run-fresh-workload.py",
+                                "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\fixture-preparation-nov01-config.json"
+                            ],
+                   "cap_seconds":  1200,
+                   "cwd":  "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031",
+                   "env":  {
+
+                           },
+                   "exe":  "C:\\Users\\suanr\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
+                   "kind":  "benchmark",
+                   "output":  "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\fixture-preparation-nov01-guard"
+               },
+    "query_deadline_ms":  5000,
+    "cap_seconds":  1200,
+    "rss_cap":  2147483648,
+    "identity":  "PID+CreationDate+path+name; require live matching parent and child born after root"
+}

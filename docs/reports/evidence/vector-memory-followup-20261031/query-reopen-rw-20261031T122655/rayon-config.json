@@ -1,0 +1,8 @@
+{
+  "script": "C:\\Users\\suanr\\genesis-vector-memory-20261031\\verify-src\\benches\\scripts\\vector_memory_matrix.ps1",
+  "line": 18,
+  "source_line": "$env:RAYON_NUM_THREADS = '4'",
+  "script_sha256": "C989F95BFA1795A874BE890AEA227B587D18C019F27FE8E54B098B52B9827BB3",
+  "GB_EF": "$env:GB_EF = '200'",
+  "explicit_rayon4": true
+}

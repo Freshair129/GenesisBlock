@@ -1,0 +1,12 @@
+{
+  "candidate_patch_exit_from_git_diff": 1,
+  "candidate_patch_sha256": "73A4A5F9E7CB385009F0C23639B6F1BFD66A44701510C2AF661C8C630A0B2865",
+  "old_trace_addition_line_count": 285,
+  "candidate_trace_addition_line_count": 285,
+  "trace_added_lines_identical": true,
+  "old_trace_removal_line_count": 19,
+  "candidate_trace_removal_line_count": 19,
+  "trace_removed_lines_identical": true,
+  "candidate_lib_sha256": "AE2D416AF3F083EA8AFBB68C6A7173A6580185A9CB48018685729D378BA80553",
+  "candidate_lib_diff_bytes": 18544
+}

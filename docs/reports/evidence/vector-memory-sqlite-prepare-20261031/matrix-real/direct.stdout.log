@@ -1,0 +1,17 @@
+run mode=direct sqlite_version="3.46.0" sqlite_source_id="2024-05-23 13:25:27 96c92aba00c8375bc32fafcdf12429c58bd8aabfcadab6683e35bbb9cdebf19e" source="C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\projection-props-split-20261031T151315\\output\\gdb\\projection.sqlite" destination=None node_u32=5932
+wal_index stage=direct_open mx_frame=0 n_backfill=0
+files stage=direct_open main=1017315328 wal=0 shm=32768
+wal_index stage=first_before_prepare mx_frame=0 n_backfill=0
+files stage=first_before_prepare main=1017315328 wal=0 shm=32768
+wal_index stage=first_after_prepare mx_frame=0 n_backfill=0
+files stage=first_after_prepare main=1017315328 wal=0 shm=32768
+query=first prepare_us=1469 row_us=56 finalize_us=0 payload_len_bytes=2 payload={}
+wal_index stage=first_after_query mx_frame=0 n_backfill=0
+files stage=first_after_query main=1017315328 wal=0 shm=32768
+wal_index stage=second_before_prepare mx_frame=0 n_backfill=0
+files stage=second_before_prepare main=1017315328 wal=0 shm=32768
+wal_index stage=second_after_prepare mx_frame=0 n_backfill=0
+files stage=second_after_prepare main=1017315328 wal=0 shm=32768
+query=second prepare_us=12 row_us=12 finalize_us=0 payload_len_bytes=2 payload={}
+wal_index stage=second_after_query mx_frame=0 n_backfill=0
+files stage=second_after_query main=1017315328 wal=0 shm=32768

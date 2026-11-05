@@ -1,0 +1,10 @@
+
+running 5 tests
+test include_invalid_surfaces_retracted ... ok
+test retract_hides_from_current_view ... ok
+test retract_missing_returns_none ... ok
+test retracted_visible_as_of_before_retraction ... ok
+test retraction_persists_across_reopen ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.54s
+

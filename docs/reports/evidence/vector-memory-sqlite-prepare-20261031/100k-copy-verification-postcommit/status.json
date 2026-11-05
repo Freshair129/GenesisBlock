@@ -1,0 +1,32 @@
+{
+  "exit": 0,
+  "reason": null,
+  "seconds": 114.0998125,
+  "peak_rss": 33574912,
+  "peak_private": 15761408,
+  "identities": [
+    {
+      "ProcessId": 32204,
+      "ParentProcessId": 39928,
+      "CreationDate": "2026-10-31T23:29:06.895112+07:00",
+      "Name": "python.exe",
+      "ExecutablePath": "C:\\Users\\suanr\\AppData\\Local\\Programs\\Python\\Python314\\python.exe"
+    },
+    {
+      "ProcessId": 24916,
+      "ParentProcessId": 32204,
+      "CreationDate": "2026-10-31T23:29:06.90363+07:00",
+      "Name": "conhost.exe",
+      "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe"
+    }
+  ],
+  "excluded_build_helpers": [],
+  "helper_finished_parent_condition": true,
+  "helper_scope": "Helpers are not terminated; successful Cargo completion and stopped tracked compiler clients are required before private-source edits. No shared source/target mutation.",
+  "admission_cpu": 3.6363636363636362,
+  "admission_free": 16889040896.0,
+  "remaining": [],
+  "cleanup_complete": true,
+  "monitor_error": null,
+  "rss_scope": "tracked owned process tree"
+}

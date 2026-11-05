@@ -1,0 +1,6 @@
+{
+  "phase": "read_only_reopen_failed",
+  "status": "failed",
+  "elapsed_ms": 2172.1747,
+  "message": "Error: HQL row is missing id or text: {\"n.id\":\"mem:235\",\"n.text\":\"observation 235: the user asked about journal segment retention and folding\"}\n    at fail (C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\followuproot\\native-perf-abbaab\\verify-profiled.cjs:16:9)\n    at main (C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\followuproot\\native-perf-abbaab\\verify-profiled.cjs:41:7)"
+}

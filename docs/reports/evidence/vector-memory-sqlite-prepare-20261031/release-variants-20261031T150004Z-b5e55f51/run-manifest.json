@@ -1,0 +1,76 @@
+{
+  "status": "running",
+  "run_id": "20261031T150004Z-b5e55f51",
+  "qualification": {
+    "run_id": "genesis-sqlite-prepare-20261031",
+    "receipt_sha256": "93E09606C78FD56A8D79CE9463B37F60BF45F0081DAA313C8007ED06B4751DA6",
+    "completed_targets": 159,
+    "passed": true,
+    "gate_hashes": {
+      "final-runtime.status": "EEBBF6457E46A7F63ACDF9B97390F790BA443D60CFA44B607DA7E5C40AA1CC1D",
+      "final-runtime.json": "B43FCA8070A93B821373E21312E6AC09A882500BF9F1CDF778DB18A06EB6DC71",
+      "final-test-artifacts.json": "C0144A407B2B5B72C706B276D3BBA0F6B43C655AB49FFBBACA0FC546366813F4",
+      "post-checks.status": "833113AF457FA828527BDF3F54D6D3EC94D0E210DB1ED6521ABA91820567F9A3"
+    },
+    "full_source_manifest_sha256": "AE9A146DF069FA0C4ED3EBF0A78C19D36486C0A9CF7EE9F6F2EFD412CC438222",
+    "clone_source_manifest_sha256": "E333B4DAEDE72CACF6309D546FC9A37F35744C141FC1C34C2F2E6D42B1FFC24A",
+    "full_source_manifest_paths": 287,
+    "clone_source_files": 71
+  },
+  "admission": {
+    "checked_at_utc": "2026-10-31T15:00:04.2757642Z",
+    "blocked_count": 0,
+    "excludes": [
+      "vctip.exe",
+      "mspdbsrv.exe"
+    ]
+  },
+  "paths": {
+    "D": "D:\\GenesisBlock_Dev\\GenesisBlock",
+    "source_clone": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\release-src\\20261031T150004Z-b5e55f51",
+    "cargo_manifest": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\release-src\\20261031T150004Z-b5e55f51\\Cargo.toml",
+    "private_target_dir": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\release-target\\20261031T150004Z-b5e55f51",
+    "guard": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\guard.ps1",
+    "lock": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\release-variants.lock",
+    "snapshot": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\release-variants-20261031T150004Z-b5e55f51\\source-snapshot.json",
+    "frozen_bench": "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\release-variants-20261031T150004Z-b5e55f51\\externalreopen100k-vector_memory.frozen.rs"
+  },
+  "hashes": {
+    "before_lib": "CE0F4A77A33A8D1EA2DFB1A7F8F3A1EA4DF18042D5EB08E59DF969A0B7E71CCF",
+    "after_lib": "74975827C95C17A783A1A26F3BA2A5439C6B198A8EA1608AF504F23577715859",
+    "production_lib": "5B8BB9BED5DDE5FA6E7D4D255DA3ACCE6C1BFE892092456133ADB65A78998FDD",
+    "production_bench": "46694637E7E028F8A12C5C5F5EB83C8BAC3CA33E7E276B1236E097F970F53C3F",
+    "frozen_external_bench": "0184EB81F94787B2CD50415084456162152A7DFBF8409C9D0578110351C422EE",
+    "qualified_full_source_manifest_sha256": "AE9A146DF069FA0C4ED3EBF0A78C19D36486C0A9CF7EE9F6F2EFD412CC438222",
+    "clone_source_manifest_sha256": "E333B4DAEDE72CACF6309D546FC9A37F35744C141FC1C34C2F2E6D42B1FFC24A"
+  },
+  "caps": {
+    "max_seconds_per_build": 1200,
+    "rss_bytes": 2147483648,
+    "min_free_bytes": 6442450944,
+    "query_deadline_ms": 5000,
+    "compile_only_cpu_admission_exemption": true
+  },
+  "build_args": [
+    "build",
+    "--manifest-path",
+    "C:\\Users\\suanr\\genesis-sqlite-prepare-20261031\\release-src\\20261031T150004Z-b5e55f51\\Cargo.toml",
+    "--locked",
+    "--offline",
+    "--release",
+    "--no-default-features",
+    "--features",
+    "bins",
+    "--bin",
+    "vbench-genesis",
+    "-j1"
+  ],
+  "variant_order": [
+    "diagnostic-before",
+    "diagnostic-after",
+    "candidate-untraced-release"
+  ],
+  "shared_manifest_and_target_for_all_variants": true,
+  "repo_source_mutation": "none",
+  "repository_target_mutation": "none"
+}

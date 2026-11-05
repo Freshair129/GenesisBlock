@@ -1,0 +1,20 @@
+
+running 15 tests
+test consensus_rejects_p6_control_events_before_proposal_creation ... ok
+test filtered_sequence_progress_carries_a_signed_receipt ... ok
+test gossip_admits_only_roster_members_and_expires_live_peer_cache ... ok
+test gossip_datagram_default_capacity_probe ... ok
+test outbound_sequence_sync_excludes_local_p6_control_events ... ok
+test peer_complete_prefix_budget_and_retry_boundaries ... ok
+test peer_ingress_rejects_direct_p6_before_wal_side_effects ... ok
+test peer_ingress_rejects_nested_p6_atomically_before_signature_or_siblings ... ok
+test peer_mixed_batch_export_blocks_without_crossing_sequence ... ok
+test peer_nested_p6_with_real_siblings_is_atomic_and_survives_reopen ... ok
+test peer_real_folded_base_zero_is_complete ... ok
+test receipt_signature_must_match_the_roster_key ... ok
+test requester_rejects_receipt_through_seq_mismatch_with_outer_cursor ... ok
+test requester_rejects_unframed_heartbeat_without_roster_authentication ... ok
+test roster_member_with_matching_receipt_advances_the_sync_cursor ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.78s
+

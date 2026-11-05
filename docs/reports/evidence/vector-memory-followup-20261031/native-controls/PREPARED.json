@@ -1,0 +1,42 @@
+{
+  "cargo_manifest_sha256_both": "00550FBAC8EDB5C1316B5EB21983B078039604ED3C1460689515BA5539F30E25",
+  "note": "No benchmark launched during preparation.",
+  "optimized_dependencies": [
+    "sha2",
+    "curve25519-dalek",
+    "lz4_flex"
+  ],
+  "drop_measured": false,
+  "candidate_addon": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\candidate-profiled.node",
+  "marker": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\followuproot\\native-perf-abbaab\\native-perf-clear",
+  "source_after_sha256": "812AFDBE74E96AEE4F0C08B93488DDA4AC5A6C0E4784B72BB9F615D30C7877A9",
+  "workload": "2000 individual nodes, exact journal test data, default retention, no vectors",
+  "caps": {
+    "wall_seconds": 300,
+    "rss_bytes": 4294967296
+  },
+  "bundle": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\followuproot\\native-perf-abbaab",
+  "order": [
+    "baseline",
+    "candidate",
+    "candidate",
+    "baseline",
+    "baseline",
+    "candidate"
+  ],
+  "cargo_lock_sha256_both": "EDA5BFA67C1077C96F2B84E44F740273E695C87A1A51B352CF18F2A031A4F8D2",
+  "status": "prepared_not_started",
+  "source_before_sha256": "60DB70FBC9FE2B133BD345DC697A1E0D823654617F27F9754328B7DE19FF61FE",
+  "baseline_sha256": "8BDE8388D401F82CB03D4A7C039EF45963AC77B8B39F7741DAECC260D08FF4C2",
+  "candidate_sha256": "8E3AAC3A8BD6A33EADB5B170F27D1A8C345FD08EFFAD13E4396190B23F9CFBB5",
+  "engineopt0_checks": "true",
+  "node_executable": "C:\\Users\\suanr\\AppData\\Local\\Programs\\nodejs-v24.20.0\\node.exe",
+  "baseline_addon": "C:\\Users\\suanr\\genesis-vector-memory-followup-20261031\\baseline-profiled.node",
+  "host_gate": {
+    "no_owned_compiler_test_or_benchmark_process": true,
+    "free_ram_bytes_min": 6442450944,
+    "global_cpu_avg_seconds": 10,
+    "max_cpu_percent": 20
+  },
+  "engine_code_opt_level": 0
+}

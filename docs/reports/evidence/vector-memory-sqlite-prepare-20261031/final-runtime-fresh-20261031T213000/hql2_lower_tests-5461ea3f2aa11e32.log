@@ -1,0 +1,24 @@
+
+running 19 tests
+test aggregate_star_in_and_between_have_closed_wire_shapes ... ok
+test between_expansion_is_rejected_before_construction ... ok
+test between_expansion_small_tree_is_preserved_and_next_bound_refuses ... ok
+test checked_remainder_lowers_to_typed_ir_rem ... ok
+test compact_twenty_five_level_between_refuses_without_expansion ... ok
+test expanded_depth_is_checked_separately_from_ast_depth ... ok
+test expression_depth_boundary_128_on_one_mib_stack ... ok
+test hql_order_without_nulls_clause_lowers_to_nulls_last_for_both_directions ... ok
+test list_literals_remain_contextual_outside_in_operators ... ok
+test lower::json_literal_size_tests::json_string_size_matches_escaped_serialization ... ok
+test lower::json_literal_size_tests::primitive_json_array_below_the_literal_size_limit_is_preserved ... ok
+test lower::json_literal_size_tests::primitive_json_array_cannot_exceed_the_literal_size_limit ... ok
+test lowering_keeps_noncommutative_operands_and_membership_order ... ok
+test nested_expression_lowers_on_one_mib_caller_stack ... ok
+test nested_function_calls_and_groups_are_stack_safe ... ok
+test optional_annotation_stage_lowers_to_typed_lookup_operator ... ok
+test scalar_pipeline_keeps_shapes_scope_and_parameter_identity ... ok
+test structural_unsigned_parameters_lower_as_u64_and_checked_u32_ranks ... ok
+test unimplemented_syntax_keeps_explicit_refusal ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+

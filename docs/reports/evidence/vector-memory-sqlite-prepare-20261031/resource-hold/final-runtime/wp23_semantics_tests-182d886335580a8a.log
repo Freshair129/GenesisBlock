@@ -1,0 +1,9 @@
+
+running 4 tests
+test hql_recorded_at_projects_edge_tx_time ... ok
+test hql_recorded_at_where_filters ... ok
+test supersede_caused_by_auto_chains_to_closed_version ... ok
+test supersede_caused_by_explicit_wins ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+

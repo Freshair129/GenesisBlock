@@ -1,0 +1,155 @@
+{
+  "completed_targets": 151,
+  "completed_target_counts": {
+    "passed": 1263,
+    "failed": 0,
+    "ignored": 6
+  },
+  "additional_unique_passed_cases": 44,
+  "total_unique_passed_cases": 1307,
+  "partial_targets": {
+    "concurrency-948a29ec82ad9112.exe": {
+      "passed": [
+        "concurrent_edge_writes",
+        "concurrent_node_writes",
+        "concurrent_read_while_write",
+        "concurrent_search_while_write"
+      ],
+      "initial_reason": "rss_limit_4_GiB",
+      "remaining": [
+        "bulk_add_edges_1000",
+        "bulk_add_nodes_1000"
+      ],
+      "expected_nonignored": 6,
+      "ignored": []
+    },
+    "consensus_checkpoint_race_tests-23a17829175f7dbc.exe": {
+      "passed": [],
+      "initial_reason": "timeout_180s",
+      "remaining": [
+        "consensus_commits_survive_concurrent_compact",
+        "consensus_commits_survive_concurrent_save_state"
+      ],
+      "expected_nonignored": 2,
+      "ignored": []
+    },
+    "hnsw_capacity_tests-e07a5c94f455a979.exe": {
+      "passed": [
+        "many_collection_indexes_do_not_oom"
+      ],
+      "initial_reason": "rss_limit_4_GiB",
+      "remaining": [
+        "index_grows_past_initial_floor"
+      ],
+      "expected_nonignored": 2,
+      "ignored": []
+    },
+    "hnsw_recall_floor_tests-14dc9db55085e84e.exe": {
+      "passed": [
+        "exact_recall_floor_preserves_candidate_budget_rejection",
+        "exact_small_view_refills_after_retired_nearest_rows",
+        "k_larger_than_collection_returns_every_vector",
+        "small_collection_returns_full_k_on_every_fresh_graph",
+        "small_lossless_l2_and_cosine_top_k_matches_exhaustive_oracle"
+      ],
+      "initial_reason": "timeout_180s",
+      "remaining": [],
+      "expected_nonignored": 5,
+      "ignored": []
+    },
+    "hql_cypher_tests-cf7711df2414f595.exe": {
+      "passed": [
+        "cypher_anchor_only",
+        "cypher_as_of_temporal",
+        "cypher_both_direction",
+        "cypher_default_return_shape",
+        "cypher_does_not_break_hybrid_match",
+        "cypher_edge_variable",
+        "cypher_id_anchor_numeric_falls_back_to_scan",
+        "cypher_id_anchor_retracted_edge_visibility",
+        "cypher_incoming_direction",
+        "cypher_inline_prop_constraint",
+        "cypher_label_constraints",
+        "cypher_order_by_limit",
+        "cypher_single_hop",
+        "cypher_two_hop_chain",
+        "cypher_where_prop_and_label"
+      ],
+      "initial_reason": "timeout_180s",
+      "remaining": [
+        "cypher_id_anchor_fast_path_full_rows",
+        "cypher_id_anchor_label_mismatch_is_empty",
+        "cypher_id_anchor_nonexistent_id_is_empty"
+      ],
+      "expected_nonignored": 18,
+      "ignored": []
+    },
+    "journal_format_tests-fe6b4cd9fa0e01d3.exe": {
+      "passed": [
+        "active_journal_uses_framed_format",
+        "checkpoint_produces_sealed_segment_files",
+        "checkpointed_journal_alone_recovers_live_state",
+        "corrupt_frame_crc_stops_replay_at_the_tear",
+        "frame_and_txn_frontier_split",
+        "journal_only_recovery_without_snapshot",
+        "orphan_tmp_segment_is_cleaned_on_open",
+        "tail_replay_recovers_post_snapshot_writes",
+        "torn_active_tail_is_truncated_not_fatal"
+      ],
+      "initial_reason": "timeout_180s",
+      "remaining": [
+        "journal_compresses_authenticated_compaction_proofs"
+      ],
+      "expected_nonignored": 10,
+      "ignored": []
+    },
+    "rebuild_from_truth_tests-afd2a683c957236a.exe": {
+      "passed": [
+        "edge_properties_survive_roundtrip",
+        "graph_indices_survive_roundtrip",
+        "idempotent_double_reload",
+        "labels_survive_roundtrip",
+        "logical_clock_persists",
+        "node_properties_survive_roundtrip",
+        "snapshot_roundtrip_nodes_edges_vectors",
+        "superseded_node_chain_survives",
+        "wal_only_roundtrip"
+      ],
+      "initial_reason": "timeout_180s",
+      "remaining": [
+        "large_batch_roundtrip"
+      ],
+      "expected_nonignored": 10,
+      "ignored": []
+    },
+    "wal_compaction_tests-ffe0c42405136a71.exe": {
+      "passed": [
+        "checkpointed_wal_replays_to_identical_live_state"
+      ],
+      "initial_reason": "timeout_180s",
+      "remaining": [
+        "save_state_shrinks_wal_through_open_handle"
+      ],
+      "expected_nonignored": 2,
+      "ignored": []
+    }
+  },
+  "new_individual_assertion_failures": [],
+  "full_cargo_invocation": "interrupted near 10 minutes in concurrency target; not a full-suite pass",
+  "bounded_runner": "complete",
+  "individual_runner_complete": true,
+  "node_engine": {
+    "passed": 32,
+    "failed": 0
+  },
+  "node_full": {
+    "passed": 85,
+    "failed": 3,
+    "failed_scope": "unchanged workflow_guard_runtime.test.mjs lease/timeout assertions"
+  },
+  "qualification": {
+    "mobile": 0,
+    "default": 0,
+    "core": 0
+  }
+}

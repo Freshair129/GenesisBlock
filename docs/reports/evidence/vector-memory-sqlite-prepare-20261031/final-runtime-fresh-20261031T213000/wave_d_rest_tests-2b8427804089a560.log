@@ -1,0 +1,8 @@
+
+running 3 tests
+test hql_and_typed_ir_transport_traverse_are_semantically_equal ... ok
+test hql_runtime_budget_failure_uses_stable_query_mapping ... ok
+test query_admission_rejection_does_not_block_status ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+

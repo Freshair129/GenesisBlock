@@ -1,0 +1,27 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const {GenesisDatabase} = require('C:/Users/suanr/genesis-sqlite-prepare-20261031/candidate-profiled.node');
+(async () => {
+ const root=fs.mkdtempSync('C:/Users/suanr/genesis-sqlite-prepare-20261031/napi-smoke-');
+ const db=GenesisDatabase.open({path:root,pageCacheMb:16,readOnly:false,vectorDim:8,retention:'full'});
+ await db.createCollection('metric','m',8,'L2','sq8',null,true);
+ assert.equal(db.listCollections().find(c=>c.name==='metric').sidecarCacheBytes,0);
+ await db.addNode({id:'one',labels:[],embedding:Array(8).fill(0.25),collection:'metric'});
+ await db.flushIndex();
+ const first=db.listCollections().find(c=>c.name==='metric');
+ assert.equal(first.arenaResidentBytes,8);
+ assert.ok(first.arenaAllocatedBytes>=8);
+ assert.equal(first.hnswVectorBytes,8);
+ assert.equal(first.sidecarResidentBytes,0);
+ assert.equal(first.sidecarDiskBytes,32);
+ const result=await db.hybridSearch({queryVector:Array(8).fill(0.25),k:1,alpha:0,collection:'metric'});
+ assert.equal(result[0].node.id,'one');
+ assert.equal(db.listCollections().find(c=>c.name==='metric').sidecarCacheBytes,32);
+ await db.rebuildIndexParallel();
+ await db.saveState();
+ assert.equal(fs.statSync(path.join(root,'vec_metric.bin')).size,8);
+ fs.writeFileSync('C:/Users/suanr/genesis-sqlite-prepare-20261031/napi-smoke.json',JSON.stringify({passed:true,path:root,metrics:db.listCollections().find(c=>c.name==='metric')},null,2));
+ console.log('NAPI memory metrics, insert/search, rebuild and snapshot smoke passed');
+})().catch(e=>{console.error(e);process.exitCode=1});
+

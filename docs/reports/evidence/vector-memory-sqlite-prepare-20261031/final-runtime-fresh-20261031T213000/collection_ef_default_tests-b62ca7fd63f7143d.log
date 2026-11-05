@@ -1,0 +1,9 @@
+
+running 4 tests
+test collection_default_search_finds_exact ... ok
+test ef_default_survives_reload ... ok
+test info_exposes_ef_default ... ok
+test per_query_override_beats_collection_default ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.62s
+
