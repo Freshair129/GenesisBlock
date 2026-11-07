@@ -360,8 +360,8 @@ fn failed_incremental_replay_does_not_mutate_the_live_projection() {
                 "schema_version": 99,
                 "mutation_id": "invalid-schema-version",
                 "payload_hash": "invalid",
-                "affected_rows": 0,
-                "mutations": [],
+                "affected_rows": 1,
+                "mutations": [{"table": "records", "kind": "Insert", "values": {"id": "invalid", "value": "invalid"}, "key": null}],
             }
         }))
         .expect("deserialize legacy relational-rows event"),

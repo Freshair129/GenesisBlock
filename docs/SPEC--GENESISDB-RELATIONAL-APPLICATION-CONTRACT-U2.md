@@ -123,7 +123,15 @@ flowchart LR
   events ได้.
 - U2 ยังไม่มี durable global commit sequence; response รายงาน `mutation_id` และ WAL durability เท่านั้น.
 - WAL compaction ต้อง preserve relational authority โดย emit current schema package ของทุก namespace
-  ตามด้วย canonical live-row upserts; ห้าม compact ทิ้ง schema/rows เพียงเพราะ SQLite snapshot มีข้อมูลอยู่.
+  ตามด้วย canonical live-row upserts และ idempotency markers; marker ต้องคง schema version, mutation
+  identity, payload hash และ affected-row count เดิม.
+- เมื่อ replay ลง projection ว่าง package แรกของ namespace อาจเป็น current version ที่มากกว่า 1 ได้
+  เฉพาะเมื่อ context ของ journal ยืนยันว่า package มาจาก materialization ใน base segment. Replay จาก
+  history, active WAL หรือ legacy WAL ยังคงใช้กฎ initial-v1 และ upgrade ทีละ version; ห้ามอนุมาน
+  ancestry จากหมายเลข version.
+- Relational idempotency marker คือ replay event ที่มี `mutations` ว่างและ `mutation_id` ไม่ว่าง.
+  Replay ตรวจ namespace และ mutation-id collision แล้วบันทึก marker fields เดิมโดยไม่ตรวจว่า schema
+  version เป็น current; live registration และ batch ยังคงใช้กฎ version ปกติ.
 
 ### 6.2 Namespace isolation
 
@@ -151,12 +159,20 @@ RelationalSchemaPackage
 
 ### 7.1 Version rules
 
-1. Initial package ต้องเป็น `version = 1`, `previous_version = null`.
-2. Upgrade ต้องเป็น `current + 1` และ `previous_version = current`.
+1. Live initial registration ต้องเป็น `version = 1`, `previous_version = null`.
+2. Live upgrade ต้องเป็น `current + 1` และ `previous_version = current`.
 3. Package เดิมที่ `package_id` และ canonical hash ตรงกัน replay ได้และคืนผล idempotent.
 4. Version เดิมแต่ hash ต่างกันต้อง fail ด้วย `REL_SCHEMA_VERSION_CONFLICT`.
 5. Version ข้าม, downgrade หรือ package ที่ canonical hash ไม่ตรงต้องถูกปฏิเสธก่อน WAL append.
 6. Engine ต้องเก็บ package canonical form, hash, applied timestamp และ mutation identity ใน registry.
+7. Projection replay ที่เริ่มจาก journal อนุญาตให้ package แรกของ namespace มี `version > 1` ได้
+   เฉพาะเมื่อ event มาจาก base segment ที่ journal ยืนยันแล้ว; package นั้นเป็น materialized current
+   schema และไม่ได้พิสูจน์ ancestry ที่ถูกพับทิ้ง. Replay จาก source อื่นยังต้องเริ่มที่ v1 หรือ validate
+   upgrade ต่อจาก package ปัจจุบัน. กฎนี้ไม่เปลี่ยน live registration.
+8. Replay event ที่มี `mutations` ว่างและ `mutation_id` ไม่ว่างเป็น idempotency marker: ต้อง resolve
+   namespace, ใช้ collision check เดิม (id เดิมกับ hash ต่างกันเป็น conflict), และเก็บ original
+   `schema_version`, `payload_hash`, `mutation_id` และ `affected_rows`. Marker ไม่ใช่ row mutation
+   และข้าม current-schema-version check เฉพาะตอน replay.
 
 ### 7.2 Logical types
 
@@ -261,6 +277,8 @@ RelationalMutationBatch
 4. Update ห้ามเปลี่ยน primary key; ใช้ delete+insert แบบ explicit หากต้องการ identity ใหม่.
 5. Batch apply ใน SQLite transaction เดียว: all operations succeed หรือไม่มี operation ใด visible.
 6. `mutation_id` เป็น idempotency key; replay payload เดิม converge, payload ต่างกัน fail conflict.
+   Marker replay ที่มี empty `mutations` ยังคง idempotency identity และ schema version เดิม แม้
+   namespace จะถูก upgrade หลัง batch นั้น.
 7. Foreign-key/unique/check failure ต้องคืน named error และ rollback SQLite transaction ทั้ง batch.
 8. U2 batch ห้ามมี graph/vector operation; wrapper จะขยายใน U3.
 
@@ -424,7 +442,12 @@ Deployment configuration ลด limits ได้ แต่เพิ่มเก�
 
 ### 14.1 Recovery
 
-- Schema/mutation WAL events replay ตาม file authority ที่ U2 มีอยู่และ apply idempotently.
+- Schema/mutation WAL events replay ตาม file authority ที่ U2 มีอยู่และ apply idempotently. Base
+  segment ที่ journal ยืนยันแล้วเริ่ม projection ของ namespace ที่ยังไม่มี schema ด้วย current
+  schema package ได้; history ปกติยังต้องใช้ version chain แบบลำดับต่อเนื่อง.
+- Event ที่มี `mutations` ว่างและ `mutation_id` ไม่ว่าง replay เป็น idempotency marker โดยคง schema
+  version, hash, identity และ affected-row count เดิม และข้ามเฉพาะการตรวจ current schema; การค้นหา
+  namespace และ conflict เมื่อ id เดิมมี hash ต่างกันยังทำงาน.
 - Missing/corrupt relational projection ต้อง rebuild schema registry ก่อน row events.
 - Compacted WAL ต้องเป็น recovery source แบบ standalone: current package ทุก namespace และ live rows
   ต้องกู้ได้แม้ลบ `projection.sqlite` และ native snapshot files.
