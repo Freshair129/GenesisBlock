@@ -1,8 +1,8 @@
-﻿# RCA: Relational schema upgrade and folded journal replay
+# RCA: Relational schema upgrade and folded journal replay
 
 ## Status / Date
 
-Suspected from source inspection; runtime confirmation on GenesisBlock main is blocked by Cargo admission. 2026-11-07. Base `e99395ae510e87e2f82ad79cc1cfd9461e61e6be`.
+**Confirmed at runtime** on `fix/relational-replay-schema-lineage` @ `8588aa9` (base main `e99395a`), 2026-11-07 13:07–13:09 ICT, lane `F:\cargo-lanes\genesisblock-issue46` (see "Observed results"). Originally suspected from source inspection. Base `e99395ae510e87e2f82ad79cc1cfd9461e61e6be`.
 
 Round 1 RCA and regression tests were approved by Claude, the lead agent acting on the owner's instruction to fix Freshair129/Lalin-AI #46. This is **agent approval, not human approval**. Production changes and contract deltas remain pending owner approval.
 
@@ -10,7 +10,22 @@ Round 1 RCA and regression tests were approved by Claude, the lead agent acting 
 
 The issue reports `projection sync failed (REL_SCHEMA_VERSION_CONFLICT: mutation schema version is not current); fresh WAL rebuild failed: REL_SCHEMA_VERSION_CONFLICT: initial schema must be version 1`, on dependency rev `14de32a` with frontier-only retention after v1 rows and v2/v3 upgrades. This is external prior evidence, not a run at the current base. The new `relational_schema_upgrade_replay_tests` contains same-session, later-session, full, budget, after-upgrade-only controls and version-99 guards. Its checkpoint prints the actual signed journal events before reopen. None has been compiled or run; the dump and per-case outcomes remain unobserved. The explicit `save_state` is an extra checkpoint before drop to expose the journal; the control still checks two subsequent reopens. The `budget:1` case does not yet demonstrate that a fold occurred.
 
-## Root cause (source-supported hypothesis)
+## Observed results (lead run, 2026-11-07)
+
+`cargo test --no-default-features --locked --test relational_schema_upgrade_replay_tests -- --nocapture`: **6 passed, 2 failed**.
+
+| Test | Result |
+|---|---|
+| `frontier_same_session_upgrade` | FAILED — `projection sync failed (REL_SCHEMA_VERSION_CONFLICT: mutation schema version is not current); fresh WAL rebuild failed: REL_SCHEMA_VERSION_CONFLICT: initial schema must be version 1` |
+| `frontier_later_session_upgrade` | FAILED — same error |
+| `full_same_session_upgrade`, `full_later_session_upgrade` | ok |
+| `budget_same_session_upgrade` | ok (fold not demonstrated for `budget:1`) |
+| `frontier_rows_after_upgrade_control` | ok |
+| `live_batch_rejects_invalid_schema_version`, `replay_rejects_invalid_schema_version` | ok |
+
+Printed folded journal (frontier, same session): `RelationalSchema` v3 → `RelationalRows` `schema_version: 3`, empty `mutation_id`, live row upserts → `RelationalRows` `schema_version: 1`, `mutation_id: 00000000-0000-4000-8000-000000000100`, non-empty `payload_hash`, `affected_rows: 1`, **empty `mutations`** (the idempotency marker). This matches the source prediction exactly: the defect is specific to folds that retain an idempotency marker from a batch applied under an older schema version; retained-history replay (`full`) is not affected.
+
+## Root cause (confirmed)
 
 On open, `projection_sync_on_open` uses the fingerprint and schema preflight to choose an existing candidate or fresh candidate (`src/lib.rs:14775`, `:14795`, `:14805`). Existing candidate replay failure is retried from a blank candidate (`:14835`-`:14875`). Both replay the journal (`:14520`-`:14545`).
 
@@ -33,5 +48,8 @@ Propose a replay-only distinction between authenticated folded-base materializat
 Proposed documentation deltas, not approved or applied: U2 `docs/SPEC--GENESISDB-RELATIONAL-APPLICATION-CONTRACT-U2.md` sections 6.1, 7.1 and replay/idempotency: specify separate base-bootstrap and marker semantics while retaining live v1 and upgrade validation. `docs/SPEC--GENESISDB-JOURNAL-FORMAT-V1.md` section 8 and `docs/adr/ADR--GENESISDB-JOURNAL-HISTORY.md` D3/D5: define proof and ordering for base materializations, existing base compatibility, and independent journal reconstruction. Review `docs/C4--GENESISDB-ARCHITECTURE.md` and `docs/MASTER-SPEC--GENESIS-DB.md` for actual impact; update only if warranted. Owner approval is required before implementation or contract edits.
 
 ## Outcome and admission
+
+Updated 2026-11-07 by the lead: tests now run (results above); the previous admission note below is historical.
+
 
 No fix or post-fix result. Focused tests are unrun and not claimed passing or failing. The lane's free-byte measurements, lock status and unresolved §J admission inputs are recorded in the handoff; resolve those inputs, rerun admission immediately before Cargo, then execute the tests and capture the printed journal and errors. No cleanup is authorized.
