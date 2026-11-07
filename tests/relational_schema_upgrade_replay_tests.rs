@@ -1,5 +1,5 @@
 use genesis_block_native::{
-    OpenOptions, RelationalColumn, RelationalColumnType, RelationalMutationBatch,
+    NodeInput, OpenOptions, RelationalColumn, RelationalColumnType, RelationalMutationBatch,
     RelationalMutationKind, RelationalRowMutation, RelationalSchemaPackage, RelationalTable,
     Storage,
 };
@@ -106,8 +106,38 @@ fn scenario(retention: &str, later: bool, after: bool) {
     if after {
         write_row(&db, 3);
     }
+    if retention == "budget:1" {
+        for i in 0..1000 {
+            if db.sealed_history_bytes() > 1 {
+                break;
+            }
+            db.add_node(NodeInput {
+                id: Some(format!("budget-churn-{i}")),
+                labels: vec![],
+                props: None,
+                embedding: Some(vec![1.0, 0.0]),
+                lang: None,
+                valid_from: None,
+                caused_by: None,
+                ttl: None,
+                collection: None,
+            })
+            .unwrap();
+        }
+        assert!(
+            db.sealed_history_bytes() > 1,
+            "budget must be exceeded before checkpoint"
+        );
+        assert_eq!(db.history_horizon(), 0, "no fold before checkpoint");
+    }
     // Inspect the actual journal following a checkpoint, before a potentially failing reopen.
     db.save_state().unwrap();
+    if retention == "budget:1" {
+        assert!(
+            db.history_horizon() > 0,
+            "budget checkpoint must fold history"
+        );
+    }
     let events = db.events_since_seq(0);
     eprintln!(
         "journal {retention}: {}",
@@ -165,21 +195,37 @@ fn live_batch_rejects_invalid_schema_version() {
 
 #[test]
 fn replay_rejects_invalid_schema_version() {
-    use ed25519_dalek::{Signer, SigningKey};
-    use genesis_block_native::{Event, SignedEvent};
-    use sha2::{Digest, Sha256};
-    use std::io::Write;
+    use genesis_block_native::Event;
     let dir = TempDir::new().unwrap();
     let db = open(dir.path(), "full");
     db.register_relational_schema(schema(1)).unwrap();
     let seq = db.stable_frontier() + 1;
     drop(db);
-    let secret: [u8; 32] = std::fs::read(dir.path().join("identity.bin"))
+    let event: Event = serde_json::from_value(json!({"RelationalRows": {"namespace": "replay_upgrade", "schema_version": 99, "mutation_id": "invalid-schema-version", "payload_hash": "invalid", "affected_rows": 1, "mutations": [{"table":"records", "kind":"Insert", "values":{"id":"bad", "value":"bad"}, "key":null}]}})).unwrap();
+    append_signed_event(dir.path(), seq, event);
+    let result = Storage::open(OpenOptions {
+        path: dir.path().to_string_lossy().into_owned(),
+        page_cache_mb: Some(16),
+        read_only: Some(false),
+        vector_dim: Some(2),
+        retention: Some("full".into()),
+    });
+    match result {
+        Ok(_) => panic!("version 99 must fail replay"),
+        Err(error) => assert!(error.to_string().contains("REL_SCHEMA_VERSION_CONFLICT")),
+    }
+}
+
+fn append_signed_event(path: &Path, seq: u64, event: genesis_block_native::Event) {
+    use ed25519_dalek::{Signer, SigningKey};
+    use genesis_block_native::SignedEvent;
+    use sha2::{Digest, Sha256};
+    use std::io::Write;
+    let secret: [u8; 32] = std::fs::read(path.join("identity.bin"))
         .unwrap()
         .try_into()
         .unwrap();
     let key = SigningKey::from_bytes(&secret);
-    let event: Event = serde_json::from_value(json!({"RelationalRows": {"namespace": "replay_upgrade", "schema_version": 99, "mutation_id": "invalid-schema-version", "payload_hash": "invalid", "affected_rows": 0, "mutations": []}})).unwrap();
     let signature = key.sign(&serde_json::to_vec(&event).unwrap());
     let fingerprint = hex::encode(Sha256::digest(key.verifying_key().as_bytes()));
     let payload = serde_json::to_vec(&SignedEvent {
@@ -191,7 +237,7 @@ fn replay_rejects_invalid_schema_version() {
     let crc = crc32c::crc32c_append(crc32c::crc32c(&seq.to_le_bytes()), &payload);
     let mut file = std::fs::OpenOptions::new()
         .append(true)
-        .open(dir.path().join("wal/active.gwal"))
+        .open(path.join("wal/active.gwal"))
         .unwrap();
     file.write_all(&(payload.len() as u32).to_le_bytes())
         .unwrap();
@@ -199,6 +245,78 @@ fn replay_rejects_invalid_schema_version() {
     file.write_all(&crc.to_le_bytes()).unwrap();
     file.write_all(&payload).unwrap();
     drop(file);
+}
+
+#[test]
+fn folded_marker_preserves_live_idempotency_conflict() {
+    let dir = TempDir::new().unwrap();
+    let db = open(dir.path(), "frontier_only");
+    db.register_relational_schema(schema(1)).unwrap();
+    write_row(&db, 1);
+    db.register_relational_schema(schema(2)).unwrap();
+    db.register_relational_schema(schema(3)).unwrap();
+    db.save_state().unwrap();
+    assert!(db.history_horizon() > 0);
+    drop(db);
+    let db = open(dir.path(), "frontier_only");
+    let mut batch = RelationalMutationBatch {
+        mutation_id: "00000000-0000-4000-8000-000000000100".into(),
+        namespace: "replay_upgrade".into(),
+        schema_version: 1,
+        operations: vec![RelationalRowMutation {
+            table: "records".into(),
+            kind: RelationalMutationKind::Insert,
+            values: json!({"id":"one", "value":"kept"}),
+            key: None,
+        }],
+    };
+    assert!(db
+        .apply_relational_batch(batch.clone())
+        .unwrap_err()
+        .to_string()
+        .contains("REL_SCHEMA_VERSION_CONFLICT"));
+    batch.schema_version = 3;
+    batch.operations[0].values = json!({"id":"one", "value":"different"});
+    assert!(db
+        .apply_relational_batch(batch)
+        .unwrap_err()
+        .to_string()
+        .contains("REL_MUTATION_CONFLICT"));
+}
+
+#[test]
+fn folded_journal_rebuilds_fresh_projection_after_upgrade() {
+    let dir = TempDir::new().unwrap();
+    let db = open(dir.path(), "frontier_only");
+    db.register_relational_schema(schema(1)).unwrap();
+    write_row(&db, 1);
+    db.register_relational_schema(schema(2)).unwrap();
+    db.register_relational_schema(schema(3)).unwrap();
+    db.save_state().unwrap();
+    assert!(db.history_horizon() > 0);
+    drop(db);
+    let projection = Connection::open(dir.path().join("projection.sqlite")).unwrap();
+    assert_eq!(
+        projection
+            .execute(
+                "DELETE FROM projection_state WHERE key='journal_projection_fingerprint_v1'",
+                []
+            )
+            .unwrap(),
+        1
+    );
+    drop(projection);
+    check_rows(dir.path(), "frontier_only");
+}
+
+#[test]
+fn ordinary_history_rejects_initial_schema_above_v1() {
+    use genesis_block_native::Event;
+    let dir = TempDir::new().unwrap();
+    let db = open(dir.path(), "full");
+    let seq = db.stable_frontier() + 1;
+    drop(db);
+    append_signed_event(dir.path(), seq, Event::RelationalSchema(schema(2)));
     let result = Storage::open(OpenOptions {
         path: dir.path().to_string_lossy().into_owned(),
         page_cache_mb: Some(16),
@@ -207,7 +325,10 @@ fn replay_rejects_invalid_schema_version() {
         retention: Some("full".into()),
     });
     match result {
-        Ok(_) => panic!("version 99 must fail replay"),
-        Err(error) => assert!(error.to_string().contains("REL_SCHEMA_VERSION_CONFLICT")),
+        Ok(_) => panic!("ordinary history must reject a first v2 schema"),
+        Err(error) => assert!(
+            error.to_string().contains("REL_SCHEMA_VERSION_CONFLICT"),
+            "{error}"
+        ),
     }
 }

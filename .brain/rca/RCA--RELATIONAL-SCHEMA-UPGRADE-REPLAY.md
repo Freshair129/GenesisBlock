@@ -2,7 +2,7 @@
 
 ## Status / Date
 
-**Status: implemented and compile-checked; functional test round pending.** Root cause was reproduced on `fix/relational-replay-schema-lineage` @ `8588aa9` (base main `e99395a`), 2026-11-07 13:07–13:09 ICT, lane `F:\cargo-lanes\genesisblock-issue46` (see "Observed results"). Round 2 implementation started from `a844c61`.
+**Status: implemented; verification incomplete due to the E: growth bound.** Root cause was reproduced on `fix/relational-replay-schema-lineage` @ `8588aa9` (base main `e99395a`), 2026-11-07 13:07–13:09 ICT, lane `F:\cargo-lanes\genesisblock-issue46` (see "Observed results"). Round 2 implementation started from `a844c61`.
 
 **Owner approval (2026-11-07):** The human owner approved the replay-only marker handling, verified base-segment bootstrap rule, and listed documentation deltas. Approval was relayed by the lead. This supersedes round-1 agent approval as authorization for the production change. Risk R8: **HIGH**; complexity R10: **C-3**.
 
@@ -64,3 +64,15 @@ Documentation updated: U2 §§6.1, 7.1, 9.1 and 14.1; journal format §8; journa
 - The first compile-only check found two internal helper call sites using the old private signature. Both now pass `None`; the final compile-only check passed.
 - `cargo test` was not run in this round by design. Round 3 owns execution of the relational replay regression suite and the remaining functional acceptance.
 - Local commit and exact lane/lock measurements are in the round-2 handoff. No push or cleanup is authorized.
+
+
+## Outcome ? round 3 (2026-11-07)
+
+Disposition: **BLOCKED ? full-suite verification incomplete**. Resume only after the owner establishes and documents a qualified E: concurrent-growth bound and applicable preflight, then remeasure C:/E:/F: after acquiring the lane lock and rerun the full suite and required Clippy. No cleanup or push was performed.
+
+- Initial focused command on `515f8a3`: **7 passed, 1 failed**. `replay_rejects_invalid_schema_version` used an empty-mutation, nonempty-ID event, which is a replay marker under the approved design, not an ordinary row event. The test was corrected to carry a real row mutation; no production code was changed.
+- Expanded focused command: **11 passed, 0 failed, 0 ignored**. `budget_same_session_upgrade` now forces sealed history over the budget and asserts a fold horizon before reopen. New tests: `folded_marker_preserves_live_idempotency_conflict`, `folded_journal_rebuilds_fresh_projection_after_upgrade`, and `ordinary_history_rejects_initial_schema_above_v1`. The marker conflict case uses current schema v3 for the changed payload because live version validation precedes identity validation.
+- Full `cargo test --no-default-features --locked`: interrupted after **13 completed binaries, 131 passed, 0 failed, 1 ignored**, plus five observed passing cases in an incomplete `concurrency` binary. No conclusion is drawn for its remaining case or the unrun binaries. Raw log: `F:\cargo-lanes\genesisblock-issue46\round3-full.log`. The stop is not a test failure, and no claim of pre-existing failure is made.
+- `cargo fmt --check`: passed. Clippy: **NOT_RUN**, blocked by the E: bound; `.github/workflows/test.yml` requires core and default-feature `--all-targets` Clippy. The requested core `--tests` command remains pending. `npm test`: **NOT_RUN**; TESTING.md lists the Node suite but does not specifically require it for relational replay changes, and it requires an addon build.
+- Lane preflight and measurements (bytes, ICT): focused initial lock 14:00:53?14:02:22: C 126,210,650,112 ? 126,205,554,688; E 132,369,629,184 ? unchanged; F 2,072,429,080,576 ? 2,072,010,342,400. Expanded lock 14:03:36?14:04:20: C 125,946,523,648 ? 125,905,522,688; E 132,369,629,184 ? unchanged; F 2,072,010,346,496 ? 2,072,167,886,848. Full lock 14:04:33?14:14:21: C 125,878,394,880 ? 125,786,451,968; E 132,369,629,184 ? 132,365,438,976; F 2,072,167,886,848 ? 2,045,919,399,936. Floors: C/E 53,687,091,200; F 107,374,182,400. Full-run E decrease **4,190,208** exceeded the lane's 0-byte E bound, despite remaining above floor; attribution is unknown. Full-run F free-space decrease was 26,248,486,912; observed target size peaked at least 30,101,357,563 bytes and observed temp at least 1,607,198 bytes (samples, not continuous peak instrumentation). All figures are volume free-space or sampled file-size measurements, not proof of isolated workload writes.
+- An initial launch at 14:00:31?14:00:32 was interrupted by PowerShell treating Cargo stderr as an exception, before results; no Cargo/rustc process remained and the lock was released. The corrected focused invocation produced the result above.
