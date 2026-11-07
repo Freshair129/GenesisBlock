@@ -12608,9 +12608,11 @@ impl Storage {
         }
     }
 
+    // Base materializations are the current state after schema history is folded.
     fn projection_apply_schema_conn(
         conn: &Connection,
         package: &RelationalSchemaPackage,
+        allow_base_bootstrap: bool,
     ) -> Result<()> {
         Self::validate_relational_schema(package)?;
         let previous = Self::load_relational_schema_conn(conn, &package.namespace)?;
@@ -12619,7 +12621,9 @@ impl Storage {
                 return Ok(());
             }
             Self::validate_schema_upgrade(previous, package)?;
-        } else if package.schema_version != 1 || package.previous_version.is_some() {
+        } else if (package.schema_version != 1 || package.previous_version.is_some())
+            && !(allow_base_bootstrap && package.schema_version > 1)
+        {
             return Err(Error::from_reason(
                 "REL_SCHEMA_VERSION_CONFLICT: initial schema must be version 1",
             ));
@@ -13973,6 +13977,7 @@ impl Storage {
         event: &Event,
         frame_seq: u64,
         allow_revision_checkpoint: bool,
+        journal_origin: Option<JournalEventOrigin>,
     ) -> Result<()> {
         if self.read_only {
             return Ok(());
@@ -13995,7 +14000,11 @@ impl Storage {
                 let tx = conn
                     .transaction()
                     .map_err(|e| Error::from_reason(e.to_string()))?;
-                Self::projection_apply_schema_conn(&tx, package)?;
+                Self::projection_apply_schema_conn(
+                    &tx,
+                    package,
+                    journal_origin == Some(JournalEventOrigin::Base),
+                )?;
                 tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
             }
             Event::RelationalRows {
@@ -14009,7 +14018,14 @@ impl Storage {
             } => {
                 let schema = Self::load_relational_schema_conn(&conn, namespace)?
                     .ok_or_else(|| Error::from_reason("relational schema is not registered"))?;
-                if *schema_version != 0 && *schema_version != schema.schema_version {
+                // Folded idempotency markers retain their original schema
+                // version and never represent row mutations.
+                let replay_marker =
+                    journal_origin.is_some() && mutations.is_empty() && !mutation_id.is_empty();
+                if !replay_marker
+                    && *schema_version != 0
+                    && *schema_version != schema.schema_version
+                {
                     return Err(Error::from_reason(
                         "REL_SCHEMA_VERSION_CONFLICT: mutation schema version is not current",
                     ));
@@ -14032,6 +14048,18 @@ impl Storage {
                             ))
                         };
                     }
+                }
+                if replay_marker {
+                    let tx = conn
+                        .transaction()
+                        .map_err(|e| Error::from_reason(e.to_string()))?;
+                    tx.execute(
+                        "INSERT INTO applied_relational_mutations(mutation_id, namespace, schema_version, payload_hash, affected_rows) VALUES(?1, ?2, ?3, ?4, ?5)",
+                        params![mutation_id, namespace, schema_version, payload_hash, affected_rows],
+                    )
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+                    tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
+                    return Ok(());
                 }
                 if self.storage_schema_version != SCHEMA_VERSION
                     && record_revision_transaction.is_some()
@@ -14694,67 +14722,81 @@ impl Storage {
             ));
         }
         let mut first_err: Option<Error> = None;
-        self.scan_journal(None, true, &mut |seq, signed_event| {
-            if first_err.is_some() {
-                return;
-            }
-            let revision_checkpoint = match &signed_event.event {
-                Event::Transaction(transaction) if Self::is_revision_checkpoint(transaction) => {
-                    self.storage_schema_version != SCHEMA_VERSION
-                        || self.verify_compacted_revision_checkpoint(&signed_event)
-                        || (!self.peer_membership_configured.load(Ordering::SeqCst)
-                            && self.compacted_revision_checkpoint_well_formed(&signed_event))
-                        || (signed_event.signer_peer_id == self.local_peer_id
-                            && self.verify_raw_event_signature(&signed_event))
+        // Keep the segment origin so replay can distinguish folded materialization
+        // from ordinary schema history; live projection writes pass no origin.
+        let _ = self.scan_journal_with_origin(
+            None,
+            true,
+            None,
+            &mut |seq, origin, signed_event, _| {
+                if first_err.is_some() {
+                    return;
                 }
-                _ => false,
-            };
-            if self.storage_schema_version == SCHEMA_VERSION
-                && matches!(
-                    &signed_event.event,
+                let revision_checkpoint = match &signed_event.event {
                     Event::Transaction(transaction)
-                        if Self::is_revision_checkpoint(transaction)
-                            && transaction.record_revision_transaction.is_some()
-                )
-                && !revision_checkpoint
-            {
-                first_err = Some(Error::from_reason(
-                    "REVISION_CHECKPOINT_PROOF_REQUIRED: journal checkpoint has no verified source event",
-                ));
-                return;
-            }
-            let mut apply = |event: Event| {
-                if let Err(e) = self.projection_apply_event(&event, seq, revision_checkpoint) {
-                    first_err = Some(e);
+                        if Self::is_revision_checkpoint(transaction) =>
+                    {
+                        self.storage_schema_version != SCHEMA_VERSION
+                            || self.verify_compacted_revision_checkpoint(&signed_event)
+                            || (!self.peer_membership_configured.load(Ordering::SeqCst)
+                                && self.compacted_revision_checkpoint_well_formed(&signed_event))
+                            || (signed_event.signer_peer_id == self.local_peer_id
+                                && self.verify_raw_event_signature(&signed_event))
+                    }
+                    _ => false,
+                };
+                if self.storage_schema_version == SCHEMA_VERSION
+                    && matches!(
+                        &signed_event.event,
+                        Event::Transaction(transaction)
+                            if Self::is_revision_checkpoint(transaction)
+                                && transaction.record_revision_transaction.is_some()
+                    )
+                    && !revision_checkpoint
+                {
+                    first_err = Some(Error::from_reason(
+                        "REVISION_CHECKPOINT_PROOF_REQUIRED: journal checkpoint has no verified source event",
+                    ));
+                    return;
                 }
-            };
-            match self.normalize_replayed_event(signed_event) {
-                Event::Node(node) => apply(Event::Node(node)),
-                Event::RelationalSchema(package) => apply(Event::RelationalSchema(package)),
-                rows @ Event::RelationalRows { .. } => apply(rows),
-                Event::Transaction(transaction) => apply(Event::Transaction(transaction)),
-                // A rebuild must re-delete the rows the retracted node's own
-                // earlier Node frame just re-inserted.
-                retract @ Event::NodeRetract { .. } => apply(retract),
-                Event::Batch(events) => {
-                    for event in events {
-                        match event {
-                            Event::Node(_)
-                            | Event::Edge(_)
-                            | Event::RelationalSchema(_)
-                            | Event::RelationalRows { .. }
-                            | Event::Transaction(_)
-                            | Event::NodeRetract { .. } => apply(event),
-                            // Reuse graph Batch projection's transaction and
-                            // traversal; other nested leaf kinds stay excluded.
-                            Event::Batch(_) => apply(event),
-                            _ => {}
+                let mut apply = |event: Event| {
+                    if let Err(e) = self.projection_apply_event(
+                        &event,
+                        seq,
+                        revision_checkpoint,
+                        Some(origin),
+                    ) {
+                        first_err = Some(e);
+                    }
+                };
+                match self.normalize_replayed_event(signed_event) {
+                    Event::Node(node) => apply(Event::Node(node)),
+                    Event::RelationalSchema(package) => apply(Event::RelationalSchema(package)),
+                    rows @ Event::RelationalRows { .. } => apply(rows),
+                    Event::Transaction(transaction) => apply(Event::Transaction(transaction)),
+                    // A rebuild must re-delete the rows the retracted node's own
+                    // earlier Node frame just re-inserted.
+                    retract @ Event::NodeRetract { .. } => apply(retract),
+                    Event::Batch(events) => {
+                        for event in events {
+                            match event {
+                                Event::Node(_)
+                                | Event::Edge(_)
+                                | Event::RelationalSchema(_)
+                                | Event::RelationalRows { .. }
+                                | Event::Transaction(_)
+                                | Event::NodeRetract { .. } => apply(event),
+                                // Reuse graph Batch projection's transaction and
+                                // traversal; other nested leaf kinds stay excluded.
+                                Event::Batch(_) => apply(event),
+                                _ => {}
+                            }
                         }
                     }
+                    _ => {}
                 }
-                _ => {}
-            }
-        });
+            },
+        );
         if let Some(e) = first_err {
             return Err(e);
         }
@@ -15092,7 +15134,7 @@ impl Storage {
         let tx = conn
             .transaction()
             .map_err(|e| Error::from_reason(e.to_string()))?;
-        Self::projection_apply_schema_conn(&tx, &package)?;
+        Self::projection_apply_schema_conn(&tx, &package, false)?;
         let seq = self.append_wal_event(&Event::RelationalSchema(package.clone()))?;
         tx.commit().map_err(|e| self.durable_apply_error(seq, e))?;
         Ok(package.schema_version)
@@ -17783,7 +17825,7 @@ impl Storage {
         self.preflight_collection_event(event)?;
         self.preflight_relational_event(event)?;
         let seq = self.append_wal_event(event)?;
-        self.projection_apply_event(event, seq, false)
+        self.projection_apply_event(event, seq, false, None)
             .map_err(|e| self.durable_apply_error(seq, e))?;
         Ok(seq)
     }
@@ -26075,7 +26117,7 @@ impl Storage {
             )
         })?;
         self.commit_sequence.fetch_max(seq, Ordering::SeqCst);
-        self.projection_apply_event(&projection_event, seq, revision_checkpoint)
+        self.projection_apply_event(&projection_event, seq, revision_checkpoint, None)
             .map_err(|e| self.durable_apply_error(seq, e))?;
         Ok(seq)
     }

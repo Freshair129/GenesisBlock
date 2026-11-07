@@ -90,6 +90,7 @@ Rules:
 
 - **Folding, not dropping**, is what keeps D6 true: at every instant the journal alone (base segment + history segments + active file) is a complete recovery source. The snapshot never becomes the sole copy of any state. (The pinned test `wal_compaction_tests::checkpointed_wal_replays_to_identical_live_state` — delete snapshot, recover from journal alone — survives with folding; it would be falsified by bare-drop.)
 - **Disk contract** = sealed budget + active-file seal threshold (part of the contract; mobile default 16–32 MiB) + one in-flight seal temp. Fold-time provenance: folded ranges lose original signatures (base segments are locally signed materializations) — same truncation today's compaction performs, now scoped and labeled.
+- Relational schema packages in a base segment describe the current materialized schema. Replay may use the verified base origin to initialize an empty namespace at that package's version; the discarded schema ancestry is not inferred from the version number. Empty-mutation relational idempotency markers retain their original schema version and other identity fields during replay.
 - **Peer-aware floor:** retention MUST NOT advance the horizon past the oldest acknowledged sync cursor of a registered peer **unless** beyond-horizon re-bootstrap (D4) is in force for that peer. Silent incomplete deltas are forbidden.
 - **Archive hook** (`full`/`budget`): best-effort, outside I1–I9 — archive failure never blocks folding (surfaced via status); mobile default: no archive.
 
@@ -106,6 +107,8 @@ Rules:
 Startup reads `journal.frontier_seq` from `state.json`. When the snapshot is valid and is not older than a completed journal fold, the engine loads it and **replays framed journal events with sequence numbers greater than that frontier**. If the snapshot is absent, invalid, predates a fold, or has no sequence frontier (including legacy byte-cursor snapshots), the engine recovers from the journal alone or performs a full idempotent replay. The journal remains the recovery authority; the snapshot and SQLite projection are rebuildable.
 
 Recovery must preserve one stable mapping from each public node ID to its internal `u32` key across the snapshot, journal replay, vector metadata, and SQLite projection. An empty node snapshot starts `next_u32` at `0`; a populated snapshot resumes at `max(saved node key) + 1`. A shifted mapping can leave vector IDs intact while properties are hydrated from another node's projection row. The standalone REST restart regression exercises this invariant after both a forced process termination and a graceful checkpoint/reopen.
+
+Relational projection rebuild uses journal origin to distinguish a verified base materialization from ordinary history. Only a base-segment schema package may initialize a missing namespace at its current version; live registration remains v1-first and live upgrades advance exactly once. Empty-mutation events with a non-empty mutation identity replay as markers, retain their recorded schema version/hash/identity/affected-row count, and bypass only the current-schema check after namespace and collision checks.
 
 ### D6 — Authority table (locked)
 
@@ -165,5 +168,6 @@ Recovery must preserve one stable mapping from each public node ID to its intern
 | Version | Date | Summary |
 |---|---|---|
 | accepted | 2026-08-17 | USER approved all four gate decisions; WP-1.2/1.3 unlocked |
+| draft-3 | 2026-11-07 | Define relational base-schema bootstrap provenance and replay preservation for idempotency markers |
 | draft-2 | 2026-08-17 | Panel findings incorporated: fold-based retention replaces bare-drop; I9 added; D2 rewritten (unsigned frame header, replica-local, stable_frontier redefined, fetch_max retired); D4 sync cursor + beyond_horizon bootstrap; migration/downgrade rules; WP-1.1 marked landed (4072cc9) |
 | draft-1 | 2026-08-17 | Initial draft from GNSE review + verified code facts |

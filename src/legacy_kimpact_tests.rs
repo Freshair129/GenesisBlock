@@ -489,7 +489,7 @@ fn verified_old_snapshot_and_matching_projection_marker_keep_legacy_metadata() {
         .fetch_max(frame_seq, Ordering::SeqCst);
     storage.replay_journal(None, true);
     storage
-        .projection_apply_event(&event, frame_seq, false)
+        .projection_apply_event(&event, frame_seq, false, None)
         .unwrap();
 
     let target = storage
@@ -899,7 +899,7 @@ fn signed_legacy_transaction_replays_into_normalized_projection_and_snapshot() {
         .any(|signed| matches!(&signed.event, Event::Transaction(_))));
     storage.replay_journal(None, true);
     storage
-        .projection_apply_event(&event, sequence, false)
+        .projection_apply_event(&event, sequence, false, None)
         .unwrap();
     assert_migrated_projection(&storage);
     drop(storage);

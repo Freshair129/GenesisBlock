@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Replay folded relational schema bases and idempotency markers without weakening
+  live schema version checks.
 - Map `/v1/insight/gaps` access-policy failures to the same HTTP 401
   authorization response used by the other community insight routes.
 - Keep the Studio and mobile Tauri lockfiles synchronized with engine version
