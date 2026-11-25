@@ -10611,9 +10611,12 @@ impl Storage {
     ) -> Result<Option<String>> {
         let mut statement = conn
             .prepare(
+                // CROSS JOIN pins the key registry as the outer loop. With a plain
+                // JOIN SQLite drives from every row revision in the namespace, so
+                // the cost grows with history (FUNG #135).
                 "SELECT r.row_id
                  FROM hql2_row_identity_registry r
-                 JOIN hql2_record_revisions v
+                 CROSS JOIN hql2_record_revisions v
                    ON v.database_id=r.database_id AND v.namespace=r.namespace
                   AND v.kind='row' AND v.record_id=r.row_id AND v.tx_to IS NULL
                   AND v.operation='upsert'
